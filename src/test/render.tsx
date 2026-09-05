@@ -1,9 +1,10 @@
 import { type RenderOptions, render } from '@testing-library/react-native';
 import type { PropsWithChildren, ReactElement } from 'react';
+import { ThemeProvider } from '../theme/ThemeProvider';
 
 // Providers are appended here as the layers land (theme, i18n, apollo).
 function Providers({ children }: PropsWithChildren) {
-  return <>{children}</>;
+  return <ThemeProvider>{children}</ThemeProvider>;
 }
 
 export function renderWithProviders(ui: ReactElement, options?: RenderOptions) {

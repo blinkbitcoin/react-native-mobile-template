@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet } from 'react-native';
+import { Pressable } from 'react-native';
+import { createStyles } from '../theme/createStyles';
 import { AppText } from './AppText';
 
 export function Button({
@@ -10,6 +11,7 @@ export function Button({
   onPress: () => void;
   testID: string;
 }) {
+  const styles = useStyles();
   return (
     <Pressable
       accessibilityRole="button"
@@ -22,13 +24,14 @@ export function Button({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createStyles((theme) => ({
   base: {
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 8,
+    borderRadius: theme.radii.md,
     borderWidth: 1,
+    borderColor: theme.colors.border,
     alignItems: 'center',
   },
   pressed: { opacity: 0.6 },
-});
+}));
