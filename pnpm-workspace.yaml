@@ -12,6 +12,10 @@ minimumReleaseAgeExclude:
   - 'browserslist@4.28.9'
   - 'electron-to-chromium@1.5.422'
   - 'postcss@8.5.28'
+  # Added for Task 6 (Expo Router skeleton): pulled in by
+  # `expo install expo-router ...` on 2026-09-06, within the 3-day window above.
+  - 'expo-router@57.0.19'
+  - '@expo/ui@57.0.16'
 strictDepBuilds: true
 onlyBuiltDependencies:
   - '@biomejs/biome'
