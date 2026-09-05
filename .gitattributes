@@ -1,0 +1,10 @@
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ttf binary
+*.p12 binary
+*.jks binary
+src/graphql/generated/** linguist-generated=true
+src/i18n/locales/**/messages.ts linguist-generated=true
+pnpm-lock.yaml linguist-generated=true
+CHANGELOG.md merge=union

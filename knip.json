@@ -1,0 +1,42 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "index.ts",
+    "App.tsx",
+    "app.config.ts",
+    "src/app/**/*.tsx",
+    "plugins/*.ts",
+    "modules/*/index.ts",
+    "mocks/server.ts",
+    "scripts/*.mjs",
+    "scripts/*.ts"
+  ],
+  "project": [
+    "*.{ts,tsx}",
+    "src/**/*.{ts,tsx}",
+    "plugins/**/*.ts",
+    "modules/**/*.ts",
+    "mocks/**/*.ts",
+    "scripts/**/*.{mjs,ts}"
+  ],
+  "ignore": [
+    "src/graphql/generated/**",
+    "src/i18n/locales/**/messages.ts",
+    "modules/**/ios/**",
+    "modules/**/android/**"
+  ],
+  "ignoreDependencies": [
+    "expo-dev-client",
+    "@expo/metro-runtime",
+    "react-native-web",
+    "react-dom",
+    "expo-status-bar",
+    "expo-updates",
+    "expo-system-ui"
+  ],
+  "ignoreBinaries": ["typos", "maestro", "xcrun", "adb"],
+  "jest": { "config": "jest.config.ts" },
+  "expo": true,
+  "graphql-codegen": true,
+  "playwright": true
+}

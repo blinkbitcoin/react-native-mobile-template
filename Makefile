@@ -39,7 +39,13 @@ format: ## Format everything with Biome (writes)
 format-check: ## Check formatting without writing
 	pnpm format:check
 
-check-code: typecheck lint format-check ## Fast local gate: types + lint + format
+knip: ## Unused files, exports and dependencies
+	pnpm knip
+
+spell: ## Spell-check with typos
+	pnpm spell
+
+check-code: typecheck lint format-check knip spell ## Fast local gate: types + lint + format + knip + spell
 
 clean: ## Remove generated native projects, caches and build output
 	rm -rf ios android .expo dist coverage node_modules/.cache
@@ -50,4 +56,4 @@ reset: clean ## clean + reinstall
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: doctor install start ios android web prebuild typecheck lint format format-check check-code clean reset help
+.PHONY: doctor install start ios android web prebuild typecheck lint format format-check knip spell check-code clean reset help

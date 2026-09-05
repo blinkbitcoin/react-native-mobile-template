@@ -1,0 +1,33 @@
+# Git hooks. Installed by `pnpm install` (prepare script). Escape hatches:
+# `git commit --no-verify`, `LEFTHOOK=0 git push`.
+pre-commit:
+  parallel: true
+  commands:
+    biome:
+      glob: '*.{ts,tsx,js,mjs,json,graphql}'
+      run: pnpm exec biome check --write --no-errors-on-unmatched {staged_files} && git add {staged_files}
+    eslint:
+      glob: 'src/**/*.{ts,tsx}'
+      run: pnpm exec eslint --max-warnings=0 {staged_files}
+    typos:
+      run: typos {staged_files}
+commit-msg:
+  commands:
+    commitlint:
+      run: pnpm exec commitlint --edit {1}
+pre-push:
+  commands:
+    typecheck:
+      run: pnpm typecheck
+    knip:
+      run: pnpm knip
+    unit:
+      run: pnpm test -- --changedSince=origin/main --passWithNoTests
+post-merge:
+  commands:
+    install:
+      run: git diff --name-only HEAD@{1} HEAD | grep -q pnpm-lock.yaml && pnpm install --frozen-lockfile || true
+post-checkout:
+  commands:
+    install:
+      run: git diff --name-only {1} {2} | grep -q pnpm-lock.yaml && pnpm install --frozen-lockfile || true
