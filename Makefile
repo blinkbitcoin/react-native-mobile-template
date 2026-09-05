@@ -47,6 +47,14 @@ spell: ## Spell-check with typos
 
 check-code: typecheck lint format-check knip spell ## Fast local gate: types + lint + format + knip + spell
 
+unit: ## Unit + component tests
+	pnpm test
+
+coverage: ## Tests with coverage thresholds (what CI enforces)
+	pnpm test:coverage
+
+test: unit check-code ## Unit tests + code checks
+
 clean: ## Remove generated native projects, caches and build output
 	rm -rf ios android .expo dist coverage node_modules/.cache
 
@@ -56,4 +64,4 @@ reset: clean ## clean + reinstall
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: doctor install start ios android web prebuild typecheck lint format format-check knip spell check-code clean reset help
+.PHONY: doctor install start ios android web prebuild typecheck lint format format-check knip spell check-code unit coverage test clean reset help
