@@ -3,8 +3,8 @@
 // prints a fix hint per failure. Exit 1 if any required tool is missing.
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export function parseVersion(output) {
   const m = /(\d+)\.(\d+)(?:\.(\d+))?/.exec(output);

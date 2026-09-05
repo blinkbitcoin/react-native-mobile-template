@@ -1,5 +1,5 @@
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { test } from 'node:test';
 import { compareVersions, parseVersion } from './doctor.mjs';
 
 test('parseVersion extracts the first semver-ish token', () => {

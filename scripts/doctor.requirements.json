@@ -2,15 +2,46 @@
   "tools": [
     { "name": "node", "command": "node --version", "minimum": "24.0.0", "hint": "mise install" },
     { "name": "pnpm", "command": "pnpm --version", "minimum": "12.0.0", "hint": "mise install" },
-    { "name": "java", "command": "java -version 2>&1", "minimum": "17.0.0", "hint": "mise install (temurin-17)" },
+    {
+      "name": "java",
+      "command": "java -version 2>&1",
+      "minimum": "17.0.0",
+      "hint": "mise install (temurin-17)"
+    },
     { "name": "ruby", "command": "ruby --version", "minimum": "3.3.0", "hint": "mise install" },
-    { "name": "watchman", "command": "watchman --version", "minimum": "2024.0.0", "hint": "brew install watchman" },
-    { "name": "xcodebuild", "command": "xcodebuild -version", "minimum": "26.4.0", "hint": "Install Xcode 26.4+ from the App Store, then: sudo xcode-select -s /Applications/Xcode.app", "platform": "darwin" },
-    { "name": "pod", "command": "pod --version", "minimum": "1.16.0", "hint": "gem install cocoapods (inside mise's ruby)", "platform": "darwin" },
-    { "name": "adb", "command": "adb --version", "minimum": "1.0.41", "hint": "Install Android Studio > SDK Manager > Android SDK Platform-Tools; export ANDROID_HOME=$HOME/Library/Android/sdk and add $ANDROID_HOME/platform-tools to PATH" },
-    { "name": "maestro", "command": "maestro --version", "minimum": "2.10.0", "hint": "curl -fsSL https://get.maestro.mobile.dev | bash", "optional": true }
+    {
+      "name": "watchman",
+      "command": "watchman --version",
+      "minimum": "2024.0.0",
+      "hint": "brew install watchman"
+    },
+    {
+      "name": "xcodebuild",
+      "command": "xcodebuild -version",
+      "minimum": "26.4.0",
+      "hint": "Install Xcode 26.4+ from the App Store, then: sudo xcode-select -s /Applications/Xcode.app",
+      "platform": "darwin"
+    },
+    {
+      "name": "pod",
+      "command": "pod --version",
+      "minimum": "1.16.0",
+      "hint": "gem install cocoapods (inside mise's ruby)",
+      "platform": "darwin"
+    },
+    {
+      "name": "adb",
+      "command": "adb --version",
+      "minimum": "1.0.41",
+      "hint": "Install Android Studio > SDK Manager > Android SDK Platform-Tools; export ANDROID_HOME=$HOME/Library/Android/sdk and add $ANDROID_HOME/platform-tools to PATH"
+    },
+    {
+      "name": "maestro",
+      "command": "maestro --version",
+      "minimum": "2.10.0",
+      "hint": "curl -fsSL https://get.maestro.mobile.dev | bash",
+      "optional": true
+    }
   ],
-  "env": [
-    { "name": "ANDROID_HOME", "hint": "export ANDROID_HOME=$HOME/Library/Android/sdk" }
-  ]
+  "env": [{ "name": "ANDROID_HOME", "hint": "export ANDROID_HOME=$HOME/Library/Android/sdk" }]
 }

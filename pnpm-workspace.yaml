@@ -17,3 +17,5 @@ onlyBuiltDependencies:
   - '@biomejs/biome'
   - esbuild
   - sharp
+allowBuilds:
+  unrs-resolver: true
