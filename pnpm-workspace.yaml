@@ -1,0 +1,19 @@
+# pnpm 10+ reads settings from here. No `packages:` key on purpose: flat repo.
+minimumReleaseAge: 4320   # 3 days in minutes; supply-chain guard
+# Exact versions pinned by `pnpm create expo-app@latest` at bootstrap time
+# (2026-09-06), published within the 3-day window above. Version-pinned (not
+# package-name-pinned) so the guard still applies to any future release.
+minimumReleaseAgeExclude:
+  - '@expo/cli@57.0.22'
+  - 'expo@57.0.20'
+  - 'expo-modules-core@57.0.16'
+  - 'expo-modules-jsi@57.0.8'
+  - 'baseline-browser-mapping@2.11.21'
+  - 'browserslist@4.28.9'
+  - 'electron-to-chromium@1.5.422'
+  - 'postcss@8.5.28'
+strictDepBuilds: true
+onlyBuiltDependencies:
+  - '@biomejs/biome'
+  - esbuild
+  - sharp

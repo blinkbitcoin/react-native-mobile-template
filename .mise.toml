@@ -1,0 +1,15 @@
+# Tool versions for humans and CI (jdx/mise-action reads this file).
+# Node/pnpm/java/ruby are what the app, Metro, Gradle and fastlane need;
+# the rest are linters used by `make check`.
+[tools]
+node = "24"
+pnpm = "12"
+java = "temurin-17"
+ruby = "3.3"
+actionlint = "1.7.12"
+shellcheck = "0.11.0"
+typos = "latest"
+
+[env]
+# Expo telemetry off everywhere; Android SDK path for `expo run:android`
+EXPO_NO_TELEMETRY = "1"
