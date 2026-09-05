@@ -59,7 +59,10 @@ export default defineConfig([
       'react/no-children-prop': 'off', // dup of Biome correctness/noChildrenProp (react domain)
       'react/no-danger-with-children': 'off', // dup of Biome security/noDangerouslySetInnerHtmlWithChildren (react domain)
       'react/no-render-return-value': 'off', // dup of Biome correctness/noRenderReturnValue (react domain)
-      'react/no-unknown-property': 'off', // dup of Biome correctness/noUnknownProperty
+      // react/no-unknown-property (JSX/DOM unknown-attribute check, e.g. class vs
+      // className) stays ON: Biome's correctness/noUnknownProperty is CSS-only
+      // (validates CSS property names in stylesheets) and cannot fire on JSX, so
+      // there is no real overlap here.
     },
   },
   {
