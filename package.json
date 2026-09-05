@@ -21,6 +21,8 @@
     "ios": "expo run:ios",
     "android": "expo run:android",
     "web": "expo start --web",
-    "prebuild": "expo prebuild --clean"
+    "prebuild": "expo prebuild --clean",
+    "doctor": "node scripts/doctor.mjs",
+    "test:scripts": "node --test scripts/*.test.mjs"
   }
 }

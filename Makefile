@@ -1,0 +1,53 @@
+# Human/agent command surface. Thin wrappers over pnpm scripts and scripts/.
+# `make` or `make help` lists targets; every target has a `##` description.
+.DEFAULT_GOAL := help
+SHELL := /bin/bash
+
+# ---------- Setup ----------
+doctor: ## Check the local toolchain (run this first)
+	node scripts/doctor.mjs
+
+install: ## Install dependencies (frozen lockfile) and git hooks
+	pnpm install --frozen-lockfile
+
+# ---------- Run ----------
+start: ## Metro for the dev client
+	pnpm start
+
+ios: ## Prebuild if needed, build and launch on the iOS simulator
+	pnpm ios
+
+android: ## Prebuild if needed, build and launch on an Android emulator
+	pnpm android
+
+web: ## Expo web dev server (web target)
+	pnpm web
+
+prebuild: ## Regenerate ios/ and android/ locally (debugging plugins only; never commit them)
+	pnpm prebuild
+
+# ---------- Quality gates (each is what CI runs) ----------
+typecheck: ## tsc --noEmit
+	pnpm typecheck
+
+lint: ## Biome lint + ESLint (React/Expo rules)
+	pnpm lint
+
+format: ## Format everything with Biome (writes)
+	pnpm format
+
+format-check: ## Check formatting without writing
+	pnpm format:check
+
+check-code: typecheck lint format-check ## Fast local gate: types + lint + format
+
+clean: ## Remove generated native projects, caches and build output
+	rm -rf ios android .expo dist coverage node_modules/.cache
+
+reset: clean ## clean + reinstall
+	rm -rf node_modules && pnpm install --frozen-lockfile
+
+help: ## Show this help
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
+
+.PHONY: doctor install start ios android web prebuild typecheck lint format format-check check-code clean reset help
