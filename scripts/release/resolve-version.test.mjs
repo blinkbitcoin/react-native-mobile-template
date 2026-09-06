@@ -17,7 +17,7 @@ after(() => {
  * Builds a throwaway git repo with `commits` commits; `tags` maps a 1-based
  * commit index to a tag name or an array of tag names.
  */
-function fixtureRepo(commits, tags = {}) {
+function fixtureRepo(commits, tags = {}, subjects = {}) {
   const root = mkdtempSync(path.join(tmpdir(), 'resolve-version-'));
   roots.push(root);
   const git = (...args) => execFileSync('git', args, { cwd: root, stdio: 'pipe' });
@@ -26,7 +26,7 @@ function fixtureRepo(commits, tags = {}) {
   git('config', 'user.name', 'Test');
   git('config', 'commit.gpgsign', 'false');
   for (let i = 1; i <= commits; i += 1) {
-    git('commit', '--quiet', '--allow-empty', '-m', `commit ${i}`);
+    git('commit', '--quiet', '--allow-empty', '-m', subjects[i] ?? `commit ${i}`);
     for (const tag of [tags[i] ?? []].flat()) git('tag', tag);
   }
   return root;
@@ -70,6 +70,47 @@ test('a tag on HEAD wins over a release-please PR title', () => {
   const repo = fixtureRepo(3, { 3: 'v2.0.0' });
   const env = { RELEASE_PR_TITLE: 'chore(main): release 1.5.0' };
   assert.equal(resolve(repo, env).APP_VERSION, '2.0.0');
+});
+
+test('the release commit is stamped with the version it releases, not patch+1', () => {
+  // The commit that merges release-please's PR: the vX.Y.Z tag does not exist
+  // yet (release-please and release-internal are triggered by the same push and
+  // run concurrently), RELEASE_PR_TITLE is empty on a push, and the pending PR
+  // has just been merged. Without the subject source this resolves to 1.4.3 and
+  // beta then looks for a v1.5.0-build.N pre-release nothing ever created.
+  const repo = fixtureRepo(3, { 1: 'v1.4.2' }, { 3: 'chore(main): release 1.5.0' });
+  assert.equal(resolve(repo).APP_VERSION, '1.5.0');
+});
+
+test('the release subject also carries the first release of a repo with no tags', () => {
+  const repo = fixtureRepo(2, {}, { 2: 'chore(main): release 0.1.0' });
+  assert.equal(resolve(repo).APP_VERSION, '0.1.0');
+});
+
+test('a tag on HEAD still wins over the release subject', () => {
+  const repo = fixtureRepo(3, { 3: 'v2.0.0' }, { 3: 'chore(main): release 1.5.0' });
+  assert.equal(resolve(repo).APP_VERSION, '2.0.0');
+});
+
+test('the release subject wins over an open release-please PR title', () => {
+  // Ordering matters: on the release commit the pending PR lookup would find
+  // the *next* release's PR if release-please has already opened one.
+  const repo = fixtureRepo(3, { 1: 'v1.4.2' }, { 3: 'chore(main): release 1.5.0' });
+  assert.equal(
+    resolve(repo, { RELEASE_PR_TITLE: 'chore(main): release 1.6.0' }).APP_VERSION,
+    '1.5.0',
+  );
+});
+
+test('an ordinary commit subject does not look like a release', () => {
+  for (const subject of [
+    'feat: release 9.9.9 notes',
+    'chore(main): release notes',
+    'Merge pull request #12 from chore(main): release 9.9.9',
+  ]) {
+    const repo = fixtureRepo(2, { 1: 'v1.4.2' }, { 2: subject });
+    assert.equal(resolve(repo).APP_VERSION, '1.4.3', `subject ${subject} was read as a release`);
+  }
 });
 
 test('build number is the first-parent commit count plus the default offset', () => {
