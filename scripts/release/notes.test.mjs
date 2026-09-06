@@ -1,17 +1,22 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { after, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import * as anthropic from './llm/anthropic.mjs';
-import { rewriteNotes } from './llm/index.mjs';
+import { maxTokensFor, rewriteNotes, validate } from './llm/index.mjs';
 import * as openai from './llm/openai.mjs';
 import {
   buildNotes,
+  cleanSection,
+  cleanText,
+  commitSubjects,
+  discoverLocales,
   extractStoreSection,
   limitText,
+  parseArgs,
   parseBody,
   parseCommits,
   renderChangelog,
@@ -385,4 +390,181 @@ test('the cli prints json to stdout with --out - and honours --body-section', ()
   assert.deepEqual(Object.keys(notes), ['en-US', 'sv-SE']);
   assert.match(notes['en-US'].play, /^Signing in sticks now/);
   assert.equal(notes['sv-SE'].appstore, notes['en-US'].appstore);
+});
+
+// ---------- fix round 1: hygiene of a hand-written override ----------
+
+test('a hand-written "## Store notes" override is cleaned, not trusted', () => {
+  const section = [
+    '## Store notes',
+    '',
+    'See the [full notes](https://example.com/notes) and PR #128 (9f2c1ab) **bold**.',
+    '',
+    '- Faster launch [ios]',
+    '* ENG-42: fewer crashes',
+  ].join('\n');
+  const cleaned = cleanSection(extractStoreSection(section));
+  assert.equal(
+    cleaned,
+    ['See the full notes and PR bold.', '', '• Faster launch ios', '• fewer crashes'].join('\n'),
+  );
+  assert.doesNotMatch(cleaned, /[#[\]*`<>]|https?:/);
+});
+
+test('the cli sends --body-section through the same filter', () => {
+  const dir = tempDir();
+  const file = path.join(dir, 'body.md');
+  writeFileSync(
+    file,
+    [
+      '### Features',
+      '',
+      '* **x:** thing',
+      '',
+      '## Store notes',
+      '',
+      'Read [more](https://x.dev/a) about PR #7 (9f2c1ab).',
+    ].join('\n'),
+  );
+  const notes = JSON.parse(
+    execFileSync(process.execPath, [script, '--from-body', file, '--body-section', '--out', '-'], {
+      encoding: 'utf8',
+      env: { ...process.env, RELEASE_NOTES_LLM_PROVIDER: '' },
+    }),
+  );
+  assert.equal(notes['en-US'].testflight, 'Read more about PR.');
+});
+
+test('bracket tags, html and ticket keys never survive cleanText', () => {
+  assert.equal(cleanText('fix: crash on launch [ios]'), 'Fix: crash on launch ios.');
+  assert.equal(parseCommits(['fix: crash on launch [ios]'])[0].text, 'Crash on launch ios.');
+  assert.equal(parseCommits(['feat: new tab bar [WIP] <b>x</b>'])[0].text, 'New tab bar WIP x.');
+  assert.equal(parseCommits(['fix: JIRA-123 handle retry'])[0].text, 'Handle retry.');
+});
+
+test('a revert keeps the reverted change, not its header', () => {
+  assert.deepEqual(parseCommits(['revert: feat(x): dark mode'])[0], {
+    group: 'Other',
+    text: 'Reverted dark mode.',
+  });
+});
+
+test('a [user-visible] marker moves a body bullet out of Other', () => {
+  const items = parseBody(
+    ['### Miscellaneous Chores', '', '* **theme:** use the system font [user-visible]'].join('\n'),
+  );
+  assert.deepEqual(items, [{ group: 'Improved', text: 'Use the system font.' }]);
+});
+
+// ---------- fix round 1: llm validation ----------
+
+test('links, bare domains with a path and markdown are rejected', () => {
+  const cases = [
+    ['Visit https://example.com/promo for details.', /contains a link/],
+    ['Now at example.com/promo.', /contains a domain/],
+    ['* markdown bullet\n- another', /contains markdown/],
+    ['Now with **bold**.', /contains markdown/],
+  ];
+  for (const [text, expected] of cases) {
+    const result = validate(JSON.stringify({ 'en-US': text }), ['en-US']);
+    assert.equal(result.notes, undefined, text);
+    assert.match(result.error, expected);
+  }
+  // A sentence that merely names a product is not a link.
+  assert.equal(
+    validate('{"en-US": "Faster on iOS 26."}', ['en-US']).notes['en-US'],
+    'Faster on iOS 26.',
+  );
+});
+
+test('the output budget grows with the number of locales', () => {
+  assert.equal(maxTokensFor(['en-US']), 2524);
+  assert.equal(maxTokensFor(['en-US', 'sv-SE', 'de-DE']), 5524);
+  assert.equal(maxTokensFor(new Array(20).fill('x')), 8192);
+});
+
+test('the budget reaches the adapter as max_tokens', async () => {
+  const calls = [];
+  await withEnv({ ANTHROPIC_API_KEY: 'sk-ant-test' }, () =>
+    withFetch(stubFetch(JSON.parse(fixture('anthropic-response.json')), calls), () =>
+      rewriteNotes({ items: [], context: '', locales: ['en-US', 'sv-SE'], provider: 'anthropic' }),
+    ),
+  );
+  assert.equal(JSON.parse(calls[0].init.body).max_tokens, maxTokensFor(['en-US', 'sv-SE']));
+});
+
+// ---------- fix round 1: cli surface ----------
+
+test('a flag without a value, and two sources at once, both fail loudly', () => {
+  assert.throws(() => parseArgs(['--locales']), /--locales needs a value/);
+  assert.throws(() => parseArgs(['--from-body', 'a.md', '--from-commits']), /mutually exclusive/);
+  assert.throws(() => parseArgs([]), /is required/);
+  assert.throws(() => parseArgs(['--nope']), /unknown argument/);
+  assert.deepEqual(parseArgs(['--from-commits', 'v1..HEAD']).range, 'v1..HEAD');
+});
+
+test('locales come from the ios metadata directories, ignoring the non-locales', () => {
+  const dir = tempDir();
+  for (const name of ['en-US', 'fr-FR', 'review_information', 'screenshots']) {
+    mkdirSync(path.join(dir, name));
+  }
+  assert.deepEqual(discoverLocales(dir), ['en-US', 'fr-FR']);
+  assert.deepEqual(discoverLocales(path.join(dir, 'nope')), ['en-US']);
+});
+
+test('commit subjects default to the range since the last v* tag', () => {
+  const repo = tempDir();
+  const git = (...args) => execFileSync('git', args, { cwd: repo, stdio: 'pipe' });
+  git('init', '--quiet', '--initial-branch=main');
+  git('config', 'user.email', 'test@example.com');
+  git('config', 'user.name', 'Test');
+  git('config', 'commit.gpgsign', 'false');
+  git('commit', '--quiet', '--allow-empty', '-m', 'feat: one');
+  // No tag yet: everything on HEAD is the release.
+  assert.deepEqual(commitSubjects('', repo), ['feat: one']);
+  git('tag', 'v1.0.0');
+  git('commit', '--quiet', '--allow-empty', '-m', 'fix: two');
+  assert.deepEqual(commitSubjects('', repo), ['fix: two']);
+  assert.deepEqual(commitSubjects('v1.0.0..HEAD', repo), ['fix: two']);
+});
+
+test('STORE_NOTES_INCLUDE_CHANGELOG=true appends the changelog through the cli', () => {
+  const notes = JSON.parse(
+    execFileSync(
+      process.execPath,
+      [script, '--from-body', path.join(here, 'fixtures', 'release-body.md'), '--out', '-'],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          RELEASE_NOTES_LLM_PROVIDER: '',
+          STORE_NOTES_INCLUDE_CHANGELOG: 'true',
+        },
+      },
+    ),
+  );
+  assert.match(notes['en-US'].testflight, /\nChangelog\nNew: Stay signed in/);
+});
+
+test('notes-store.txt falls back to the first locale when en-US is not requested', () => {
+  const out = tempDir();
+  execFileSync(
+    process.execPath,
+    [
+      script,
+      '--from-body',
+      path.join(here, 'fixtures', 'release-body.md'),
+      '--locales',
+      'sv-SE',
+      '--out',
+      out,
+    ],
+    { encoding: 'utf8', env: { ...process.env, RELEASE_NOTES_LLM_PROVIDER: '' } },
+  );
+  const notes = JSON.parse(readFileSync(path.join(out, 'store-notes.json'), 'utf8'));
+  assert.deepEqual(Object.keys(notes), ['sv-SE']);
+  assert.equal(
+    readFileSync(path.join(out, 'notes-store.txt'), 'utf8'),
+    `${notes['sv-SE'].testflight}\n`,
+  );
 });

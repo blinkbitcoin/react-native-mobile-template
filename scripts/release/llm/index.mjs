@@ -29,6 +29,15 @@ Hard rules for every value:
 - Never invent a change that is not in the input.
 `.trim();
 
+/**
+ * Enough output tokens for every requested locale to reach the TestFlight cap.
+ * A fixed budget truncates the JSON mid-object once a release asks for more
+ * than a couple of locales, and a truncated response is a silent fallback.
+ */
+export function maxTokensFor(locales) {
+  return Math.min(8192, 1024 + locales.length * 1500);
+}
+
 /** The user turn: the deterministic items, grouped, plus the locales wanted. */
 function buildUserPrompt(items, locales) {
   const lines = items.map((item) => `- [${item.group}] ${item.text}`);
@@ -40,12 +49,22 @@ function buildUserPrompt(items, locales) {
   ].join('\n');
 }
 
+/** Top-level domains common enough that a bare one is almost certainly a link. */
+const LINKISH_TLDS = 'com|io|dev|app|net|org|co|ai|sh|me|gg';
+
 /** Reasons `text` cannot be shipped to a store, in the order they are checked. */
 function violations(text) {
   const found = [];
   if (!text.trim()) found.push('empty');
   if (text.includes('#')) found.push('contains "#"');
   if (text.includes('[')) found.push('contains markdown link syntax');
+  if (/https?:\/\//i.test(text)) found.push('contains a link');
+  // A bare `example.com/promo` is a link a person can still type in, and the
+  // path is what separates it from a sentence that happens to name a product.
+  if (new RegExp(`\\b[a-z0-9-]+\\.(?:${LINKISH_TLDS})\\b/`, 'i').test(text)) {
+    found.push('contains a domain');
+  }
+  if (/(?:^|\n)\s*[*-]\s|\*\*|__/.test(text)) found.push('contains markdown');
   if (/\b(?=[0-9a-f]{7,40}\b)[0-9a-f]*\d[0-9a-f]*\b/i.test(text)) found.push('contains a hash');
   if (text.length > TESTFLIGHT_LIMIT) found.push(`longer than ${TESTFLIGHT_LIMIT} characters`);
   return found;
@@ -90,6 +109,7 @@ export async function rewriteNotes({ items, context, locales, provider, model, f
   let raw;
   try {
     raw = await adapter.complete({
+      maxTokens: maxTokensFor(locales),
       system,
       user: buildUserPrompt(items, locales),
       model,

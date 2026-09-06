@@ -33,6 +33,8 @@ const CONTEXT_FILE = path.join(repoRoot, 'fastlane', 'release-notes-context.md')
 const IOS_METADATA_DIR = path.join(repoRoot, 'fastlane', 'metadata', 'ios');
 
 const TYPE_GROUPS = { feat: 'New', fix: 'Fixed', perf: 'Improved', refactor: 'Improved' };
+/** `type(scope)!: subject` -- the header of a conventional commit. */
+const CONVENTIONAL_SUBJECT = /^([a-z]+)(\([^)]*\))?(!)?:\s*(.+)$/i;
 const SECTION_GROUPS = {
   features: 'New',
   'bug fixes': 'Fixed',
@@ -42,25 +44,43 @@ const SECTION_GROUPS = {
 // ---------- text hygiene ----------
 
 /**
- * Strips every trace of the repository from a changelog line: markdown, links,
- * PR references, commit hashes and the conventional-commit scope. What is left
- * is a sentence a person can read on a store page.
+ * Everything a store must never see: markdown links and emphasis, bare urls,
+ * PR references, commit hashes, ticket keys and bracket tags. Kept separate
+ * from `cleanText` because a hand-written `## Store notes` override has to pass
+ * through exactly the same filter without being reflowed into one sentence.
  */
-export function cleanText(raw) {
-  let text = String(raw).trim();
-  text = text.replace(/^[*-]\s+/, '');
-  // `**scope:**` (release-please) before generic bold stripping, so that the
-  // scope is removed rather than unwrapped into the sentence.
-  text = text.replace(/^\*\*[^*]+:\*\*\s*/, '');
+export function stripRepoReferences(raw) {
+  let text = String(raw);
   // `[label](url)` -> `label`, then bare urls.
   text = text.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
-  text = text.replace(/https?:\/\/\S+/g, '');
+  text = text.replace(/<?https?:\/\/\S+/g, '');
   // Trailing `(#128)` / `(9f2c1ab)` decorations, then any stray reference.
   text = text.replace(/\s*\((?:#\d+|[0-9a-f]{7,40})\)/gi, '');
   text = text.replace(/\s*#\d+/g, '');
   text = text.replace(/\s*\b(?=[0-9a-f]{7,40}\b)[0-9a-f]*\d[0-9a-f]*\b/gi, '');
-  text = text.replace(/[*_`]/g, '');
+  // Ticket keys (JIRA-123, ENG-7), banned by fastlane/release-notes-context.md.
+  text = text.replace(/\b[A-Z][A-Z0-9]+-\d+\b[:\s]*/g, '');
   text = text.replace(USER_VISIBLE_MARKER, ' ');
+  // Html tags go whole; emphasis, code spans and bracket tags (`[ios]`,
+  // `[WIP]`) lose their punctuation but keep their words. The suffix in
+  // TRUNCATION_SUFFIX is added after this runs, so it stays the only pair of
+  // square brackets that can reach a store.
+  text = text.replace(/<\/?[a-z][^>]*>/gi, '');
+  text = text.replace(/[*_`[\]<>]/g, '');
+  return text;
+}
+
+/**
+ * Strips every trace of the repository from a changelog line and reflows it
+ * into one sentence a person can read on a store page.
+ */
+export function cleanText(raw) {
+  let text = String(raw).trim();
+  text = text.replace(/^[*-]\s+/, '');
+  // `**scope:**` (release-please) before generic emphasis stripping, so that
+  // the scope is removed rather than unwrapped into the sentence.
+  text = text.replace(/^\*\*[^*]+:\*\*\s*/, '');
+  text = stripRepoReferences(text);
   text = text
     .replace(/\s+/g, ' ')
     .replace(/\s+([.,;:!?])/g, '$1')
@@ -69,6 +89,28 @@ export function cleanText(raw) {
   if (!text) return '';
   const sentence = text[0].toUpperCase() + text.slice(1);
   return /[.!?]$/.test(sentence) ? sentence : `${sentence}.`;
+}
+
+/**
+ * A hand-written `## Store notes` override, made safe for a store while its
+ * line structure is left alone: headings lose their `#`, markdown bullets
+ * become plain ones, and everything `stripRepoReferences` catches is gone.
+ */
+export function cleanSection(section) {
+  const lines = String(section)
+    .split('\n')
+    .map((line) => {
+      const withoutHeading = line.replace(/^\s*#{1,6}\s*/, '');
+      const withBullet = withoutHeading.replace(/^\s*[*-]\s+/, BULLET);
+      return stripRepoReferences(withBullet)
+        .replace(/[ \t]{2,}/g, ' ')
+        .replace(/\s+([.,;:!?])/g, '$1')
+        .trimEnd();
+    });
+  return lines
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 /**
@@ -113,7 +155,9 @@ export function parseBody(markdown) {
     const userVisible = USER_VISIBLE_MARKER.test(line);
     const text = cleanText(line);
     if (!text) continue;
-    items.push({ group, text, userVisible });
+    // The marker is the author saying "this one is worth a user's attention",
+    // and it means the same thing in a body as it does in a commit subject.
+    items.push({ group: userVisible && group === OTHER_GROUP ? 'Improved' : group, text });
   }
   return items;
 }
@@ -124,18 +168,25 @@ export function parseCommits(subjects) {
   for (const subject of subjects) {
     const line = String(subject).trim();
     if (!line) continue;
-    const match = /^([a-z]+)(\([^)]*\))?(!)?:\s*(.+)$/i.exec(line);
+    const match = CONVENTIONAL_SUBJECT.exec(line);
     if (!match) continue;
-    const [, type, , breaking, rest] = match;
-    const userVisible = USER_VISIBLE_MARKER.test(rest);
-    const group = TYPE_GROUPS[type.toLowerCase()] ?? OTHER_GROUP;
+    const [, rawType, , , described] = match;
+    const type = rawType.toLowerCase();
+    const userVisible = USER_VISIBLE_MARKER.test(described);
+    // `revert: feat(x): thing` carries the reverted commit's own header, which
+    // would otherwise reach the notes as the literal scope "Feat(x):".
+    let rest = described;
+    if (type === 'revert') {
+      const inner = CONVENTIONAL_SUBJECT.exec(described);
+      rest = `reverted ${inner ? inner[4] : described}`;
+    }
     const text = cleanText(rest);
     if (!text) continue;
     // A `refactor` is invisible to users unless its author says otherwise, so
     // it only reaches the notes with the marker; everything else keeps its
     // group. `chore`, `docs`, `ci`, ... fall through to Other by construction.
-    const resolved = type.toLowerCase() === 'refactor' && !userVisible ? OTHER_GROUP : group;
-    items.push({ group: resolved, text, userVisible: userVisible || Boolean(breaking) });
+    const group = TYPE_GROUPS[type] ?? OTHER_GROUP;
+    items.push({ group: type === 'refactor' && !userVisible ? OTHER_GROUP : group, text });
   }
   return items;
 }
@@ -270,6 +321,7 @@ export function parseArgs(argv) {
     const arg = argv[i];
     const next = () => {
       i += 1;
+      if (argv[i] === undefined) throw new Error(`${arg} needs a value`);
       return argv[i];
     };
     if (arg === '--from-body') options.fromBody = next();
@@ -285,6 +337,9 @@ export function parseArgs(argv) {
   if (!options.fromBody && !options.fromCommits) {
     throw new Error('one of --from-body FILE or --from-commits [RANGE] is required');
   }
+  if (options.fromBody && options.fromCommits) {
+    throw new Error('--from-body and --from-commits are mutually exclusive');
+  }
   return options;
 }
 
@@ -297,7 +352,9 @@ export async function main(argv, { cwd = process.cwd() } = {}) {
   if (options.fromBody) {
     const body = readFileSync(path.resolve(cwd, options.fromBody), 'utf8');
     items = parseBody(body);
-    if (options.bodySection) verbatim = extractStoreSection(body);
+    // A hand-written override is still repository prose: it goes through the
+    // same filter as everything the renderer produces.
+    if (options.bodySection) verbatim = cleanSection(extractStoreSection(body));
   } else {
     items = parseCommits(commitSubjects(options.range));
   }

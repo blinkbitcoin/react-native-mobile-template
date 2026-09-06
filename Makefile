@@ -36,10 +36,13 @@ version: ## Print what CI would build for HEAD
 	bash scripts/release/resolve-version.sh
 
 release-notes: ## Preview store notes for HEAD (TAG=vX.Y.Z uses that release body via gh)
-	@if [ -n "$(TAG)" ]; then \
+	@set -euo pipefail; \
+	if [ -n "$(TAG)" ]; then \
 		body="$$(mktemp)"; \
 		trap 'rm -f "$$body"' EXIT; \
-		gh release view "$(TAG)" --json body -q .body > "$$body"; \
+		gh release view "$(TAG)" --json body -q .body > "$$body" \
+			|| { echo "gh release view $(TAG) failed" >&2; exit 1; }; \
+		[ -s "$$body" ] || { echo "empty release body for $(TAG)" >&2; exit 1; }; \
 		node scripts/release/notes.mjs --from-body "$$body" --body-section --out -; \
 	else \
 		node scripts/release/notes.mjs --from-commits --out -; \
