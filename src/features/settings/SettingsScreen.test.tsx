@@ -1,4 +1,4 @@
-import { act, fireEvent, screen } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { ErrorBoundary } from 'react-error-boundary';
 import { ErrorFallback } from '@/components/ErrorFallback';
 import { activateLocale } from '@/i18n/i18n';
@@ -36,6 +36,21 @@ test('dev menu shows the build stamp and version', async () => {
   await renderWithProviders(<SettingsScreen />);
   expect(screen.getByTestId('settings-build-stamp')).toBeOnTheScreen();
   expect(screen.getByTestId('settings-version')).toBeOnTheScreen();
+});
+
+test('dev menu signs in and out through the auth service', async () => {
+  await renderWithProviders(<SettingsScreen />);
+  expect(screen.getByTestId('settings-auth-state')).toHaveTextContent('signed out');
+
+  await press('settings-auth-sign-in');
+  await waitFor(() =>
+    expect(screen.getByTestId('settings-auth-state')).toHaveTextContent('signed in'),
+  );
+
+  await press('settings-auth-sign-out');
+  await waitFor(() =>
+    expect(screen.getByTestId('settings-auth-state')).toHaveTextContent('signed out'),
+  );
 });
 
 test('the trigger-error button raises to the boundary and retry comes back', async () => {

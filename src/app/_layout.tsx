@@ -2,6 +2,9 @@ import { t } from '@lingui/core/macro';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ErrorBoundary } from 'react-error-boundary';
+// Side-effect import: registers the UNAUTHENTICATED → signOut hook for every
+// variant, including production builds that never mount the dev menu.
+import '@/services/auth';
 import { ErrorFallback } from '../components/ErrorFallback';
 import { ApolloProvider } from '../graphql/ApolloProvider';
 import { I18nProvider } from '../i18n/I18nProvider';

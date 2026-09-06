@@ -13,15 +13,15 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#: src/features/settings/DevMenu.tsx:75
+#: src/features/settings/DevMenu.tsx:77
 msgid "Channel"
 msgstr "Channel"
 
-#: src/features/settings/DevMenu.tsx:53
+#: src/features/settings/DevMenu.tsx:55
 msgid "Dark"
 msgstr "Dark"
 
-#: src/app/_layout.tsx:43
+#: src/app/_layout.tsx:46
 #: src/features/details/DetailsScreen.tsx:9
 msgid "Details"
 msgstr "Details"
@@ -35,11 +35,11 @@ msgstr "Go home"
 msgid "Home"
 msgstr "Home"
 
-#: src/features/settings/DevMenu.tsx:65
+#: src/features/settings/DevMenu.tsx:67
 msgid "Language"
 msgstr "Language"
 
-#: src/features/settings/DevMenu.tsx:48
+#: src/features/settings/DevMenu.tsx:50
 msgid "Light"
 msgstr "Light"
 
@@ -59,15 +59,15 @@ msgstr "Settings"
 msgid "Something went wrong"
 msgstr "Something went wrong"
 
-#: src/features/settings/DevMenu.tsx:58
+#: src/features/settings/DevMenu.tsx:60
 msgid "System"
 msgstr "System"
 
-#: src/features/settings/DevMenu.tsx:44
+#: src/features/settings/DevMenu.tsx:46
 msgid "Theme"
 msgstr "Theme"
 
-#: src/features/settings/DevMenu.tsx:101
+#: src/features/settings/DevMenu.tsx:112
 msgid "Trigger error"
 msgstr "Trigger error"
 

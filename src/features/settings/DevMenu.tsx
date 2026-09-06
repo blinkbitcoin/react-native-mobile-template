@@ -6,6 +6,7 @@ import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { constants } from '@/config/constants';
 import { activateLocale, type Locale } from '@/i18n/i18n';
+import { useAuth } from '@/services/auth';
 import { updates, useUpdateInfo } from '@/services/updates';
 import { createStyles } from '@/theme/createStyles';
 import { useThemePreference } from '@/theme/useTheme';
@@ -19,6 +20,7 @@ export function DevMenu() {
   const styles = useStyles();
   const { setPreference } = useThemePreference();
   const updateInfo = useUpdateInfo();
+  const { signedIn, signIn, signOut } = useAuth();
   // Lingui re-renders <Trans> on activate; this state keeps the plain `t`
   // strings below in sync too.
   const [, setLocale] = useState<Locale>('en');
@@ -96,6 +98,15 @@ export function DevMenu() {
           </AppText>
         </>
       ) : null}
+
+      {/* Dev-only mock session controls, deliberately untranslated. */}
+      <AppText variant="caption" testID="settings-auth-state">
+        {signedIn ? 'signed in' : 'signed out'}
+      </AppText>
+      <View style={styles.row}>
+        <Button title="Sign in" testID="settings-auth-sign-in" onPress={() => void signIn()} />
+        <Button title="Sign out" testID="settings-auth-sign-out" onPress={() => void signOut()} />
+      </View>
 
       <Button
         title={t`Trigger error`}

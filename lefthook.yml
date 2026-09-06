@@ -13,15 +13,11 @@ pre-commit:
       # generated src/i18n/locales/**/messages.ts catalogs.
       run: pnpm exec eslint --max-warnings=0 --no-warn-ignored {staged_files}
     typos:
-      # typos.toml's extend-exclude only governs directory traversal; naming files
-      # explicitly bypasses it, so the same exclusions are repeated here (the
-      # translated catalogs are full of words that look like English typos).
-      exclude:
-        - 'pnpm-lock.yaml'
-        - '*.po'
-        - 'src/i18n/locales/**'
-        - 'src/graphql/generated/**'
-      run: typos {staged_files}
+      # --force-exclude: typos.toml's extend-exclude otherwise only governs
+      # directory traversal, and naming files explicitly on the command line
+      # bypasses it (the translated catalogs are full of Spanish words that look
+      # like English typos).
+      run: typos --force-exclude {staged_files}
 commit-msg:
   commands:
     commitlint:
