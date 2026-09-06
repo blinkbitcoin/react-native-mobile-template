@@ -5,7 +5,13 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 out="$(mktemp -d)"; trap 'rm -rf "$out"' EXIT
 pnpm exec expo export --platform ios --output-dir "$out" >/dev/null
-bundle="$(find "$out" -name '*.hbc' -o -name '*.js' | head -1)"
+# Prefer the Hermes bytecode bundle over a plain JS bundle, sorted for a
+# deterministic pick when more than one candidate exists.
+bundle="$(find "$out" -name '*.hbc' | sort | head -1)"
+if [ -z "$bundle" ]; then
+  bundle="$(find "$out" -name '*.js' | sort | head -1)"
+fi
+[ -n "$bundle" ] || { echo "no bundle found under $out" >&2; exit 1; }
 # Non-public key names: any UPPER_SNAKE token in .env.example (commented or
 # not) that isn't EXPO_PUBLIC_*-prefixed. This catches uncommented `KEY=`
 # lines as well as commented build-time keys like `# APP_VARIANT=... OTA_ENABLED=...`
