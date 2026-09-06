@@ -18,6 +18,7 @@ ln -s "$PWD/node_modules" "$tmp/app/node_modules"
   grep -q 'android:name="AppBuildStamp"' android/app/src/main/AndroidManifest.xml || { echo "AndroidManifest lacks AppBuildStamp" >&2; exit 1; }
   grep -q 'ANDROID_UPLOAD_STORE_FILE' android/app/build.gradle || { echo "build.gradle lacks release signing config" >&2; exit 1; }
   grep -q 'signingConfig signingConfigs.release' android/app/build.gradle || { echo "release buildType is not pointed at the release signingConfig" >&2; exit 1; }
+  grep -q 'ANDROID_UPLOAD_\* gradle properties not set: release build will be signed with the DEBUG keystore' android/app/build.gradle || { echo "build.gradle lacks the debug-keystore fallback warning" >&2; exit 1; }
   grep -q '^reactNativeArchitectures=armeabi-v7a,arm64-v8a' android/gradle.properties || { echo "gradle.properties lacks arm-only ABIs" >&2; exit 1; }
   grep -q 'versionCode 42' android/app/build.gradle || { echo "versionCode not injected" >&2; exit 1; }
   grep -q '<string>1.2.3</string>' ios/*/Info.plist || { echo "CFBundleShortVersionString not injected" >&2; exit 1; }
