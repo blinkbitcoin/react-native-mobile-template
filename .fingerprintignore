@@ -7,8 +7,7 @@ e2e/**
 coverage/**
 dist/**
 
-# Scripts are CI/dev tooling — except config plugins and local native modules,
-# which do end up in the native projects.
+# scripts/ is CI and dev tooling only. Note that plugins/ and modules/ are
+# top-level siblings, not children of scripts/ — they DO reach the native
+# projects and are deliberately left fingerprinted.
 scripts/**
-!plugins/**
-!modules/**

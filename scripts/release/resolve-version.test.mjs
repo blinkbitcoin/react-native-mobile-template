@@ -13,7 +13,10 @@ after(() => {
   for (const root of roots) rmSync(root, { recursive: true, force: true });
 });
 
-/** Builds a throwaway git repo with `commits` commits; `tags` maps 1-based commit index → tag. */
+/**
+ * Builds a throwaway git repo with `commits` commits; `tags` maps a 1-based
+ * commit index to a tag name or an array of tag names.
+ */
 function fixtureRepo(commits, tags = {}) {
   const root = mkdtempSync(path.join(tmpdir(), 'resolve-version-'));
   roots.push(root);
@@ -24,7 +27,7 @@ function fixtureRepo(commits, tags = {}) {
   git('config', 'commit.gpgsign', 'false');
   for (let i = 1; i <= commits; i += 1) {
     git('commit', '--quiet', '--allow-empty', '-m', `commit ${i}`);
-    if (tags[i]) git('tag', tags[i]);
+    for (const tag of [tags[i] ?? []].flat()) git('tag', tag);
   }
   return root;
 }
@@ -80,4 +83,39 @@ test('BUILD_NUMBER_OFFSET overrides the default offset', () => {
 
 test('non-semver tags are ignored when picking the last tag', () => {
   assert.equal(resolve(fixtureRepo(2, { 1: 'nightly' })).APP_VERSION, '0.0.1');
+});
+
+test('a prerelease tag is ignored in favour of the newest release tag', () => {
+  // `v1.4.2-rc.1` sorts above `v1.4.2` under -v:refname, so an unfiltered
+  // last-tag lookup would feed "1.4.2-rc.1" to the patch arithmetic, fail it,
+  // and emit an empty APP_VERSION with exit code 0.
+  const repo = fixtureRepo(3, { 1: 'v1.4.2', 2: 'v1.4.2-rc.1' });
+  assert.equal(resolve(repo).APP_VERSION, '1.4.3');
+});
+
+test('tags that are not plain vX.Y.Z never produce an empty version', () => {
+  // Every shape that the loose `v[0-9]*` glob would have let through.
+  for (const tag of ['v1.4.2-rc.1', 'v1.2.3+build', 'v1.2', 'v1']) {
+    const result = resolve(fixtureRepo(2, { 1: tag }));
+    assert.match(result.APP_VERSION, /^\d+\.\d+\.\d+$/, `tag ${tag} produced a bad version`);
+    assert.equal(result.APP_VERSION, '0.0.1', `tag ${tag} should not count as a release`);
+  }
+});
+
+test('a repo the script cannot resolve fails instead of emitting an empty version', () => {
+  // No commits at all: `git rev-list HEAD` fails, `set -e` aborts, and nothing
+  // is printed. The contract is that an unresolvable repo is never reported as
+  // a successful build with a blank version.
+  const root = mkdtempSync(path.join(tmpdir(), 'resolve-version-'));
+  roots.push(root);
+  execFileSync('git', ['init', '--quiet', '--initial-branch=main'], { cwd: root, stdio: 'pipe' });
+  assert.throws(
+    () =>
+      execFileSync('bash', [script, root], {
+        encoding: 'utf8',
+        env: { ...process.env, GH_TOKEN: '', GITHUB_OUTPUT: '', RELEASE_PR_TITLE: '' },
+        stdio: 'pipe',
+      }),
+    (error) => error.status !== 0 && !String(error.stdout).includes('APP_VERSION='),
+  );
 });

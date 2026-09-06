@@ -55,16 +55,17 @@ env \
   "BUILD_INFO_OUT=$out" \
   node -e '
 const fs = require("node:fs");
-const pkg = require("./package.json");
-const dep = (n) => (pkg.dependencies?.[n] ?? "").replace(/^[~^]/, "");
+// A provenance record must say what actually went into the build, so these
+// come from the installed package, not from the range in package.json.
+const installed = (n) => require(`${n}/package.json`).version;
 fs.writeFileSync(process.env.BUILD_INFO_OUT, `${JSON.stringify({
   sha: process.env.BUILD_INFO_SHA,
   version: process.env.BUILD_INFO_VERSION,
   buildNumber: Number(process.env.BUILD_INFO_BUILD_NUMBER),
   stage: process.env.BUILD_INFO_STAGE,
   fingerprint: { ios: process.env.BUILD_INFO_IOS, android: process.env.BUILD_INFO_ANDROID },
-  expoSdk: dep("expo"),
-  reactNative: dep("react-native"),
+  expoSdk: installed("expo"),
+  reactNative: installed("react-native"),
   workflowRunId: process.env.BUILD_INFO_RUN_ID || null,
   artifacts: {},
 }, null, 2)}\n`);

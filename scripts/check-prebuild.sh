@@ -43,7 +43,8 @@ prepare default
   # OTA is off unless OTA_ENABLED=true, so the native projects must say so.
   grep -A1 '<key>EXUpdatesEnabled</key>' ios/*/Supporting/Expo.plist | grep -q '<false/>' || { echo "Expo.plist does not disable EXUpdatesEnabled with OTA off" >&2; exit 1; }
   ! grep -q 'EXUpdatesCodeSigningCertificate' ios/*/Supporting/Expo.plist || { echo "Expo.plist carries a code-signing certificate with OTA off" >&2; exit 1; }
-  ! grep -q 'updates.example.com' android/app/src/main/AndroidManifest.xml || { echo "AndroidManifest carries an update URL with OTA off" >&2; exit 1; }
+  grep -q 'expo.modules.updates.ENABLED" android:value="false"' android/app/src/main/AndroidManifest.xml || { echo "AndroidManifest does not disable expo.modules.updates.ENABLED with OTA off" >&2; exit 1; }
+  ! grep -q 'expo.modules.updates.CODE_SIGNING_CERTIFICATE' android/app/src/main/AndroidManifest.xml || { echo "AndroidManifest carries a code-signing certificate with OTA off" >&2; exit 1; }
 )
 echo "prebuild check passed (OTA off)"
 

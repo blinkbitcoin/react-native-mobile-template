@@ -4,7 +4,6 @@
     "index.ts",
     "App.tsx",
     "app.config.ts",
-    "fingerprint.config.js",
     "lingui.config.ts",
     "src/app/**/*.tsx",
     "plugins/*.ts",
