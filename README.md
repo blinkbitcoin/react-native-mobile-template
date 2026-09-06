@@ -10,4 +10,4 @@ make ios            # or: make android
 make check && make unit
 ```
 
-`make help` lists every target.
+`make help` lists every target. CI is described in [`docs/ci.md`](docs/ci.md).

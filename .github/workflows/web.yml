@@ -21,5 +21,9 @@ jobs:
     with:
       # PRs export a dev build (fast smoke); a published release exports the
       # production bundle that actually gets deployed to Pages.
-      export-args: ${{ github.event_name == 'release' && '' || '--dev' }}
+      # The non-empty value MUST sit in the `&&` slot: GitHub's `&&` yields the
+      # first falsy operand and `||` the first truthy one, so
+      # `cond && '' || '--dev'` evaluates to '--dev' on BOTH branches (the empty
+      # string is falsy) and would quietly deploy a dev bundle.
+      export-args: ${{ github.event_name != 'release' && '--dev' || '' }}
       deploy: ${{ github.event_name == 'release' }}

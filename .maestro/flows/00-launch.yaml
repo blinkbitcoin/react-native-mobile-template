@@ -9,6 +9,11 @@ tags: [smoke]
 # its launcher screen, whose "DEVELOPMENT SERVERS" list is populated by Bonjour
 # discovery — which does not work on a simulator or in CI, so the flow would
 # hang there forever.
+#
+# The whole suite depends on this: every later flow assumes the app is already
+# foregrounded on Home, and the only thing that puts it there is the runner's
+# deep-link relaunch — never a `clearState` restart from inside a flow, which
+# would land on the launcher and strand every flow after this one.
 - launchApp:
     stopApp: false
 # Belt and braces, all optional and all no-ops on the happy path: React

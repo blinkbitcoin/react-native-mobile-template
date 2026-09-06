@@ -127,16 +127,18 @@ paths, so renaming them breaks that smoke test.
 
 ## Forensics
 
-Both E2E jobs upload artifacts on failure, which is where to look first:
+A failed run uploads its evidence as named artifacts — download these from the
+run's summary page first:
 
-- Maestro's `--debug-output` tree (per-flow `commands-*.json`, failure
-  screenshots, `maestro.log`).
-- A screen recording of the simulator/emulator session.
-- Metro's log, the device system log, and — on iOS — any crash report from
-  `DiagnosticReports` newer than the run's start stamp (older ones are filtered
-  out so a previous job's crash on the same runner cannot be misread as this
-  one's).
-- `unit.yml` uploads `coverage/` on every run (30-day retention).
+| Artifact | From | Contents |
+| --- | --- | --- |
+| `forensics-ios` | `e2e.yml`'s `ios` job | Maestro's `--debug-output` tree (per-flow `commands-*.json`, failure screenshots, `maestro.log`), the simulator screen recording, Metro's log, the device system log, and any crash report from `DiagnosticReports` newer than the run's start stamp (older ones are filtered out so a previous job's crash on the same runner cannot be misread as this one's) |
+| `forensics-android` | `e2e.yml`'s `android` job | The same Maestro debug tree, the emulator screen recording, Metro's log and `logcat` |
+| `playwright-report` | `web.yml`'s `playwright` job | The Playwright HTML report (traces, screenshots) |
+| `coverage` | `unit.yml` | `coverage/`, uploaded on every run (30-day retention) |
+
+The two E2E jobs also pass their builds between jobs as `ios-app` and
+`android-apk`; those are plumbing, not forensics.
 
 Locally the same debug tree lands in `.maestro/output/` (gitignored).
 
