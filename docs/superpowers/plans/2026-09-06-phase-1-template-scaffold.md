@@ -3387,3 +3387,4 @@ git tag phase-1-scaffold
 - **Coverage thresholds unchanged**; the global figure excludes per-path-threshold files (Jest semantics).
 - **Tag** for the phase is `phase-1-complete` (a tag named like the branch made refs ambiguous).
 - **Bootstrap lesson:** never `cp -R generated/. .` into a repo; it copies the generator's `.git`. Use `rsync -a --exclude .git`.
+- **Post-merge finding (2026-09-06):** the lefthook `post-merge`/`post-checkout` install commands use `HEAD@{1}`; lefthook strips the braces and git reports `fatal: ambiguous argument 'HEAD@0'` (the hook still exits 0). Fix in Phase 4: use `ORIG_HEAD`/`{1}` via a script instead of inline shell.
