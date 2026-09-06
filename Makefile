@@ -35,6 +35,16 @@ build-web: ## Static web export into dist/
 version: ## Print what CI would build for HEAD
 	bash scripts/release/resolve-version.sh
 
+release-notes: ## Preview store notes for HEAD (TAG=vX.Y.Z uses that release body via gh)
+	@if [ -n "$(TAG)" ]; then \
+		body="$$(mktemp)"; \
+		trap 'rm -f "$$body"' EXIT; \
+		gh release view "$(TAG)" --json body -q .body > "$$body"; \
+		node scripts/release/notes.mjs --from-body "$$body" --body-section --out -; \
+	else \
+		node scripts/release/notes.mjs --from-commits --out -; \
+	fi
+
 # ---------- Codegen ----------
 i18n: ## Extract + compile message catalogs
 	pnpm i18n:extract
@@ -123,4 +133,4 @@ reset: clean ## clean + reinstall
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: doctor install start ios android web mock-api prebuild build-web version i18n codegen typecheck lint format format-check knip spell check-gen check-prebuild check-code check-deps check-ci check-docs bundle-secrets-check check-release check test-scripts unit coverage e2e-ios e2e-android e2e-web test clean reset help
+.PHONY: doctor install start ios android web mock-api prebuild build-web version release-notes i18n codegen typecheck lint format format-check knip spell check-gen check-prebuild check-code check-deps check-ci check-docs bundle-secrets-check check-release check test-scripts unit coverage e2e-ios e2e-android e2e-web test clean reset help
