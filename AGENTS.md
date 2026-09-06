@@ -37,6 +37,7 @@ Every row is a make target; nothing here is run through pnpm directly.
 
 | Setup | |
 |---|---|
+| `make init` | Rename this template into your app, then delete itself (template only; `docs/template-usage.md`) |
 | `make doctor` | Check the local toolchain (run this first) |
 | `make install` | Install dependencies (frozen lockfile) and git hooks |
 | `make clean` | Remove generated native projects, caches and build output |
@@ -108,8 +109,10 @@ Every row is a make target; nothing here is run through pnpm directly.
   `noRestrictedImports` enforces both.
 - **Env goes through `src/config/env`** — zod-parsed, `EXPO_PUBLIC_*` only.
   Nothing else may read `process.env` in `src/`.
-- **Logging goes through `src/lib/logger`.** `console.*` is a Biome error
-  everywhere except that file.
+- **Logging goes through `src/lib/logger`.** `console.*` is a Biome error in
+  application code; `biome.json` turns `noConsole` off only for
+  `src/lib/logger.ts` (the sink itself) and for tooling that legitimately writes
+  to stdout: `scripts/**`, `plugins/**`, `mocks/**`, `*.config.*`, `codegen.ts`.
 - **Routes-only rule:** files in `src/app/` compose screens from `src/features`
   and `src/components` and may not import `@apollo/client`, `@/graphql`,
   `@/services` or `@/lib`. Only `src/app/_layout.tsx` and
@@ -145,8 +148,9 @@ Every row is a make target; nothing here is run through pnpm directly.
 | Native e2e | `.maestro/flows/` | `make e2e-ios`, `make e2e-android` |
 | Web e2e | `e2e/web/` | `make e2e-web` |
 
-Coverage thresholds are global 80% lines/branches, 100% for `src/config/**` and
-`src/lib/**` (`jest.config.ts`). See `docs/testing.md`.
+Coverage thresholds (`jest.config.ts`) are global 80% lines/branches, and 100%
+lines/branches for `src/config/**`, `src/lib/**`, `modules/*/index.ts` and
+`plugins/**`. See `docs/testing.md`.
 
 ## CI, release and troubleshooting
 
