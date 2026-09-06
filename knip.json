@@ -4,6 +4,7 @@
     "index.ts",
     "App.tsx",
     "app.config.ts",
+    "lingui.config.ts",
     "src/app/**/*.tsx",
     "plugins/*.ts",
     "modules/*/index.ts",
@@ -25,25 +26,15 @@
     "modules/**/ios/**",
     "modules/**/android/**"
   ],
-  "ignoreDependencies": [
-    "expo-dev-client",
-    "@expo/metro-runtime",
-    "react-native-web",
-    "react-dom",
-    "expo-status-bar",
-    "expo-updates",
-    "expo-system-ui",
-    "zod",
-    "@apollo/client",
-    "graphql",
-    "rxjs",
-    "@graphql-typed-document-node/core"
-  ],
+  "ignoreDependencies": ["ts-node", "expo-system-ui"],
   "ignoreBinaries": ["typos", "maestro", "xcrun", "adb"],
   "jest": {
     "config": "jest.config.ts"
   },
   "expo": true,
   "graphql-codegen": true,
-  "playwright": true
+  "playwright": true,
+  "ignoreUnresolved": ["babel-jest"],
+  "ignoreExportsUsedInFile": true,
+  "tags": ["-knipignore"]
 }

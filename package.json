@@ -76,7 +76,7 @@
     "lint:fix": "biome check --write . && eslint . --fix",
     "format": "biome format --write .",
     "format:check": "biome format .",
-    "knip": "knip --strict",
+    "knip": "knip",
     "spell": "typos",
     "i18n:extract": "lingui extract --clean && lingui compile",
     "i18n:check": "bash scripts/check-i18n.sh",

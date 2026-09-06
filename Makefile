@@ -49,7 +49,7 @@ format: ## Format everything with Biome (writes)
 format-check: ## Check formatting without writing
 	pnpm format:check
 
-knip: ## Unused files, exports and dependencies
+knip: ## Unused files, exports and dependencies (default mode; production mode flags test-only exports)
 	pnpm knip
 
 spell: ## Spell-check with typos

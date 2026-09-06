@@ -6,6 +6,12 @@ const extra = (Constants.expoConfig?.extra ?? {}) as {
   buildStamp?: string;
 };
 
+/**
+ * Build/runtime metadata for the app to display or report.
+ *
+ * @knipignore its only current consumer is constants.test.ts, which loads it with
+ * `require()` inside `jest.isolateModules` — a form knip cannot resolve statically.
+ */
 export const constants = Object.freeze({
   version: Constants.expoConfig?.version ?? '0.0.0',
   buildNumber: String(

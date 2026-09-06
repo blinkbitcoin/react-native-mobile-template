@@ -1,4 +1,3 @@
-import '@testing-library/react-native';
 import { type RenderOptions, render } from '@testing-library/react-native';
 import type { PropsWithChildren, ReactElement } from 'react';
 import { ApolloProvider } from '../graphql/ApolloProvider';
