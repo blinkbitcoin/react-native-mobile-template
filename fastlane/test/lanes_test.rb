@@ -9,6 +9,8 @@ require 'minitest/autorun'
 require 'tempfile'
 require 'tmpdir'
 require 'fileutils'
+require 'rbconfig'
+require 'English'
 require 'stubs'
 
 require_relative '../lanes/shared'
@@ -272,11 +274,26 @@ class LanesTest < Minitest::Test
     refute truthy?('')
   end
 
-  def test_rollout_fraction_accepts_both_a_fraction_and_a_percentage
-    assert_in_delta 0.5, rollout_fraction('0.5')
-    assert_in_delta 0.5, rollout_fraction(50)
-    assert_in_delta 1.0, rollout_fraction('100')
-    assert_in_delta 1.0, rollout_fraction(1)
+  def test_rollout_fraction_returns_the_string_supply_requires
+    # supply's `rollout` ConfigItem is data_type: String; a Float is rejected by
+    # FastlaneCore before the action runs.
+    assert_equal '0.5', rollout_fraction('0.5')
+    assert_instance_of String, rollout_fraction(50)
+  end
+
+  def test_a_whole_number_is_a_percentage
+    assert_equal '0.01', rollout_fraction('1')
+    assert_equal '0.01', rollout_fraction(1)
+    assert_equal '0.5', rollout_fraction(50)
+    assert_equal '1', rollout_fraction('100')
+  end
+
+  def test_a_decimal_is_a_fraction
+    # `1` is both "1% canary" and "everybody"; only the written form separates
+    # them, and guessing by magnitude would ship a canary to the whole user base.
+    assert_equal '0.01', rollout_fraction('0.01')
+    assert_equal '0.5', rollout_fraction(0.5)
+    assert_equal '1', rollout_fraction('1.0')
   end
 
   def test_rollout_fraction_rejects_values_supply_would_reject
@@ -284,6 +301,7 @@ class LanesTest < Minitest::Test
     assert_raises(UI::UserError) { rollout_fraction('0') }
     assert_raises(UI::UserError) { rollout_fraction('-1') }
     assert_raises(UI::UserError) { rollout_fraction('101') }
+    assert_raises(UI::UserError) { rollout_fraction('1.5') }
     assert_raises(UI::UserError) { rollout_fraction('half') }
   end
 
@@ -500,6 +518,16 @@ class LaneBehaviourTest < Minitest::Test
     end
   end
 
+  # What `expo prebuild` leaves behind: a project, a workspace, and an
+  # Info.plist carrying the version and build number (which is where they
+  # actually live -- the pbxproj keeps Xcode's 1.0 / 1 defaults).
+  def generated_ios_project(dir)
+    FileUtils.mkdir_p(File.join(dir, 'ios', 'App.xcodeproj'))
+    FileUtils.mkdir_p(File.join(dir, 'ios', 'App.xcworkspace'))
+    FileUtils.mkdir_p(File.join(dir, 'ios', 'App'))
+    File.write(File.join(dir, 'ios', 'App', 'Info.plist'), '<plist/>')
+  end
+
   def args_for(action)
     call = $calls.find { |name, _| name == action }
     refute_nil call, "expected a #{action} call, got #{$calls.map(&:first).inspect}"
@@ -514,8 +542,7 @@ class LaneBehaviourTest < Minitest::Test
 
   def test_ios_build_skip_signing_archives_without_signing_or_export
     in_project do |dir|
-      FileUtils.mkdir_p(File.join(dir, 'ios', 'App.xcodeproj'))
-      FileUtils.mkdir_p(File.join(dir, 'ios', 'App.xcworkspace'))
+      generated_ios_project(dir)
       run_lane(:ios, :build, skip_signing: 'true')
 
       args = args_for(:gym)
@@ -530,8 +557,7 @@ class LaneBehaviourTest < Minitest::Test
 
   def test_ios_build_signs_and_exports_for_the_app_store
     in_project do |dir|
-      FileUtils.mkdir_p(File.join(dir, 'ios', 'App.xcodeproj'))
-      FileUtils.mkdir_p(File.join(dir, 'ios', 'App.xcworkspace'))
+      generated_ios_project(dir)
       ENV['MATCH_GIT_URL'] = 'git@example.com:certs.git'
       ENV['MATCH_PASSWORD'] = 'secret'
       run_lane(:ios, :build)
@@ -546,9 +572,8 @@ class LaneBehaviourTest < Minitest::Test
 
   def test_ios_build_refuses_a_project_whose_numbers_do_not_match_the_release
     in_project do |dir|
-      FileUtils.mkdir_p(File.join(dir, 'ios', 'App.xcodeproj'))
-      FileUtils.mkdir_p(File.join(dir, 'ios', 'App.xcworkspace'))
-      stub_result(:get_build_number, '41')
+      generated_ios_project(dir)
+      stub_result(:CFBundleVersion, '41')
       error = assert_raises(UI::UserError) { run_lane(:ios, :build, skip_signing: 'true') }
       assert_includes error.message, 'APP_BUILD_NUMBER'
       refute called?(:gym), 'nothing may be archived once the numbers disagree'
@@ -642,6 +667,27 @@ class LaneBehaviourTest < Minitest::Test
       assert_equal 'review@example.com', info[:contact_email]
       assert_equal 'demo', info[:demo_account_name]
       assert info[:demo_account_required]
+      refute info.key?(:contact_first_name), 'a blank would erase the name in App Store Connect'
+    end
+  end
+
+  def test_ios_promote_beta_omits_review_info_entirely_when_nothing_is_configured
+    in_project do
+      # pilot PATCHes every key it is handed (build_manager.rb keys off
+      # `info.key?`, not on the value), so sending a hash full of blanks
+      # silently clears the beta review contact someone set in the web UI.
+      run_lane(:ios, :promote_beta)
+      refute args_for(:upload_to_testflight).key?(:beta_app_review_info)
+    end
+  end
+
+  def test_ios_promote_beta_sends_no_demo_account_required_without_a_demo_user
+    in_project do
+      ENV['APP_REVIEW_EMAIL'] = 'review@example.com'
+      run_lane(:ios, :promote_beta)
+
+      assert_equal({ contact_email: 'review@example.com' },
+                   args_for(:upload_to_testflight)[:beta_app_review_info])
     end
   end
 
@@ -674,7 +720,8 @@ class LaneBehaviourTest < Minitest::Test
       assert args[:automatic_release]
       assert args[:phased_release]
       refute args[:run_precheck_before_submit]
-      assert_equal({}, args[:app_review_information].reject { |_, v| v.to_s.empty? })
+      refute args.key?(:app_review_information),
+             'deliver derives demoAccountRequired from this hash: blanks would clear it'
     end
   end
 
@@ -754,7 +801,7 @@ class LaneBehaviourTest < Minitest::Test
       args = args_for(:upload_to_play_store)
       assert_equal 'beta', args[:track]
       assert_equal 'production', args[:track_promote_to]
-      assert_in_delta 0.2, args[:rollout]
+      assert_equal '0.2', args[:rollout]
       assert_equal 3, args[:in_app_update_priority]
       refute args[:skip_upload_metadata], 'production is the one lane that syncs the listing'
       refute args[:skip_upload_images]
@@ -764,7 +811,7 @@ class LaneBehaviourTest < Minitest::Test
   def test_android_release_production_defaults_to_a_full_rollout
     in_project do
       run_lane(:android, :release_production)
-      assert_in_delta 1.0, args_for(:upload_to_play_store)[:rollout]
+      assert_equal '1', args_for(:upload_to_play_store)[:rollout]
     end
   end
 
@@ -775,7 +822,7 @@ class LaneBehaviourTest < Minitest::Test
       run_lane(:android, :rollout, percent: 50)
 
       args = args_for(:upload_to_play_store)
-      assert_in_delta 0.5, args[:rollout]
+      assert_equal '0.5', args[:rollout]
       assert args[:skip_upload_aab], 'update_rollout is the path with nothing to upload'
       assert args[:skip_upload_apk]
       assert_equal 'production', args[:track]
@@ -858,6 +905,74 @@ class LaneBehaviourTest < Minitest::Test
     %i[upload_huawei upload_samsung fdroid_metadata].each do |lane_name|
       error = assert_raises(UI::UserError) { run_lane(nil, lane_name) }
       assert_includes error.message, 'docs/release-runbook.md#future-stores'
+    end
+  end
+
+  # ---------- arguments vs. the real fastlane action definitions ----------
+
+  # Replays every recorded action call through the real option set. The stubs
+  # accept any key of any type, so without this the suite is thorough about
+  # *which* arguments a lane passes and silent about whether fastlane will take
+  # them -- which is how a Float `rollout` shipped green past 73 tests and a
+  # clean six-lane dry run, then aborted on the first real invocation.
+  #
+  # The validator runs in a child process: loading the fastlane gem here would
+  # pull in the real `supply` (through UploadToPlayStoreAction.available_options)
+  # and replace the supply double the `halt` fallback test depends on.
+  def validate_fastlane_options(recorded)
+    script = File.expand_path('validate_options.rb', __dir__)
+    output = nil
+    IO.popen([RbConfig.ruby, script], 'r+') do |io|
+      io.write(JSON.generate(recorded))
+      io.close_write
+      output = io.read
+    end
+    return ["validator exited #{$CHILD_STATUS.exitstatus}: #{output}"] unless $CHILD_STATUS.success?
+
+    # fastlane can chatter on stdout; the result is the last line.
+    JSON.parse(output.to_s.lines.map(&:strip).reject(&:empty?).last.to_s)
+  end
+
+  def test_every_lane_argument_hash_is_accepted_by_the_real_fastlane_action
+    recorded = []
+    in_project(notes: { 'en-US' => { 'appstore' => 'Notes.', 'play' => 'Notes.' } }) do |dir|
+      generated_ios_project(dir)
+      File.write(File.join(dir, 'artifacts', 'android', 'mapping.txt'), 'mapping')
+      ENV['MATCH_GIT_URL'] = 'git@example.com:certs.git'
+      ENV['MATCH_PASSWORD'] = 'secret'
+      ENV['APP_REVIEW_EMAIL'] = 'review@example.com'
+      ENV['APP_REVIEW_DEMO_USER'] = 'demo'
+      ENV['APP_REVIEW_DEMO_PASSWORD'] = 'demopass'
+      ENV['PLAY_UPDATE_PRIORITY'] = '3'
+
+      [
+        [:ios, :build, { skip_signing: 'true' }],
+        [:ios, :build, {}],
+        [:ios, :upload_internal, {}],
+        [:ios, :promote_beta, {}],
+        [:ios, :release_production, {}],
+        [:ios, :phased, { action: 'pause' }],
+        [:ios, :upload_symbols, {}],
+        [:android, :upload_internal, {}],
+        [:android, :promote_beta, {}],
+        [:android, :release_production, {}],
+        [:android, :rollout, { percent: 50 }],
+        [:android, :halt, {}]
+      ].each do |platform_name, lane_name, options|
+        reset_calls!
+        stub_result(:latest_testflight_build_number, 41)
+        stub_result(:google_play_track_version_codes, [41])
+        run_lane(platform_name, lane_name, options)
+        $calls.each do |action, args|
+          next unless STUBBED_FASTLANE_ACTIONS.include?(action)
+
+          recorded << { action: action.to_s, args: args, lane: "#{platform_name} #{lane_name}" }
+        end
+      end
+
+      refute_empty recorded
+      errors = validate_fastlane_options(recorded)
+      assert_empty errors, "fastlane rejects these lane arguments:\n#{errors.join("\n")}"
     end
   end
 end

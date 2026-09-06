@@ -25,19 +25,36 @@ def default_ios_artifact(out, scheme)
   app || ipa
 end
 
+# The generated Info.plist, which is where `expo prebuild` writes the version
+# and the build number.
+#
+# `get_version_number` / `get_build_number` read the *pbxproj*, and prebuild
+# leaves Xcode's own MARKETING_VERSION / CURRENT_PROJECT_VERSION defaults
+# (1.0 / 1) untouched there. Proved on a real prebuild of this template with
+# APP_VERSION=1.2.3 APP_BUILD_NUMBER=42: pbxproj said 1.0 / 1, Info.plist said
+# 1.2.3 / 42. Asserting against the pbxproj therefore failed every single
+# build, correct ones included.
+def ios_info_plist
+  plist = Dir.glob(root_path('ios', '*', 'Info.plist')).sort.first
+  UI.user_error!('No ios/*/Info.plist — run `pnpm expo prebuild` first (see docs/release-runbook.md)') if plist.nil?
+
+  plist
+end
+
 platform :ios do
   desc 'Archive the generated iOS project (skip_signing:true for an unsigned local proof)'
   lane :build do |options|
     skip_signing = truthy?(options[:skip_signing])
     scheme = ENV.fetch('IOS_SCHEME')
     out = prepare_output_dir!(output_dir('ios'))
-    project = ios_xcodeproj
+    ios_xcodeproj # says "run prebuild first" rather than failing inside gym
 
     # Before the archive, not after: an artifact labelled with the previous
     # run's numbers is indistinguishable from a correct one once it is built.
+    plist = ios_info_plist
     assert_project_version!(
-      get_version_number(xcodeproj: project, target: scheme),
-      get_build_number(xcodeproj: project)
+      get_info_plist_value(path: plist, key: 'CFBundleShortVersionString'),
+      get_info_plist_value(path: plist, key: 'CFBundleVersion')
     )
 
     args = {
@@ -86,7 +103,7 @@ platform :ios do
 
   desc 'Upload the build to TestFlight for internal testers (idempotent)'
   lane :upload_internal do |options|
-    require_env!(%w[ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64])
+    require_env!(%w[ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64 RELEASE_NOTES_STORE_FILE])
     build_info # asserts the artifact belongs to this version/build number
     key = api_key
     bundle_id = ENV.fetch('IOS_BUNDLE_ID')
@@ -95,6 +112,10 @@ platform :ios do
 
     # Re-running a release job must not fail on "build already exists": the
     # upload is the step most likely to be retried after an unrelated flake.
+    # This compares against the *highest* build number for the version, which is
+    # only equivalent to "this build number is present" because the template's
+    # build numbers are monotonic (`git rev-list --count`, Task 2). A scheme that
+    # can reissue a lower number needs a per-build Spaceship lookup instead.
     latest = store_action(
       :latest_testflight_build_number,
       api_key: key,
@@ -124,12 +145,11 @@ platform :ios do
 
   desc 'Promote the existing TestFlight build to the external beta group'
   lane :promote_beta do
-    require_env!(%w[ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64 TESTFLIGHT_EXTERNAL_GROUP])
+    require_env!(%w[ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64 TESTFLIGHT_EXTERNAL_GROUP RELEASE_NOTES_STORE_FILE])
 
     # `distribute_only: true` promotes the build that is already there; nothing
     # is re-uploaded, so beta always ships the exact binary internal testers saw.
-    store_action(
-      :upload_to_testflight,
+    args = {
       api_key: api_key,
       app_identifier: ENV.fetch('IOS_BUNDLE_ID'),
       app_version: ENV.fetch('APP_VERSION'),
@@ -138,9 +158,14 @@ platform :ios do
       distribute_external: true,
       notify_external_testers: true,
       groups: [ENV.fetch('TESTFLIGHT_EXTERNAL_GROUP')],
-      changelog: store_notes(TESTFLIGHT_NOTES_LIMIT),
-      beta_app_review_info: beta_review_information
-    )
+      changelog: store_notes(TESTFLIGHT_NOTES_LIMIT)
+    }
+    # Omitted when no APP_REVIEW_* is set: pilot PATCHes every key it is given,
+    # so passing blanks would erase the beta review contact in App Store Connect.
+    review = beta_review_information
+    args[:beta_app_review_info] = review unless review.empty?
+
+    store_action(:upload_to_testflight, **args)
   end
 
   desc 'Submit the existing build to the App Store with metadata and release notes'
@@ -150,8 +175,7 @@ platform :ios do
     written = write_release_notes!(ios_metadata_path, kind: :appstore, limit: APP_STORE_NOTES_LIMIT)
     UI.message("Release notes written: #{written.join(', ')}")
 
-    store_action(
-      :upload_to_app_store,
+    args = {
       api_key: api_key,
       app_identifier: ENV.fetch('IOS_BUNDLE_ID'),
       app_version: ENV.fetch('APP_VERSION'),
@@ -168,9 +192,15 @@ platform :ios do
       # submission on a warning; the metadata gate above is the check we own.
       run_precheck_before_submit: false,
       force: true,
-      app_review_information: review_information,
       submission_information: { add_id_info_uses_idfa: false, export_compliance_uses_encryption: false }
-    )
+    }
+    # Omitted when no APP_REVIEW_* is set: deliver derives demoAccountRequired
+    # from this hash whether or not a demo user is in it, so an unconfigured run
+    # would clear the flag on an app that does require a demo account.
+    review = review_information
+    args[:app_review_information] = review unless review.empty?
+
+    store_action(:upload_to_app_store, **args)
   end
 
   desc 'Control the 7-day phased release of the live version (action:pause|resume|complete)'

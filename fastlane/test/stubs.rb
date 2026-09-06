@@ -56,6 +56,21 @@ end
 
 # The fastlane actions the lanes reach for. Each records its call and returns
 # something shaped like the real return value.
+#
+# These stubs accept any key of any type, which is exactly what makes them
+# useless as a check that fastlane will accept the call -- an option renamed by
+# a gem bump, or a value of the wrong type, passes here and fails on the first
+# real run. `validate_options.rb` is the other half: it replays the recorded
+# arguments against the real option definitions. STUBBED_FASTLANE_ACTIONS is how
+# a test tells a real action call apart from the `sh`/Spaceship/supply records
+# sharing the same list.
+STUBBED_FASTLANE_ACTIONS = %i[
+  upload_to_testflight upload_to_play_store upload_to_app_store gym gradle match
+  setup_ci app_store_connect_api_key google_play_track_version_codes
+  latest_testflight_build_number get_version_number get_build_number
+  get_info_plist_value download_dsyms
+].freeze
+
 {
   upload_to_testflight: nil,
   upload_to_play_store: nil,
@@ -75,6 +90,19 @@ end
     $calls << [action, args]
     $stub_results.fetch(action) { result }
   end
+end
+
+# What a prebuilt Info.plist carries. Keyed by plist key rather than by action
+# name: one lane reads two different keys through the same action, and a test
+# has to be able to make just one of them disagree.
+IOS_INFO_PLIST_STUB = {
+  'CFBundleShortVersionString' => '1.2.3',
+  'CFBundleVersion' => '42'
+}.freeze
+
+def get_info_plist_value(**args)
+  $calls << [:get_info_plist_value, args]
+  $stub_results.fetch(args[:key].to_sym) { IOS_INFO_PLIST_STUB[args[:key]] }
 end
 
 # fastlane's `sh` takes argv plus keyword options (`log:` suppresses the echo

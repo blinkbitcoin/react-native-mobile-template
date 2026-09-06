@@ -123,16 +123,25 @@ end
 
 # App Review contact details live in the environment, not in the repo: the
 # metadata files under fastlane/metadata/ hold blanks and lanes fill them here.
+#
+# Blank values are dropped, and an empty hash means "nothing configured": both
+# stores treat a field they are *given* as an instruction to overwrite, so
+# sending blanks would clear the contact, demo account and review notes someone
+# entered in the web UI -- worse than not touching them. Callers omit the
+# argument entirely when this comes back empty. deliver also derives
+# `demoAccountRequired` from the hash unconditionally
+# (deliver/lib/deliver/upload_metadata.rb), which is the other reason it is
+# all-or-nothing rather than per-key.
 def review_information
   {
-    first_name: ENV['APP_REVIEW_FIRST_NAME'].to_s,
-    last_name: ENV['APP_REVIEW_LAST_NAME'].to_s,
-    phone_number: ENV['APP_REVIEW_PHONE'].to_s,
-    email_address: ENV['APP_REVIEW_EMAIL'].to_s,
-    demo_user: ENV['APP_REVIEW_DEMO_USER'].to_s,
-    demo_password: ENV['APP_REVIEW_DEMO_PASSWORD'].to_s,
-    notes: ENV['APP_REVIEW_NOTES'].to_s
-  }
+    first_name: ENV['APP_REVIEW_FIRST_NAME'],
+    last_name: ENV['APP_REVIEW_LAST_NAME'],
+    phone_number: ENV['APP_REVIEW_PHONE'],
+    email_address: ENV['APP_REVIEW_EMAIL'],
+    demo_user: ENV['APP_REVIEW_DEMO_USER'],
+    demo_password: ENV['APP_REVIEW_DEMO_PASSWORD'],
+    notes: ENV['APP_REVIEW_NOTES']
+  }.reject { |_, value| value.to_s.strip.empty? }
 end
 
 # The same contact details in pilot's key names. deliver and pilot spell every
@@ -141,18 +150,23 @@ end
 # Valid keys per pilot/lib/pilot/options.rb: contact_email, contact_first_name,
 # contact_last_name, contact_phone, demo_account_required, demo_account_name,
 # demo_account_password, notes.
+#
+# pilot is the stricter of the two: build_manager.rb keys off `info.key?`, not
+# on the value being present, so a blank here really does erase what is in App
+# Store Connect.
 def beta_review_information
-  demo_user = ENV['APP_REVIEW_DEMO_USER'].to_s
-  {
-    contact_first_name: ENV['APP_REVIEW_FIRST_NAME'].to_s,
-    contact_last_name: ENV['APP_REVIEW_LAST_NAME'].to_s,
-    contact_phone: ENV['APP_REVIEW_PHONE'].to_s,
-    contact_email: ENV['APP_REVIEW_EMAIL'].to_s,
-    demo_account_required: demo_user != '',
-    demo_account_name: demo_user,
-    demo_account_password: ENV['APP_REVIEW_DEMO_PASSWORD'].to_s,
-    notes: ENV['APP_REVIEW_NOTES'].to_s
-  }
+  demo_user = ENV['APP_REVIEW_DEMO_USER'].to_s.strip
+  info = {
+    contact_first_name: ENV['APP_REVIEW_FIRST_NAME'],
+    contact_last_name: ENV['APP_REVIEW_LAST_NAME'],
+    contact_phone: ENV['APP_REVIEW_PHONE'],
+    contact_email: ENV['APP_REVIEW_EMAIL'],
+    demo_account_name: ENV['APP_REVIEW_DEMO_USER'],
+    demo_account_password: ENV['APP_REVIEW_DEMO_PASSWORD'],
+    notes: ENV['APP_REVIEW_NOTES']
+  }.reject { |_, value| value.to_s.strip.empty? }
+  info[:demo_account_required] = true unless demo_user.empty?
+  info
 end
 
 # ---------------------------------------------------------------------------
@@ -306,7 +320,12 @@ end
 
 def locale_store_notes(locale, kind, limit, notes_json = store_notes_json)
   text = notes_json&.dig(locale, kind.to_s).to_s.strip
-  return store_notes(limit) if text.empty?
+  if text.empty?
+    # The fallback needs the single-locale file. Say so with the runbook pointer
+    # every other missing input here gets, rather than a bare KeyError.
+    require_env!(%w[RELEASE_NOTES_STORE_FILE])
+    return store_notes(limit)
+  end
   return text if text.length <= limit
 
   text[0, limit].rstrip

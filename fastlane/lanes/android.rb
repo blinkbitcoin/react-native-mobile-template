@@ -34,6 +34,35 @@ def android_signing_properties
   }
 end
 
+# Writes each secret to its own 0600 file for the duration of the block, so a
+# password reaches bundletool without ever appearing in an argument list.
+def with_password_files(*secrets)
+  require 'tempfile'
+  files = secrets.map do |secret|
+    file = Tempfile.new('rnmt-pass')
+    file.chmod(0o600)
+    file.write(secret) # no trailing newline: bundletool reads the file verbatim
+    file.close
+    file
+  end
+  yield(*files.map(&:path))
+ensure
+  files&.each { |file| file.close! }
+end
+
+# The single universal.apk inside the .apks archive bundletool just wrote.
+def extract_universal_apk!(apks_path, destination)
+  require 'zip'
+  require 'fileutils'
+  Zip::File.open(apks_path) do |archive|
+    entry = archive.find_entry('universal.apk')
+    UI.user_error!("bundletool produced no universal.apk in #{apks_path}") if entry.nil?
+    FileUtils.rm_f(destination)
+    entry.extract(destination)
+  end
+  destination
+end
+
 def android_aab_path
   Dir.glob(root_path('android', 'app', 'build', 'outputs', 'bundle', 'release', '*.aab')).sort.first
 end
@@ -72,21 +101,29 @@ platform :android do
     # what QA installs is the artifact being released, not a second build of it.
     apks = File.join(out, 'app-universal.apks')
     FileUtils.rm_f(apks)
-    sh(
-      *bundletool_command,
-      'build-apks',
-      "--bundle=#{File.join(out, 'app-release.aab')}",
-      "--output=#{apks}",
-      '--mode=universal',
-      "--ks=#{android_keystore_path}",
-      "--ks-pass=pass:#{ENV.fetch('ANDROID_UPLOAD_KEYSTORE_PASSWORD')}",
-      "--ks-key-alias=#{ENV.fetch('ANDROID_UPLOAD_KEY_ALIAS')}",
-      "--key-pass=pass:#{ENV.fetch('ANDROID_UPLOAD_KEY_PASSWORD')}",
-      log: false
-    )
+    # `--ks-pass=pass:` would put the keystore password in the process table,
+    # where `log: false` cannot reach it; bundletool's `file:` form reads it
+    # from a 0600 file that exists only for the length of the call.
+    with_password_files(
+      ENV.fetch('ANDROID_UPLOAD_KEYSTORE_PASSWORD'),
+      ENV.fetch('ANDROID_UPLOAD_KEY_PASSWORD')
+    ) do |store_pass_file, key_pass_file|
+      sh(
+        *bundletool_command,
+        'build-apks',
+        "--bundle=#{File.join(out, 'app-release.aab')}",
+        "--output=#{apks}",
+        '--mode=universal',
+        "--ks=#{android_keystore_path}",
+        "--ks-pass=file:#{store_pass_file}",
+        "--ks-key-alias=#{ENV.fetch('ANDROID_UPLOAD_KEY_ALIAS')}",
+        "--key-pass=file:#{key_pass_file}",
+        log: false
+      )
+    end
     # build-apks writes a zip; the universal APK is the single entry inside it.
-    sh('unzip', '-o', '-j', apks, 'universal.apk', '-d', out)
-    FileUtils.mv(File.join(out, 'universal.apk'), File.join(out, 'app-universal.apk'))
+    # rubyzip comes with fastlane, so this needs no `unzip` on the runner.
+    extract_universal_apk!(apks, File.join(out, 'app-universal.apk'))
     FileUtils.rm_f(apks)
   end
 
@@ -210,9 +247,10 @@ platform :android do
     store_action(:upload_to_play_store, **args)
   end
 
-  desc 'Change the production staged-rollout fraction (percent:50, or 100 to complete)'
+  desc 'Change the production staged-rollout share. Whole number = percent (percent:1 is 1%, percent:100 completes); a decimal is a fraction (percent:0.01 is 1%, percent:1.0 completes)'
   lane :rollout do |options|
     fraction = rollout_fraction(options[:percent] || ENV['PLAY_ROLLOUT'])
+    UI.important("Setting the production rollout to #{(fraction.to_f * 100).round(4)}% of users")
 
     store_action(
       :upload_to_play_store,
@@ -236,6 +274,9 @@ platform :android do
   lane :halt do
     package = ENV.fetch('ANDROID_PACKAGE')
     version_code = ENV.fetch('APP_BUILD_NUMBER').to_i
+    # Outside the begin: a missing credential is not a supply regression, and
+    # reporting it as one would send the operator to the wrong fix.
+    credentials = play_json_key_args
 
     begin
       store_action(
@@ -250,7 +291,7 @@ platform :android do
         skip_upload_changelogs: true,
         skip_upload_images: true,
         skip_upload_screenshots: true,
-        **play_json_key_args
+        **credentials
       )
     rescue StandardError => e
       # `release_status: halted` through supply has regressed more than once
@@ -262,26 +303,40 @@ platform :android do
   end
 end
 
-# PLAY_ROLLOUT is a fraction supply understands; accept a percentage too,
-# because that is what the production workflow's dispatch input collects.
+# PLAY_ROLLOUT is a fraction supply understands; the production workflow's
+# dispatch input collects a percentage. Default: the whole user base.
 def play_rollout
-  rollout_fraction(ENV['PLAY_ROLLOUT'].to_s.strip.empty? ? '1.0' : ENV['PLAY_ROLLOUT'])
+  raw = ENV['PLAY_ROLLOUT'].to_s.strip
+  rollout_fraction(raw.empty? ? '1.0' : raw)
 end
 
+# The *form* of the input decides what it means, not its magnitude. `1` is both
+# the first step of a canary (1%) and the fraction for everybody, and resolving
+# that collision by size would silently ship a 1% canary to 100% of users. So:
+#
+#   whole number  -> percent    "1" -> 0.01, "50" -> 0.5, "100" -> 1
+#   has a decimal -> fraction   "0.01" -> 0.01, "0.5" -> 0.5, "1.0" -> 1
+#
+# Anything outside 0 < x <= 1 after that conversion is a mistake, not a reading
+# to guess at, so `1.5` and `150` both fail rather than being clamped.
+#
+# The result is a String because supply's `rollout` ConfigItem is `data_type:
+# String` and FastlaneCore rejects a Float before the action ever runs.
 def rollout_fraction(value)
+  raw = value.to_s.strip
   begin
-    number = Float(value.to_s.strip)
+    number = Float(raw)
   rescue ArgumentError, TypeError
     UI.user_error!("Rollout must be a number (got #{value.inspect})")
   end
-  # `50` and `0.5` both mean half, because the production workflow collects a
-  # percentage while supply wants the fraction.
-  number /= 100.0 if number > 1.0
+  number /= 100.0 unless raw.include?('.')
   # supply rejects 0 (`must be greater than 0.0 and less than or equal to 1.0`);
-  # halting a rollout is what `halt` is for.
-  UI.user_error!("Rollout must be greater than 0 and at most 100 (got #{value})") unless number > 0.0 && number <= 1.0
+  # stopping a rollout is what `halt` is for.
+  unless number > 0.0 && number <= 1.0
+    UI.user_error!("Rollout #{value.inspect} is out of range: use a whole number of percent (1..100) or a fraction (0.01..1.0)")
+  end
 
-  number
+  format('%g', number)
 end
 
 # The direct AndroidPublisher edit supply's `release_status: halted` is supposed
