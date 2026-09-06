@@ -15,6 +15,7 @@ expo-env.d.ts
 .kotlin/
 *.orig.*
 *.jks
+*.keystore
 *.p8
 *.p12
 *.key
@@ -55,9 +56,23 @@ modules/*/android/.cxx/
 # Ruby gems for fastlane/cocoapods (Gemfile.lock is committed, the gems are not)
 /vendor/bundle
 
-# fastlane run output
+# fastlane run output and local release credentials (never committed).
+# Signing material is covered by the *.jks/*.keystore/*.p8/*.p12/*.key rules
+# above; fastlane/*.json is where a Play service-account key lands, and
+# fastlane/.env* is where people put MATCH_PASSWORD and ASC_*.
 /fastlane/report.xml
 /fastlane/README.md
+/fastlane/test_output/
+/fastlane/.env*
+/fastlane/*.json
+# Screenshots are generated, but the directories are kept so fastlane and CI
+# have somewhere to write.
+/fastlane/screenshots/*
+!/fastlane/screenshots/.gitkeep
+/fastlane/metadata/ios/screenshots/*
+!/fastlane/metadata/ios/screenshots/.gitkeep
+/fastlane/metadata/android/*/images/*
+!/fastlane/metadata/android/*/images/.gitkeep
 
 # react-native-workflows self-checkout (also added to .git/info/exclude by its setup action)
 /.rnw

@@ -33,9 +33,14 @@ module UI
   end
 
   def self.reset!
-    $calls.clear
     messages.clear
   end
+end
+
+# Clears the action recorder. Kept separate from UI.reset! so the stubbed UI
+# does not own a global it has nothing to do with.
+def reset_calls!
+  $calls.clear
 end
 
 # The fastlane actions the lanes reach for. Each records its call and returns

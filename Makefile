@@ -83,7 +83,8 @@ bundle-secrets-check: ## Export the bundle and assert no non-public keys leaked
 	pnpm check-bundle-secrets
 
 check-release: ## Ruby syntax + fastlane lane parse + lane unit tests
-	for f in fastlane/Fastfile fastlane/lanes/*.rb; do ruby -c $$f; done
+	@bundle check >/dev/null 2>&1 || { echo "run: bundle install (see docs/release-runbook.md)"; exit 1; }
+	for f in fastlane/Fastfile fastlane/lanes/*.rb fastlane/test/*.rb; do ruby -c "$$f" || exit 1; done
 	FASTLANE_SKIP_ENV_ASSERT=1 bundle exec fastlane lanes
 	bundle exec ruby -Ifastlane/test fastlane/test/lanes_test.rb
 

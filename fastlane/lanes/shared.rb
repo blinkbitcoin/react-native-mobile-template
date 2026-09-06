@@ -5,6 +5,18 @@
 #      Ruby -- no `lane`, no `sh`, no fastlane action outside `store_action`.
 #   2. Every call that talks to a store goes through `store_action`, which is
 #      what makes DRY_RUN=1 a real, testable rehearsal of a release.
+require 'json'
+
+# Argument names whose values are credentials. A DRY_RUN=1 rehearsal is exactly
+# the run someone pastes into a PR or leaves in a public Actions log, and
+# GitHub only masks values registered as secrets in that job -- so the dry-run
+# log redacts these itself. The pattern catches names this list has not met yet.
+REDACTED_ARG_KEYS = %i[
+  api_key api_token app_specific_password auth_token demo_password json_key
+  json_key_data key_content key_password keystore_password match_password
+  password private_key store_password token
+].freeze
+REDACTED_ARG_PATTERN = /password|secret|token|private_key|key_content|json_key/
 
 # Fails with a pointer to the runbook rather than a stack trace when a release
 # is started without its credentials.
@@ -18,11 +30,25 @@ end
 # lane can be walked end to end on a laptop or in a CI dry run.
 def store_action(name, **args)
   if ENV['DRY_RUN'] == '1'
-    UI.important("[dry-run] #{name} #{JSON.generate(args)}")
+    UI.important("[dry-run] #{name} #{JSON.generate(loggable_args(args))}")
     return []
   end
 
   args.empty? ? send(name) : send(name, **args)
+end
+
+# Credential-shaped values replaced with `[redacted]`, nested hashes included
+# (`api_key:` is itself a hash whose `key_content` is the App Store Connect .p8).
+def redacted_arg?(key)
+  REDACTED_ARG_KEYS.include?(key.to_sym) || REDACTED_ARG_PATTERN.match?(key.to_s)
+end
+
+def loggable_args(args)
+  args.to_h do |key, value|
+    next [key, '[redacted]'] if redacted_arg?(key)
+
+    [key, value.is_a?(Hash) ? loggable_args(value) : value]
+  end
 end
 
 # App Store Connect API key, assembled from the three secrets CI holds. The .p8
@@ -37,16 +63,26 @@ def api_key
   )
 end
 
+STORE_NOTES_SUFFIX = ' [+more on GitHub]'
+
 # Store-ready release notes, truncated at a word boundary with a pointer to the
-# full changelog. `limit` is the store's own cap (App Store 4000, Play 500).
+# full changelog. `limit` is the store's own cap (App Store 4000, Play 500) and
+# is counted in characters, which is how both stores count. The result is never
+# nil and never longer than `limit`, whatever `limit` is.
 def store_notes(limit)
   path = ENV.fetch('RELEASE_NOTES_STORE_FILE')
   text = File.read(path).strip
+  return '' if limit <= 0
   return text if text.length <= limit
+  # No room for the pointer: hard-cut instead of returning only a suffix.
+  return text[0, limit].rstrip if limit <= STORE_NOTES_SUFFIX.length
 
-  cut = text[0, limit - 24]
-  cut = cut[0, cut.rindex(/\s/) || cut.length]
-  "#{cut.rstrip} [+more on GitHub]"
+  window = text[0, limit - STORE_NOTES_SUFFIX.length]
+  boundary = window.rindex(/\s/)
+  # Only honour a word boundary that keeps most of the window; otherwise a note
+  # whose only space is near the start would lose nearly all of its content.
+  cut = boundary && boundary > window.length / 2 ? window[0, boundary] : window
+  "#{cut.rstrip}#{STORE_NOTES_SUFFIX}"
 end
 
 # build-info.json is written by the build job. Reading it here is the seam that

@@ -33,5 +33,7 @@ Other locales fall back to `en-US` on both stores until translated notes exist.
 | Google Play | changelog | 500 characters |
 
 `store_notes(limit)` truncates at a word boundary and appends
-` [+more on GitHub]` (24 characters, reserved from the limit) when the notes are
-longer than the target allows.
+` [+more on GitHub]` (18 characters, reserved from the limit) when the notes are
+longer than the target allows. A word boundary is only honoured when it keeps
+more than half the available window, and the suffix is dropped entirely when the
+limit is too small to hold it -- the result never exceeds the limit.

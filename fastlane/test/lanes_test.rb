@@ -12,6 +12,7 @@ require_relative '../lanes/shared'
 class LanesTest < Minitest::Test
   def setup
     UI.reset!
+    reset_calls!
     @env = ENV.to_h
   end
 
@@ -61,8 +62,45 @@ class LanesTest < Minitest::Test
     assert notes.end_with?(' [+more on GitHub]'), notes
     # Truncation must not split a word: everything before the suffix is whole words.
     body = notes.sub(' [+more on GitHub]', '')
-    assert_equal body.split.map(&:length).uniq, [4]
+    assert_equal [4], body.split.map(&:length).uniq
     refute_match(/\s\z/, body)
+  end
+
+  def test_store_notes_returns_text_unchanged_at_exactly_the_limit
+    ENV['RELEASE_NOTES_STORE_FILE'] = write_file('a' * 50)
+    assert_equal 'a' * 50, store_notes(50)
+  end
+
+  def test_store_notes_hard_cuts_text_with_no_word_boundary
+    ENV['RELEASE_NOTES_STORE_FILE'] = write_file('a' * 200)
+    notes = store_notes(50)
+
+    assert_equal 50, notes.length
+    assert notes.end_with?(' [+more on GitHub]'), notes
+  end
+
+  def test_store_notes_ignores_a_word_boundary_that_would_lose_most_of_the_window
+    ENV['RELEASE_NOTES_STORE_FILE'] = write_file("x #{'y' * 100}")
+    notes = store_notes(30)
+
+    assert_equal 30, notes.length
+    assert notes.start_with?('x yyy'), notes
+  end
+
+  def test_store_notes_handles_a_limit_smaller_than_the_suffix
+    ENV['RELEASE_NOTES_STORE_FILE'] = write_file('hello world this is long')
+
+    [1, 5, 10, 17, 18].each do |limit|
+      notes = store_notes(limit)
+      refute_nil notes, "limit #{limit} returned nil"
+      assert_operator notes.length, :<=, limit
+      refute_includes notes, '[+more on GitHub]', "limit #{limit} kept the suffix"
+    end
+  end
+
+  def test_store_notes_returns_an_empty_string_for_a_zero_limit
+    ENV['RELEASE_NOTES_STORE_FILE'] = write_file('hello world this is long')
+    assert_equal '', store_notes(0)
   end
 
   def test_store_notes_raises_when_the_file_is_not_configured
@@ -126,5 +164,47 @@ class LanesTest < Minitest::Test
     ENV['DRY_RUN'] = 'true'
     store_action(:match)
     assert_equal [[:match, {}]], $calls
+  end
+
+  # ---------- store_action: secret redaction in the dry-run log ----------
+
+  def test_dry_run_log_redacts_a_nested_api_key
+    ENV['DRY_RUN'] = '1'
+    store_action(:upload_to_testflight, api_key: { key_id: 'K', key_content: 'SECRET' }, ipa: '/tmp/App.ipa')
+
+    log = UI.messages.first
+    refute_includes log, 'SECRET', 'the App Store Connect .p8 must never reach the log'
+    assert_includes log, '[redacted]'
+    assert_includes log, '/tmp/App.ipa'
+  end
+
+  def test_dry_run_log_redacts_every_known_secret_argument
+    ENV['DRY_RUN'] = '1'
+    secrets = {
+      json_key_data: 'SECRET', json_key: 'SECRET', password: 'SECRET',
+      key_password: 'SECRET', store_password: 'SECRET', keystore_password: 'SECRET',
+      match_password: 'SECRET', token: 'SECRET', api_token: 'SECRET',
+      private_key: 'SECRET', key_content: 'SECRET', demo_password: 'SECRET'
+    }
+    store_action(:upload_to_play_store, track: 'production', **secrets)
+
+    log = UI.messages.first
+    refute_includes log, 'SECRET', log
+    assert_includes log, '"track":"production"'
+  end
+
+  def test_dry_run_log_redacts_unfamiliar_credential_shaped_names
+    ENV['DRY_RUN'] = '1'
+    store_action(:gradle, some_new_secret: 'SECRET', properties: { signing_password: 'SECRET' })
+
+    refute_includes UI.messages.first, 'SECRET', UI.messages.first
+  end
+
+  def test_dry_run_log_keeps_non_secret_arguments_readable
+    ENV['DRY_RUN'] = '1'
+    store_action(:upload_to_play_store, track: 'internal', rollout: '0.1', aab: '/tmp/app.aab')
+
+    assert_equal '[dry-run] upload_to_play_store {"track":"internal","rollout":"0.1","aab":"/tmp/app.aab"}',
+                 UI.messages.first
   end
 end
