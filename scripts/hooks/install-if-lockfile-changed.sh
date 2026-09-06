@@ -8,11 +8,16 @@
 # `HEAD@{1}` became `HEAD@0`, so every merge printed
 # `fatal: ambiguous argument 'HEAD@0'` and no install ever ran.
 set -euo pipefail
-cd "$(dirname "$0")/../.."
+# Ask git rather than counting directories up from $0: correct from a
+# subdirectory, from a linked worktree, and if this script ever moves.
+cd "$(git rev-parse --show-toplevel)"
 
 LOCKFILE=pnpm-lock.yaml
-# Overridable so the unit test can watch the decision without installing.
-INSTALL_CMD=${RNW_INSTALL_CMD:-"pnpm install --frozen-lockfile"}
+# Overridable so the unit test can watch the decision without installing. It is
+# split on whitespace into an array once and run from there -- no globbing, no
+# re-splitting at call time -- so the contract is "words", not a quoted path:
+# an argument containing a space needs a wrapper script instead.
+read -ra install_cmd <<<"${RNW_INSTALL_CMD:-pnpm install --frozen-lockfile}"
 
 hook=${1:-}
 shift || true
@@ -43,6 +48,6 @@ for rev in "$old" "$new"; do
 done
 
 if git diff --name-only "$old" "$new" -- "$LOCKFILE" | grep -q .; then
-  echo "$LOCKFILE changed: $INSTALL_CMD"
-  $INSTALL_CMD
+  echo "$LOCKFILE changed: ${install_cmd[*]}"
+  "${install_cmd[@]}"
 fi
