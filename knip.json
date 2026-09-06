@@ -32,7 +32,8 @@
     "react-dom",
     "expo-status-bar",
     "expo-updates",
-    "expo-system-ui"
+    "expo-system-ui",
+    "zod"
   ],
   "ignoreBinaries": ["typos", "maestro", "xcrun", "adb"],
   "jest": { "config": "jest.config.ts" },

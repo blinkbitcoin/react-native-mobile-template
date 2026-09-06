@@ -16,13 +16,17 @@
     "expo-linking": "~57.0.9",
     "expo-localization": "~57.0.1",
     "expo-router": "~57.0.19",
+    "expo-secure-store": "~57.0.3",
+    "expo-sqlite": "~57.0.2",
     "expo-status-bar": "~57.0.1",
+    "expo-updates": "~57.0.21",
     "react": "19.2.3",
     "react-native": "0.86.3",
     "react-native-gesture-handler": "~2.32.0",
     "react-native-reanimated": "4.5.1",
     "react-native-safe-area-context": "~5.7.0",
-    "react-native-screens": "~4.26.2"
+    "react-native-screens": "~4.26.2",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.11",
