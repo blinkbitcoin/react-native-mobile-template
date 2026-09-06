@@ -21,5 +21,7 @@ ln -s "$PWD/node_modules" "$tmp/app/node_modules"
   grep -q '^reactNativeArchitectures=armeabi-v7a,arm64-v8a' android/gradle.properties || { echo "gradle.properties lacks arm-only ABIs" >&2; exit 1; }
   grep -q 'versionCode 42' android/app/build.gradle || { echo "versionCode not injected" >&2; exit 1; }
   grep -q '<string>1.2.3</string>' ios/*/Info.plist || { echo "CFBundleShortVersionString not injected" >&2; exit 1; }
+  grep -q 'UIAppFonts' ios/*/Info.plist || { echo "iOS Info.plist lacks UIAppFonts (bundled font not registered)" >&2; exit 1; }
+  find ios -type d -name 'SplashScreenBackground.colorset' | grep -q . || { echo "iOS project lacks SplashScreenBackground.colorset (expo-splash-screen did not run)" >&2; exit 1; }
 )
 echo "prebuild check passed"

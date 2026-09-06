@@ -6,6 +6,7 @@ const iosBundleId = process.env.IOS_BUNDLE_ID ?? 'com.example.rnmt';
 const androidPackage = process.env.ANDROID_PACKAGE ?? 'com.example.rnmt';
 const otaEnabled = process.env.OTA_ENABLED === 'true';
 const buildStamp = `${variant}-${process.env.GITHUB_SHA?.slice(0, 7) ?? 'local'}-${new Date().toISOString().slice(0, 10)}`;
+const webDomain = process.env.EXPO_PUBLIC_WEB_DOMAIN;
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
@@ -16,13 +17,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   orientation: 'portrait',
   userInterfaceStyle: 'automatic',
   icon: './assets/icon.png',
-  // NOTE: SDK 57's `ExpoConfig` dropped the top-level `splash` field (splash screens
-  // are now configured exclusively via the standalone `expo-splash-screen` plugin,
-  // which is not installed in this task's scope). Left for a future task to wire up.
   ios: {
     bundleIdentifier: isDev ? `${iosBundleId}.dev` : iosBundleId,
     buildNumber: process.env.APP_BUILD_NUMBER ?? '1',
     supportsTablet: false,
+    associatedDomains: webDomain ? [`applinks:${webDomain}`] : [],
   },
   android: {
     package: isDev ? `${androidPackage}.dev` : androidPackage,
@@ -34,6 +33,16 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundColor: '#E6F4FE',
     },
     predictiveBackGestureEnabled: false,
+    intentFilters: webDomain
+      ? [
+          {
+            action: 'VIEW',
+            autoVerify: true,
+            data: [{ scheme: 'https', host: webDomain, pathPrefix: '/' }],
+            category: ['BROWSABLE', 'DEFAULT'],
+          },
+        ]
+      : [],
   },
   web: { bundler: 'metro', output: 'static', favicon: './assets/favicon.png' },
   runtimeVersion: { policy: 'fingerprint' },
@@ -59,5 +68,16 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ['./plugins/with-build-stamp', { stamp: buildStamp }],
     './plugins/with-android-release-signing',
     './plugins/with-android-release-abis',
+    [
+      'expo-splash-screen',
+      {
+        image: './assets/splash-icon.png',
+        imageWidth: 200,
+        resizeMode: 'contain',
+        backgroundColor: '#ffffff',
+        dark: { backgroundColor: '#0b0b0f' },
+      },
+    ],
+    ['expo-font', { fonts: ['./assets/fonts/Inter-Variable.ttf'] }],
   ],
 });

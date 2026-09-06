@@ -5,5 +5,13 @@ type Variant = 'title' | 'body' | 'caption';
 
 export function AppText({ variant = 'body', style, ...props }: TextProps & { variant?: Variant }) {
   const { colors, typography } = useTheme();
-  return <Text {...props} style={[{ fontSize: typography[variant], color: colors.text }, style]} />;
+  return (
+    <Text
+      {...props}
+      style={[
+        { fontFamily: 'InterVariable', fontSize: typography[variant], color: colors.text },
+        style,
+      ]}
+    />
+  );
 }
