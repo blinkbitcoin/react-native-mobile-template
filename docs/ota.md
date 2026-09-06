@@ -93,15 +93,25 @@ Scope `OTA_PUBLISH_TOKEN` per GitHub Environment (`internal`, `beta`,
 `production`) so a leaked internal token cannot publish to production. The
 callers pass `environment:` to `expo-ota-publish.yml` for exactly that reason.
 
-`EXPO_UPDATES_URL` does double duty: besides being compiled into the binary, the
-three in-pipeline callers pass it as `manifest-url` so that after each publish
+`EXPO_UPDATES_URL` does double duty: besides being compiled into the binary,
+every caller passes it as `manifest-url` so that after each publish
 the workflow fetches the manifest a client would fetch, with the same `expo-*`
 headers, and fails when it does not come back. A publish that "succeeded" but
 serves nothing is otherwise indistinguishable from a working one until a user
 opens the app. The check defaults to the iOS platform, so the callers pair it
 with `runtime-version: ${{ needs.prepare.outputs.fp-ios }}`. `ota-hotfix.yml`
-has no prepare job and therefore no fingerprint to send, so it skips the smoke
-check rather than risk failing a good publish on a missing header.
+has no prepare job, but it does resolve a baseline release — and that release's
+`build-info.json` carries the `fingerprint.ios` of the binary currently
+installed on the channel, which is exactly the runtime version to ask for. Its
+`baseline` job downloads it and passes it on, so a hotfix (the publish most
+likely to be made under pressure) is checked like every other. When the baseline
+carries no fingerprint, the smoke check is skipped rather than failing a good
+publish on a missing header.
+
+`ota-hotfix.yml`'s `baseline` job carries the same `vars.OTA_ENABLED == 'true'`
+condition as its `publish` job: on a repo with OTA off a dispatch would
+otherwise burn a runner and fail with "no baseline release found", which reads
+as a hotfix problem rather than "OTA is not enabled here".
 
 Then rebuild and ship a store build. An OTA update can only reach a binary that
 was compiled with `OTA_ENABLED=true` and the right certificate — turning the

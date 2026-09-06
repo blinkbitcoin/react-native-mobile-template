@@ -105,9 +105,17 @@ and takes Play to 100%. `action: halt` stops both. See
 ## Versions and build numbers
 
 - **Version** comes from `scripts/release/resolve-version.sh`: a stable `vX.Y.Z`
-  tag on HEAD → the open release PR's title → the newest stable tag with its
-  patch bumped → `0.0.1`. Prerelease tags are ignored at every step. Internal
-  builds therefore already carry the version that will be released.
+  tag on HEAD → a HEAD subject of `chore(main): release X.Y.Z` → the open
+  release PR's title → the newest stable tag with its patch bumped → `0.0.1`.
+  Prerelease tags are ignored at every step. Internal builds therefore already
+  carry the version that will be released.
+  - The subject source is what makes that true on the one commit where it
+    matters. `release-please` and `release-internal` are triggered by the same
+    push to main and run concurrently, so on the release commit the `vX.Y.Z` tag
+    does not exist yet, `RELEASE_PR_TITLE` is empty (a push carries no PR) and
+    the `autorelease: pending` PR has just been merged. Without it a `0.2.0`
+    release built and uploaded `0.1.1`, and `release-beta` then asked for a
+    `v0.2.0-build.N` pre-release nothing had ever created.
 - **Build number** = `git rev-list --count --first-parent HEAD` plus
   `BUILD_NUMBER_OFFSET` (repo variable, default `1000`). Identical on both
   platforms, derivable from the tagged commit alone, monotonic on main and
@@ -136,6 +144,26 @@ Preview locally with `make release-notes` (or `make release-notes TAG=vX.Y.Z`).
 body before promoting. Its line structure is kept as written; it still goes
 through the same hygiene filter, so a link or a `#123` in it is removed rather
 than shipped.
+
+`release-beta` writes that section itself after promoting (`github-release` in
+`append` mode, marker-delimited and idempotent), so the release body always
+shows what the pipeline actually shipped — and an operator editing it for the
+next stage has the heading in front of them rather than typing it from memory.
+`release-production` appends a `## Production` line the same way
+(`<action> at <time>, platforms <x>, rollout <n>%`), so the release records
+which stage it reached.
+
+Both append jobs upload their section under a filename that is deliberately
+*not* one of `github-release`'s fixed asset names: that mode regenerates
+`SHA256SUMS` over whatever of the fixed set it finds, and an artifact carrying
+one of those names would replace the checksums of the release's binaries.
+
+**Locales.** `notes.mjs` emits one entry per locale directory under
+`fastlane/metadata/ios` unless `--locales` or `$NOTES_LOCALES` (which is what
+`expo-prepare`'s `notes-locales` input becomes) says otherwise. Use the
+*metadata* locale names there — `en-US`, not `en`: the lanes look a locale up in
+`store-notes.json` by directory name, and a key they cannot find sends every
+locale back to the single-locale fallback and throws the LLM pass away.
 
 **Audience split.** Store notes are prose for end users; the grouped technical
 changelog with PR links stays on GitHub (release body + `CHANGELOG.md`). Set the
@@ -183,7 +211,7 @@ anyone who can see the run. Credentials go in `secrets:` instead.
 | `TESTFLIGHT_INTERNAL_GROUP` | `release-internal` iOS upload | Group name in App Store Connect → TestFlight |
 | `TESTFLIGHT_EXTERNAL_GROUP` | `release-beta` iOS promote | External group name; must already exist and be approved |
 | `PLAY_UPDATE_PRIORITY` | Android upload / production | `0`–`5`, Play in-app update priority |
-| `ANDROID_UPLOAD_CERT_SHA256` | `android verify` lane → `verify-android.sh --cert-sha256` (via `build-env`) | `keytool -list -v -keystore upload.keystore`, the SHA-256 line. **Leave it unset and the signature check reports `skip`** — the gate that exists to catch a wrong signing identity stops checking |
+| `ANDROID_UPLOAD_CERT_SHA256` | `verify-android.sh`, read from the environment (via `build-env`); `--cert-sha256` is the manual override | `keytool -list -v -keystore upload.keystore`, the SHA-256 line. **Leave it unset and the signature check reports `skip`** — the gate that exists to catch a wrong signing identity stops checking |
 | `OTA_ENABLED` | `app.config.ts` at build time (via `build-env`) and the `if:` on every `ota-*` job | `true` to turn OTA on; see [ota.md](ota.md) |
 | `EXPO_UPDATES_URL` | `app.config.ts` at build time (via `build-env`) and the OTA manifest smoke check | Public origin of the update server |
 | `OTA_CLI_VERSION` | `expo-ota-publish` | Exact `eoas` version; the publish script refuses to run unpinned |
@@ -245,10 +273,14 @@ outright. Configure both or neither — the workflows branch on the id being set
 ### Concurrency: which workflows share a queue
 
 Every **store-affecting** workflow — `release-internal`, `release-beta`,
-`release-production`, `ota-hotfix` — shares
-`concurrency: release-${{ github.ref }}` with `cancel-in-progress: false`, so two
-of them can never touch a store at the same time and none is ever cancelled
-half-way.
+`release-production`, `ota-hotfix` — shares `concurrency: release` with
+`cancel-in-progress: false`, so two of them can never touch a store at the same
+time and none is ever cancelled half-way.
+
+The group is a **constant**, not `release-${{ github.ref }}`. `github.ref` is
+`refs/heads/main` on a push or a dispatch but `refs/tags/vX.Y.Z` on a
+`release: published` event, so a ref-keyed group put `release-beta` in a queue of
+its own — and the same workflow changed queue depending on how it was started.
 
 `release-please` and `release-retry` deliberately have their own groups
 (`release-please-*`, `release-retry-*`). GitHub keeps only one *pending* run per
@@ -335,7 +367,12 @@ number and bundle id against `APP_VERSION` / `APP_BUILD_NUMBER` /
 embedded provisioning profile and `get-task-allow` (skipped under
 `--no-signing`, which is what a local unsigned archive needs); that
 `Expo.plist`'s `EXUpdatesEnabled` agrees with `OTA_ENABLED`, and that an
-OTA-enabled build carries an update URL; that `main.jsbundle` is Hermes
+OTA-enabled build carries an update URL, a runtime version (compared against
+`fingerprint.ios` in `build-info.json` when there is one) and an
+`expo-channel-name` request header of `production` — the two settings that
+decide whether a published update is ever *offered* to the binary, and the ones
+whose failure is invisible until someone notices an OTA that "published fine"
+and reached nobody; that `main.jsbundle` is Hermes
 bytecode and carries no development markers; and, with `--dsym`, that the
 dSYM's UUIDs cover the binary's. The `ios verify` lane passes the archive's own
 `dSYMs/` directory, so that last check runs in CI without being asked.
@@ -346,10 +383,20 @@ and the AAB with `bundletool`, checks both against `APP_VERSION` /
 from a different bundle than the one being uploaded is the mistake this exists
 to catch), refuses a debuggable build or a `minSdkVersion` below 24, refuses any
 `lib/x86*` and requires an arm ABI, verifies the signature with `apksigner`
-(compared against `--cert-sha256`, or `ANDROID_UPLOAD_CERT_SHA256` when the flag
-is absent), checks the OTA meta-data the same way iOS does, and compares the
-APK's SHA-256 with `artifacts.apkSha256` in `build-info.json` when the release
-workflow has filled it in.
+(read from `ANDROID_UPLOAD_CERT_SHA256`, or from `--cert-sha256` as the manual
+override), checks the OTA meta-data the same way iOS does — including
+`expo.modules.updates.EXPO_RUNTIME_VERSION` and the `expo-channel-name` entry in
+`UPDATES_CONFIGURATION_REQUEST_HEADERS_KEY` — and compares the APK's SHA-256
+with `artifacts.apkSha256` in `build-info.json`.
+
+That last one is no longer a permanent `skip`: the `android build` lane now
+records `artifacts.aabSha256` and `artifacts.apkSha256` (the AAB it produced and
+the universal APK extracted from that same bundle) into a **copy** of
+build-info.json written to `$RNW_OUTPUT_DIR/build-info.json`, next to the
+artifacts. That copy is the gate's default source; `BUILD_INFO_FILE` overrides
+it. CI currently sets `BUILD_INFO_FILE` to the `release-meta` copy, which the
+build lane does not touch, so the check reports `skip` in the build job until
+the workflows repo points it at the output directory.
 
 Both gates check every `EXPO_PUBLIC_*` name in `.env.example`: Expo inlines the
 *values*, so for each name that is set and non-empty in the environment at
@@ -439,9 +486,11 @@ bundle exec fastlane ios upload_internal
 bundle exec fastlane android rollout percent:50
 ```
 
-Two things to expect. The lanes **write** into `fastlane/metadata/` (release
-notes and `changelogs/<versionCode>.txt`), so rehearse in a scratch copy of the
-checkout or restore the tree afterwards. And both `release_production` lanes
+One thing to expect. Under `DRY_RUN=1` the lanes do **not** write into
+`fastlane/metadata/`: the release notes and `changelogs/<versionCode>.txt` a real
+run would produce are logged as `[dry-run] would write <path>` instead, so a
+rehearsal leaves the working tree exactly as it found it. And both
+`release_production` lanes
 stop on the shipped placeholder prose (`Replace this text ...`) in
 `description.txt` / `full_description.txt` — that gate is the point, so replace
 the copy for your own app before reading anything into the failure.
