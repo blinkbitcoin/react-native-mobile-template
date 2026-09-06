@@ -386,6 +386,38 @@ class LanesTest < Minitest::Test
     assert_equal '/tmp/rnw-out', output_dir('ios')
   end
 
+  # ---------- artifact_dir (where a publish lane reads the binary from) ----------
+
+  def test_artifact_dir_prefers_the_download_directory_over_the_build_output
+    Dir.mktmpdir do |dir|
+      assets = File.join(dir, 'assets')
+      FileUtils.mkdir_p(assets)
+      ENV['RNW_ASSETS_DIR'] = assets
+      ENV['RNW_OUTPUT_DIR'] = dir
+      # The publish job downloads into $RNW_ASSETS_DIR and builds nothing, so
+      # $RNW_OUTPUT_DIR is one level above the binaries there.
+      assert_equal assets, artifact_dir('ios')
+      assert_equal dir, output_dir('ios')
+    end
+  end
+
+  def test_artifact_dir_falls_back_to_the_output_dir_when_nothing_was_downloaded
+    Dir.mktmpdir do |dir|
+      ENV['RNW_ASSETS_DIR'] = File.join(dir, 'never-created')
+      ENV['RNW_OUTPUT_DIR'] = dir
+      assert_equal dir, artifact_dir('android')
+
+      ENV.delete('RNW_ASSETS_DIR')
+      assert_equal dir, artifact_dir('android')
+    end
+  end
+
+  def test_artifact_dir_falls_all_the_way_back_to_the_default_output_dir
+    ENV.delete('RNW_ASSETS_DIR')
+    ENV.delete('RNW_OUTPUT_DIR')
+    assert_equal root_path('artifacts', 'ios'), artifact_dir('ios')
+  end
+
   # ---------- metadata locales, release notes, placeholder gate ----------
 
   def test_metadata_locales_skips_the_non_locale_directories
@@ -437,6 +469,88 @@ class LanesTest < Minitest::Test
     end
   end
 
+  # A tree with no locales in it wrote no notes and raised nothing, so
+  # release_production would have submitted for review with none.
+  def test_assert_metadata_ready_refuses_a_tree_with_no_locales
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, 'review_information'))
+      error = assert_raises(UI::UserError) { assert_metadata_ready!(dir) }
+      assert_includes error.message, 'No locale directories'
+      assert_includes error.message, dir
+    end
+  end
+
+  def test_write_release_notes_refuses_a_tree_with_no_locales
+    Dir.mktmpdir do |dir|
+      ENV['RELEASE_NOTES_STORE_FILE'] = write_file('Some notes.')
+      error = assert_raises(UI::UserError) do
+        write_release_notes!(dir, kind: :appstore, limit: 4000)
+      end
+      assert_includes error.message, 'No locale directories'
+    end
+  end
+
+  def test_write_release_notes_writes_nothing_under_dry_run
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, 'en-US'))
+      ENV['RELEASE_NOTES_STORE_FILE'] = write_file('Some notes.')
+      ENV['DRY_RUN'] = '1'
+      written = write_release_notes!(dir, kind: :play, limit: 500, changelog_name: '42.txt')
+
+      assert_equal [File.join(dir, 'en-US', 'changelogs', '42.txt')], written
+      refute File.exist?(written.first), 'a rehearsal must not modify the working tree'
+      assert(UI.messages.any? { |m| m.include?('[dry-run] would write') }, UI.messages.inspect)
+    end
+  end
+
+  # ---------- truncation is one rule ----------
+
+  def test_the_per_locale_notes_are_truncated_the_same_way_as_the_shared_file
+    long = "#{'word ' * 200}end"
+    ENV['STORE_NOTES_JSON'] = write_file(JSON.generate({ 'en-US' => { 'play' => long } }))
+    ENV['RELEASE_NOTES_STORE_FILE'] = write_file(long)
+
+    assert_equal store_notes(500), locale_store_notes('en-US', :play, 500)
+    assert(locale_store_notes('en-US', :play, 500).end_with?(STORE_NOTES_SUFFIX),
+           'the per-locale path used to hard-cut without the pointer')
+  end
+
+  # ---------- build-info artifact checksums ----------
+
+  def test_write_build_info_artifacts_merges_the_checksums_into_a_copy
+    Dir.mktmpdir do |dir|
+      source = File.join(dir, 'release-meta', 'build-info.json')
+      FileUtils.mkdir_p(File.dirname(source))
+      File.write(source, JSON.generate({ 'version' => '1.2.3', 'artifacts' => {} }))
+      ENV['BUILD_INFO_FILE'] = source
+      out = File.join(dir, 'out')
+      FileUtils.mkdir_p(out)
+
+      written = write_build_info_artifacts!(out, aabSha256: 'aaa', apkSha256: 'bbb')
+
+      assert_equal File.join(out, 'build-info.json'), written
+      info = JSON.parse(File.read(written))
+      assert_equal({ 'aabSha256' => 'aaa', 'apkSha256' => 'bbb' }, info['artifacts'])
+      assert_equal '1.2.3', info['version'], 'the rest of the record must survive'
+      # The source is an input to this build; rewriting it in place would make a
+      # re-run depend on how far the previous one got.
+      assert_equal({}, JSON.parse(File.read(source))['artifacts'])
+    end
+  end
+
+  def test_write_build_info_artifacts_says_so_when_there_is_nothing_to_merge_into
+    Dir.mktmpdir do |dir|
+      ENV['BUILD_INFO_FILE'] = File.join(dir, 'absent.json')
+      assert_nil write_build_info_artifacts!(dir, apkSha256: 'bbb')
+      assert(UI.messages.any? { |m| m.include?('artifact checksums not recorded') }, UI.messages.inspect)
+    end
+  end
+
+  def test_file_sha256_is_the_hex_digest_every_other_tool_prints
+    file = write_file('hello')
+    assert_equal '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824', file_sha256(file)
+  end
+
   # ---------- assert_project_version! ----------
 
   def test_assert_project_version_accepts_matching_numbers
@@ -472,7 +586,7 @@ class LaneBehaviourTest < Minitest::Test
 
   # Env keys a test must not inherit from the shell that ran the suite.
   CLEARED_ENV = %w[
-    DRY_RUN RNW_OUTPUT_DIR STORE_NOTES_JSON PLAY_ROLLOUT PLAY_UPDATE_PRIORITY
+    DRY_RUN RNW_OUTPUT_DIR RNW_ASSETS_DIR STORE_NOTES_JSON PLAY_ROLLOUT PLAY_UPDATE_PRIORITY
     IOS_PHASED_RELEASE PLAY_SERVICE_ACCOUNT_JSON_PATH BUNDLETOOL_JAR CI
     APP_REVIEW_FIRST_NAME APP_REVIEW_LAST_NAME APP_REVIEW_PHONE APP_REVIEW_EMAIL
     APP_REVIEW_DEMO_USER APP_REVIEW_DEMO_PASSWORD APP_REVIEW_NOTES
@@ -634,6 +748,34 @@ class LaneBehaviourTest < Minitest::Test
     end
   end
 
+  # The publish job never builds: `fastlane-lane.yml` downloads the build job's
+  # artifacts into $RNW_ASSETS_DIR, one level *below* $RNW_OUTPUT_DIR. Reading
+  # the output directory here handed pilot a path with no ipa at it, on every
+  # single run.
+  def test_ios_upload_internal_reads_the_ipa_from_the_download_directory
+    in_project do |dir|
+      assets = File.join(dir, 'rnw-out', 'assets')
+      FileUtils.mkdir_p(assets)
+      File.write(File.join(assets, 'App.ipa'), 'ipa')
+      ENV['RNW_OUTPUT_DIR'] = File.join(dir, 'rnw-out')
+      ENV['RNW_ASSETS_DIR'] = assets
+      stub_result(:latest_testflight_build_number, 41)
+      run_lane(:ios, :upload_internal)
+
+      assert_equal File.join(assets, 'App.ipa'), args_for(:upload_to_testflight)[:ipa]
+    end
+  end
+
+  def test_ios_upload_internal_lets_an_explicit_ipa_win_over_both_directories
+    in_project do |dir|
+      ENV['RNW_ASSETS_DIR'] = dir
+      stub_result(:latest_testflight_build_number, 41)
+      run_lane(:ios, :upload_internal, ipa: '/somewhere/else/App.ipa')
+
+      assert_equal '/somewhere/else/App.ipa', args_for(:upload_to_testflight)[:ipa]
+    end
+  end
+
   def test_ios_upload_internal_refuses_an_artifact_from_another_release
     in_project do |dir|
       File.write(File.join(dir, 'build-info.json'), JSON.generate({ 'version' => '9.9.9', 'buildNumber' => 42 }))
@@ -775,6 +917,33 @@ class LaneBehaviourTest < Minitest::Test
       assert args[:skip_upload_metadata], 'the public listing is synced only from release_production'
       refute args[:skip_upload_changelogs]
       assert_equal '{"type":"service_account"}', args[:json_key_data]
+    end
+  end
+
+  def test_android_upload_internal_reads_the_aab_and_mapping_from_the_download_directory
+    in_project do |dir|
+      assets = File.join(dir, 'rnw-out', 'assets')
+      FileUtils.mkdir_p(assets)
+      File.write(File.join(assets, 'app-release.aab'), 'aab')
+      File.write(File.join(assets, 'mapping.txt'), 'mapping')
+      ENV['RNW_OUTPUT_DIR'] = File.join(dir, 'rnw-out')
+      ENV['RNW_ASSETS_DIR'] = assets
+      stub_result(:google_play_track_version_codes, [41])
+      run_lane(:android, :upload_internal)
+
+      args = args_for(:upload_to_play_store)
+      assert_equal File.join(assets, 'app-release.aab'), args[:aab]
+      assert_equal File.join(assets, 'mapping.txt'), args[:mapping]
+    end
+  end
+
+  def test_android_upload_internal_lets_an_explicit_aab_win_over_both_directories
+    in_project do |dir|
+      ENV['RNW_ASSETS_DIR'] = dir
+      stub_result(:google_play_track_version_codes, [41])
+      run_lane(:android, :upload_internal, aab: '/somewhere/else/app-release.aab')
+
+      assert_equal '/somewhere/else/app-release.aab', args_for(:upload_to_play_store)[:aab]
     end
   end
 

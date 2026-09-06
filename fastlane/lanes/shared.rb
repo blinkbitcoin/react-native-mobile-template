@@ -96,8 +96,13 @@ STORE_NOTES_SUFFIX = ' [+more on GitHub]'
 # is counted in characters, which is how both stores count. The result is never
 # nil and never longer than `limit`, whatever `limit` is.
 def store_notes(limit)
-  path = ENV.fetch('RELEASE_NOTES_STORE_FILE')
-  text = File.read(path).strip
+  truncate_store_text(File.read(ENV.fetch('RELEASE_NOTES_STORE_FILE')).strip, limit)
+end
+
+# The one truncation rule. Both callers -- the single-locale file and the
+# per-locale store-notes.json -- go through it, so a note that reaches a store
+# is cut the same way whichever source it came from.
+def truncate_store_text(text, limit)
   return '' if limit <= 0
   return text if text.length <= limit
   # No room for the pointer: hard-cut instead of returning only a suffix.
@@ -203,6 +208,58 @@ def output_dir(platform)
   return root_path('artifacts', platform.to_s) if dir.empty?
 
   File.absolute_path?(dir) ? dir : root_path(dir)
+end
+
+# The directory a lane *reads* a finished artifact from, which is not the one
+# it would write to. A build job archives into $RNW_OUTPUT_DIR; a publish job
+# never builds anything -- it downloads the build job's artifacts into
+# $RNW_ASSETS_DIR and uploads from there. Reading $RNW_OUTPUT_DIR in a publish
+# job pointed the upload lanes one directory above the binaries, which failed
+# the very first store stage of every run.
+#
+# Precedence, highest first:
+#   1. the lane's own `ipa:` / `aab:` / `apk:` option (handled at the call site)
+#   2. $RNW_ASSETS_DIR   -- the download directory in a publish job
+#   3. $RNW_OUTPUT_DIR   -- the build output directory (via output_dir)
+#
+# A set-but-missing $RNW_ASSETS_DIR falls through rather than failing here: it
+# means nothing was downloaded, and `output_dir` is then the honest answer for
+# a lane run on a laptop with a stale variable in its shell.
+def artifact_dir(platform)
+  assets = ENV['RNW_ASSETS_DIR'].to_s.strip
+  return assets if !assets.empty? && Dir.exist?(assets)
+
+  output_dir(platform)
+end
+
+# sha256 of a file, in the hex form every other tool in the release path prints.
+def file_sha256(path)
+  require 'digest'
+  Digest::SHA256.file(path).hexdigest
+end
+
+# build-info.json is written before the artifacts exist, so its `artifacts`
+# object starts empty and the "APK derived from the exact AAB" gate had nothing
+# to compare against. The build lane is the only place that knows the checksums
+# of the AAB Play will receive and of the universal APK extracted from that same
+# bundle, so it merges them in here.
+#
+# The source file is copied rather than rewritten: it is an input to this build
+# (the publish job reads the same one), and a lane that edited it in place would
+# make a re-run of the build depend on how far the previous run got.
+def write_build_info_artifacts!(dir, artifacts)
+  source = ENV['BUILD_INFO_FILE'].to_s.strip
+  source = root_path('build-info.json') if source.empty?
+  unless File.exist?(source)
+    UI.important("No build-info.json at #{source} — artifact checksums not recorded")
+    return nil
+  end
+
+  info = JSON.parse(File.read(source))
+  info['artifacts'] = (info['artifacts'] || {}).merge(artifacts.transform_keys(&:to_s))
+  destination = File.join(dir, 'build-info.json')
+  File.write(destination, "#{JSON.pretty_generate(info)}\n")
+  destination
 end
 
 def prepare_output_dir!(dir)
@@ -326,9 +383,7 @@ def locale_store_notes(locale, kind, limit, notes_json = store_notes_json)
     require_env!(%w[RELEASE_NOTES_STORE_FILE])
     return store_notes(limit)
   end
-  return text if text.length <= limit
-
-  text[0, limit].rstrip
+  truncate_store_text(text, limit)
 end
 
 # Writes the release notes every store reads out of its metadata tree. deliver
@@ -337,18 +392,29 @@ end
 # can log exactly what a submission will carry.
 def write_release_notes!(metadata_path, kind:, limit:, changelog_name: nil)
   notes_json = store_notes_json
-  metadata_locales(metadata_path).map do |locale|
+  locales = metadata_locales(metadata_path)
+  # An empty locale list writes nothing and returns [], which reads exactly like
+  # a successful run: `release_production` would go on to submit for review with
+  # no release notes at all. An empty tree, or a path that resolved somewhere
+  # else, is a mistake, and this is the last moment anyone can be told.
+  assert_metadata_locales!(metadata_path, locales)
+  locales.map do |locale|
     text = locale_store_notes(locale, kind, limit, notes_json)
     path =
       if changelog_name
-        dir = File.join(metadata_path, locale, 'changelogs')
-        require 'fileutils'
-        FileUtils.mkdir_p(dir)
-        File.join(dir, changelog_name)
+        File.join(metadata_path, locale, 'changelogs', changelog_name)
       else
         File.join(metadata_path, locale, 'release_notes.txt')
       end
-    File.write(path, "#{text}\n")
+    # A rehearsal must not leave modified files behind in a working tree: the
+    # whole point of DRY_RUN=1 is that it can be run on a laptop.
+    if ENV['DRY_RUN'] == '1'
+      UI.important("[dry-run] would write #{path} (#{text.length} chars)")
+    else
+      require 'fileutils'
+      FileUtils.mkdir_p(File.dirname(path))
+      File.write(path, "#{text}\n")
+    end
     path
   end
 end
@@ -358,7 +424,17 @@ end
 # submission is the last moment anyone can still be told.
 METADATA_PLACEHOLDER = 'Replace this text'
 
+# A metadata tree with no locale directories in it. Every caller of this and of
+# `write_release_notes!` would otherwise pass silently on a tree that is empty
+# or, more likely, on a path that resolved to the wrong place.
+def assert_metadata_locales!(metadata_path, locales = metadata_locales(metadata_path))
+  return unless locales.empty?
+
+  UI.user_error!("No locale directories under #{metadata_path} — store metadata is missing or the path is wrong (see docs/release-runbook.md)")
+end
+
 def assert_metadata_ready!(metadata_path)
+  assert_metadata_locales!(metadata_path)
   offenders = Dir.glob(File.join(metadata_path, '**', '*.txt')).sort.select do |file|
     File.read(file).include?(METADATA_PLACEHOLDER)
   end

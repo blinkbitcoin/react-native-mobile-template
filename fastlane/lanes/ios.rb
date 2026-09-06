@@ -143,7 +143,9 @@ platform :ios do
     args = {
       api_key: key,
       app_identifier: bundle_id,
-      ipa: options[:ipa] || File.join(output_dir('ios'), "#{ENV.fetch('IOS_SCHEME')}.ipa"),
+      # artifact_dir, not output_dir: this job downloaded the build job's
+      # artifacts into $RNW_ASSETS_DIR and has nothing of its own to upload.
+      ipa: options[:ipa] || File.join(artifact_dir('ios'), "#{ENV.fetch('IOS_SCHEME')}.ipa"),
       changelog: store_notes(TESTFLIGHT_NOTES_LIMIT),
       skip_submission: true,
       distribute_external: false,

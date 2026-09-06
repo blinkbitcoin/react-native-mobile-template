@@ -123,8 +123,19 @@ platform :android do
     end
     # build-apks writes a zip; the universal APK is the single entry inside it.
     # rubyzip comes with fastlane, so this needs no `unzip` on the runner.
-    extract_universal_apk!(apks, File.join(out, 'app-universal.apk'))
+    apk = extract_universal_apk!(apks, File.join(out, 'app-universal.apk'))
     FileUtils.rm_f(apks)
+
+    # The provenance record of what this build actually produced. verify-android's
+    # `apk-sha` check compares the APK it is handed against `artifacts.apkSha256`,
+    # which is what catches a universal APK built from a different bundle than the
+    # one being uploaded.
+    written = write_build_info_artifacts!(
+      out,
+      aabSha256: file_sha256(File.join(out, 'app-release.aab')),
+      apkSha256: file_sha256(apk)
+    )
+    UI.message("Artifact checksums recorded in #{written}") if written
   end
 
   desc 'Run the Android artifact verification gate'
@@ -145,7 +156,9 @@ platform :android do
     build_info # asserts the artifact belongs to this version/build number
     package = ENV.fetch('ANDROID_PACKAGE')
     version_code = ENV.fetch('APP_BUILD_NUMBER')
-    out = output_dir('android')
+    # artifact_dir, not output_dir: this job downloaded the build job's
+    # artifacts into $RNW_ASSETS_DIR and has nothing of its own to upload.
+    out = artifact_dir('android')
 
     # Play rejects a duplicate version code outright, which turns any retry of
     # the release job into a red build. Ask first.
