@@ -1,0 +1,17 @@
+appId: ${APP_ID}
+---
+# Pop the current native-stack screen. Maestro's `back` is a left-edge swipe on
+# iOS, which the react-native-screens header does not accept reliably, so tap
+# the navigation-bar back button there; on Android the hardware back key is the
+# right gesture and no `BackButton` id exists.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: 'BackButton'
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back

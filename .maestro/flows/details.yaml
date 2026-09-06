@@ -7,10 +7,6 @@ tags: [smoke]
     id: details-id
 - assertVisible:
     text: '42'
-# Maestro's `back` is a left-edge swipe on iOS, which the native stack header
-# does not accept reliably; tap the header back button instead. `BackButton` is
-# the id react-native-screens gives the iOS navigation-bar back button.
-- tapOn:
-    id: 'BackButton'
+- runFlow: ../helpers/go-back.yaml
 - assertVisible:
     id: home-screen

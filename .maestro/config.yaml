@@ -5,6 +5,9 @@ includeTags:
 # Maestro 2.x does not order a glob alphabetically, and every flow after
 # 00-launch assumes the app is already foregrounded on Home, so the order is
 # pinned explicitly.
+# NOTE: a new flow must be added to `flowsOrder` below, otherwise Maestro runs
+# it in an arbitrary position (or not at all) and it will not see the app state
+# the other flows leave behind.
 executionOrder:
   flowsOrder:
     - 00-launch
