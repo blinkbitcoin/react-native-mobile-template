@@ -4,6 +4,7 @@ import { AppText } from '@/components/AppText';
 import { Screen } from '@/components/Screen';
 import { constants } from '@/config/constants';
 import { DevMenu } from './DevMenu';
+import { NativeDemoCard } from './NativeDemoCard';
 
 const TAPS_TO_REVEAL = 7;
 
@@ -18,6 +19,7 @@ export function SettingsScreen() {
       <AppText variant="title" testID="settings-title" onPress={() => setTaps((n) => n + 1)}>
         <Trans>Settings</Trans>
       </AppText>
+      <NativeDemoCard />
       {revealed ? <DevMenu /> : null}
     </Screen>
   );

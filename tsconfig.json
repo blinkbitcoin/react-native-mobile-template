@@ -12,6 +12,13 @@
     "paths": { "@/*": ["src/*"] },
     "types": ["jest", "node"]
   },
-  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "src/global.d.ts"],
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "modules/**/*.ts",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts",
+    "src/global.d.ts"
+  ],
   "exclude": ["node_modules", "ios", "android", "dist", ".rnw", "plugins/**/*.test.ts"]
 }

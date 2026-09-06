@@ -51,7 +51,7 @@ msgstr "No encontrado"
 msgid "Open details"
 msgstr "Abrir detalles"
 
-#: src/features/settings/SettingsScreen.tsx:19
+#: src/features/settings/SettingsScreen.tsx:20
 msgid "Settings"
 msgstr "Ajustes"
 
