@@ -83,6 +83,7 @@
     "i18n:check": "bash scripts/check-i18n.sh",
     "codegen": "graphql-codegen --config codegen.ts",
     "codegen:check": "bash scripts/check-codegen.sh",
+    "check-prebuild": "bash scripts/check-prebuild.sh",
     "mock-api": "tsx mocks/server.ts"
   }
 }

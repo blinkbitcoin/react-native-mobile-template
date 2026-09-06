@@ -59,6 +59,9 @@ check-gen: ## Generated-file drift (i18n, codegen)
 	pnpm i18n:check
 	pnpm codegen:check
 
+check-prebuild: ## Prebuild both platforms into a temp dir and assert plugin output
+	pnpm check-prebuild
+
 check-code: typecheck lint format-check knip spell ## Fast local gate: types + lint + format + knip + spell
 
 unit: ## Unit + component tests
@@ -78,4 +81,4 @@ reset: clean ## clean + reinstall
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: doctor install start ios android web mock-api prebuild i18n codegen typecheck lint format format-check knip spell check-gen check-code unit coverage test clean reset help
+.PHONY: doctor install start ios android web mock-api prebuild i18n codegen typecheck lint format format-check knip spell check-gen check-prebuild check-code unit coverage test clean reset help

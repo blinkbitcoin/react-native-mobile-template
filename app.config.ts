@@ -50,5 +50,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     : { enabled: false },
   experiments: { typedRoutes: true },
   extra: { variant, otaEnabled, buildStamp },
-  plugins: ['expo-router', 'expo-localization', 'expo-secure-store', 'expo-sqlite', 'expo-updates'],
+  plugins: [
+    'expo-router',
+    'expo-localization',
+    'expo-secure-store',
+    'expo-sqlite',
+    'expo-updates',
+    ['./plugins/with-build-stamp', { stamp: buildStamp }],
+    './plugins/with-android-release-signing',
+    './plugins/with-android-release-abis',
+  ],
 });
