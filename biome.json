@@ -74,11 +74,42 @@
               "level": "error",
               "options": {
                 "paths": {
-                  "@/graphql/client": "Route files only compose screens from src/features; data access belongs in features.",
-                  "@apollo/client": "Route files only compose screens from src/features."
-                }
+                  "expo-secure-store": "Use the typed wrapper in src/lib/secure-store.ts",
+                  "expo-sqlite/kv-store": "Use src/lib/storage.ts"
+                },
+                "patterns": [
+                  {
+                    "group": [
+                      "@apollo/client",
+                      "@apollo/client/**",
+                      "@/graphql/**",
+                      "@/services/**",
+                      "@/lib/**",
+                      "../graphql/**",
+                      "../services/**",
+                      "../lib/**",
+                      "../../graphql/**",
+                      "../../services/**",
+                      "../../lib/**",
+                      "../../../graphql/**",
+                      "../../../services/**",
+                      "../../../lib/**"
+                    ],
+                    "message": "Route files only compose screens from src/features and src/components; data access, services and lib wrappers belong behind a feature or component. (src/app/_layout.tsx and src/app/+native-intent.tsx are exempt.)"
+                  }
+                ]
               }
             }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/app/_layout.tsx", "src/app/+native-intent.tsx"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": "off"
           }
         }
       }

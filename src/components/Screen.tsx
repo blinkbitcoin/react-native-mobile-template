@@ -7,19 +7,29 @@ export function Screen({
   children,
   testID,
   scroll = false,
+  ...rest
 }: PropsWithChildren<{ testID: string; scroll?: boolean }> & ViewProps) {
   const styles = useStyles();
-  const Body = scroll ? ScrollView : View;
+  // The scroll container itself fills the screen (`body`) while its content
+  // only grows to fill it (`content` uses flexGrow, never flex): `flex: 1` on
+  // the content container pins it to the viewport and kills scrolling.
   return (
     <SafeAreaView style={styles.safe} testID={testID}>
-      <Body style={styles.body} contentContainerStyle={scroll ? styles.body : undefined}>
-        {children}
-      </Body>
+      {scroll ? (
+        <ScrollView style={styles.body} contentContainerStyle={styles.content} {...rest}>
+          {children}
+        </ScrollView>
+      ) : (
+        <View style={[styles.body, styles.content]} {...rest}>
+          {children}
+        </View>
+      )}
     </SafeAreaView>
   );
 }
 
 const useStyles = createStyles((theme) => ({
   safe: { flex: 1, backgroundColor: theme.colors.background },
-  body: { flex: 1, padding: theme.spacing.md, gap: theme.spacing.sm },
+  body: { flex: 1 },
+  content: { flexGrow: 1, padding: theme.spacing.md, gap: theme.spacing.sm },
 }));

@@ -1,15 +1,11 @@
-import { t } from '@lingui/core/macro';
+import { useLingui } from '@lingui/react/macro';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ErrorBoundary } from 'react-error-boundary';
 // Side-effect import: registers the UNAUTHENTICATED → signOut hook for every
 // variant, including production builds that never mount the dev menu.
 import '@/services/auth';
-import { ErrorFallback } from '../components/ErrorFallback';
-import { ApolloProvider } from '../graphql/ApolloProvider';
-import { I18nProvider } from '../i18n/I18nProvider';
+import { Providers } from '../components/Providers';
 import { crashReporting } from '../lib/crash-reporting';
-import { ThemeProvider } from '../theme/ThemeProvider';
 
 /**
  * React Native's global error hook. It is absent on web and under Jest, hence
@@ -31,23 +27,25 @@ if (typeof ErrorUtils !== 'undefined') {
   });
 }
 
+function RootStack() {
+  // `useLingui` subscribes to locale activation, so the header titles below
+  // re-render when the language changes.
+  const { t } = useLingui();
+  return (
+    <Stack>
+      {/* The title doubles as the back label on pushed screens; without it the
+          stack falls back to the route name and shows "(tabs)". */}
+      <Stack.Screen name="(tabs)" options={{ headerShown: false, title: t`Home` }} />
+      <Stack.Screen name="details/[id]" options={{ title: t`Details` }} />
+    </Stack>
+  );
+}
+
 export default function RootLayout() {
   return (
-    <ThemeProvider>
-      <I18nProvider>
-        <ErrorBoundary
-          FallbackComponent={ErrorFallback}
-          onError={(error) => crashReporting.captureException(error)}
-        >
-          <ApolloProvider>
-            <StatusBar style="auto" />
-            <Stack>
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="details/[id]" options={{ title: t`Details` }} />
-            </Stack>
-          </ApolloProvider>
-        </ErrorBoundary>
-      </I18nProvider>
-    </ThemeProvider>
+    <Providers>
+      <StatusBar style="auto" />
+      <RootStack />
+    </Providers>
   );
 }

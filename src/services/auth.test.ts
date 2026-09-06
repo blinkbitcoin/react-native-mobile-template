@@ -23,3 +23,34 @@ test('useAuth tracks the signed-in state across sign-in and sign-out', async () 
   });
   await waitFor(() => expect(result.current.signedIn).toBe(false));
 });
+
+test('useAuth falls back to signed out when the secure store rejects', async () => {
+  const rejection = new Error('secure storage is not available on web');
+  const getToken = jest.spyOn(auth, 'getToken').mockRejectedValue(rejection);
+  const unhandled = jest.fn();
+  process.on('unhandledRejection', unhandled);
+  try {
+    const { result } = await renderHook(() => useAuth());
+    await waitFor(() => expect(getToken).toHaveBeenCalled());
+    expect(result.current.signedIn).toBe(false);
+    // Let any escaped rejection reach the process hook before asserting.
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(unhandled).not.toHaveBeenCalled();
+  } finally {
+    process.off('unhandledRejection', unhandled);
+    getToken.mockRestore();
+  }
+});
+
+test('useAuth stops updating state once unmounted', async () => {
+  const { result, unmount } = await renderHook(() => useAuth());
+  await waitFor(() => expect(result.current.signedIn).toBe(false));
+  unmount();
+  // A notify() after unmount must not reach setSignedIn; React would warn and
+  // the listener set would keep the unmounted hook alive.
+  await act(async () => {
+    await auth.signInMock();
+  });
+  expect(result.current.signedIn).toBe(false);
+  await auth.signOut();
+});

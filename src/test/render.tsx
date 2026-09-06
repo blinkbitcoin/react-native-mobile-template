@@ -1,17 +1,13 @@
 import { type RenderOptions, render } from '@testing-library/react-native';
 import type { PropsWithChildren, ReactElement } from 'react';
-import { ApolloProvider } from '../graphql/ApolloProvider';
-import { I18nProvider } from '../i18n/I18nProvider';
-import { ThemeProvider } from '../theme/ThemeProvider';
+import { Providers as AppProviders } from '../components/Providers';
 
+/**
+ * The app's provider stack with the error boundary disabled, so a render error
+ * fails the test loudly instead of rendering the fallback.
+ */
 export function Providers({ children }: PropsWithChildren) {
-  return (
-    <ThemeProvider>
-      <I18nProvider>
-        <ApolloProvider>{children}</ApolloProvider>
-      </I18nProvider>
-    </ThemeProvider>
-  );
+  return <AppProviders withErrorBoundary={false}>{children}</AppProviders>;
 }
 
 export function renderWithProviders(ui: ReactElement, options?: RenderOptions) {
