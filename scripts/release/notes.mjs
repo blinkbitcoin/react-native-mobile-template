@@ -307,6 +307,24 @@ export async function buildNotes({
 
 // ---------- CLI ----------
 
+export const USAGE = `usage: node scripts/release/notes.mjs (--from-body FILE | --from-commits [RANGE]) [options]
+
+Store release notes for a build, from a release-please body or from
+conventional commit subjects. Nothing here talks to a store: the lanes read
+store-notes.json and notes-store.txt (fastlane/lanes/shared.rb).
+
+  --from-body FILE      render from a release body (e.g. the GitHub release)
+  --from-commits [R]    render from conventional commit subjects in range R
+  --body-section        also take a verbatim "## Store notes" section from the body
+  --locales a,b         locales to emit (default: $NOTES_LOCALES, else
+                        the locale directories under fastlane/metadata/ios)
+  --include-changelog   append the full changelog (also $STORE_NOTES_INCLUDE_CHANGELOG)
+  --out DIR|-           write store-notes.json + notes-store.txt into DIR, or - for stdout
+  --help                this text
+
+  node scripts/release/notes.mjs --from-body RELEASE_BODY.md --out dist/
+  node scripts/release/notes.mjs --from-commits v1.2.0..HEAD --out -`;
+
 export function parseArgs(argv) {
   const options = {
     fromBody: '',
@@ -343,9 +361,36 @@ export function parseArgs(argv) {
   return options;
 }
 
+/**
+ * The locales to emit notes for, most specific source first:
+ *
+ *   1. `--locales a,b`
+ *   2. `$NOTES_LOCALES` — what the reusable `expo-prepare` workflow exports for
+ *      its `notes-locales` input. Reading it here is what makes that input do
+ *      something; it was plumbed through and silently ignored.
+ *   3. the locale directories under fastlane/metadata/ios, which are the ones
+ *      the lanes then look up in store-notes.json.
+ *
+ * A caller that sets `notes-locales` must therefore use the *metadata* locale
+ * names (`en-US`, not `en`): a key the lanes do not look up sends every locale
+ * back to the single-locale fallback and throws the LLM pass away.
+ */
+export function resolveLocales(options, env = process.env) {
+  if (options.locales.length) return options.locales;
+  const fromEnv = String(env.NOTES_LOCALES ?? '')
+    .split(',')
+    .map((locale) => locale.trim())
+    .filter(Boolean);
+  return fromEnv.length ? fromEnv : discoverLocales();
+}
+
 export async function main(argv, { cwd = process.cwd() } = {}) {
+  if (argv.includes('--help') || argv.includes('-h')) {
+    process.stdout.write(`${USAGE}\n`);
+    return null;
+  }
   const options = parseArgs(argv);
-  const locales = options.locales.length ? options.locales : discoverLocales();
+  const locales = resolveLocales(options);
 
   let items = [];
   let verbatim = '';

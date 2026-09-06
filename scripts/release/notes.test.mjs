@@ -21,6 +21,7 @@ import {
   parseCommits,
   renderChangelog,
   renderNotes,
+  resolveLocales,
   STORE_LIMITS,
   TRUNCATION_SUFFIX,
   toStoreNotes,
@@ -510,6 +511,27 @@ test('locales come from the ios metadata directories, ignoring the non-locales',
   }
   assert.deepEqual(discoverLocales(dir), ['en-US', 'fr-FR']);
   assert.deepEqual(discoverLocales(path.join(dir, 'nope')), ['en-US']);
+});
+
+test('NOTES_LOCALES is honoured, below --locales and above discovery', () => {
+  // expo-prepare exports it for its `notes-locales` input; before this the
+  // input was plumbed through the whole workflow and then ignored.
+  const flag = { locales: ['sv-SE'] };
+  const none = { locales: [] };
+  assert.deepEqual(resolveLocales(flag, { NOTES_LOCALES: 'de,fr-FR' }), ['sv-SE']);
+  assert.deepEqual(resolveLocales(none, { NOTES_LOCALES: 'de,fr-FR' }), ['de', 'fr-FR']);
+  assert.deepEqual(resolveLocales(none, { NOTES_LOCALES: ' de , fr-FR ,' }), ['de', 'fr-FR']);
+  // An empty or absent value must not produce an empty locale list, which would
+  // write a store-notes.json with no locales in it at all.
+  assert.deepEqual(resolveLocales(none, { NOTES_LOCALES: '' }), discoverLocales());
+  assert.deepEqual(resolveLocales(none, {}), discoverLocales());
+});
+
+test('--help prints the usage and exits 0 without rendering anything', () => {
+  const stdout = execFileSync('node', [script, '--help'], { encoding: 'utf8' });
+  assert.match(stdout, /^usage: node scripts\/release\/notes\.mjs /);
+  assert.match(stdout, /--from-commits/);
+  assert.match(stdout, /--locales/);
 });
 
 test('commit subjects default to the range since the last v* tag', () => {
