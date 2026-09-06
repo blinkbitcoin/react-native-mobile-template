@@ -1,0 +1,10 @@
+name: pr-closed
+on:
+  pull_request:
+    types: [closed]
+permissions:
+  contents: read
+  actions: write # required: pr-closed.yml's cancel job needs this to cancel runs
+jobs:
+  pr-closed:
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/pr-closed.yml@v0

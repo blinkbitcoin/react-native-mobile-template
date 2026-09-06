@@ -1,0 +1,25 @@
+name: web
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  release:
+    types: [published]
+permissions:
+  contents: read
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+jobs:
+  web:
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/web.yml@v0
+    permissions:
+      contents: read
+      # The called workflow's `deploy` job needs these; a called job can only
+      # narrow the caller's token, never widen it, so they are granted here.
+      pages: write
+      id-token: write
+    with:
+      # PRs export a dev build (fast smoke); a published release exports the
+      # production bundle that actually gets deployed to Pages.
+      export-args: ${{ github.event_name == 'release' && '' || '--dev' }}
+      deploy: ${{ github.event_name == 'release' }}

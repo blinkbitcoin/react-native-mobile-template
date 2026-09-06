@@ -1,5 +1,5 @@
 [files]
-extend-exclude = ["pnpm-lock.yaml", "*.po", "src/i18n/locales/**", "src/graphql/generated/**", "ios/", "android/", "assets/", "*.svg"]
+extend-exclude = [".rnw/", "pnpm-lock.yaml", "*.po", "src/i18n/locales/**", "src/graphql/generated/**", "ios/", "android/", "assets/", "*.svg"]
 
 [default.extend-words]
 # add false positives here, one per line, e.g. `ba = "ba"`

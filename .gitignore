@@ -51,3 +51,6 @@ modules/*/android/.cxx/
 /playwright-report
 /test-results
 /.maestro/output
+
+# react-native-workflows self-checkout (also added to .git/info/exclude by its setup action)
+/.rnw

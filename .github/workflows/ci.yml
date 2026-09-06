@@ -1,0 +1,33 @@
+name: ci
+on:
+  push:
+    branches: [main]
+    paths-ignore: [docs/**, "**.md"]
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+jobs:
+  checks:
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/checks.yml@v0
+  unit:
+    needs: checks
+    if: ${{ needs.checks.outputs.docs-only != 'true' }}
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/unit.yml@v0
+  e2e:
+    needs: checks
+    if: ${{ needs.checks.outputs.docs-only != 'true' }}
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/e2e.yml@v0
+    with:
+      # iOS is opt-in (macOS runners bill at 10x): set the repo variable
+      # E2E_IOS=true for every run, or label a single PR `e2e:ios` (the
+      # `labeled` trigger above is what makes the label alone start a run).
+      ios: ${{ vars.E2E_IOS == 'true' || contains(github.event.pull_request.labels.*.name, 'e2e:ios') }}
+      macos-runner: ${{ vars.RNW_MACOS_RUNNER || 'macos-26' }}
+      dev-client: true
+      e2e-setup-script: scripts/e2e/ci-mock-api-up.sh
+      e2e-teardown-script: scripts/e2e/ci-mock-api-down.sh

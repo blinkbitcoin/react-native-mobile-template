@@ -21,6 +21,7 @@
     "scripts/**/*.{mjs,ts}"
   ],
   "ignore": [
+    ".rnw/**",
     "src/graphql/generated/**",
     "src/i18n/locales/**/messages.ts",
     "modules/**/ios/**",
