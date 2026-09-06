@@ -19,11 +19,29 @@ One variable, read in three places:
 | `.github/workflows/release-{internal,beta,production}.yml` | the `ota-*` job is skipped (`if: vars.OTA_ENABLED == 'true'`) |
 | `.github/workflows/ota-hotfix.yml` | the publish job is skipped |
 
-The build-time value comes from the `OTA_ENABLED` environment variable; CI takes
-it from the repository variable of the same name. The reusable
-`expo-ota-publish.yml` has its own `ota-enabled` master switch too, so the caller
-passes `ota-enabled: ${{ vars.OTA_ENABLED == 'true' }}` and the job is skipped
-twice over — belt and braces on the one setting that cannot be undone.
+The build-time value comes from the `OTA_ENABLED` environment variable. A GitHub
+repository *variable* is never automatically an environment variable, so the
+release callers forward it (and `EXPO_UPDATES_URL`) explicitly through the
+`build-env` input on `expo-prepare.yml` / `expo-build-ios.yml` /
+`expo-build-android.yml`:
+
+```yaml
+      build-env: >-
+        {"APP_VARIANT":"production",
+        "OTA_ENABLED":"${{ vars.OTA_ENABLED }}",
+        "EXPO_UPDATES_URL":"${{ vars.EXPO_UPDATES_URL }}", ...}
+```
+
+Without that forwarding the binary would compile with `updates: { enabled: false }`
+and no URL while the OTA jobs published happily — a completely silent failure in
+which no installed app ever receives an update. Both names are non-secret, which
+is what makes `build-env` the right channel; it refuses anything that reads as a
+credential.
+
+The reusable `expo-ota-publish.yml` has its own `ota-enabled` master switch too,
+so the caller also passes `ota-enabled: ${{ vars.OTA_ENABLED == 'true' }}` and
+the job is skipped twice over — belt and braces on the one setting that cannot
+be undone.
 
 Leaving it off is a supported end state. The rest of the release path works
 unchanged; there is simply no OTA job.
@@ -74,6 +92,16 @@ checked against the upstream README on first deploy.
 Scope `OTA_PUBLISH_TOKEN` per GitHub Environment (`internal`, `beta`,
 `production`) so a leaked internal token cannot publish to production. The
 callers pass `environment:` to `expo-ota-publish.yml` for exactly that reason.
+
+`EXPO_UPDATES_URL` does double duty: besides being compiled into the binary, the
+three in-pipeline callers pass it as `manifest-url` so that after each publish
+the workflow fetches the manifest a client would fetch, with the same `expo-*`
+headers, and fails when it does not come back. A publish that "succeeded" but
+serves nothing is otherwise indistinguishable from a working one until a user
+opens the app. The check defaults to the iOS platform, so the callers pair it
+with `runtime-version: ${{ needs.prepare.outputs.fp-ios }}`. `ota-hotfix.yml`
+has no prepare job and therefore no fingerprint to send, so it skips the smoke
+check rather than risk failing a good publish on a missing header.
 
 Then rebuild and ship a store build. An OTA update can only reach a binary that
 was compiled with `OTA_ENABLED=true` and the right certificate — turning the

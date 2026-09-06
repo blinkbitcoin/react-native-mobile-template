@@ -56,8 +56,21 @@ release time, so editing it before step 3 finishes is safe.
 
 `release-beta.yml` fires on `release: published` (non-prerelease), waits for the
 release commit's internal run, then promotes to the TestFlight external group
-and the Play open beta track, attaches `build-info.json` and the store notes to
-the `vX.Y.Z` release, and publishes OTA `beta`.
+and the Play open beta track, moves the `vX.Y.Z-build.N` pre-release's assets
+onto the `vX.Y.Z` release (and deletes the pre-release and its tag afterwards),
+and publishes OTA `beta`.
+
+The assets are **moved, not rebuilt**. A rebuild from the same source is a
+different binary with a different signature and a different native fingerprint,
+and the OTA gate downstream compares fingerprints — so the release has to carry
+the exact bytes internal testers ran. The pre-release is deleted only once the
+upload has succeeded, so a failed upload can never leave the binaries nowhere.
+
+Everything in this run is scoped to the tag, not to `main`: `expo-prepare`'s
+`release-tag` input makes the tag the checkout ref, resolves `TAG^{commit}` as
+the commit that is gated and stamped into `build-info.json`, and takes the store
+notes from that release's body. `github.sha` would be the branch tip at the
+moment the event fired, which may already be ahead of the tag.
 
 If beta was published before internal finished, the beta run fails at the gate.
 `release-retry.yml` re-runs it automatically the moment internal for that commit
@@ -127,24 +140,37 @@ than shipped.
 **Audience split.** Store notes are prose for end users; the grouped technical
 changelog with PR links stays on GitHub (release body + `CHANGELOG.md`). Set the
 repo variable `STORE_NOTES_INCLUDE_CHANGELOG=true` to append the changelog after
-the prose, truncated to the store limits.
+the prose, truncated to the store limits. It reaches `notes.mjs` through
+`expo-prepare`'s `build-env`.
 
 **Optional LLM pass**, off unless configured. Every failure — no key, an HTTP
 error, unparseable JSON, a missing locale, a leaked commit hash — is a warning
 and a fall back to the deterministic prose. A release never fails because a
 model was unavailable.
 
-| Variable | Meaning |
-| --- | --- |
-| `RELEASE_NOTES_LLM_PROVIDER` | `anthropic` or `openai`; anything else disables the pass |
-| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | key for the chosen provider |
-| `RELEASE_NOTES_LLM_MODEL` | model override |
-| `OPENAI_BASE_URL` | OpenAI-compatible endpoint |
+| Name | Kind | Meaning |
+| --- | --- | --- |
+| `RELEASE_NOTES_LLM_PROVIDER` | repo variable | `anthropic` or `openai`; anything else disables the pass |
+| `RELEASE_NOTES_LLM_MODEL` | repo variable | Model override |
+| `OPENAI_BASE_URL` | repo variable | OpenAI-compatible endpoint |
+| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | **secret** | Key for the chosen provider |
+
+The three variables reach `notes.mjs` through `expo-prepare`'s `build-env`; the
+two keys are declared secrets on `expo-prepare.yml`, because `build-env` is a
+workflow input and would publish them in the run's parameters.
 
 ## Variables and secrets
 
 Repository **variables** (Settings → Secrets and variables → Actions →
 Variables). None are sensitive; all are visible in logs.
+
+Most of them reach a runner through the callers' `build-env` input — a flat JSON
+object of non-secret environment published to `$GITHUB_ENV` before the prebuild,
+the lanes and the consumer scripts run. It is the only channel for arbitrary
+environment in this workflow family, and it **refuses** a key that reads as a
+credential (anything ending in `_KEY`, `_TOKEN`, `_PASSWORD`, `_PASSPHRASE`,
+`_SECRET`, `_CREDENTIAL(S)`): a workflow input is unmasked and readable by
+anyone who can see the run. Credentials go in `secrets:` instead.
 
 | Variable | Used by | Value / how to obtain |
 | --- | --- | --- |
@@ -157,12 +183,25 @@ Variables). None are sensitive; all are visible in logs.
 | `TESTFLIGHT_INTERNAL_GROUP` | `release-internal` iOS upload | Group name in App Store Connect → TestFlight |
 | `TESTFLIGHT_EXTERNAL_GROUP` | `release-beta` iOS promote | External group name; must already exist and be approved |
 | `PLAY_UPDATE_PRIORITY` | Android upload / production | `0`–`5`, Play in-app update priority |
-| `ANDROID_UPLOAD_CERT_SHA256` | `verify-android.sh` | `keytool -list -v -keystore upload.keystore`, the SHA-256 line |
-| `OTA_ENABLED` | every `ota-*` job, `app.config.ts` | `true` to turn OTA on; see [ota.md](ota.md) |
-| `EXPO_UPDATES_URL` | `app.config.ts` at build time | Public origin of the update server |
+| `ANDROID_UPLOAD_CERT_SHA256` | `android verify` lane → `verify-android.sh --cert-sha256` (via `build-env`) | `keytool -list -v -keystore upload.keystore`, the SHA-256 line. **Leave it unset and the signature check reports `skip`** — the gate that exists to catch a wrong signing identity stops checking |
+| `OTA_ENABLED` | `app.config.ts` at build time (via `build-env`) and the `if:` on every `ota-*` job | `true` to turn OTA on; see [ota.md](ota.md) |
+| `EXPO_UPDATES_URL` | `app.config.ts` at build time (via `build-env`) and the OTA manifest smoke check | Public origin of the update server |
 | `OTA_CLI_VERSION` | `expo-ota-publish` | Exact `eoas` version; the publish script refuses to run unpinned |
-| `STORE_NOTES_INCLUDE_CHANGELOG` | `notes.mjs` | `true` appends the changelog to the store notes |
+| `STORE_NOTES_INCLUDE_CHANGELOG` | `notes.mjs` in `expo-prepare` (via `build-env`) | `true` appends the changelog to the store notes |
+| `RELEASE_NOTES_LLM_PROVIDER` | `notes.mjs` (via `build-env`) | `anthropic` or `openai`; anything else disables the optional LLM pass |
+| `RELEASE_NOTES_LLM_MODEL` | `notes.mjs` (via `build-env`) | Model override for that provider |
+| `OPENAI_BASE_URL` | `notes.mjs` (via `build-env`) | OpenAI-compatible endpoint |
+| `EXPO_PUBLIC_API_URL` | the bundle, through `src/config/env.ts` (via `build-env`) | **Required for a CI build**: `env.ts` validates it as a URL and the app fails to start without it |
+| `EXPO_PUBLIC_APP_NAME` | same | **Required for a CI build** (non-empty string) |
+| `EXPO_PUBLIC_WEB_DOMAIN` | same, plus `app.config.ts` universal links | Your web domain; empty disables the associated-domain / intent-filter entries |
+| `EXPO_PUBLIC_ALLOW_INSECURE_WEB_STORAGE` | same | `true`/`false`; the callers substitute `false` when the variable is unset, because `env.ts` rejects an empty string |
 | `E2E_IOS` | `ci.yml` | `true` runs iOS E2E on every push (macOS runners bill at 10x) |
+
+`APP_VARIANT` is not a repo variable: the callers hard-code
+`"APP_VARIANT":"production"` in `build-env` for every release job. Without it
+`app.config.ts` falls back to `development` and appends `.dev` to the bundle id
+and package name, which would then disagree with the `IOS_BUNDLE_ID` /
+`ANDROID_PACKAGE` the lanes assert.
 
 Repository / environment **secrets**. Scope the store credentials to the
 `internal`, `beta` and `production` environments rather than the repository when
@@ -184,6 +223,16 @@ you want a reviewer between a token and production.
 | `RELEASE_TAGGER_APP_ID` | `release-please`, every `github-release` call | A GitHub App installed on the repo with contents + pull-requests write |
 | `RELEASE_TAGGER_APP_PRIVATE_KEY` | same | That App's private key (`.pem`, whole file) |
 | `OTA_PUBLISH_TOKEN` | every `ota-*` job | One of the update server's `EOO_TOKENS`; scope per environment |
+| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | `expo-prepare` (`notes.mjs`) | Only needed when `RELEASE_NOTES_LLM_PROVIDER` selects that provider. The notes fall back to deterministic prose without them |
+| `APP_REVIEW_EMAIL`, `APP_REVIEW_FIRST_NAME`, `APP_REVIEW_LAST_NAME`, `APP_REVIEW_PHONE` | iOS `promote_beta` and `release_production` lanes | The contact Apple reaches for review questions |
+| `APP_REVIEW_DEMO_USER`, `APP_REVIEW_DEMO_PASSWORD` | same | A working login for the reviewer; omit both if the app needs no account |
+| `APP_REVIEW_NOTES` | same | Free-text notes for the reviewer |
+
+The seven `APP_REVIEW_*` values are **secrets, not `build-env` or `env-json`
+values**: a reviewer demo login is a real credential and both of those inputs are
+printed to the log. The lanes omit the whole argument when none of them is set —
+`pilot` PATCHes every key it is given, so blanks would erase the contact already
+configured in App Store Connect.
 
 ### Why the GitHub App matters
 
@@ -193,15 +242,20 @@ release-please's `vX.Y.Z` release publishes but `release-beta.yml` never fires,
 and an org ruleset that forbids Actions-authored pushes blocks the release PR
 outright. Configure both or neither — the workflows branch on the id being set.
 
-### Known gap: App Store review contact and demo account
+### Concurrency: which workflows share a queue
 
-`fastlane/lanes/ios.rb` reads `APP_REVIEW_EMAIL`, `APP_REVIEW_PHONE`,
-`APP_REVIEW_FIRST_NAME`, `APP_REVIEW_LAST_NAME`, `APP_REVIEW_NOTES`,
-`APP_REVIEW_DEMO_USER` and `APP_REVIEW_DEMO_PASSWORD`, but `fastlane-lane.yml`
-declares no secret inputs for them and its `env-json` is printed to the log, so
-credentials must not go there. Until the reusable workflow grows those secret
-slots, set the review contact and demo account **in App Store Connect directly**
-and leave the variables unset; the lane treats them as optional.
+Every **store-affecting** workflow — `release-internal`, `release-beta`,
+`release-production`, `ota-hotfix` — shares
+`concurrency: release-${{ github.ref }}` with `cancel-in-progress: false`, so two
+of them can never touch a store at the same time and none is ever cancelled
+half-way.
+
+`release-please` and `release-retry` deliberately have their own groups
+(`release-please-*`, `release-retry-*`). GitHub keeps only one *pending* run per
+group and evicts the older one, so sharing the store queue would leave the
+release PR stale for the length of a 60-90 minute build and drop the run
+entirely on two quick pushes — and `release-retry` is precisely the workflow
+that has to run promptly. Neither calls a store API.
 
 ## GitHub Environments
 
