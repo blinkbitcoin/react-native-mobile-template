@@ -32,6 +32,9 @@ prebuild: ## Regenerate ios/ and android/ locally (debugging plugins only; never
 build-web: ## Static web export into dist/
 	pnpm build:web
 
+version: ## Print what CI would build for HEAD
+	bash scripts/release/resolve-version.sh
+
 # ---------- Codegen ----------
 i18n: ## Extract + compile message catalogs
 	pnpm i18n:extract
@@ -120,4 +123,4 @@ reset: clean ## clean + reinstall
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: doctor install start ios android web mock-api prebuild build-web i18n codegen typecheck lint format format-check knip spell check-gen check-prebuild check-code check-deps check-ci check-docs bundle-secrets-check check-release check test-scripts unit coverage e2e-ios e2e-android e2e-web test clean reset help
+.PHONY: doctor install start ios android web mock-api prebuild build-web version i18n codegen typecheck lint format format-check knip spell check-gen check-prebuild check-code check-deps check-ci check-docs bundle-secrets-check check-release check test-scripts unit coverage e2e-ios e2e-android e2e-web test clean reset help

@@ -31,13 +31,22 @@ yarn-error.*
 
 # macOS
 .DS_Store
+
+# Keys and certificates. Private keys never get committed; the expo-updates
+# code-signing *certificate* is public by design and is the one exception
+# (see certs/README.md).
 *.pem
+!/certs/*.pem
+/keys/
 
 # local env files
 .env*.local
 
 # typescript
 *.tsbuildinfo
+
+# per-build provenance record (scripts/release/build-info.sh)
+/build-info.json
 
 # generated native folders (Continuous Native Generation: never commit these)
 /ios

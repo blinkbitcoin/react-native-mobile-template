@@ -55,6 +55,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         checkAutomatically: 'ON_LOAD',
         fallbackToCacheTimeout: 0,
         requestHeaders: { 'expo-channel-name': 'production' },
+        // Public certificate; the private key lives in the release secret
+        // store and signs manifests at publish time. See certs/README.md.
+        codeSigningCertificate: './certs/expo-updates-cert.pem',
+        codeSigningMetadata: { keyid: 'main', alg: 'rsa-v1_5-sha256' },
       }
     : { enabled: false },
   experiments: { typedRoutes: true },
