@@ -1,0 +1,28 @@
+appId: ${APP_ID}
+tags: [smoke]
+---
+- tapOn:
+    id: tab-settings
+- tapOn:
+    id: settings-trigger-error
+# Development builds also raise React Native's LogBox overlay on a render error,
+# and it swallows taps meant for the app. Dismissing it is a no-op in release
+# builds, where LogBox is not bundled.
+- tapOn:
+    text: '^Dismiss$'
+    optional: true
+- assertVisible:
+    id: error-screen
+- tapOn:
+    id: error-retry
+- tapOn:
+    text: '^Dismiss$'
+    optional: true
+# The error boundary sits in the root layout, so resetting it remounts the
+# navigator and the app recovers on the initial route rather than on Settings.
+- assertVisible:
+    id: home-screen
+- tapOn:
+    id: tab-settings
+- assertVisible:
+    id: settings-screen

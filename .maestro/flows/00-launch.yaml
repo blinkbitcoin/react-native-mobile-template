@@ -1,0 +1,35 @@
+appId: ${APP_ID}
+tags: [smoke]
+---
+- launchApp:
+    clearState: true
+# `clearState` also wipes expo-dev-client's state, so a local dev build lands on
+# the launcher instead of the app and then greets the first launch with the
+# developer-menu onboarding sheet. Both are dev-client-only: the block is
+# skipped for release builds, which boot straight into the bundle.
+- runFlow:
+    when:
+      visible:
+        text: 'DEVELOPMENT SERVERS'
+    commands:
+      - extendedWaitUntil:
+          visible:
+            text: 'http://.*:8081'
+          timeout: 30000
+      - tapOn:
+          text: 'http://.*:8081'
+      - extendedWaitUntil:
+          visible:
+            text: '^Continue$'
+          timeout: 90000
+      - tapOn:
+          text: '^Continue$'
+      # `Continue` hands over to the dev menu itself; close it.
+      - tapOn:
+          id: 'xmark'
+# `assertVisible` has no `timeout` property in Maestro 2.x; `extendedWaitUntil`
+# is the supported way to wait out a cold start.
+- extendedWaitUntil:
+    visible:
+      id: home-screen
+    timeout: 90000

@@ -1,0 +1,15 @@
+flows:
+  - flows/*.yaml
+includeTags:
+  - smoke
+# Maestro 2.x does not order a glob alphabetically, and every flow after
+# 00-launch assumes the app is already foregrounded on Home, so the order is
+# pinned explicitly.
+executionOrder:
+  flowsOrder:
+    - 00-launch
+    - home
+    - details
+    - deep-link
+    - settings
+    - error-screen

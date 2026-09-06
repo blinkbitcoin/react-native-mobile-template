@@ -1,0 +1,32 @@
+appId: ${APP_ID}
+tags: [smoke]
+---
+# Canonical deep link. iOS may show a system "Open in ...?" confirmation dialog
+# when a link is opened from outside the app; the optional tap dismisses it and
+# is a no-op when the dialog does not appear.
+- openLink: rnmt://details/99
+- tapOn:
+    text: '^Open$'
+    optional: true
+- assertVisible:
+    id: details-id
+- assertVisible:
+    text: '99'
+# Maestro's `back` is a left-edge swipe on iOS, which the native stack header
+# does not accept reliably; tap the header back button instead. `BackButton` is
+# the id react-native-screens gives the iOS navigation-bar back button.
+- tapOn:
+    id: 'BackButton'
+# Legacy path, rewritten to /details/7 by src/app/+native-intent.tsx.
+- openLink: rnmt://d/7
+- tapOn:
+    text: '^Open$'
+    optional: true
+- assertVisible:
+    id: details-id
+- assertVisible:
+    text: '7'
+- tapOn:
+    id: 'BackButton'
+- assertVisible:
+    id: home-screen

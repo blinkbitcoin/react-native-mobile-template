@@ -29,6 +29,9 @@ mock-api: ## Local GraphQL mock API on :4000
 prebuild: ## Regenerate ios/ and android/ locally (debugging plugins only; never commit them)
 	pnpm prebuild
 
+build-web: ## Static web export into dist/
+	pnpm build:web
+
 # ---------- Codegen ----------
 i18n: ## Extract + compile message catalogs
 	pnpm i18n:extract
@@ -70,6 +73,16 @@ unit: ## Unit + component tests
 coverage: ## Tests with coverage thresholds (what CI enforces)
 	pnpm test:coverage
 
+# ---------- End-to-end ----------
+e2e-ios: ## Maestro flows on iOS (needs: make mock-api, make start, make ios)
+	pnpm test:e2e:ios
+
+e2e-android: ## Maestro flows on Android (needs: make mock-api, make start, make android)
+	pnpm test:e2e:android
+
+e2e-web: ## Web export (dev env, mock API) + Playwright smoke
+	pnpm test:e2e:web
+
 test: unit check-code ## Unit tests + code checks
 
 clean: ## Remove generated native projects, caches and build output
@@ -81,4 +94,4 @@ reset: clean ## clean + reinstall
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: doctor install start ios android web mock-api prebuild i18n codegen typecheck lint format format-check knip spell check-gen check-prebuild check-code unit coverage test clean reset help
+.PHONY: doctor install start ios android web mock-api prebuild build-web i18n codegen typecheck lint format format-check knip spell check-gen check-prebuild check-code unit coverage e2e-ios e2e-android e2e-web test clean reset help

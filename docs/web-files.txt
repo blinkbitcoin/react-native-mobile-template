@@ -1,2 +1,5 @@
+assets/favicon.png
+e2e/web/
+playwright.config.ts
 src/app/+html.tsx
 src/features/settings/NativeDemoCard.web.tsx

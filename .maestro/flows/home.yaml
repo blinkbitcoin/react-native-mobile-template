@@ -1,0 +1,12 @@
+appId: ${APP_ID}
+tags: [smoke]
+---
+- tapOn:
+    id: tab-home
+- assertVisible:
+    id: home-title
+# The greeting comes from the GraphQL mock API, so allow for the round trip.
+- extendedWaitUntil:
+    visible:
+      text: 'Hello, world!'
+    timeout: 20000
