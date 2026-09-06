@@ -198,8 +198,23 @@ elif vc_require_cmd ota plutil; then
     fi
     # A runtime version that does not match the fingerprint this build was made
     # from means the binary silently receives no updates for its whole life.
+    #
+    # Under the fingerprint policy the plist holds the `file:fingerprint`
+    # sentinel and the hash is a file inside the .app, written by the
+    # expo-updates build phase. Found rather than assumed: with the pod's
+    # resource bundle it is `EXUpdates.bundle/fingerprint`, and a
+    # `use_frameworks!` build puts it under the framework instead.
+    declared_rv="$(plist_value EXUpdatesRuntimeVersion "$expo_plist")"
+    resolved_rv=''
+    case "$declared_rv" in
+      file:* | '@string/'*)
+        fingerprint_file="$(find "$app" -maxdepth 3 -type f -name fingerprint -print -quit 2>/dev/null || true)"
+        [ -z "$fingerprint_file" ] || resolved_rv="$(tr -d '[:space:]' <"$fingerprint_file")"
+        ;;
+      *) ;;
+    esac
     vc_verdict ota-runtime-version \
-      "$(vc_runtime_version_verdict "$(plist_value EXUpdatesRuntimeVersion "$expo_plist")" "$(vc_build_info_fingerprint "$build_info" ios)")"
+      "$(vc_runtime_version_verdict "$declared_rv" "$resolved_rv" "$(vc_build_info_fingerprint "$build_info" ios)")"
     # `EXUpdatesRequestHeaders` is a dict; plutil reads into it by key path.
     vc_verdict ota-channel \
       "$(vc_channel_verdict "$(plist_value 'EXUpdatesRequestHeaders.expo-channel-name' "$expo_plist")" "${OTA_CHANNEL:-production}")"

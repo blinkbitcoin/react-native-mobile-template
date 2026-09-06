@@ -497,21 +497,63 @@ vc_ota_verdict() { # <expected true|false|''> <actual true|false|absent>
 # binary. Both are invisible failures: an update "publishes fine" and reaches
 # nobody, and nothing surfaces it until someone notices.
 #
-# The runtime version is what the client sends as `expo-runtime-version`. Under
-# `runtimeVersion: { policy: 'fingerprint' }` (app.config.ts) `expo prebuild`
-# resolves it to the fingerprint hash and writes it into Expo.plist /
-# AndroidManifest.xml, which is the same hash build-info.json records -- so when
-# build-info.json is at hand the two must agree.
-vc_runtime_version_verdict() { # <actual> <expected, may be empty>
-  if [ -z "$1" ]; then
-    printf 'FAIL updates are enabled but the artifact carries no runtime version (it would never be offered an update)\n'
-  elif [ -z "$2" ]; then
-    printf 'ok runtime version %s (no build-info fingerprint to compare against)\n' "$1"
-  elif [ "$1" = "$2" ]; then
-    printf 'ok runtime version %s matches the build fingerprint\n' "$1"
-  else
-    printf 'FAIL runtime version %s does not match the build fingerprint %s\n' "$1" "$2"
-  fi
+# The runtime version is what the client sends as `expo-runtime-version`.
+#
+# Under `runtimeVersion: { policy: 'fingerprint' }` (app.config.ts) `expo
+# prebuild` does *not* write the hash. Verified against a real
+# `expo prebuild --clean` of this tree with OTA_ENABLED=true; the fixtures under
+# scripts/release/fixtures/ota/ are that output:
+#
+#   Expo.plist:         EXUpdatesRuntimeVersion = file:fingerprint
+#   AndroidManifest:    expo.modules.updates.EXPO_RUNTIME_VERSION
+#                         = @string/expo_runtime_version
+#   res/values/strings: expo_runtime_version = file:fingerprint
+#
+# `file:fingerprint` is a sentinel with a name in both clients
+# (EXUpdatesConfigRuntimeVersionReadFingerprintFileSentinel,
+# UpdatesConfiguration.kt:170). The hash is computed at *build* time by
+# expo-updates' createFingerprintForBuildAsync and shipped inside the artifact
+# as a file called `fingerprint`: `EXUpdates.bundle/fingerprint` in the .app
+# (create-updates-resources-ios.sh) and `assets/fingerprint` in the APK (the
+# gradle plugin registers the generated asset directory). Those are the bytes
+# the client actually reads (UpdatesConfig.swift:179,
+# UpdatesConfiguration.kt:270), so those are what this compares.
+#
+#   declared  what the plist or manifest says
+#   resolved  the fingerprint read out of the artifact, '' when there is none
+#   expected  build-info.json's fingerprint for the platform, '' when unknown
+VC_RUNTIME_VERSION_SENTINEL='file:fingerprint'
+
+vc_runtime_version_verdict() { # <declared> <resolved> <expected>
+  case "$1" in
+    '')
+      printf 'FAIL updates are enabled but the artifact carries no runtime version (it would never be offered an update)\n'
+      ;;
+    "$VC_RUNTIME_VERSION_SENTINEL" | '@string/'*)
+      if [ -z "$2" ]; then
+        printf 'FAIL runtime version is %s but the artifact carries no fingerprint file to resolve it from\n' "$1"
+      elif [ -z "$3" ]; then
+        printf 'ok runtime version %s (from %s; no build-info fingerprint to compare against)\n' "$2" "$1"
+      elif [ "$2" = "$3" ]; then
+        printf 'ok runtime version %s matches the build fingerprint\n' "$2"
+      else
+        printf 'FAIL runtime version %s does not match the build fingerprint %s\n' "$2" "$3"
+      fi
+      ;;
+    *)
+      # A pinned literal `runtimeVersion`, which is a supported Expo config and
+      # is deliberately *not* compared against build-info's fingerprint: under
+      # any policy but `fingerprint` the two are different things, and failing
+      # a correct build is worse than not checking.
+      printf 'ok runtime version %s (pinned literal, not a fingerprint policy)\n' "$1"
+      ;;
+  esac
+}
+
+# XML attribute values arrive escaped from a manifest. `&amp;` is undone last so
+# an escaped `&amp;quot;` does not become a quote.
+vc_xml_unescape() { # <text>
+  printf '%s' "$1" | sed 's/&quot;/"/g; s/&apos;/'"'"'/g; s/&lt;/</g; s/&gt;/>/g; s/&amp;/\&/g'
 }
 
 # The channel the binary asks for, sent as the `expo-channel-name` request

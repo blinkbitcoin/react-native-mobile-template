@@ -412,24 +412,51 @@ test('OTA_ENABLED is read the way app.config.ts reads it', () => {
 
 test('a binary with no runtime version fails: it would never be offered an update', () => {
   assert.match(
-    sh('vc_runtime_version_verdict "" ""'),
+    sh('vc_runtime_version_verdict "" "" ""'),
     /^FAIL updates are enabled but the artifact carries no runtime version/,
   );
 });
 
-test('the runtime version is compared against the build fingerprint when there is one', () => {
+// The sentinel is what `expo prebuild` really writes under
+// `runtimeVersion: { policy: 'fingerprint' }` -- see fixtures/ota/README.md.
+// The first version of this check compared the sentinel *itself* against the
+// build fingerprint and so failed every OTA-enabled build.
+test('the fingerprint sentinel is resolved, not compared', () => {
   assert.equal(
-    sh('vc_runtime_version_verdict abc123 abc123'),
+    sh('vc_runtime_version_verdict file:fingerprint abc123 abc123'),
     'ok runtime version abc123 matches the build fingerprint',
   );
   assert.equal(
-    sh('vc_runtime_version_verdict abc123 def456'),
+    sh('vc_runtime_version_verdict "@string/expo_runtime_version" abc123 abc123'),
+    'ok runtime version abc123 matches the build fingerprint',
+  );
+  assert.equal(
+    sh('vc_runtime_version_verdict file:fingerprint abc123 def456'),
     'FAIL runtime version abc123 does not match the build fingerprint def456',
   );
   // No build-info.json to compare against is not a mismatch.
   assert.match(
-    sh('vc_runtime_version_verdict abc123 ""'),
-    /^ok runtime version abc123 \(no build-info/,
+    sh('vc_runtime_version_verdict file:fingerprint abc123 ""'),
+    /^ok runtime version abc123 \(from file:fingerprint; no build-info/,
+  );
+});
+
+test('a sentinel with no fingerprint file behind it fails', () => {
+  // The binary cannot resolve a runtime version at all, so it would never be
+  // offered an update -- which is the defect this check exists for.
+  assert.match(
+    sh('vc_runtime_version_verdict file:fingerprint "" abc123'),
+    /^FAIL runtime version is file:fingerprint but the artifact carries no fingerprint file/,
+  );
+});
+
+test('a pinned literal runtime version is reported, never compared to a fingerprint', () => {
+  // `runtimeVersion: "1.0.0"` is a supported Expo config; under any policy but
+  // `fingerprint` the build-info hash is a different thing entirely, and
+  // failing a correct build is worse than not checking.
+  assert.equal(
+    sh('vc_runtime_version_verdict 1.0.0 "" deadbeef'),
+    'ok runtime version 1.0.0 (pinned literal, not a fingerprint policy)',
   );
 });
 
@@ -453,6 +480,19 @@ test('the channel is read out of the manifest request-header JSON', () => {
     sh(`vc_json_string_field '{"expo-channel-name": "beta"}' expo-channel-name`),
     'beta',
   );
+});
+
+test('XML entities are undone before the JSON is parsed', () => {
+  // AndroidManifest.xml stores the request headers XML-escaped, so the plain
+  // sed found nothing and the channel check failed on every Android build.
+  const escaped = '{&quot;expo-channel-name&quot;:&quot;production&quot;}';
+  assert.equal(sh(`vc_xml_unescape '${escaped}'`), '{"expo-channel-name":"production"}');
+  assert.equal(
+    sh(`vc_json_string_field "$(vc_xml_unescape '${escaped}')" expo-channel-name`),
+    'production',
+  );
+  // &amp; is undone last, so an escaped entity does not become a live one.
+  assert.equal(sh(`vc_xml_unescape 'a&amp;quot;b'`), 'a&quot;b');
 });
 
 test('a fingerprint is read out of build-info.json, and absence is not a mismatch', () =>
@@ -674,35 +714,50 @@ function machOArm64() {
  * exactly that one thing, so a FAIL in their output can only be the defect.
  */
 /**
- * The Expo.plist `expo prebuild` writes with OTA on. `runtime` is what the
- * fingerprint policy resolves to at prebuild time; omitting a key drops it,
- * which is exactly the defect the OTA checks exist to catch.
+ * The Expo.plist to put in a fake .app, taken from `fixtures/ota/Expo.plist` --
+ * real `expo prebuild --clean` output with OTA on, not a hand-written guess.
+ * That distinction is the whole point: the first version of these tests wrote
+ * a fingerprint hash into EXUpdatesRuntimeVersion, which prebuild never does,
+ * so the fixture agreed with the bug and all four cases passed green.
+ *
+ * The overrides rewrite one key of the real file at a time, so a FAIL in a
+ * test's output can only be the defect that test injected.
  */
-function expoPlist({
-  enabled = true,
-  url = 'https://updates.example.com/manifest',
-  runtime = 'fp-abc',
-  channel = 'production',
-} = {}) {
-  const entries = [`<key>EXUpdatesEnabled</key><${enabled}/>`];
-  if (url) entries.push(`<key>EXUpdatesURL</key><string>${url}</string>`);
-  if (runtime) entries.push(`<key>EXUpdatesRuntimeVersion</key><string>${runtime}</string>`);
-  if (channel) {
-    entries.push(
-      `<key>EXUpdatesRequestHeaders</key><dict><key>expo-channel-name</key><string>${channel}</string></dict>`,
-    );
+function expoPlist({ enabled = null, runtime = null, channel = null, drop = [] } = {}) {
+  let xml = readFileSync(path.join(here, 'fixtures', 'ota', 'Expo.plist'), 'utf8');
+  const replaceString = (key, value) =>
+    xml.replace(new RegExp(`(<key>${key}</key>\\s*<string>)[^<]*(</string>)`), `$1${value}$2`);
+  if (enabled !== null) {
+    xml = xml.replace(/(<key>EXUpdatesEnabled<\/key>\s*)<(true|false)\/>/, `$1<${enabled}/>`);
   }
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-${entries.join('\n')}
-</dict></plist>
-`;
+  if (runtime !== null) xml = replaceString('EXUpdatesRuntimeVersion', runtime);
+  if (channel !== null) xml = replaceString('expo-channel-name', channel);
+  for (const key of drop) {
+    // Drop a <key>/<string> pair, or a <key> followed by a <dict>…</dict>.
+    xml = xml
+      .replace(new RegExp(`\\s*<key>${key}</key>\\s*<string>[^<]*</string>`), '')
+      .replace(new RegExp(`\\s*<key>${key}</key>\\s*<dict>[\\s\\S]*?</dict>`), '');
+  }
+  return xml;
 }
+
+/** The real prebuilt AndroidManifest.xml, for the Android OTA assertions. */
+const androidManifestFixture = () =>
+  readFileSync(path.join(here, 'fixtures', 'ota', 'AndroidManifest.xml'), 'utf8');
 
 function fakeApp(
   dir,
-  { version = '1.2.3', build = '42', bundle = HERMES_MAGIC, arch = machOArm64(), expo = null } = {},
+  {
+    version = '1.2.3',
+    build = '42',
+    bundle = HERMES_MAGIC,
+    arch = machOArm64(),
+    expo = null,
+    // The file expo-updates' build phase writes into the app's resource
+    // bundle; `null` leaves it out, which is what an OTA build that never ran
+    // that phase looks like.
+    fingerprint = null,
+  } = {},
 ) {
   const app = path.join(dir, 'Fake.app');
   mkdirSync(app, { recursive: true });
@@ -721,6 +776,13 @@ function fakeApp(
   writeFileSync(path.join(app, 'Fake'), arch);
   writeFileSync(path.join(app, 'main.jsbundle'), bundle);
   if (expo) writeFileSync(path.join(app, 'Expo.plist'), expo);
+  if (fingerprint !== null) {
+    // EXUpdates.bundle, not the .app root: create-updates-resources-ios.sh
+    // writes into the pod's resource bundle, and UpdatesConfig.swift reads it
+    // back from there.
+    mkdirSync(path.join(app, 'EXUpdates.bundle'), { recursive: true });
+    writeFileSync(path.join(app, 'EXUpdates.bundle', 'fingerprint'), fingerprint);
+  }
   return app;
 }
 
@@ -804,12 +866,12 @@ test('verify-ios.sh skips every signing check under --no-signing', macOnly, () =
   }),
 );
 
-// I5: a runtime version or channel that is wrong is invisible -- the update
-// publishes fine and reaches nobody -- so these two are the OTA checks that
-// have to be end-to-end against a real Expo.plist.
-test('verify-ios.sh accepts an Expo.plist that would actually receive updates', macOnly, () =>
+// I5/R1: a runtime version or channel that is wrong is invisible -- the update
+// publishes fine and reaches nobody -- so both are checked end to end against
+// the *real* prebuilt Expo.plist in fixtures/ota/, never a hand-written one.
+test('verify-ios.sh accepts a real prebuilt Expo.plist and its fingerprint file', macOnly, () =>
   withTempDir((dir) => {
-    const app = fakeApp(dir, { expo: expoPlist() });
+    const app = fakeApp(dir, { expo: expoPlist(), fingerprint: 'fp-abc\n' });
     writeFileSync(
       path.join(dir, 'build-info.json'),
       JSON.stringify({ fingerprint: { ios: 'fp-abc', android: 'fp-xyz' } }),
@@ -829,27 +891,41 @@ test('verify-ios.sh accepts an Expo.plist that would actually receive updates', 
   }),
 );
 
-test('verify-ios.sh fails a build with no runtime version and the wrong channel', macOnly, () =>
+test('verify-ios.sh accepts the sentinel with no build-info to compare against', macOnly, () =>
   withTempDir((dir) => {
-    const app = fakeApp(dir, { expo: expoPlist({ runtime: '', channel: 'internal' }) });
-    const { status, stdout } = run(verifyIos, [app, '--no-signing'], {
+    const app = fakeApp(dir, { expo: expoPlist(), fingerprint: 'fp-abc' });
+    const { stdout } = run(verifyIos, [app, '--no-signing'], {
       APP_VERSION: '1.2.3',
       APP_BUILD_NUMBER: '42',
       OTA_ENABLED: 'true',
       BUILD_INFO_FILE: path.join(dir, 'absent.json'),
     });
-    assert.equal(status, 1);
-    assert.match(
-      stdout,
-      /FAIL ota-runtime-version: updates are enabled but the artifact carries no runtime version/,
-    );
-    assert.match(stdout, /FAIL ota-channel: update channel internal, expected production/);
+    assert.match(stdout, /ok ota-runtime-version: runtime version fp-abc \(from file:fingerprint/);
+    assert.doesNotMatch(stdout, /^FAIL ota-/m, stdout);
   }),
 );
 
-test('verify-ios.sh fails a runtime version that is not the build fingerprint', macOnly, () =>
+test('verify-ios.sh fails an OTA build whose bundle has no fingerprint file', macOnly, () =>
   withTempDir((dir) => {
-    const app = fakeApp(dir, { expo: expoPlist({ runtime: 'stale-fp' }) });
+    // The build phase that writes it never ran: the binary cannot resolve a
+    // runtime version at all, so no update would ever be offered to it.
+    const app = fakeApp(dir, { expo: expoPlist() });
+    const { status, stdout } = run(verifyIos, [app, '--no-signing'], {
+      APP_VERSION: '1.2.3',
+      APP_BUILD_NUMBER: '42',
+      OTA_ENABLED: 'true',
+    });
+    assert.equal(status, 1);
+    assert.match(
+      stdout,
+      /FAIL ota-runtime-version: runtime version is file:fingerprint but the artifact carries no fingerprint file/,
+    );
+  }),
+);
+
+test('verify-ios.sh fails a fingerprint that is not the one the build recorded', macOnly, () =>
+  withTempDir((dir) => {
+    const app = fakeApp(dir, { expo: expoPlist(), fingerprint: 'stale-fp' });
     writeFileSync(
       path.join(dir, 'build-info.json'),
       JSON.stringify({ fingerprint: { ios: 'fp-abc' } }),
@@ -865,10 +941,33 @@ test('verify-ios.sh fails a runtime version that is not the build fingerprint', 
   }),
 );
 
+test('verify-ios.sh fails a plist with no runtime version and the wrong channel', macOnly, () =>
+  withTempDir((dir) => {
+    const app = fakeApp(dir, {
+      expo: expoPlist({ channel: 'internal', drop: ['EXUpdatesRuntimeVersion'] }),
+      fingerprint: 'fp-abc',
+    });
+    const { status, stdout } = run(verifyIos, [app, '--no-signing'], {
+      APP_VERSION: '1.2.3',
+      APP_BUILD_NUMBER: '42',
+      OTA_ENABLED: 'true',
+    });
+    assert.equal(status, 1);
+    assert.match(
+      stdout,
+      /FAIL ota-runtime-version: updates are enabled but the artifact carries no runtime version/,
+    );
+    assert.match(stdout, /FAIL ota-channel: update channel internal, expected production/);
+  }),
+);
+
 test('verify-ios.sh leaves the OTA checks alone when updates are off', macOnly, () =>
   withTempDir((dir) => {
     const app = fakeApp(dir, {
-      expo: expoPlist({ enabled: false, url: '', runtime: '', channel: '' }),
+      expo: expoPlist({
+        enabled: false,
+        drop: ['EXUpdatesURL', 'EXUpdatesRuntimeVersion', 'EXUpdatesRequestHeaders'],
+      }),
     });
     const { status, stdout } = run(verifyIos, [app, '--no-signing'], {
       APP_VERSION: '1.2.3',
@@ -880,6 +979,54 @@ test('verify-ios.sh leaves the OTA checks alone when updates are off', macOnly, 
     assert.doesNotMatch(stdout, /ota-channel/);
   }),
 );
+
+// The fixtures are the contract with a generator this repo does not control, so
+// assert what they say. If an Expo bump changes any of it, this fails here
+// rather than in a release job.
+test('the captured prebuild output still says what the gates assume', () => {
+  const plist = readFileSync(path.join(here, 'fixtures', 'ota', 'Expo.plist'), 'utf8');
+  assert.match(plist, /<key>EXUpdatesRuntimeVersion<\/key>\s*<string>file:fingerprint<\/string>/);
+  assert.match(plist, /<key>expo-channel-name<\/key>\s*<string>production<\/string>/);
+
+  const manifest = androidManifestFixture();
+  assert.match(
+    manifest,
+    /expo\.modules\.updates\.EXPO_RUNTIME_VERSION" android:value="@string\/expo_runtime_version"/,
+  );
+  assert.match(
+    manifest,
+    /UPDATES_CONFIGURATION_REQUEST_HEADERS_KEY" android:value="\{&quot;expo-channel-name&quot;:&quot;production&quot;\}"/,
+  );
+  const strings = readFileSync(path.join(here, 'fixtures', 'ota', 'strings.xml'), 'utf8');
+  assert.match(strings, /<string name="expo_runtime_version">file:fingerprint<\/string>/);
+});
+
+// The Android gate cannot be run end to end (no hand-made file is a readable
+// AAB), so its two OTA reads are exercised as the exact shell pipeline the gate
+// uses, against the real manifest.
+test('the android gate reads the real manifest the way the gate does', () =>
+  withTempDir((dir) => {
+    const manifest = path.join(dir, 'AndroidManifest.xml');
+    writeFileSync(manifest, androidManifestFixture());
+    const meta = (name) =>
+      `$(grep -A2 '${name}' "${manifest}" | sed -n 's/.*android:value="\\([^"]*\\)".*/\\1/p' | head -1)`;
+    assert.equal(
+      sh(`printf '%s' "${meta('expo.modules.updates.EXPO_RUNTIME_VERSION')}"`),
+      '@string/expo_runtime_version',
+    );
+    assert.equal(
+      sh(
+        `vc_json_string_field "$(vc_xml_unescape "${meta('expo.modules.updates.UPDATES_CONFIGURATION_REQUEST_HEADERS_KEY')}")" expo-channel-name`,
+      ),
+      'production',
+    );
+    // And the verdicts those two values produce.
+    assert.match(
+      sh(`vc_runtime_version_verdict "@string/expo_runtime_version" abc123 abc123`),
+      /^ok runtime version abc123 matches/,
+    );
+    assert.equal(sh(`vc_channel_verdict production production`), 'ok update channel production');
+  }));
 
 test('verify-ios.sh refuses an artifact that holds no .app', () =>
   withTempDir((dir) => {

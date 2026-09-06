@@ -197,12 +197,45 @@ else
       }
       # A runtime version that does not match the fingerprint this build was
       # made from means the binary silently receives no updates for its life.
-      vc_verdict ota-runtime-version \
-        "$(vc_runtime_version_verdict "$(updates_meta 'expo.modules.updates.EXPO_RUNTIME_VERSION')" "$(vc_build_info_fingerprint "$build_info" android)")"
-      # The request headers arrive as one JSON string in a single meta-data value.
+      #
+      # Under the fingerprint policy the manifest holds
+      # `@string/expo_runtime_version`, whose string resource is in turn the
+      # `file:fingerprint` sentinel; the hash itself is an asset written into
+      # the build by expo-updates' gradle task and read from `assets/fingerprint`
+      # at runtime (UpdatesConfiguration.kt:270). It is in the APK flat and in
+      # the AAB under `base/`.
+      declared_rv="$(updates_meta 'expo.modules.updates.EXPO_RUNTIME_VERSION')"
+      resolved_rv=''
+      case "$declared_rv" in
+        file:* | '@string/'*)
+          if command -v unzip >/dev/null 2>&1; then
+            resolved_rv="$(unzip -p "$apk" 'assets/fingerprint' 2>/dev/null | tr -d '[:space:]' || true)"
+            [ -n "$resolved_rv" ] ||
+              resolved_rv="$(unzip -p "$aab" 'base/assets/fingerprint' 2>/dev/null | tr -d '[:space:]' || true)"
+          fi
+          ;;
+        *) ;;
+      esac
+      if [ -z "$resolved_rv" ] && [ "${declared_rv#@string/}" != "$declared_rv" ]; then
+        # Deliberately a skip and not a FAIL. The asset path is established from
+        # the client and the gradle plugin, not from a real AAB (no Android
+        # toolchain is available where these gates were written), and a check
+        # whose only evidence is source-reading is exactly what shipped the
+        # `file:fingerprint` regression. The declared value below is proven
+        # against real prebuild output; promote this to a FAIL once a real AAB
+        # has been through it.
+        vc_skip ota-runtime-version "manifest declares $declared_rv; no assets/fingerprint in the artifact to resolve it from"
+      else
+        vc_verdict ota-runtime-version \
+          "$(vc_runtime_version_verdict "$declared_rv" "$resolved_rv" "$(vc_build_info_fingerprint "$build_info" android)")"
+      fi
+      # The request headers arrive as one JSON string in a single meta-data
+      # value, and the manifest stores that JSON XML-escaped
+      # (`{&quot;expo-channel-name&quot;:&quot;production&quot;}`). Unescaping
+      # first is harmless when a dump has already done it.
       vc_verdict ota-channel \
         "$(vc_channel_verdict \
-          "$(vc_json_string_field "$(updates_meta 'expo.modules.updates.UPDATES_CONFIGURATION_REQUEST_HEADERS_KEY')" 'expo-channel-name')" \
+          "$(vc_json_string_field "$(vc_xml_unescape "$(updates_meta 'expo.modules.updates.UPDATES_CONFIGURATION_REQUEST_HEADERS_KEY')")" 'expo-channel-name')" \
           "${OTA_CHANNEL:-production}")"
       if vc_contains "$aab_manifest" 'expo.modules.updates.CODE_SIGNING_CERTIFICATE'; then
         cert="$repo_root/certs/expo-updates-cert.pem"
