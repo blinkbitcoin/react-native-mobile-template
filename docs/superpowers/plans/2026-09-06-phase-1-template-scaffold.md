@@ -3378,3 +3378,12 @@ git tag phase-1-scaffold
 - Spec coverage (Part C + Phase 1): dev env (T1, T2), quality tooling (T3, T4, T17), router (T6), theme (T7), i18n (T8; compiled catalogs instead of metro transformer, recorded deviation), env/config (T9), lib layer (T10), GraphQL + mock API + codegen (T11), auth/updates/dev menu/error boundary (T12), native module (T13), plugins incl. Android release signing/ABIs (T14), assets + deep links (T15), Maestro + local scripts + Playwright (T16), `make check` aggregate + remaining scripts (T17), acceptance (T18). Not in this phase by design: `.github/`, `AGENTS.md`, `CONTRIBUTING.md`, ADRs, `make init`, fastlane, release scripts, OTA server (Phases 2 to 4).
 - Type consistency: `renderWithProviders`/`Providers` (T5, used T8, T11, T12); `secureStore`/`SecureKey` (T10, used T11, T12); `constants` (T9, used T12, T13); `updates.switchChannel(channel)` (T12); `hello`/`getBuildStamp`/`HelloNativeError` (T13, used T13 card); `withBuildStamp({ stamp })` (T14, wired T9's `app.config.ts`); `testID`s used by Maestro (T16) are exactly the ones defined in T6, T12, T13.
 - Known judgement calls the implementer may need to adjust against installed versions: Apollo 4 `ErrorLink` payload shape, `@expo/config-plugins` `generateCode` import path, knip plugin keys, `tabBarTestID` vs `tabBarButtonTestID`, jest-expo's Jest major, Node `fetch` under jest-expo for MSW. Each is called out inline where it occurs.
+
+## Rulings recorded during execution (2026-09-06)
+
+- **`src/app` import rule narrowed.** The Global Constraint "files under `src/app/` import only from `src/features/` and `src/components/`" is unachievable for the root layout, which must compose providers. Binding rule: route files other than `src/app/_layout.tsx` and `src/app/+native-intent.tsx` may not import `src/graphql`, `src/services`, `src/lib` or `@apollo/client` (alias or relative). Biome enforces it (`biome.json` `src/app/**` override).
+- **knip runs in default mode**, not `--strict`: production mode needs `!`-marked patterns and then flags test-only exports.
+- **Lingui catalogs are compiled to TypeScript** (`lingui compile`) and committed; no Metro transformer.
+- **Coverage thresholds unchanged**; the global figure excludes per-path-threshold files (Jest semantics).
+- **Tag** for the phase is `phase-1-complete` (a tag named like the branch made refs ambiguous).
+- **Bootstrap lesson:** never `cp -R generated/. .` into a repo; it copies the generator's `.git`. Use `rsync -a --exclude .git`.
