@@ -13,7 +13,11 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: release-${{ github.ref }}
+  # Per-sha, and not the shared `release-` group: this is precisely the
+  # workflow that must run promptly after an internal run goes green, and the
+  # shared group would park it behind the next 60-90 minute build (or evict it
+  # outright). It calls no store API.
+  group: release-retry-${{ github.event.workflow_run.head_sha }}
   cancel-in-progress: false
 jobs:
   retry-beta:
@@ -32,8 +36,12 @@ jobs:
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
+          # Not `--status failure`: a beta run that was cancelled or timed out
+          # (including one evicted from a concurrency group) needs the same
+          # retry, so filter on "concluded, but not successfully" instead.
           run_id="$(gh run list --workflow release-beta.yml --commit "$HEAD_SHA" \
-            --status failure --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+            --limit 20 --json databaseId,status,conclusion \
+            --jq '[.[] | select(.status == "completed" and .conclusion != "success" and .conclusion != "skipped")][0].databaseId // empty')"
           if [ -z "$run_id" ]; then
             echo "no failed release-beta run for $HEAD_SHA - nothing to retry"
             exit 0

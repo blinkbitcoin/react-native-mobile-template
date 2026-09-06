@@ -29,11 +29,33 @@ jobs:
       # without this the gate cannot see release-internal's runs.
       actions: read
     with:
-      ref: ${{ inputs.tag || github.event.release.tag_name }}
+      # `release-tag` (not `ref`) is what makes this correct: it becomes the
+      # checkout ref, the gated and stamped commit (`TAG^{commit}`, exposed as
+      # the `sha` output) and the source of the store notes. `github.sha` on a
+      # `release: published` event is the default branch's tip when the event
+      # fired, which may already be ahead of the tag — gating on it would check
+      # the wrong commit's CI, and on the workflow_dispatch path it would gate
+      # on main while promoting an older tag.
+      release-tag: ${{ inputs.tag || github.event.release.tag_name }}
       stage: beta
       build-number-offset: ${{ fromJSON(vars.BUILD_NUMBER_OFFSET || '1000') }}
       # A promotion must never ship a binary whose own build never went green.
       require-green-workflow: release-internal.yml
+      build-env: >-
+        {"APP_VARIANT":"production",
+        "OTA_ENABLED":"${{ vars.OTA_ENABLED }}",
+        "EXPO_UPDATES_URL":"${{ vars.EXPO_UPDATES_URL }}",
+        "STORE_NOTES_INCLUDE_CHANGELOG":"${{ vars.STORE_NOTES_INCLUDE_CHANGELOG }}",
+        "RELEASE_NOTES_LLM_PROVIDER":"${{ vars.RELEASE_NOTES_LLM_PROVIDER }}",
+        "RELEASE_NOTES_LLM_MODEL":"${{ vars.RELEASE_NOTES_LLM_MODEL }}",
+        "OPENAI_BASE_URL":"${{ vars.OPENAI_BASE_URL }}",
+        "EXPO_PUBLIC_API_URL":"${{ vars.EXPO_PUBLIC_API_URL }}",
+        "EXPO_PUBLIC_APP_NAME":"${{ vars.EXPO_PUBLIC_APP_NAME }}",
+        "EXPO_PUBLIC_WEB_DOMAIN":"${{ vars.EXPO_PUBLIC_WEB_DOMAIN }}",
+        "EXPO_PUBLIC_ALLOW_INSECURE_WEB_STORAGE":"${{ vars.EXPO_PUBLIC_ALLOW_INSECURE_WEB_STORAGE || 'false' }}"}
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
   promote-ios:
     needs: prepare
@@ -48,6 +70,7 @@ jobs:
       environment: beta
       artifacts: release-meta
       env-json: '{"TESTFLIGHT_EXTERNAL_GROUP": "${{ vars.TESTFLIGHT_EXTERNAL_GROUP }}"}'
+      build-env: '{"APP_VARIANT":"production"}'
       version: ${{ needs.prepare.outputs.version }}
       build-number: ${{ needs.prepare.outputs.build-number }}
       ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
@@ -57,6 +80,18 @@ jobs:
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+      # The Beta App Review contact and demo account. Secrets rather than
+      # env-json/build-env because a reviewer demo login is a real credential
+      # and both of those inputs are printed to the log. `promote_beta` omits
+      # the whole argument when none of them is set — pilot PATCHes every key it
+      # is given, so blanks would erase the contact in App Store Connect.
+      APP_REVIEW_EMAIL: ${{ secrets.APP_REVIEW_EMAIL }}
+      APP_REVIEW_FIRST_NAME: ${{ secrets.APP_REVIEW_FIRST_NAME }}
+      APP_REVIEW_LAST_NAME: ${{ secrets.APP_REVIEW_LAST_NAME }}
+      APP_REVIEW_PHONE: ${{ secrets.APP_REVIEW_PHONE }}
+      APP_REVIEW_DEMO_USER: ${{ secrets.APP_REVIEW_DEMO_USER }}
+      APP_REVIEW_DEMO_PASSWORD: ${{ secrets.APP_REVIEW_DEMO_PASSWORD }}
+      APP_REVIEW_NOTES: ${{ secrets.APP_REVIEW_NOTES }}
 
   promote-android:
     needs: prepare
@@ -69,6 +104,7 @@ jobs:
       runner: ubuntu-latest
       environment: beta
       artifacts: release-meta
+      build-env: '{"APP_VARIANT":"production"}'
       version: ${{ needs.prepare.outputs.version }}
       build-number: ${{ needs.prepare.outputs.build-number }}
       ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
@@ -85,9 +121,20 @@ jobs:
     with:
       mode: promote
       tag: ${{ inputs.tag || github.event.release.tag_name }}
-      # build-info.json and the store notes ride along so the release is the
-      # single record of what beta got — and so the OTA gate below has a
-      # fingerprint baseline to download.
+      # The promoted release must ship the bytes internal testers actually ran.
+      # `from-tag` re-uploads the pre-release's ipa/aab/apk/dSYM/mapping to this
+      # tag and regenerates SHA256SUMS over the merged set; a rebuild from the
+      # same source would be a different binary with a different signature and a
+      # different fingerprint, and the OTA gate downstream compares fingerprints.
+      # The build number is derived from the tag's commit, so it resolves to the
+      # same `-build.N` tag release-internal created for that sha.
+      from-tag: v${{ needs.prepare.outputs.version }}-build.${{ needs.prepare.outputs.build-number }}
+      # Removed only after the upload succeeded; a re-run whose source is
+      # already gone continues instead of failing.
+      delete-source: true
+      # build-info.json and the store notes from this run ride along, so the
+      # release is the single record of what beta got — and so the OTA gate
+      # below has a fingerprint baseline to download.
       assets-artifacts: release-meta
     secrets:
       RELEASE_TAGGER_APP_ID: ${{ secrets.RELEASE_TAGGER_APP_ID }}
@@ -101,12 +148,16 @@ jobs:
       contents: read
     with:
       ota-enabled: ${{ vars.OTA_ENABLED == 'true' }}
-      ref: ${{ inputs.tag || github.event.release.tag_name }}
+      # The commit the tag actually points at, resolved by prepare — not the
+      # branch tip the release event carried.
+      ref: ${{ needs.prepare.outputs.sha }}
       channel: beta
       rollout: 100
       environment: beta
       ota-cli-version: ${{ vars.OTA_CLI_VERSION }}
       # The release being promoted is the binary now on the beta track.
       baseline-tag: ${{ inputs.tag || github.event.release.tag_name }}
+      manifest-url: ${{ vars.EXPO_UPDATES_URL }}
+      runtime-version: ${{ needs.prepare.outputs.fp-ios }}
     secrets:
       OTA_PUBLISH_TOKEN: ${{ secrets.OTA_PUBLISH_TOKEN }}

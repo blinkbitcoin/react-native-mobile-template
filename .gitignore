@@ -42,6 +42,11 @@ yarn-error.*
 # local env files
 .env*.local
 
+# OTA deploy: .env holds EOO_PRIVATE_KEY (the expo-updates signing key) and the
+# publish tokens; data/ is the update store the server writes.
+/deploy/ota/.env
+/deploy/ota/data/
+
 # typescript
 *.tsbuildinfo
 

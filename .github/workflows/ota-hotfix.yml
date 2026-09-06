@@ -75,7 +75,9 @@ jobs:
       ota-enabled: ${{ vars.OTA_ENABLED == 'true' }}
       ref: ${{ inputs.ref }}
       channel: ${{ inputs.channel }}
-      rollout: ${{ fromJSON(inputs.rollout) }}
+      # A dispatcher who clears the field submits '', and fromJSON('') is an
+      # expression error rather than a readable message.
+      rollout: ${{ fromJSON(inputs.rollout || '10') }}
       # A production hotfix goes through the same required reviewer as a store
       # release; internal and beta do not gate.
       environment: ${{ inputs.channel == 'production' && 'production' || '' }}

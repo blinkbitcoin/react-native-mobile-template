@@ -33,7 +33,7 @@ on:
         required: false
         default: true
       platforms:
-        description: Which stores to act on
+        description: Which stores to act on - action=rollout is Android-only, so choosing ios with it does nothing
         type: choice
         required: false
         default: both
@@ -49,9 +49,27 @@ jobs:
     permissions:
       contents: read
     with:
-      ref: ${{ inputs.tag }}
+      # The tag, not a ref: it fixes the checkout, the stamped commit
+      # (`TAG^{commit}`, exposed as the `sha` output) and the store notes, which
+      # come from that release's body rather than from commit subjects.
+      release-tag: ${{ inputs.tag }}
       stage: production
       build-number-offset: ${{ fromJSON(vars.BUILD_NUMBER_OFFSET || '1000') }}
+      build-env: >-
+        {"APP_VARIANT":"production",
+        "OTA_ENABLED":"${{ vars.OTA_ENABLED }}",
+        "EXPO_UPDATES_URL":"${{ vars.EXPO_UPDATES_URL }}",
+        "STORE_NOTES_INCLUDE_CHANGELOG":"${{ vars.STORE_NOTES_INCLUDE_CHANGELOG }}",
+        "RELEASE_NOTES_LLM_PROVIDER":"${{ vars.RELEASE_NOTES_LLM_PROVIDER }}",
+        "RELEASE_NOTES_LLM_MODEL":"${{ vars.RELEASE_NOTES_LLM_MODEL }}",
+        "OPENAI_BASE_URL":"${{ vars.OPENAI_BASE_URL }}",
+        "EXPO_PUBLIC_API_URL":"${{ vars.EXPO_PUBLIC_API_URL }}",
+        "EXPO_PUBLIC_APP_NAME":"${{ vars.EXPO_PUBLIC_APP_NAME }}",
+        "EXPO_PUBLIC_WEB_DOMAIN":"${{ vars.EXPO_PUBLIC_WEB_DOMAIN }}",
+        "EXPO_PUBLIC_ALLOW_INSECURE_WEB_STORAGE":"${{ vars.EXPO_PUBLIC_ALLOW_INSECURE_WEB_STORAGE || 'false' }}"}
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
   # ---- action=release -------------------------------------------------------
 
@@ -70,6 +88,7 @@ jobs:
       environment: production
       artifacts: release-meta
       env-json: '{"IOS_PHASED_RELEASE": "${{ inputs.ios_phased_release }}"}'
+      build-env: '{"APP_VARIANT":"production"}'
       version: ${{ needs.prepare.outputs.version }}
       build-number: ${{ needs.prepare.outputs.build-number }}
       ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
@@ -80,6 +99,16 @@ jobs:
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+      # App Review contact and demo account for the App Store submission.
+      # Secrets, not env-json/build-env: a reviewer demo login is a real
+      # credential and both of those inputs are printed to the log.
+      APP_REVIEW_EMAIL: ${{ secrets.APP_REVIEW_EMAIL }}
+      APP_REVIEW_FIRST_NAME: ${{ secrets.APP_REVIEW_FIRST_NAME }}
+      APP_REVIEW_LAST_NAME: ${{ secrets.APP_REVIEW_LAST_NAME }}
+      APP_REVIEW_PHONE: ${{ secrets.APP_REVIEW_PHONE }}
+      APP_REVIEW_DEMO_USER: ${{ secrets.APP_REVIEW_DEMO_USER }}
+      APP_REVIEW_DEMO_PASSWORD: ${{ secrets.APP_REVIEW_DEMO_PASSWORD }}
+      APP_REVIEW_NOTES: ${{ secrets.APP_REVIEW_NOTES }}
 
   android-release:
     needs: prepare
@@ -94,6 +123,7 @@ jobs:
       environment: production
       artifacts: release-meta
       env-json: '{"PLAY_ROLLOUT": "${{ inputs.play_rollout_percent }}", "PLAY_UPDATE_PRIORITY": "${{ vars.PLAY_UPDATE_PRIORITY }}"}'
+      build-env: '{"APP_VARIANT":"production"}'
       version: ${{ needs.prepare.outputs.version }}
       build-number: ${{ needs.prepare.outputs.build-number }}
       ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
@@ -119,6 +149,7 @@ jobs:
       runner: ubuntu-latest
       environment: production
       artifacts: release-meta
+      build-env: '{"APP_VARIANT":"production"}'
       version: ${{ needs.prepare.outputs.version }}
       build-number: ${{ needs.prepare.outputs.build-number }}
       ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
@@ -144,6 +175,7 @@ jobs:
       runner: ubuntu-latest
       environment: production
       artifacts: release-meta
+      build-env: '{"APP_VARIANT":"production"}'
       version: ${{ needs.prepare.outputs.version }}
       build-number: ${{ needs.prepare.outputs.build-number }}
       ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
@@ -166,6 +198,7 @@ jobs:
       runner: ubuntu-latest
       environment: production
       artifacts: release-meta
+      build-env: '{"APP_VARIANT":"production"}'
       version: ${{ needs.prepare.outputs.version }}
       build-number: ${{ needs.prepare.outputs.build-number }}
       ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
@@ -177,6 +210,8 @@ jobs:
   # ---- action=release only: mark latest, publish OTA, deploy web ------------
 
   github-release:
+    # `prepare` is ordering, not data: this job keys off `inputs.tag`, but the
+    # `release-meta` artifact it attaches only exists once prepare has run.
     needs: [prepare, ios-release, android-release]
     # A status function in the `if` drops the implicit success() requirement, so
     # a job skipped by `platforms` does not skip this one; `!failure()` still
@@ -194,6 +229,8 @@ jobs:
       RELEASE_TAGGER_APP_PRIVATE_KEY: ${{ secrets.RELEASE_TAGGER_APP_PRIVATE_KEY }}
 
   ota-production:
+    # github-release is what puts build-info.json on the tag, which is the
+    # fingerprint baseline the gate downloads.
     needs: [prepare, github-release]
     if: ${{ !failure() && !cancelled() && inputs.action == 'release' && vars.OTA_ENABLED == 'true' }}
     uses: blinkbitcoin/react-native-workflows/.github/workflows/expo-ota-publish.yml@v0
@@ -207,10 +244,16 @@ jobs:
       environment: production
       ota-cli-version: ${{ vars.OTA_CLI_VERSION }}
       baseline-tag: ${{ inputs.tag }}
+      # smoke.sh defaults to the ios platform, so the iOS fingerprint is the
+      # runtime version to ask the server for.
+      manifest-url: ${{ vars.EXPO_UPDATES_URL }}
+      runtime-version: ${{ needs.prepare.outputs.fp-ios }}
     secrets:
       OTA_PUBLISH_TOKEN: ${{ secrets.OTA_PUBLISH_TOKEN }}
 
   web:
+    # Pure ordering: the site should not go live before the stores have accepted
+    # the release. Neither job's outputs are read here.
     needs: [prepare, github-release]
     # The site tracks what is actually live in the stores, so it deploys from
     # the production dispatch rather than from the tag push.
@@ -225,3 +268,7 @@ jobs:
     with:
       ref: ${{ inputs.tag }}
       deploy: true
+      # Deliberately on: the reviewer has already approved, and a broken site is
+      # the one failure mode nothing downstream would catch. It adds a browser
+      # e2e run (~15-20 min) to the dispatch on code CI already tested at merge.
+      playwright: true

@@ -27,6 +27,28 @@ jobs:
       # the empty string, which fails input validation rather than falling back
       # to the workflow default. fromJSON turns the fallback into a real number.
       build-number-offset: ${{ fromJSON(vars.BUILD_NUMBER_OFFSET || '1000') }}
+      # `build-env` is the only way a caller gets an environment variable into
+      # the prebuild, the lanes and the consumer scripts. Non-secret only: the
+      # value is a workflow input, unmasked and visible to anyone who can read
+      # the run, and build-env.sh refuses a key that looks like a credential.
+      build-env: >-
+        {"APP_VARIANT":"production",
+        "OTA_ENABLED":"${{ vars.OTA_ENABLED }}",
+        "EXPO_UPDATES_URL":"${{ vars.EXPO_UPDATES_URL }}",
+        "ANDROID_UPLOAD_CERT_SHA256":"${{ vars.ANDROID_UPLOAD_CERT_SHA256 }}",
+        "STORE_NOTES_INCLUDE_CHANGELOG":"${{ vars.STORE_NOTES_INCLUDE_CHANGELOG }}",
+        "RELEASE_NOTES_LLM_PROVIDER":"${{ vars.RELEASE_NOTES_LLM_PROVIDER }}",
+        "RELEASE_NOTES_LLM_MODEL":"${{ vars.RELEASE_NOTES_LLM_MODEL }}",
+        "OPENAI_BASE_URL":"${{ vars.OPENAI_BASE_URL }}",
+        "EXPO_PUBLIC_API_URL":"${{ vars.EXPO_PUBLIC_API_URL }}",
+        "EXPO_PUBLIC_APP_NAME":"${{ vars.EXPO_PUBLIC_APP_NAME }}",
+        "EXPO_PUBLIC_WEB_DOMAIN":"${{ vars.EXPO_PUBLIC_WEB_DOMAIN }}",
+        "EXPO_PUBLIC_ALLOW_INSECURE_WEB_STORAGE":"${{ vars.EXPO_PUBLIC_ALLOW_INSECURE_WEB_STORAGE || 'false' }}"}
+    secrets:
+      # Only needed when RELEASE_NOTES_LLM_PROVIDER selects that provider; the
+      # notes renderer falls back to deterministic prose without them.
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
   build-ios:
     needs: prepare
@@ -45,6 +67,18 @@ jobs:
       ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
       ios-scheme: ${{ vars.IOS_SCHEME }}
       android-package: ${{ vars.ANDROID_PACKAGE }}
+      # APP_VARIANT decides the `.dev` id suffix in app.config.ts, and
+      # OTA_ENABLED / EXPO_UPDATES_URL decide whether the binary can ever
+      # receive an update — none of them reach a build any other way.
+      build-env: >-
+        {"APP_VARIANT":"production",
+        "OTA_ENABLED":"${{ vars.OTA_ENABLED }}",
+        "EXPO_UPDATES_URL":"${{ vars.EXPO_UPDATES_URL }}",
+        "ANDROID_UPLOAD_CERT_SHA256":"${{ vars.ANDROID_UPLOAD_CERT_SHA256 }}",
+        "EXPO_PUBLIC_API_URL":"${{ vars.EXPO_PUBLIC_API_URL }}",
+        "EXPO_PUBLIC_APP_NAME":"${{ vars.EXPO_PUBLIC_APP_NAME }}",
+        "EXPO_PUBLIC_WEB_DOMAIN":"${{ vars.EXPO_PUBLIC_WEB_DOMAIN }}",
+        "EXPO_PUBLIC_ALLOW_INSECURE_WEB_STORAGE":"${{ vars.EXPO_PUBLIC_ALLOW_INSECURE_WEB_STORAGE || 'false' }}"}
     secrets:
       MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
       MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
@@ -66,6 +100,19 @@ jobs:
       android-package: ${{ vars.ANDROID_PACKAGE }}
       ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
       ios-scheme: ${{ vars.IOS_SCHEME }}
+      # ANDROID_UPLOAD_CERT_SHA256 is what turns the `android verify` lane's
+      # "the aab is signed" into "the aab is signed by the expected key"; the
+      # lane forwards it to verify-android.sh as --cert-sha256 and reports
+      # `skip` when it is missing.
+      build-env: >-
+        {"APP_VARIANT":"production",
+        "OTA_ENABLED":"${{ vars.OTA_ENABLED }}",
+        "EXPO_UPDATES_URL":"${{ vars.EXPO_UPDATES_URL }}",
+        "ANDROID_UPLOAD_CERT_SHA256":"${{ vars.ANDROID_UPLOAD_CERT_SHA256 }}",
+        "EXPO_PUBLIC_API_URL":"${{ vars.EXPO_PUBLIC_API_URL }}",
+        "EXPO_PUBLIC_APP_NAME":"${{ vars.EXPO_PUBLIC_APP_NAME }}",
+        "EXPO_PUBLIC_WEB_DOMAIN":"${{ vars.EXPO_PUBLIC_WEB_DOMAIN }}",
+        "EXPO_PUBLIC_ALLOW_INSECURE_WEB_STORAGE":"${{ vars.EXPO_PUBLIC_ALLOW_INSECURE_WEB_STORAGE || 'false' }}"}
     secrets:
       ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
       ANDROID_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
@@ -89,6 +136,9 @@ jobs:
       # is where the lane looks for app.ipa, build-info.json and the notes.
       artifacts: "*"
       env-json: '{"TESTFLIGHT_INTERNAL_GROUP": "${{ vars.TESTFLIGHT_INTERNAL_GROUP }}"}'
+      # No lane reads app.config.ts, but a lane that ever does must agree with
+      # the build about which variant it is acting on.
+      build-env: '{"APP_VARIANT":"production"}'
       version: ${{ needs.prepare.outputs.version }}
       build-number: ${{ needs.prepare.outputs.build-number }}
       ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
@@ -112,6 +162,7 @@ jobs:
       environment: internal
       artifacts: "*"
       env-json: '{"PLAY_UPDATE_PRIORITY": "${{ vars.PLAY_UPDATE_PRIORITY }}"}'
+      build-env: '{"APP_VARIANT":"production"}'
       version: ${{ needs.prepare.outputs.version }}
       build-number: ${{ needs.prepare.outputs.build-number }}
       ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
@@ -153,5 +204,10 @@ jobs:
       # the binary now installed on the internal track, which is exactly the
       # fingerprint baseline the gate has to compare against.
       baseline-tag: v${{ needs.prepare.outputs.version }}-build.${{ needs.prepare.outputs.build-number }}
+      # A publish that "succeeded" but serves nothing looks identical to a
+      # working one until a user opens the app. smoke.sh defaults to the ios
+      # platform, so the iOS fingerprint is the runtime version to ask for.
+      manifest-url: ${{ vars.EXPO_UPDATES_URL }}
+      runtime-version: ${{ needs.prepare.outputs.fp-ios }}
     secrets:
       OTA_PUBLISH_TOKEN: ${{ secrets.OTA_PUBLISH_TOKEN }}

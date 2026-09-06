@@ -10,9 +10,12 @@ on:
 permissions:
   contents: read
 concurrency:
-  # Shared with every other release workflow, and never cancelling: a half-cut
-  # release is worse than a queued one.
-  group: release-${{ github.ref }}
+  # Deliberately NOT the shared `release-` group. GitHub keeps one pending run
+  # per group and evicts the older one, so sharing it with release-internal
+  # would leave the release PR stale for the length of a build and drop this
+  # run entirely on two quick pushes. Nothing here touches a store, so it does
+  # not need the store-serialising group.
+  group: release-please-${{ github.ref }}
   cancel-in-progress: false
 jobs:
   release-please:
@@ -21,6 +24,9 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+    # Exposed for a consumer that wants to chain a job off the cut release
+    # (e.g. moving a major tag). Nothing in this template consumes them; the
+    # `vX.Y.Z` release itself is what triggers release-beta.yml.
     outputs:
       release-created: ${{ steps.release.outputs.release_created }}
       tag-name: ${{ steps.release.outputs.tag_name }}
