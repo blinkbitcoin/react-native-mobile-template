@@ -35,6 +35,16 @@ build-web: ## Static web export into dist/
 version: ## Print what CI would build for HEAD
 	bash scripts/release/resolve-version.sh
 
+# ARTIFACT, not PATH: a variable set on make's command line is exported to every
+# recipe, so `make verify-ios PATH=...` would replace the shell's PATH.
+verify-ios: ## Verify a built .app/.ipa/.xcarchive (ARTIFACT=... [ARGS=--no-signing])
+	@[ -n "$(ARTIFACT)" ] || { echo "usage: make verify-ios ARTIFACT=artifacts/ios/App.xcarchive [ARGS=--no-signing]"; exit 2; }
+	bash scripts/release/verify-ios.sh "$(ARTIFACT)" $(ARGS)
+
+verify-android: ## Verify AAB+APK (AAB=... APK=... [ARGS=--cert-sha256 X])
+	@[ -n "$(AAB)" ] && [ -n "$(APK)" ] || { echo "usage: make verify-android AAB=artifacts/android/app-release.aab APK=artifacts/android/app-universal.apk"; exit 2; }
+	bash scripts/release/verify-android.sh "$(AAB)" "$(APK)" $(ARGS)
+
 release-notes: ## Preview store notes for HEAD (TAG=vX.Y.Z uses that release body via gh)
 	@set -euo pipefail; \
 	if [ -n "$(TAG)" ]; then \
@@ -136,4 +146,4 @@ reset: clean ## clean + reinstall
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: doctor install start ios android web mock-api prebuild build-web version release-notes i18n codegen typecheck lint format format-check knip spell check-gen check-prebuild check-code check-deps check-ci check-docs bundle-secrets-check check-release check test-scripts unit coverage e2e-ios e2e-android e2e-web test clean reset help
+.PHONY: doctor install start ios android web mock-api prebuild build-web version verify-ios verify-android release-notes i18n codegen typecheck lint format format-check knip spell check-gen check-prebuild check-code check-deps check-ci check-docs bundle-secrets-check check-release check test-scripts unit coverage e2e-ios e2e-android e2e-web test clean reset help

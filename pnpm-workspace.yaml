@@ -41,3 +41,17 @@ auditConfig:
   ignoreGhsas:
     - GHSA-w3rx-r6r6-pgpr
     - GHSA-5p2g-fcmc-qvqq
+
+# babel.config.js names `babel-preset-expo`, and @babel/core resolves a preset
+# from the config file's own directory -- which pnpm's strict node_modules does
+# not expose, because the preset is a transitive dependency of `expo`. Metro's
+# transform workers get away with it; the in-process tree-shaking serializer
+# that `expo export:embed --minify false` takes does not, and that is exactly
+# the path `gradle bundleRelease` uses. Without this, every Android release
+# build dies at :app:createBundleReleaseJsAndAssets with
+# "Failed to construct transformer: Cannot find module 'babel-preset-expo'".
+# The two defaults are repeated because setting the key replaces them.
+publicHoistPattern:
+  - '*eslint*'
+  - '*prettier*'
+  - 'babel-preset-expo'

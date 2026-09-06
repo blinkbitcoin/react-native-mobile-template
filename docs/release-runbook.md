@@ -250,6 +250,60 @@ let `release-internal` build it, merge the release PR release-please opens,
 let beta promote, then dispatch production. The steps do not change; only the
 soak does.
 
+## Verification gates
+
+Two scripts stand between a build and a store. Both are run by a fastlane lane
+(`fastlane ios verify`, `fastlane android verify`) and both can be run by hand:
+
+```bash
+make verify-ios ARTIFACT=artifacts/ios/App.xcarchive ARGS=--no-signing
+make verify-android AAB=artifacts/android/app-release.aab APK=artifacts/android/app-universal.apk
+```
+
+Each check prints one line — `ok`, `warn`, `skip` or `FAIL`, followed by the
+check name and a detail — and the same checklist is appended to
+`$GITHUB_STEP_SUMMARY` when CI set it. **Only `FAIL` fails the gate** (exit 1).
+`skip` means the check could not run: a tool is missing (`bundletool`, `aapt2`),
+or an input was not given (`APP_VERSION` unset, no `--cert-sha256`). That is
+deliberate — the gates have to be usable on a laptop that has neither an Android
+SDK nor a release environment.
+
+`verify-ios.sh <path> [--no-signing] [--dsym <path>]` takes an `.ipa`, an
+`.xcarchive`, or the `.app` inside one, and checks the Info.plist version, build
+number and bundle id against `APP_VERSION` / `APP_BUILD_NUMBER` /
+`IOS_BUNDLE_ID`; that `lipo` reports arm64 and nothing else; the signature, the
+embedded provisioning profile and `get-task-allow` (skipped under
+`--no-signing`, which is what a local unsigned archive needs); that
+`Expo.plist`'s `EXUpdatesEnabled` agrees with `OTA_ENABLED`, and that an
+OTA-enabled build carries an update URL; that `main.jsbundle` is Hermes
+bytecode with no Metro dev-server URL in it; and, with `--dsym`, that the dSYM's
+UUIDs cover the binary's.
+
+`verify-android.sh <aab> <apk> [--cert-sha256 <fp>]` reads the APK with `aapt2`
+and the AAB with `bundletool`, checks both against `APP_VERSION` /
+`APP_BUILD_NUMBER` / `ANDROID_PACKAGE` **and against each other** (an APK built
+from a different bundle than the one being uploaded is the mistake this exists
+to catch), refuses a debuggable build or a `minSdkVersion` below 24, refuses any
+`lib/x86*` and requires an arm ABI, verifies the signature with `apksigner`
+(compared against `--cert-sha256`, or `ANDROID_UPLOAD_CERT_SHA256` when the flag
+is absent), checks the OTA meta-data the same way iOS does, and compares the
+APK's SHA-256 with `artifacts.apkSha256` in `build-info.json` when the release
+workflow has filled it in.
+
+Both gates check every `EXPO_PUBLIC_*` name in `.env.example`: Expo inlines the
+*values*, so for each name that is set and non-empty in the environment at
+verify time, that value has to appear in the JS bundle. Names that are unset are
+listed as skipped and never fail.
+
+Two things only ever **warn**:
+
+- Store metadata still carrying `Replace this text`. The hard gate is
+  `assert_metadata_ready!` in the `release_production` lanes; failing a beta
+  build over copy nobody has written yet would help no one.
+- `certs/expo-updates-cert.pem` still being the certificate this template ships,
+  when OTA is on. Its private key was discarded (see `certs/README.md`), so it
+  proves the wiring and not the trust chain.
+
 ## Local builds
 
 `make check-release` runs the same lane checks CI runs (Ruby syntax, a fastlane
