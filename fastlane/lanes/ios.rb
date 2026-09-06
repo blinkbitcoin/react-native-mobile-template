@@ -25,6 +25,14 @@ def default_ios_artifact(out, scheme)
   app || ipa
 end
 
+# The dSYMs gym leaves inside the archive, when there is an archive. nil rather
+# than a guess when there is not: `verify-ios.sh --dsym` on a path that is not
+# there is a FAIL, and a missing dSYM is not what that check is about.
+def default_ios_dsyms(out, scheme)
+  dir = File.join(out, "#{scheme}.xcarchive", 'dSYMs')
+  Dir.exist?(dir) ? dir : nil
+end
+
 # The generated Info.plist, which is where `expo prebuild` writes the version
 # and the build number.
 #
@@ -98,6 +106,10 @@ platform :ios do
 
     args = ['bash', script, path]
     args << '--no-signing' if truthy?(options[:skip_signing])
+    # The archive carries its own dSYMs next to the binary being verified, so
+    # the UUID check is free here; without this it is a permanent skip in CI.
+    dsym = options[:dsym_path] || default_ios_dsyms(out, scheme)
+    args.push('--dsym', dsym) if dsym
     sh(*args)
   end
 

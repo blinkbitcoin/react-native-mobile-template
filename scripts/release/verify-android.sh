@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Post-build verification gate for the Android release artifacts.
 #
-#   bash scripts/release/verify-android.sh <aab> <apk> [--cert-sha256 <fp>]
+#   bash scripts/release/verify-android.sh <aab> <apk> [--cert-sha256 <fp>] [--strict]
 #
 # The AAB is what Play receives; the APK is the universal one built from that
 # same bundle, and is the only one of the two whose contents can be read with
@@ -11,7 +11,9 @@
 #
 # Prints one `status check: detail` line per check (ok | warn | skip | FAIL),
 # mirrors the list into $GITHUB_STEP_SUMMARY when CI set it, and exits 1 if
-# anything FAILed. A missing tool is a skip, not a failure.
+# anything FAILed. A missing tool is a skip -- unless --strict (or CI, which
+# turns it on by itself), where a check that could not run is a check that did
+# not pass.
 #
 # Env read: APP_VERSION, APP_BUILD_NUMBER, ANDROID_PACKAGE, OTA_ENABLED,
 #           BUILD_INFO_FILE (default build-info.json), ANDROID_HOME,
@@ -24,19 +26,24 @@ repo_root="$(cd "$here/../.." && pwd)"
 . "$here/lib/verify-common.sh"
 
 # Expo SDK 57's own floor. A release built below it would not install on the
-# devices the store listing promises.
-MIN_SDK_FLOOR=24
+# devices the store listing promises. Deliberately a constant rather than a read
+# of the generated android/build.gradle -- a gate that takes its expectation
+# from the thing it is checking checks nothing -- so ANDROID_MIN_SDK is the way
+# to move it when the SDK bump moves it.
+MIN_SDK_FLOOR="${ANDROID_MIN_SDK:-24}"
 
 usage() {
-  echo "usage: verify-android.sh <aab> <apk> [--cert-sha256 <fingerprint>]" >&2
+  echo "usage: verify-android.sh <aab> <apk> [--cert-sha256 <fingerprint>] [--strict]" >&2
   exit 2
 }
 
 aab=''
 apk=''
 cert_sha=''
+strict=''
 while [ $# -gt 0 ]; do
   case "$1" in
+    --strict) strict=1 ;;
     --cert-sha256)
       shift
       [ $# -gt 0 ] || usage
@@ -71,19 +78,25 @@ work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
 vc_reset
+vc_init_strict "$strict"
 vc_ok artifacts "$(basename "$aab") + $(basename "$apk")"
 
 aapt2="$(vc_android_build_tool aapt2 || true)"
 apksigner="$(vc_android_build_tool apksigner || true)"
 
 # --- APK manifest -----------------------------------------------------------
+# One line per check whether or not aapt2 is there, so a reader of the summary
+# can never mistake a check that was dropped for one that passed.
+APK_CHECKS='apk-manifest apk-package apk-version-name apk-version-code debuggable min-sdk'
 badging=''
 if [ -z "$aapt2" ]; then
-  vc_skip apk-manifest 'requires aapt2 (install Android SDK build-tools or set ANDROID_HOME)'
+  # shellcheck disable=SC2086 # deliberate word splitting of the check-name list
+  vc_require_cmd_for aapt2 $APK_CHECKS || true
 else
   badging="$("$aapt2" dump badging "$apk" 2>/dev/null || true)"
   if [ -z "$badging" ]; then
-    vc_fail apk-manifest "aapt2 could not read $apk"
+    # shellcheck disable=SC2086 # deliberate word splitting of the check-name list
+    vc_fail_group "aapt2 could not read $apk" $APK_CHECKS
   else
     apk_package="$(vc_badging_field "$badging" name)"
     apk_version_code="$(vc_badging_field "$badging" versionCode)"
@@ -117,13 +130,15 @@ fi
 # --- AAB manifest -----------------------------------------------------------
 # bundletool is the only thing that can read the protobuf manifest inside an
 # AAB, and the AAB -- not the APK -- is what Play actually publishes.
+AAB_CHECKS='aab-manifest aab-version-code aab-version-name aab-matches-apk ota'
 if ! vc_find_bundletool; then
-  # shellcheck disable=SC2016 # backticks are markdown, not a command substitution
-  vc_skip aab-manifest 'requires bundletool (`brew install bundletool`, or set BUNDLETOOL_JAR)'
+  # shellcheck disable=SC2086 # deliberate word splitting of the check-name list
+  vc_require_cmd_for bundletool $AAB_CHECKS || true
 else
   aab_manifest="$("${VC_BUNDLETOOL[@]}" dump manifest --bundle "$aab" 2>/dev/null || true)"
   if [ -z "$aab_manifest" ]; then
-    vc_fail aab-manifest "bundletool could not read $aab"
+    # shellcheck disable=SC2086 # deliberate word splitting of the check-name list
+    vc_fail_group "bundletool could not read $aab" $AAB_CHECKS
   else
     attr() { # <attribute name>
       printf '%s\n' "$aab_manifest" | sed -n "s/.*android:$1=\"\([^\"]*\)\".*/\1/p" | head -1
@@ -154,7 +169,7 @@ else
     # so this holds for the artifact Play publishes.
     ota_expected="$(vc_bool "${OTA_ENABLED:-}")"
     ota_actual='absent'
-    if printf '%s\n' "$aab_manifest" | grep -q 'expo.modules.updates.ENABLED'; then
+    if vc_contains "$aab_manifest" 'expo.modules.updates.ENABLED'; then
       ota_actual="$(printf '%s\n' "$aab_manifest" |
         grep -A2 'expo.modules.updates.ENABLED' |
         sed -n 's/.*android:value="\([^"]*\)".*/\1/p' | head -1)"
@@ -163,7 +178,7 @@ else
     vc_verdict ota "$(vc_ota_verdict "$ota_expected" "$ota_actual")"
 
     if [ "$ota_actual" = 'true' ]; then
-      if printf '%s\n' "$aab_manifest" | grep -q 'expo.modules.updates.CODE_SIGNING_CERTIFICATE'; then
+      if vc_contains "$aab_manifest" 'expo.modules.updates.CODE_SIGNING_CERTIFICATE'; then
         cert="$repo_root/certs/expo-updates-cert.pem"
         if [ -f "$cert" ] && command -v shasum >/dev/null 2>&1; then
           vc_verdict ota-cert "$(vc_cert_placeholder_verdict "$(shasum -a 256 "$cert" | cut -d' ' -f1)")"
@@ -178,14 +193,14 @@ else
 fi
 
 # --- native ABIs ------------------------------------------------------------
-if vc_require_cmd abis unzip; then
+if vc_require_cmd_for unzip apk-abis aab-abis; then
   vc_verdict apk-abis "$(vc_abi_verdict "$(unzip -Z1 "$apk" 2>/dev/null || true)")"
   vc_verdict aab-abis "$(vc_abi_verdict "$(unzip -Z1 "$aab" 2>/dev/null || true)")"
 fi
 
 # --- signing ----------------------------------------------------------------
 if [ -z "$apksigner" ]; then
-  vc_skip signature 'requires apksigner (install Android SDK build-tools or set ANDROID_HOME)'
+  vc_require_cmd_for apksigner signature signing-cert || true
 elif ! "$apksigner" verify --print-certs "$apk" >"$work/certs.txt" 2>"$work/certs.err"; then
   vc_fail signature "apksigner verify failed: $(tr '\n' ' ' <"$work/certs.err")"
 else
@@ -199,11 +214,15 @@ else
 fi
 
 # --- JS bundle --------------------------------------------------------------
-if vc_require_cmd bundle unzip; then
+BUNDLE_CHECKS='hermes dev-server expo-public'
+# shellcheck disable=SC2086 # deliberate word splitting of the check-name list
+if vc_require_cmd_for unzip $BUNDLE_CHECKS; then
   if unzip -q -o -j "$apk" 'assets/index.android.bundle' -d "$work" 2>/dev/null; then
     bundle="$work/index.android.bundle"
     vc_verdict hermes "$(vc_hermes_verdict "$bundle")"
-    vc_verdict dev-server "$(vc_dev_server_verdict "$bundle")"
+    # The dev-server rule depends on whether string boundaries are observable at
+    # all, which they are not in Hermes bytecode.
+    vc_verdict dev-server "$(vc_dev_server_verdict "$bundle" "$(vc_bundle_kind "$bundle")")"
     env_example="$repo_root/.env.example"
     if [ -f "$env_example" ]; then
       vc_verdict expo-public "$(vc_public_env_verdict "$bundle" "$(cat "$env_example")")"
@@ -211,7 +230,8 @@ if vc_require_cmd bundle unzip; then
       vc_skip expo-public 'no .env.example next to the scripts'
     fi
   else
-    vc_fail bundle 'no assets/index.android.bundle in the APK'
+    # shellcheck disable=SC2086 # deliberate word splitting of the check-name list
+    vc_fail_group 'no assets/index.android.bundle in the APK' $BUNDLE_CHECKS
   fi
 fi
 

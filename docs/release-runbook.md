@@ -318,9 +318,15 @@ Each check prints one line — `ok`, `warn`, `skip` or `FAIL`, followed by the
 check name and a detail — and the same checklist is appended to
 `$GITHUB_STEP_SUMMARY` when CI set it. **Only `FAIL` fails the gate** (exit 1).
 `skip` means the check could not run: a tool is missing (`bundletool`, `aapt2`),
-or an input was not given (`APP_VERSION` unset, no `--cert-sha256`). That is
-deliberate — the gates have to be usable on a laptop that has neither an Android
-SDK nor a release environment.
+or an input was not given (`APP_VERSION` unset, no `--cert-sha256`). The check
+name is printed either way, one line per check, so a row never silently
+disappears from the summary.
+
+**`--strict`** turns a skip caused by a *missing tool* into a `FAIL`, so a gate
+cannot report success having verified nothing. It is on automatically whenever
+`CI=true` or `GITHUB_ACTIONS=true`, which is what makes the laptop default
+(skip) and the release-job default (fail) the same flag. Skips for inputs
+nobody supplied stay skips in every mode.
 
 `verify-ios.sh <path> [--no-signing] [--dsym <path>]` takes an `.ipa`, an
 `.xcarchive`, or the `.app` inside one, and checks the Info.plist version, build
@@ -330,8 +336,9 @@ embedded provisioning profile and `get-task-allow` (skipped under
 `--no-signing`, which is what a local unsigned archive needs); that
 `Expo.plist`'s `EXUpdatesEnabled` agrees with `OTA_ENABLED`, and that an
 OTA-enabled build carries an update URL; that `main.jsbundle` is Hermes
-bytecode with no Metro dev-server URL in it; and, with `--dsym`, that the dSYM's
-UUIDs cover the binary's.
+bytecode and carries no development markers; and, with `--dsym`, that the
+dSYM's UUIDs cover the binary's. The `ios verify` lane passes the archive's own
+`dSYMs/` directory, so that last check runs in CI without being asked.
 
 `verify-android.sh <aab> <apk> [--cert-sha256 <fp>]` reads the APK with `aapt2`
 and the AAB with `bundletool`, checks both against `APP_VERSION` /
@@ -348,6 +355,30 @@ Both gates check every `EXPO_PUBLIC_*` name in `.env.example`: Expo inlines the
 *values*, so for each name that is set and non-empty in the environment at
 verify time, that value has to appear in the JS bundle. Names that are unset are
 listed as skipped and never fail.
+
+### What "no dev server" actually checks
+
+The obvious rule — grep the bundle for `localhost:8081` — is wrong twice over,
+and both ways are release-blocking:
+
+- `http://localhost:8081/` is the `FALLBACK` constant in React Native's
+  `getDevServer.js`. It is in **every** bundle ever built, release included. It
+  is inert there (the script URL is a `file://` URL) but the literal is always
+  present, so on its own it proves nothing.
+- Hermes packs its whole string table into one character buffer with no
+  terminators, overlapping shared prefixes and suffixes. `FALLBACK` ends in
+  `/`, so whatever string Hermes happens to pack next to it that starts with
+  `/` — an asset's `/assets/…` path, say — reads to `grep -a` as one URL that
+  exists in no program. Which string lands there is not something a build
+  controls.
+
+So the rule depends on the bundle. On **Hermes bytecode** the gate looks only
+for complete dev-only literals that adjacency cannot manufacture (`dev=true`,
+`hot=true`, `minify=false`, `/.expo/.virtual-metro-entry`,
+`index.bundle?platform=`) and reports `ok` otherwise. On a **plain-text**
+bundle, where string boundaries are real, any dev-server URL other than the
+bare RN fallback is a `FAIL` — though a plain-text bundle in a release artifact
+already fails the `hermes` check on its own.
 
 Two things only ever **warn**:
 

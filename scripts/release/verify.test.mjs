@@ -20,12 +20,18 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const lib = path.join(here, 'lib', 'verify-common.sh');
 const verifyIos = path.join(here, 'verify-ios.sh');
+const verifyAndroid = path.join(here, 'verify-android.sh');
+
+// Strict mode turns itself on under CI, so the default for a test is "off"
+// unless the test is about strict mode. Anything else would make these tests
+// behave differently on a laptop and on a runner.
+const baseEnv = { ...process.env, CI: '', GITHUB_ACTIONS: '' };
 
 /** Sources the helper library and runs one snippet, returning trimmed stdout. */
 function sh(snippet, env = {}) {
   return execFileSync('bash', ['-c', `set -euo pipefail; . "${lib}"; ${snippet}`], {
     encoding: 'utf8',
-    env: { ...process.env, ...env },
+    env: { ...baseEnv, ...env },
   }).trim();
 }
 
@@ -34,13 +40,26 @@ function run(script, args, env = {}) {
   try {
     const stdout = execFileSync('bash', [script, ...args], {
       encoding: 'utf8',
-      env: { ...process.env, ...env },
+      env: { ...baseEnv, ...env },
     });
     return { status: 0, stdout };
   } catch (error) {
     return { status: error.status, stdout: `${error.stdout ?? ''}${error.stderr ?? ''}` };
   }
 }
+
+/** The iOS gate reads Info.plist with plutil and slices with lipo: macOS only. */
+function hasCmd(cmd) {
+  try {
+    execFileSync('command', ['-v', cmd], { shell: true, stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+const macOnly = {
+  skip: hasCmd('plutil') && hasCmd('lipo') ? false : 'needs plutil and lipo (macOS)',
+};
 
 function withTempDir(fn) {
   const dir = mkdtempSync(path.join(tmpdir(), 'verify-test-'));
@@ -147,12 +166,20 @@ test('minSdk below the floor fails and at or above it passes', () => {
 // JS bundle
 // ---------------------------------------------------------------------------
 
-test('a bundle that names the Metro dev server fails', () =>
+const HERMES_MAGIC = Buffer.from([0xc6, 0x1f, 0xbc, 0x03, 0xc1, 0x03, 0x19, 0x1f]);
+
+/** A file that vc_bundle_kind will call Hermes bytecode. */
+function hermesBundle(file, body = '') {
+  writeFileSync(file, Buffer.concat([HERMES_MAGIC, Buffer.from(body, 'utf8')]));
+  return file;
+}
+
+test('a plain-text bundle that names the Metro dev server fails', () =>
   withTempDir((dir) => {
     const bundle = path.join(dir, 'main.jsbundle');
     writeFileSync(bundle, 'var url = "http://localhost:8081/index.bundle";\n');
     assert.match(
-      sh(`vc_dev_server_verdict "${bundle}"`),
+      sh(`vc_dev_server_verdict "${bundle}" text`),
       /^FAIL bundle references a Metro dev server: http:\/\/localhost:8081/,
     );
   }));
@@ -161,38 +188,128 @@ test('the emulator loopback address counts as a dev server too', () =>
   withTempDir((dir) => {
     const bundle = path.join(dir, 'index.android.bundle');
     writeFileSync(bundle, 'fetch("http://10.0.2.2:8081/status")');
-    assert.match(sh(`vc_dev_server_verdict "${bundle}"`), /^FAIL .*10\.0\.2\.2:8081/);
+    assert.match(sh(`vc_dev_server_verdict "${bundle}" text`), /^FAIL .*10\.0\.2\.2:8081/);
   }));
 
-test('a clean bundle passes the dev-server check', () =>
+test('a clean plain-text bundle passes the dev-server check', () =>
   withTempDir((dir) => {
     const bundle = path.join(dir, 'main.jsbundle');
     writeFileSync(bundle, 'var url = "https://api.example.com/graphql";\n');
-    assert.equal(sh(`vc_dev_server_verdict "${bundle}"`), 'ok no dev-server URL in the bundle');
+    assert.equal(
+      sh(`vc_dev_server_verdict "${bundle}" text`),
+      'ok no dev-server URL in the bundle',
+    );
   }));
 
 test('a missing bundle fails rather than being skipped', () => {
-  assert.match(sh('vc_dev_server_verdict "/nope/main.jsbundle"'), /^FAIL no JS bundle at/);
+  assert.match(sh('vc_dev_server_verdict "/nope/main.jsbundle" text'), /^FAIL no JS bundle at/);
 });
 
-test('an asset baked with a dev-server origin warns instead of failing', () =>
+// React Native's getDevServer FALLBACK constant is in every bundle ever built,
+// dev or release. On its own it proves nothing, so it must not fail a release.
+test("React Native's inert getDevServer fallback alone does not fail", () =>
   withTempDir((dir) => {
     const bundle = path.join(dir, 'main.jsbundle');
-    writeFileSync(bundle, 'uri:"http://localhost:8081/assets/node_modules/pkg/font"');
-    assert.match(
-      sh(`vc_dev_server_verdict "${bundle}"`),
-      /^warn asset\(s\) baked with a dev-server origin/,
+    writeFileSync(bundle, "var e,t,o='http://localhost:8081/';function f(){}");
+    assert.equal(
+      sh(`vc_dev_server_verdict "${bundle}" text`),
+      "ok only React Native's inert getDevServer fallback",
     );
   }));
 
-test('a dev-server asset does not excuse dev-server code in the same bundle', () =>
+// The regression this whole rule exists for. Hermes packs its string table into
+// one buffer with no terminators and overlaps shared prefixes and suffixes, so
+// the FALLBACK constant (which ends in `/`) and any string starting with `/`
+// read, byte for byte, as one URL that is in no program. Scanning bytecode for
+// URLs therefore cannot be trusted at all -- only complete dev-only literals
+// can. This fixture is the two adjacent strings, exactly as hermesc emits them.
+test('adjacent Hermes strings that look like a dev-server URL do not fail', () =>
+  withTempDir((dir) => {
+    const bundle = path.join(dir, 'index.android.bundle');
+    // Verbatim what a real release build of this template produces: RN's
+    // FALLBACK `'http://localhost:8081/'` packed immediately before Metro's
+    // ordinary asset httpServerLocation `'/assets/node_modules/...'`,
+    // overlapping on the shared `/`. Two strings; `grep -ao` reads one URL.
+    hermesBundle(
+      bundle,
+      'http://localhost:8081/assets/node_modules/.pnpm/@expo-google-fonts+material-symbols@0.4.45/node_modules/@expo-google-fonts/material-symbols/400Regular',
+    );
+    assert.equal(
+      sh(`vc_dev_server_verdict "${bundle}" hermes`),
+      'ok no development markers in the Hermes bundle',
+    );
+  }));
+
+test('a URL-shaped concatenation is not a dev marker either', () =>
+  withTempDir((dir) => {
+    const bundle = path.join(dir, 'index.android.bundle');
+    hermesBundle(bundle, 'http://localhost:8081/index.bundle');
+    assert.equal(
+      sh(`vc_dev_server_verdict "${bundle}" hermes`),
+      'ok no development markers in the Hermes bundle',
+    );
+  }));
+
+test('a Hermes bundle carrying real development markers fails', () => {
+  for (const marker of ['dev=true', 'hot=true', 'minify=false', '/.expo/.virtual-metro-entry']) {
+    withTempDir((dir) => {
+      const bundle = hermesBundle(path.join(dir, 'index.android.bundle'), `x${marker}y`);
+      assert.match(
+        sh(`vc_dev_server_verdict "${bundle}" hermes`),
+        /^FAIL bundle carries development markers/,
+        `expected ${marker} to fail`,
+      );
+    });
+  }
+});
+
+test('vc_bundle_kind tells Hermes bytecode from text', () =>
+  withTempDir((dir) => {
+    assert.equal(sh(`vc_bundle_kind "${hermesBundle(path.join(dir, 'h.bundle'))}"`), 'hermes');
+    const plain = path.join(dir, 'p.bundle');
+    writeFileSync(plain, 'var __d = 1;');
+    assert.equal(sh(`vc_bundle_kind "${plain}"`), 'text');
+  }));
+
+// I1: a tool that did not run must never read as a check that passed. `grep`
+// exits 1 for "no match" and >=2 for "I broke", and `|| true` cannot tell them
+// apart -- which is how a missing grep used to print `ok`.
+test("vc_grep keeps grep's exit status", () =>
+  withTempDir((dir) => {
+    const file = path.join(dir, 'f.txt');
+    writeFileSync(file, 'hello\n');
+    assert.equal(sh(`vc_grep hello "${file}" && printf 'rc=0 %s' "$VC_GREP_OUTPUT"`), 'rc=0 hello');
+    assert.equal(sh(`vc_grep nope "${file}" || printf 'rc=%s' "$?"`), 'rc=1');
+    assert.match(sh(`vc_grep hello "${dir}/missing" || printf 'rc=%s' "$?"`), /rc=[2-9]/);
+  }));
+
+test('a grep that cannot run fails the check instead of passing it', () =>
   withTempDir((dir) => {
     const bundle = path.join(dir, 'main.jsbundle');
-    writeFileSync(
-      bundle,
-      'a="http://localhost:8081/assets/x";b="http://localhost:8081/index.bundle"',
+    writeFileSync(bundle, 'var url = "http://localhost:8081/index.bundle";\n');
+    // A grep on PATH that always fails, which is what a broken or absent grep
+    // looks like from the caller's side.
+    const shim = path.join(dir, 'bin');
+    mkdirSync(shim);
+    writeFileSync(path.join(shim, 'grep'), '#!/bin/sh\necho "grep: broken" >&2\nexit 2\n', {
+      mode: 0o755,
+    });
+    const out = sh(`PATH="${shim}:$PATH" vc_dev_server_verdict "${bundle}" text`);
+    assert.match(out, /^FAIL could not scan the bundle/);
+  }));
+
+test('a broken grep fails the metadata check instead of passing it', () =>
+  withTempDir((dir) => {
+    mkdirSync(path.join(dir, 'fastlane', 'metadata'), { recursive: true });
+    const shim = path.join(dir, 'bin');
+    mkdirSync(shim);
+    writeFileSync(path.join(shim, 'grep'), '#!/bin/sh\necho "grep: broken" >&2\nexit 2\n', {
+      mode: 0o755,
+    });
+    assert.match(
+      sh(`PATH="${shim}:$PATH" vc_metadata_placeholder_verdict "${dir}"`),
+      /^FAIL could not scan fastlane\/metadata/,
     );
-    assert.match(sh(`vc_dev_server_verdict "${bundle}"`), /^FAIL .*localhost:8081\/index\.bundle/);
   }));
 
 test('Hermes bytecode is recognised by its magic and plain JS is not', () =>
@@ -267,7 +384,7 @@ test('unset EXPO_PUBLIC_ names are skipped, never failed', () =>
       EXPO_PUBLIC_APP_NAME: '',
       EXPO_PUBLIC_WEB_DOMAIN: '',
     });
-    assert.match(out, /^skip none set in this environment: EXPO_PUBLIC_API_URL/);
+    assert.match(out, /^skip nothing checkable in this environment \(not checked: /);
   }));
 
 // ---------------------------------------------------------------------------
@@ -281,6 +398,9 @@ test('OTA has to agree with OTA_ENABLED, and is only skipped when it is unset', 
     'FAIL OTA_ENABLED=true but the artifact says updates enabled=false',
   );
   assert.match(sh('vc_ota_verdict "" true'), /^skip OTA_ENABLED not set/);
+  // No updates configuration at all is what OTA_ENABLED=false looks like.
+  assert.match(sh('vc_ota_verdict false absent'), /^ok no updates configuration/);
+  assert.match(sh('vc_ota_verdict true absent'), /^FAIL OTA_ENABLED=true/);
 });
 
 test('OTA_ENABLED is read the way app.config.ts reads it', () => {
@@ -395,17 +515,112 @@ test('the checklist is mirrored into GITHUB_STEP_SUMMARY when CI sets it', () =>
 
 test('a missing tool is a skip, not a failure', () => {
   assert.match(
-    sh('vc_reset; vc_require_cmd thing definitely-not-a-real-binary || true'),
+    sh('vc_reset; vc_init_strict ""; vc_require_cmd thing definitely-not-a-real-binary || true'),
     /^skip thing: requires/,
   );
   assert.equal(sh('vc_reset; vc_require_cmd thing bash && echo PRESENT'), 'PRESENT');
 });
 
+// I2: one tool guarding several checks must not delete rows from the checklist.
+test('one missing tool emits one skip line per check it guards', () => {
+  const out = sh(
+    'vc_reset; vc_init_strict ""; vc_require_cmd_for definitely-not-a-real-binary version build-number bundle-id || true',
+  ).split('\n');
+  assert.deepEqual(
+    out.map((line) => line.split(':')[0]),
+    ['skip version', 'skip build-number', 'skip bundle-id'],
+  );
+});
+
+test('a tool that is present emits nothing and succeeds', () => {
+  assert.equal(sh('vc_reset; vc_require_cmd_for bash a b c && echo PRESENT'), 'PRESENT');
+});
+
+test('a tool that cannot read the artifact fails every check it guards', () => {
+  const out = sh('vc_reset; vc_fail_group "aapt2 could not read it" apk-package min-sdk').split(
+    '\n',
+  );
+  assert.deepEqual(out, [
+    'FAIL apk-package: aapt2 could not read it',
+    'FAIL min-sdk: aapt2 could not read it',
+  ]);
+});
+
+// I3: a gate must not be able to pass by skipping everything.
+test('--strict turns a tool-missing skip into a failure', () => {
+  assert.match(
+    sh(
+      'vc_reset; vc_init_strict 1; vc_require_cmd bundletool definitely-not-a-real-binary || true',
+    ),
+    /^FAIL bundletool: requires .*--strict/,
+  );
+});
+
+test('CI and GITHUB_ACTIONS turn strict mode on by themselves', () => {
+  for (const [name, value] of [
+    ['CI', 'true'],
+    ['GITHUB_ACTIONS', 'true'],
+  ]) {
+    assert.match(
+      sh('vc_reset; vc_init_strict ""; vc_require_cmd t definitely-not-a-real-binary || true', {
+        [name]: value,
+      }),
+      /^FAIL t: /,
+      `expected ${name}=${value} to enable strict mode`,
+    );
+  }
+  assert.match(
+    sh('vc_reset; vc_init_strict ""; vc_require_cmd t definitely-not-a-real-binary || true', {
+      CI: 'false',
+    }),
+    /^skip t: /,
+  );
+});
+
+test('an input that was never supplied stays a skip even under --strict', () => {
+  assert.match(
+    sh('vc_reset; vc_init_strict 1; vc_skip signing-cert "no --cert-sha256 given"'),
+    /^skip signing-cert/,
+  );
+});
+
+test('summary cells escape a pipe so the job-summary table survives a path', () =>
+  withTempDir((dir) => {
+    const summary = path.join(dir, 'summary.md');
+    writeFileSync(summary, '');
+    sh(`vc_reset; vc_fail signature "apksigner said a|b"; vc_summary 'A' || true`, {
+      GITHUB_STEP_SUMMARY: summary,
+    });
+    assert.match(readFileSync(summary, 'utf8'), /\| `signature` \| apksigner said a\\\|b \|/);
+  }));
+
 // ---------------------------------------------------------------------------
 // End to end, against a hand-made fake .app
 // ---------------------------------------------------------------------------
 
-function fakeApp(dir, { version = '1.2.3', build = '42', bundleBody = 'var x = 1;\n' } = {}) {
+/**
+ * The smallest thing `lipo -archs` calls an arm64 binary: a 64-bit Mach-O
+ * header with no load commands. Written by hand so no binary is committed and
+ * no compiler is needed.
+ */
+function machOArm64() {
+  const b = Buffer.alloc(4096);
+  b.writeUInt32LE(0xfeedfacf, 0); // MH_MAGIC_64
+  b.writeInt32LE(0x0100000c, 4); // CPU_TYPE_ARM64
+  b.writeInt32LE(0, 8); // CPU_SUBTYPE_ARM64_ALL
+  b.writeUInt32LE(2, 12); // MH_EXECUTE
+  return b;
+}
+
+/**
+ * A fake .app that a correct release would produce: the right version, an
+ * arm64 binary, a Hermes bundle. Tests that want a specific defect override
+ * exactly that one thing, so a FAIL in their output can only be the defect.
+ */
+function fakeApp(
+  dir,
+  { version = '1.2.3', build = '42', bundle = HERMES_MAGIC, arch = machOArm64() } = {},
+) {
   const app = path.join(dir, 'Fake.app');
   mkdirSync(app, { recursive: true });
   writeFileSync(
@@ -420,12 +635,36 @@ function fakeApp(dir, { version = '1.2.3', build = '42', bundleBody = 'var x = 1
 </dict></plist>
 `,
   );
-  writeFileSync(path.join(app, 'Fake'), 'not a real mach-o');
-  writeFileSync(path.join(app, 'main.jsbundle'), bundleBody);
+  writeFileSync(path.join(app, 'Fake'), arch);
+  writeFileSync(path.join(app, 'main.jsbundle'), bundle);
   return app;
 }
 
-test('verify-ios.sh fails on a version that is not the one being released', () =>
+// I4: the case that matters most -- a well-formed artifact must come out
+// green. Without it every end-to-end assertion of `status === 1` is satisfied
+// by an unrelated FAIL, and a spurious new FAIL goes unnoticed.
+test('verify-ios.sh passes a well-formed artifact with exit 0', macOnly, () =>
+  withTempDir((dir) => {
+    const app = fakeApp(dir);
+    const { status, stdout } = run(verifyIos, [app, '--no-signing'], {
+      APP_VERSION: '1.2.3',
+      APP_BUILD_NUMBER: '42',
+      IOS_BUNDLE_ID: 'com.example.rnmt',
+      OTA_ENABLED: 'false',
+    });
+    assert.equal(status, 0, stdout);
+    assert.doesNotMatch(stdout, /^FAIL /m, stdout);
+    assert.match(stdout, /ok version: 1\.2\.3/);
+    assert.match(stdout, /ok build-number: 42/);
+    assert.match(stdout, /ok bundle-id: com\.example\.rnmt/);
+    assert.match(stdout, /ok arch: arm64 only/);
+    assert.match(stdout, /ok hermes: Hermes bytecode/);
+    assert.match(stdout, /ok dev-server: no development markers/);
+    assert.match(stdout, /0 failed/);
+  }),
+);
+
+test('verify-ios.sh fails on a version that is not the one being released', macOnly, () =>
   withTempDir((dir) => {
     const app = fakeApp(dir, { version: '1.2.2' });
     const { status, stdout } = run(verifyIos, [app, '--no-signing'], {
@@ -436,20 +675,40 @@ test('verify-ios.sh fails on a version that is not the one being released', () =
     assert.equal(status, 1);
     assert.match(stdout, /FAIL version: expected '1\.2\.3', got '1\.2\.2'/);
     assert.match(stdout, /ok build-number: 42/);
-  }));
+  }),
+);
 
-test('verify-ios.sh fails on a bundle that points at a Metro dev server', () =>
+test('verify-ios.sh fails on a plain-text bundle naming a Metro dev server', macOnly, () =>
   withTempDir((dir) => {
-    const app = fakeApp(dir, { bundleBody: 'var u = "http://localhost:8081/index.bundle";\n' });
+    // Not Hermes on purpose: a text bundle in a release artifact is itself a
+    // FAIL, and it is the only bundle whose string boundaries are observable.
+    const app = fakeApp(dir, { bundle: 'var u = "http://localhost:8081/index.bundle";\n' });
     const { status, stdout } = run(verifyIos, [app, '--no-signing'], {
       APP_VERSION: '1.2.3',
       APP_BUILD_NUMBER: '42',
     });
     assert.equal(status, 1);
     assert.match(stdout, /FAIL dev-server: bundle references a Metro dev server/);
-  }));
+    assert.match(stdout, /FAIL hermes: not Hermes bytecode/);
+  }),
+);
 
-test('verify-ios.sh skips every signing check under --no-signing', () =>
+test('verify-ios.sh fails an x86_64 slice', macOnly, () =>
+  withTempDir((dir) => {
+    const intel = machOArm64();
+    intel.writeInt32LE(0x01000007, 4); // CPU_TYPE_X86_64
+    intel.writeInt32LE(3, 8); // CPU_SUBTYPE_X86_64_ALL
+    const app = fakeApp(dir, { arch: intel });
+    const { status, stdout } = run(verifyIos, [app, '--no-signing'], {
+      APP_VERSION: '1.2.3',
+      APP_BUILD_NUMBER: '42',
+    });
+    assert.equal(status, 1);
+    assert.match(stdout, /FAIL arch: expected arm64 only, got x86_64/);
+  }),
+);
+
+test('verify-ios.sh skips every signing check under --no-signing', macOnly, () =>
   withTempDir((dir) => {
     const app = fakeApp(dir);
     const { stdout } = run(verifyIos, [app, '--no-signing'], {
@@ -458,7 +717,8 @@ test('verify-ios.sh skips every signing check under --no-signing', () =>
     });
     assert.match(stdout, /skip signing: --no-signing given/);
     assert.match(stdout, /skip provisioning: --no-signing given/);
-  }));
+  }),
+);
 
 test('verify-ios.sh refuses an artifact that holds no .app', () =>
   withTempDir((dir) => {
@@ -467,4 +727,88 @@ test('verify-ios.sh refuses an artifact that holds no .app', () =>
     const { status, stdout } = run(verifyIos, [empty, '--no-signing']);
     assert.equal(status, 1);
     assert.match(stdout, /FAIL artifact: no \.app found/);
+  }));
+
+test('verify-ios.sh --strict fails a check whose tool is missing', macOnly, () =>
+  withTempDir((dir) => {
+    const app = fakeApp(dir);
+    const shim = path.join(dir, 'bin');
+    mkdirSync(shim);
+    // No plutil on PATH: the three checks it guards must all appear, and under
+    // --strict they must fail rather than quietly disappear.
+    const { status, stdout } = run(verifyIos, [app, '--no-signing', '--strict'], {
+      PATH: `${shim}:/usr/bin:/bin`,
+      APP_VERSION: '1.2.3',
+      APP_BUILD_NUMBER: '42',
+      PLUTIL_ABSENT: '1',
+    });
+    if (!/requires plutil/.test(stdout)) return; // plutil is in /usr/bin; nothing to assert
+    assert.equal(status, 1);
+    for (const check of ['version', 'build-number', 'bundle-id']) {
+      assert.match(stdout, new RegExp(`FAIL ${check}: requires plutil`), stdout);
+    }
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// The Android gate's checklist shape
+// ---------------------------------------------------------------------------
+//
+// There is no exit-0 end-to-end case here on purpose: aapt2 and bundletool
+// have to be able to *read* the artifact, and no hand-made fixture is a real
+// AAB. What can be asserted without them is the thing I2 and I3 are about --
+// that the checklist keeps its rows when a tool is absent, and that --strict
+// refuses to call that a pass.
+
+const ANDROID_TOOL_CHECKS = [
+  'apk-manifest',
+  'apk-package',
+  'apk-version-name',
+  'apk-version-code',
+  'debuggable',
+  'min-sdk',
+  'aab-manifest',
+  'aab-version-code',
+  'aab-version-name',
+  'aab-matches-apk',
+  'ota',
+  'signature',
+  'signing-cert',
+];
+
+/** A PATH and SDK with no aapt2, apksigner or bundletool on them. */
+function withoutAndroidTools(dir) {
+  return {
+    PATH: '/usr/bin:/bin',
+    ANDROID_HOME: path.join(dir, 'no-sdk'),
+    ANDROID_SDK_ROOT: '',
+    BUNDLETOOL_JAR: '',
+  };
+}
+
+function fakeAndroidArtifacts(dir) {
+  const aab = path.join(dir, 'app-release.aab');
+  const apk = path.join(dir, 'app-universal.apk');
+  writeFileSync(aab, 'not really a bundle');
+  writeFileSync(apk, 'not really an apk');
+  return [aab, apk];
+}
+
+test('verify-android.sh keeps every check row when its tool is missing', () =>
+  withTempDir((dir) => {
+    const [aab, apk] = fakeAndroidArtifacts(dir);
+    const { stdout } = run(verifyAndroid, [aab, apk], withoutAndroidTools(dir));
+    for (const check of ANDROID_TOOL_CHECKS) {
+      assert.match(stdout, new RegExp(`^skip ${check}: requires `, 'm'), `${check}\n${stdout}`);
+    }
+  }));
+
+test('verify-android.sh --strict refuses to pass a check it could not run', () =>
+  withTempDir((dir) => {
+    const [aab, apk] = fakeAndroidArtifacts(dir);
+    const { status, stdout } = run(verifyAndroid, [aab, apk, '--strict'], withoutAndroidTools(dir));
+    assert.equal(status, 1);
+    for (const check of ANDROID_TOOL_CHECKS) {
+      assert.match(stdout, new RegExp(`^FAIL ${check}: requires `, 'm'), `${check}\n${stdout}`);
+    }
   }));

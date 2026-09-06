@@ -88,5 +88,15 @@ modules/*/android/.cxx/
 /fastlane/metadata/android/*/images/*
 !/fastlane/metadata/android/*/images/.gitkeep
 
+# Release artifacts. `artifacts/` is where the lanes write by default, but
+# RNW_OUTPUT_DIR can point anywhere, so the shapes are ignored by extension too.
+/artifacts
+*.aab
+*.apk
+*.ipa
+*.xcarchive
+*.dSYM.zip
+mapping.txt
+
 # react-native-workflows self-checkout (also added to .git/info/exclude by its setup action)
 /.rnw

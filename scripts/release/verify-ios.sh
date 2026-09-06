@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Post-build verification gate for an iOS release artifact.
 #
-#   bash scripts/release/verify-ios.sh <path> [--no-signing] [--dsym <path>]
+#   bash scripts/release/verify-ios.sh <path> [--no-signing] [--dsym <path>] [--strict]
 #
 # <path> is an .ipa, an .xcarchive, or the .app inside one. Everything that can
 # be wrong about a build *after* it succeeded is checked here: the wrong
@@ -10,7 +10,9 @@
 #
 # Prints one `status check: detail` line per check (ok | warn | skip | FAIL),
 # mirrors the list into $GITHUB_STEP_SUMMARY when CI set it, and exits 1 if
-# anything FAILed. A missing tool is a skip, not a failure.
+# anything FAILed. A missing tool is a skip -- unless --strict (or CI, which
+# turns it on by itself), where a check that could not run is a check that did
+# not pass.
 #
 # Env read: APP_VERSION, APP_BUILD_NUMBER, IOS_BUNDLE_ID, OTA_ENABLED,
 #           EXPO_PUBLIC_* (values must be inlined in the bundle).
@@ -22,16 +24,18 @@ repo_root="$(cd "$here/../.." && pwd)"
 . "$here/lib/verify-common.sh"
 
 usage() {
-  echo "usage: verify-ios.sh <path to .ipa|.xcarchive|.app> [--no-signing] [--dsym <path>]" >&2
+  echo "usage: verify-ios.sh <path to .ipa|.xcarchive|.app> [--no-signing] [--dsym <path>] [--strict]" >&2
   exit 2
 }
 
 artifact=''
 check_signing=1
 dsym_path=''
+strict=''
 while [ $# -gt 0 ]; do
   case "$1" in
     --no-signing) check_signing=0 ;;
+    --strict) strict=1 ;;
     --dsym)
       shift
       [ $# -gt 0 ] || usage
@@ -56,6 +60,7 @@ work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
 vc_reset
+vc_init_strict "$strict"
 
 # --- resolve the .app -------------------------------------------------------
 # An .ipa is a zip whose Payload/ holds the app; an .xcarchive keeps it under
@@ -96,7 +101,7 @@ plist_value() { # <key> [<plist>]
 }
 
 # --- version, build number, bundle id ---------------------------------------
-if vc_require_cmd version plutil; then
+if vc_require_cmd_for plutil version build-number bundle-id; then
   version="$(plist_value CFBundleShortVersionString)"
   build_number="$(plist_value CFBundleVersion)"
   bundle_id="$(plist_value CFBundleIdentifier)"
@@ -158,8 +163,9 @@ elif vc_require_cmd signing codesign; then
   # get-task-allow lets a debugger attach. App Store review rejects it, and it
   # is the single entitlement a wrongly signed release is most likely to carry.
   entitlements="$(codesign -d --entitlements - --xml "$app" 2>/dev/null || true)"
-  if printf '%s\n' "$entitlements" | grep -q 'get-task-allow'; then
-    if printf '%s\n' "$entitlements" | grep -A1 'get-task-allow' | grep -q '<true/>'; then
+  if vc_contains "$entitlements" 'get-task-allow'; then
+    # `<key>get-task-allow</key><true/>`, with any whitespace between them.
+    if vc_contains "$(printf '%s' "$entitlements" | tr -d ' \n\t')" 'get-task-allow</key><true/>'; then
       vc_fail get-task-allow 'get-task-allow is true (a debug entitlement in a release build)'
     else
       vc_ok get-task-allow 'get-task-allow is false'
@@ -198,7 +204,9 @@ fi
 # --- JS bundle --------------------------------------------------------------
 bundle="$app/main.jsbundle"
 vc_verdict hermes "$(vc_hermes_verdict "$bundle")"
-vc_verdict dev-server "$(vc_dev_server_verdict "$bundle")"
+# The dev-server rule depends on whether string boundaries are observable at
+# all, which they are not in Hermes bytecode.
+vc_verdict dev-server "$(vc_dev_server_verdict "$bundle" "$(vc_bundle_kind "$bundle")")"
 
 env_example="$repo_root/.env.example"
 if [ -f "$env_example" ] && [ -f "$bundle" ]; then

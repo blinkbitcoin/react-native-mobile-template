@@ -67,19 +67,106 @@ vc_expect() { # <check> <expected> <actual>
   fi
 }
 
-# Every check names the tools it needs. A missing tool is a skip, not a
-# failure -- but it is a *loud* skip, and vc_summary counts it.
+# Strict mode. On a laptop a missing bundletool should not fail a release
+# gate; in the release job it must, or a gate can exit 0 having verified
+# nothing. `--strict` says so explicitly, and CI says so by being CI.
+VC_STRICT=0
+
+vc_init_strict() { # <1 when --strict was given, else empty>
+  if [ "${1:-}" = '1' ]; then
+    VC_STRICT=1
+  elif [ "${CI:-}" = 'true' ] || [ "${GITHUB_ACTIONS:-}" = 'true' ]; then
+    VC_STRICT=1
+  else
+    VC_STRICT=0
+  fi
+}
+
+# A check that cannot run because its tool is absent. Only *tool* skips are
+# strict-mode failures: a skip for an input nobody supplied (APP_VERSION unset,
+# no --cert-sha256) stays a skip in every mode.
+vc_tool_missing() { # <check> <cmd>
+  if [ "$VC_STRICT" -eq 1 ]; then
+    vc_fail "$1" "requires $2, which is not on PATH (--strict)"
+  else
+    vc_skip "$1" "requires $2, which is not on PATH"
+  fi
+}
+
+# Every check names the tools it needs.
 vc_require_cmd() { # <check> <cmd>...
   local check="$1"
   shift
   local cmd
   for cmd in "$@"; do
     if ! command -v "$cmd" >/dev/null 2>&1; then
-      vc_skip "$check" "requires $cmd, which is not on PATH"
+      vc_tool_missing "$check" "$cmd"
       return 1
     fi
   done
   return 0
+}
+
+# The same, for one tool that guards several checks: one line per check name, so
+# the checklist has the same rows whether or not the tool was there. A single
+# `skip apk-manifest` that silently deletes `min-sdk` and `debuggable` from the
+# summary is indistinguishable, to a reader, from those checks having passed.
+vc_require_cmd_for() { # <cmd> <check>...
+  local cmd="$1"
+  shift
+  command -v "$cmd" >/dev/null 2>&1 && return 0
+
+  local check
+  for check in "$@"; do
+    vc_tool_missing "$check" "$cmd"
+  done
+  return 1
+}
+
+# Records the same missing-row skips for a tool that was found but could not
+# read the artifact -- those are real failures, not absences.
+vc_fail_group() { # <detail> <check>...
+  local detail="$1"
+  shift
+  local check
+  for check in "$@"; do
+    vc_fail "$check" "$detail"
+  done
+}
+
+# grep with its exit status kept. `grep ... || true` cannot tell "found
+# nothing" (1) from "grep is not installed" (127) or "grep failed" (>=2), and
+# the second reads as a clean bundle -- a green check produced by a tool that
+# never ran. Callers get the matches in VC_GREP_OUTPUT, grep's stderr in
+# VC_GREP_ERROR, and 0/1/>=2 as the return code.
+VC_GREP_OUTPUT=''
+VC_GREP_ERROR=''
+
+vc_grep() { # <extended regex> <file>
+  local rc=0 err
+  err="$(mktemp)"
+  VC_GREP_OUTPUT="$(LC_ALL=C grep -aoE -e "$1" -- "$2" 2>"$err")" || rc=$?
+  VC_GREP_ERROR="$(tr '\n' ' ' <"$err" 2>/dev/null || true)"
+  rm -f "$err"
+  return "$rc"
+}
+
+# Substring and whole-line tests that need no external tool at all, so a
+# missing grep cannot turn them into a silent pass.
+vc_contains() { # <haystack> <needle>
+  case "$1" in
+    *"$2"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+vc_has_line_starting() { # <haystack> <prefix>
+  local nl='
+'
+  case "$nl$1" in
+    *"$nl$2"*) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 vc_icon() { # <status>
@@ -108,6 +195,9 @@ vc_summary() { # <title>
           rest="${line#* }"
           check="${rest%%:*}"
           detail="${rest#*: }"
+          # A path or an apksigner error containing `|` would otherwise end the
+          # table cell and shift every column after it.
+          detail="${detail//|/\\|}"
           # shellcheck disable=SC2016 # the backticks are markdown code spans
           printf '| %s | `%s` | %s |\n' "$(vc_icon "$status")" "$check" "$detail"
         done
@@ -139,32 +229,38 @@ vc_arch_verdict() { # <archs>
   fi
 }
 
-# ABIs Play has not accepted for phones in years, and which would only ever be
-# in a release artifact by accident (a stray `reactNativeArchitectures`).
-VC_FORBIDDEN_ABI='^(x86|x86_64|mips|mips64)$'
-VC_ARM_ABI='^(arm64-v8a|armeabi-v7a)$'
-
 # Native ABIs from a list of archive entry paths (`unzip -Z1` output for an
 # APK or an AAB -- `lib/<abi>/x.so` and `base/lib/<abi>/x.so` both parse).
+# The classification is a `case`, not a grep: a missing grep would otherwise
+# report "no forbidden ABIs" for a bundle full of them.
 vc_abi_verdict() { # <entry paths, newline separated>
-  local abis all forbidden arm
+  local abis all='' forbidden='' arm='' abi
   abis="$(printf '%s\n' "$1" | sed -n 's#^.*lib/\([A-Za-z0-9_-]*\)/[^/]*\.so$#\1#p' | sort -u || true)"
   if [ -z "$abis" ]; then
     printf 'FAIL no native libraries found\n'
     return 0
   fi
-  all="$(printf '%s\n' "$abis" | paste -sd' ' - || true)"
-  forbidden="$(printf '%s\n' "$abis" | grep -E "$VC_FORBIDDEN_ABI" | paste -sd' ' - || true)"
+  while IFS= read -r abi; do
+    [ -n "$abi" ] || continue
+    all="${all:+$all }$abi"
+    case "$abi" in
+      # Play has not accepted these for phones in years; one would only ever be
+      # in a release artifact by accident (a stray `reactNativeArchitectures`).
+      x86 | x86_64 | mips | mips64) forbidden="${forbidden:+$forbidden }$abi" ;;
+      arm64-v8a | armeabi-v7a) arm="${arm:+$arm }$abi" ;;
+      *) ;;
+    esac
+  done <<EOF
+$abis
+EOF
+
   if [ -n "$forbidden" ]; then
     printf 'FAIL forbidden ABI present: %s (all: %s)\n' "$forbidden" "$all"
-    return 0
-  fi
-  arm="$(printf '%s\n' "$abis" | grep -E "$VC_ARM_ABI" | paste -sd' ' - || true)"
-  if [ -z "$arm" ]; then
+  elif [ -z "$arm" ]; then
     printf 'FAIL no arm ABI among: %s\n' "$all"
-    return 0
+  else
+    printf 'ok %s\n' "$all"
   fi
-  printf 'ok %s\n' "$all"
 }
 
 # A field off aapt2's `package:` line (`name`, `versionCode`, `versionName`).
@@ -184,7 +280,7 @@ vc_badging_line_value() { # <badging output> <prefix>
 # A debuggable release build hands anyone with the APK a debugger session
 # against production data.
 vc_debuggable_verdict() { # <badging output>
-  if printf '%s\n' "$1" | grep -q '^application-debuggable'; then
+  if vc_has_line_starting "$1" 'application-debuggable'; then
     printf 'FAIL application-debuggable is set\n'
   else
     printf 'ok not debuggable\n'
@@ -206,41 +302,102 @@ vc_min_sdk_verdict() { # <actual> <minimum>
   fi
 }
 
-# The Metro dev server, in every spelling a release bundle could carry it. Code
-# that talks to it means the artifact was built with `--dev true` or against a
-# running packager, and it would try to reach a laptop from a customer's phone.
+# Is this artifact talking to a Metro dev server?
+#
+# The naive answer -- grep the bundle for `localhost:8081` -- is wrong twice
+# over, and the second way is release-blocking:
+#
+#   1. `http://localhost:8081/` is in *every* React Native bundle, dev or
+#      release: it is the `FALLBACK` constant in
+#      react-native/Libraries/Core/Devtools/getDevServer.js. It is inert in a
+#      release build (scriptURL is a file:// URL) but the literal is always
+#      there, so on its own it proves nothing.
+#   2. Hermes packs its whole string table into one character buffer with no
+#      terminators and overlaps common prefixes and suffixes. `FALLBACK` ends
+#      in `/`, so any string starting with `/` that Hermes happens to pack next
+#      to it -- `/index.bundle?platform=ios`, an asset's `/assets/...` path --
+#      is read by `grep -ao` as one URL that does not exist in the program.
+#      Which string lands there is not something a build controls.
+#
+# So the rule depends on what the bundle is. On **Hermes bytecode** no regex can
+# see a string boundary, and only complete literals that adjacency cannot
+# manufacture count: the dev-only query parameters and Metro's virtual dev
+# entry. On a **plain-text** bundle boundaries are real, so any dev-server URL
+# other than the bare RN fallback fails -- though a plain-text bundle in a
+# release artifact is already a `FAIL hermes`.
 VC_DEV_SERVER_HOST='(localhost|127\.0\.0\.1|10\.0\.2\.2):8081'
-VC_DEV_SERVER_PATTERN="(https?://)?$VC_DEV_SERVER_HOST(/[A-Za-z0-9_./@+%~-]*)?"
+VC_DEV_SERVER_PATTERN="(https?://)?$VC_DEV_SERVER_HOST(/[A-Za-z0-9_./@+%~?=&-]*)?"
 
-# `.../:8081/assets/...` is a different animal: Metro bakes an asset's
-# `httpServerLocation` with the default dev-server origin when a package ships
-# an asset it cannot make relative. That asset will not load in production --
-# worth saying -- but it is not evidence that the *bundle* is a dev bundle, so
-# it warns while anything else fails. (A real, single instance of this in this
-# template: an @expo-google-fonts/material-symbols font pulled in transitively.)
-vc_dev_server_verdict() { # <bundle path>
-  local hits code assets
+# react-native/Libraries/Core/Devtools/getDevServer.js: `const FALLBACK =
+# 'http://localhost:8081/'`. Present in every bundle; benign on its own.
+VC_RN_DEV_SERVER_FALLBACK='http://localhost:8081/'
+
+# Complete literals that only a development bundle carries. None of these can be
+# produced by two release strings ending up next to each other, because each one
+# spans a `=`, a `?` or a directory name that no release string ends with.
+VC_DEV_MARKERS='dev=true|hot=true|minify=false|/\.expo/\.virtual-metro-entry|index\.bundle\?platform='
+
+vc_dev_server_verdict() { # <bundle path> <hermes|text>
+  local kind="${2:-text}" rc=0 hits
+
   if [ ! -f "$1" ]; then
     printf 'FAIL no JS bundle at %s\n' "$1"
     return 0
   fi
-  hits="$(LC_ALL=C grep -aoE "$VC_DEV_SERVER_PATTERN" "$1" | sort -u || true)"
-  if [ -z "$hits" ]; then
+
+  if [ "$kind" = 'hermes' ]; then
+    vc_grep "$VC_DEV_MARKERS" "$1" || rc=$?
+    if [ "$rc" -ge 2 ]; then
+      printf 'FAIL could not scan the bundle: %s\n' "${VC_GREP_ERROR:-grep failed with status $rc}"
+    elif [ "$rc" -eq 0 ]; then
+      printf 'FAIL bundle carries development markers: %s\n' \
+        "$(printf '%s\n' "$VC_GREP_OUTPUT" | sort -u | head -3 | paste -sd' ' - || true)"
+    else
+      printf 'ok no development markers in the Hermes bundle\n'
+    fi
+    return 0
+  fi
+
+  vc_grep "$VC_DEV_SERVER_PATTERN" "$1" || rc=$?
+  if [ "$rc" -ge 2 ]; then
+    printf 'FAIL could not scan the bundle: %s\n' "${VC_GREP_ERROR:-grep failed with status $rc}"
+    return 0
+  fi
+  if [ "$rc" -eq 1 ]; then
     printf 'ok no dev-server URL in the bundle\n'
     return 0
   fi
-  code="$(printf '%s\n' "$hits" | grep -vE ":8081/assets/" | cut -c1-90 | head -3 | paste -sd' ' - || true)"
-  if [ -n "$code" ]; then
-    printf 'FAIL bundle references a Metro dev server: %s\n' "$code"
-    return 0
+
+  # The fallback is dropped in the shell rather than with a second grep, so a
+  # grep that is not there cannot empty the list and read as clean.
+  local hit
+  hits=''
+  while IFS= read -r hit; do
+    [ -n "$hit" ] || continue
+    [ "$hit" != "$VC_RN_DEV_SERVER_FALLBACK" ] || continue
+    hits="${hits:+$hits }$(printf '%s' "$hit" | cut -c1-90)"
+  done <<EOF
+$(printf '%s\n' "$VC_GREP_OUTPUT" | sort -u || true)
+EOF
+
+  if [ -n "$hits" ]; then
+    printf 'FAIL bundle references a Metro dev server: %s\n' "$hits"
+  else
+    printf "ok only React Native's inert getDevServer fallback\n"
   fi
-  assets="$(printf '%s\n' "$hits" | cut -c1-90 | head -2 | paste -sd' ' - || true)"
-  printf 'warn asset(s) baked with a dev-server origin (they will not load in production): %s\n' "$assets"
 }
 
 # The first eight bytes of a Hermes bytecode file (`HermesBytecodeFileMagic`
 # in hermes/BCGen/HBC/BytecodeFileFormat.h), little-endian.
 VC_HERMES_MAGIC='c61fbc03c103191f'
+
+# `hermes` or `text` -- what the dev-server check has to know before it can
+# decide whether a regex over this file means anything.
+vc_bundle_kind() { # <bundle path>
+  local magic
+  magic="$(od -An -tx1 -N8 -- "$1" 2>/dev/null | tr -d ' \n' || true)"
+  if [ "$magic" = "$VC_HERMES_MAGIC" ]; then printf 'hermes'; else printf 'text'; fi
+}
 
 vc_hermes_verdict() { # <bundle path>
   local magic
@@ -264,11 +421,18 @@ vc_public_env_names() { # <.env.example content>
   printf '%s\n' "$1" | sed -n 's/^[[:space:]]*\(EXPO_PUBLIC_[A-Za-z0-9_]*\)=.*/\1/p' | sort -u || true
 }
 
+# The shortest value worth searching for. This is a *substring* search, so
+# `true`, `1` or a bare hostname would match text that has nothing to do with
+# the variable -- and on Hermes bytecode it can match across a string boundary
+# (see vc_dev_server_verdict for why that is not hypothetical). A short value
+# is reported as unverifiable rather than as proof.
+VC_MIN_PUBLIC_VALUE_LENGTH=12
+
 # For every EXPO_PUBLIC_* name that is set and non-empty *here*, its value has
 # to be inlined in the bundle. Unset names are listed as skipped and never
 # fail: a verify run on a machine without the release env is still useful.
 vc_public_env_verdict() { # <bundle path> <.env.example content>
-  local names name value found=() missing=() skipped=()
+  local names name value rc found=() missing=() skipped=() short=()
   names="$(vc_public_env_names "$2")"
   if [ -z "$names" ]; then
     printf 'skip no EXPO_PUBLIC_* names in .env.example\n'
@@ -279,7 +443,18 @@ vc_public_env_verdict() { # <bundle path> <.env.example content>
     value="$(printenv "$name" || true)"
     if [ -z "$value" ]; then
       skipped+=("$name")
-    elif LC_ALL=C grep -aqF -- "$value" "$1"; then
+      continue
+    fi
+    if [ "${#value}" -lt "$VC_MIN_PUBLIC_VALUE_LENGTH" ]; then
+      short+=("$name")
+      continue
+    fi
+    rc=0
+    LC_ALL=C grep -aqF -e "$value" -- "$1" || rc=$?
+    if [ "$rc" -ge 2 ]; then
+      printf 'FAIL could not scan the bundle for %s (grep status %s)\n' "$name" "$rc"
+      return 0
+    elif [ "$rc" -eq 0 ]; then
       found+=("$name")
     else
       missing+=("$name")
@@ -288,12 +463,14 @@ vc_public_env_verdict() { # <bundle path> <.env.example content>
 $names
 EOF
 
+  local unchecked
+  unchecked="$(printf '%s %s' "${skipped[*]:-}" "${short[*]:-}" | tr -s ' ' | sed 's/^ //;s/ $//')"
   if [ "${#missing[@]}" -gt 0 ]; then
     printf 'FAIL value not inlined in the bundle: %s\n' "${missing[*]}"
   elif [ "${#found[@]}" -gt 0 ]; then
-    printf 'ok inlined: %s (unset, skipped: %s)\n' "${found[*]}" "${skipped[*]:-none}"
+    printf 'ok inlined: %s (not checked: %s)\n' "${found[*]}" "${unchecked:-none}"
   else
-    printf 'skip none set in this environment: %s\n' "${skipped[*]}"
+    printf 'skip nothing checkable in this environment (not checked: %s)\n' "${unchecked:-none}"
   fi
 }
 
@@ -303,6 +480,12 @@ EOF
 vc_ota_verdict() { # <expected true|false|''> <actual true|false|absent>
   if [ -z "$1" ]; then
     printf 'skip OTA_ENABLED not set; artifact says updates enabled=%s\n' "$2"
+  elif [ "$2" = 'absent' ] && [ "$1" = 'false' ]; then
+    # No updates configuration at all is the same thing as updates being off,
+    # and it is what an OTA_ENABLED=false build of an app without expo-updates
+    # looks like. Only a build that was *supposed* to have updates and has no
+    # configuration is a failure.
+    printf 'ok no updates configuration, matching OTA_ENABLED=false\n'
   elif [ "$1" = "$2" ]; then
     printf 'ok updates enabled=%s, matching OTA_ENABLED\n' "$2"
   else
@@ -339,14 +522,22 @@ vc_cert_placeholder_verdict() { # <sha256 of the pem>
 VC_METADATA_PLACEHOLDER='Replace this text'
 
 vc_metadata_placeholder_verdict() { # <repo root>
-  local dir="$1/fastlane/metadata" offenders
+  local dir="$1/fastlane/metadata" offenders rc=0 err
   if [ ! -d "$dir" ]; then
     printf 'skip no fastlane/metadata tree at %s\n' "$dir"
     return 0
   fi
-  offenders="$(grep -rl "$VC_METADATA_PLACEHOLDER" "$dir" 2>/dev/null | sed "s#^$1/##" | sort | paste -sd' ' - || true)"
-  if [ -n "$offenders" ]; then
-    printf 'warn store metadata still has template placeholder text: %s\n' "$offenders"
+  err="$(mktemp)"
+  offenders="$(grep -rl -e "$VC_METADATA_PLACEHOLDER" "$dir" 2>"$err")" || rc=$?
+  if [ "$rc" -ge 2 ]; then
+    printf 'FAIL could not scan fastlane/metadata: %s\n' "$(tr '\n' ' ' <"$err" 2>/dev/null || true)"
+    rm -f "$err"
+    return 0
+  fi
+  rm -f "$err"
+  if [ "$rc" -eq 0 ] && [ -n "$offenders" ]; then
+    printf 'warn store metadata still has template placeholder text: %s\n' \
+      "$(printf '%s\n' "$offenders" | sed "s#^$1/##" | sort | paste -sd' ' - || true)"
   else
     printf 'ok no placeholder text in fastlane/metadata\n'
   fi
