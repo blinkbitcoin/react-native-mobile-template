@@ -374,7 +374,7 @@ cannot report success having verified nothing. It is on automatically whenever
 (skip) and the release-job default (fail) the same flag. Skips for inputs
 nobody supplied stay skips in every mode.
 
-`verify-ios.sh <path> [--no-signing] [--dsym <path>]` takes an `.ipa`, an
+`verify-ios.sh <path> [--no-signing] [--dsym <path>] [--strict]` takes an `.ipa`, an
 `.xcarchive`, or the `.app` inside one, and checks the Info.plist version, build
 number and bundle id against `APP_VERSION` / `APP_BUILD_NUMBER` /
 `IOS_BUNDLE_ID`; that `lipo` reports arm64 and nothing else; the signature, the

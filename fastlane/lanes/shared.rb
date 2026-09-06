@@ -16,7 +16,9 @@ REDACTED_ARG_KEYS = %i[
   json_key_data key_content key_password keystore_password match_password
   password private_key store_password token
 ].freeze
-REDACTED_ARG_PATTERN = /password|secret|token|private_key|key_content|json_key/
+# Case-insensitive: fastlane and the workflows both pass keys through from
+# environment names, so a `JSON_KEY` or `Password` must redact like `json_key`.
+REDACTED_ARG_PATTERN = /password|secret|token|private_key|key_content|json_key/i
 
 # Fails with a pointer to the runbook rather than a stack trace when a release
 # is started without its credentials.
@@ -60,11 +62,22 @@ def redacted_arg?(key)
   REDACTED_ARG_KEYS.include?(key.to_sym) || REDACTED_ARG_PATTERN.match?(key.to_s)
 end
 
+# Arrays are descended too: `groups: [{ name:, password: }]` and similar
+# list-shaped arguments would otherwise print a secret the sibling hash form
+# redacts.
+def loggable_value(value)
+  case value
+  when Hash then loggable_args(value)
+  when Array then value.map { |item| loggable_value(item) }
+  else value
+  end
+end
+
 def loggable_args(args)
   args.to_h do |key, value|
     next [key, '[redacted]'] if redacted_arg?(key)
 
-    [key, value.is_a?(Hash) ? loggable_args(value) : value]
+    [key, loggable_value(value)]
   end
 end
 
@@ -89,7 +102,7 @@ def api_key
   )
 end
 
-STORE_NOTES_SUFFIX = ' [+more on GitHub]'
+STORE_NOTES_SUFFIX = ' [+more on GitHub]'.freeze
 
 # Store-ready release notes, truncated at a word boundary with a pointer to the
 # full changelog. `limit` is the store's own cap (App Store 4000, Play 500) and

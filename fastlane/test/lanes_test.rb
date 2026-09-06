@@ -175,6 +175,45 @@ class LanesTest < Minitest::Test
     assert_equal [[:match, {}]], $calls
   end
 
+  # ---------- ios_info_plist ----------
+
+  # A prebuilt project has more than one Info.plist under ios/ (extension
+  # targets, and the Pods project once `pod install` has run), so the app's is
+  # found by scheme rather than by taking the first glob match.
+  def in_ios_project(*plist_dirs)
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, 'fastlane', 'lanes'))
+      plist_dirs.each do |name|
+        FileUtils.mkdir_p(File.join(dir, 'ios', name))
+        File.write(File.join(dir, 'ios', name, 'Info.plist'), '<plist/>')
+      end
+      # realpath: macOS hands out /var/folders/... for a tmpdir whose real path
+      # (and so `Dir.pwd`, which repo_root anchors on) is /private/var/folders.
+      Dir.chdir(dir) { yield File.realpath(dir) }
+    end
+  end
+
+  def test_ios_info_plist_prefers_the_scheme_directory
+    ENV['IOS_SCHEME'] = 'App'
+    in_ios_project('AAAExtension', 'App') do |dir|
+      assert_equal File.join(dir, 'ios', 'App', 'Info.plist'), ios_info_plist
+    end
+  end
+
+  def test_ios_info_plist_falls_back_to_the_glob_when_the_scheme_has_none
+    ENV['IOS_SCHEME'] = 'Missing'
+    in_ios_project('AAAExtension') do |dir|
+      assert_equal File.join(dir, 'ios', 'AAAExtension', 'Info.plist'), ios_info_plist
+    end
+  end
+
+  def test_ios_info_plist_says_to_run_prebuild_when_there_is_none
+    ENV['IOS_SCHEME'] = 'App'
+    in_ios_project do
+      assert_includes assert_raises(UI::UserError) { ios_info_plist }.message, 'prebuild'
+    end
+  end
+
   # ---------- store_action: secret redaction in the dry-run log ----------
 
   def test_dry_run_log_redacts_a_nested_api_key
@@ -205,6 +244,23 @@ class LanesTest < Minitest::Test
   def test_dry_run_log_redacts_unfamiliar_credential_shaped_names
     ENV['DRY_RUN'] = '1'
     store_action(:gradle, some_new_secret: 'SECRET', properties: { signing_password: 'SECRET' })
+
+    refute_includes UI.messages.first, 'SECRET', UI.messages.first
+  end
+
+  def test_dry_run_log_redacts_inside_arrays
+    ENV['DRY_RUN'] = '1'
+    store_action(:upload_to_testflight, groups: [{ name: 'Beta', demo_password: 'SECRET' }, 'Internal'])
+
+    log = UI.messages.first
+    refute_includes log, 'SECRET', "an array argument must be descended too: #{log}"
+    assert_includes log, 'Beta'
+    assert_includes log, 'Internal'
+  end
+
+  def test_dry_run_log_redaction_pattern_ignores_case
+    ENV['DRY_RUN'] = '1'
+    store_action(:gradle, properties: { 'STORE_PASSWORD' => 'SECRET', 'JSON_Key' => 'SECRET' })
 
     refute_includes UI.messages.first, 'SECRET', UI.messages.first
   end

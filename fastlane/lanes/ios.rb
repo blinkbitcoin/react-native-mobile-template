@@ -42,7 +42,15 @@ end
 # APP_VERSION=1.2.3 APP_BUILD_NUMBER=42: pbxproj said 1.0 / 1, Info.plist said
 # 1.2.3 / 42. Asserting against the pbxproj therefore failed every single
 # build, correct ones included.
+#
+# The scheme's own directory comes first: a prebuild leaves other Info.plist
+# files under ios/ (an extension target, or a Pods one once `pod install` has
+# run), and the alphabetically first glob match is not reliably the app's.
 def ios_info_plist
+  scheme = ENV['IOS_SCHEME'].to_s.strip
+  scheme_plist = root_path('ios', scheme, 'Info.plist') unless scheme.empty?
+  return scheme_plist if scheme_plist && File.exist?(scheme_plist)
+
   plist = Dir.glob(root_path('ios', '*', 'Info.plist')).sort.first
   UI.user_error!('No ios/*/Info.plist — run `pnpm expo prebuild` first (see docs/release-runbook.md)') if plist.nil?
 
