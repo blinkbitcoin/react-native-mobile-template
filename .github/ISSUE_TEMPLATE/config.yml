@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/blinkbitcoin/react-native-mobile-template/security/policy
+    about: Never file a public issue for a vulnerability — use the private channel in SECURITY.md.
+  - name: Contributing guide
+    url: https://github.com/blinkbitcoin/react-native-mobile-template/blob/main/CONTRIBUTING.md
+    about: Setup, branching, commit conventions and what has to pass before you push.

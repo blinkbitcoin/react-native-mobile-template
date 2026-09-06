@@ -1,0 +1,43 @@
+name: Feature request
+description: Propose a change to the app, the template or the tooling
+labels: ['enhancement']
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: The situation today and why it is a problem. Not the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - App / UI
+        - GraphQL / data
+        - i18n
+        - Native module or config plugin
+        - Tooling, lint or tests
+        - CI / release
+        - Docs
+    validations:
+      required: true
+  - type: checkboxes
+    id: impact
+    attributes:
+      label: Impact
+      options:
+        - label: Needs a native change (config plugin or local module, `make check-prebuild`)
+        - label: Release-affecting (versioning, store metadata, fastlane, OTA)
+        - label: Breaking change for apps built from this template
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

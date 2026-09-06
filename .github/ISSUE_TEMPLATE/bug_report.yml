@@ -1,0 +1,68 @@
+name: Bug report
+description: Something in the app or the tooling misbehaves
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Security vulnerabilities do **not** belong here — see
+        [SECURITY.md](https://github.com/blinkbitcoin/react-native-mobile-template/blob/main/SECURITY.md)
+        for the private channel.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. make mock-api
+        2. make start
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      multiple: true
+      options:
+        - iOS simulator
+        - iOS device
+        - Android emulator
+        - Android device
+        - Web
+        - Tooling / CI (not the app)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version or commit
+      description: 'Output of `make version`, or the commit SHA you are on.'
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: 'Paste the output of `make doctor` (OS, node, pnpm, Xcode, JDK versions).'
+      render: shell
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs, stack trace or screenshots
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before filing
+      options:
+        - label: I searched existing issues
+          required: true
+        - label: I am on a supported version (`main` or the latest release)
+          required: true

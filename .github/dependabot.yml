@@ -1,0 +1,90 @@
+version: 2
+
+# Conventions
+#   - `chore(deps)` / `chore(deps-dev)` match the commitlint scope enum, and
+#     `chore` does not bump the release-please version.
+#   - Minor/patch updates are grouped into one PR per ecosystem per week; a
+#     major update always arrives on its own so it can be reviewed alone.
+#   - Anything Expo pins for us is ignored here: `make check-deps` runs
+#     `expo install --check` + `expo-doctor`, which is the authority on which
+#     version of an SDK-coupled package belongs in this SDK. Dependabot cannot
+#     see that table and would only open PRs that CI then rejects.
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
+    labels: ['dependencies']
+    commit-message:
+      prefix: 'chore(deps)'
+      prefix-development: 'chore(deps-dev)'
+    groups:
+      npm-minor-patch:
+        patterns: ['*']
+        update-types: ['minor', 'patch']
+    ignore:
+      # SDK-coupled: `expo install` pins react-native, react and every expo*
+      # package to the versions the installed Expo SDK was built against.
+      # Majors AND minors are ignored; only patches inside the pinned range are
+      # safe to take without an SDK upgrade.
+      - dependency-name: react-native
+        update-types:
+          ['version-update:semver-major', 'version-update:semver-minor']
+      - dependency-name: expo
+        update-types:
+          ['version-update:semver-major', 'version-update:semver-minor']
+      - dependency-name: expo-*
+        update-types:
+          ['version-update:semver-major', 'version-update:semver-minor']
+      - dependency-name: '@expo/*'
+        update-types:
+          ['version-update:semver-major', 'version-update:semver-minor']
+      - dependency-name: react
+        update-types:
+          ['version-update:semver-major', 'version-update:semver-minor']
+      - dependency-name: react-dom
+        update-types:
+          ['version-update:semver-major', 'version-update:semver-minor']
+      # typescript majors break the typescript-eslint peer range that
+      # eslint-config-expo pulls in; upgrade the two together, by hand.
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
+      # eslint majors move the plugin API; the rules we run come from
+      # eslint-config-expo's plugins, which lag a major behind.
+      - dependency-name: eslint
+        update-types: ['version-update:semver-major']
+      # jest is in `expo.install.exclude` (package.json) because jest-expo's
+      # supported version comes from the Expo SDK table, not from jest's
+      # releases. A major is an SDK-upgrade decision.
+      - dependency-name: jest
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@types/jest'
+        update-types: ['version-update:semver-major']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    labels: ['dependencies', 'ci']
+    commit-message:
+      prefix: 'chore(ci)'
+    groups:
+      actions-minor-patch:
+        patterns: ['*']
+        update-types: ['minor', 'patch']
+
+  # fastlane and cocoapods (Gemfile / Gemfile.lock). `make check-release` is the
+  # gate that has to stay green for these.
+  - package-ecosystem: bundler
+    directory: /
+    schedule:
+      interval: weekly
+    labels: ['dependencies', 'release']
+    commit-message:
+      prefix: 'chore(deps)'
+    groups:
+      bundler-minor-patch:
+        patterns: ['*']
+        update-types: ['minor', 'patch']

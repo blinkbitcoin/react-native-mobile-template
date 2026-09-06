@@ -1,0 +1,10 @@
+# Every PR needs a review from the mobile team.
+* @blinkbitcoin/mobile
+
+# Native, signing and release surfaces need someone who can run a device build
+# and holds the store credentials.
+/plugins/         @blinkbitcoin/mobile-native
+/modules/         @blinkbitcoin/mobile-native
+/fastlane/        @blinkbitcoin/mobile-native
+/scripts/release/ @blinkbitcoin/mobile-native
+/deploy/          @blinkbitcoin/mobile-native

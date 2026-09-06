@@ -1,0 +1,24 @@
+<!--
+The PR title becomes the commit message on main (squash merge) and feeds
+release-please. Conventional Commits, closed scope enum — see CONTRIBUTING.md.
+-->
+
+## What and why
+
+<!-- One paragraph. Link the issue: Closes #123 -->
+
+## How to verify
+
+<!-- The commands or steps a reviewer runs. -->
+
+## Checklist
+
+- [ ] PR title is a Conventional Commit with a valid scope (`app ui i18n graphql native plugins config tooling ci release deps deps-dev docs e2e web`)
+- [ ] `make check` and `make unit` pass locally
+- [ ] Tests added or updated for the behaviour that changed
+- [ ] Docs updated (`docs/`, `AGENTS.md` command table if a make target changed)
+- [ ] User-visible strings go through Lingui and `make i18n` was run
+- [ ] Screenshots or a screen recording for UI changes
+- [ ] Native change (`app.config.ts`, `plugins/`, `modules/`)? → `make check-prebuild` passes and the plugin/module is documented
+- [ ] Release-affecting (`fastlane/`, `scripts/release/`, workflow pins, versioning)? → `make check-release` passes and `docs/release-runbook.md` is updated
+- [ ] No secrets, keys or `.env` values added; nothing new reads `process.env` outside `src/config/env`
