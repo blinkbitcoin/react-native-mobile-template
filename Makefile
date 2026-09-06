@@ -26,6 +26,10 @@ web: ## Expo web dev server (web target)
 prebuild: ## Regenerate ios/ and android/ locally (debugging plugins only; never commit them)
 	pnpm prebuild
 
+# ---------- Codegen ----------
+i18n: ## Extract + compile message catalogs
+	pnpm i18n:extract
+
 # ---------- Quality gates (each is what CI runs) ----------
 typecheck: ## tsc --noEmit
 	pnpm typecheck
@@ -44,6 +48,9 @@ knip: ## Unused files, exports and dependencies
 
 spell: ## Spell-check with typos
 	pnpm spell
+
+check-gen: ## Generated-file drift (i18n, codegen)
+	pnpm i18n:check
 
 check-code: typecheck lint format-check knip spell ## Fast local gate: types + lint + format + knip + spell
 
@@ -64,4 +71,4 @@ reset: clean ## clean + reinstall
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: doctor install start ios android web prebuild typecheck lint format format-check knip spell check-code unit coverage test clean reset help
+.PHONY: doctor install start ios android web prebuild i18n typecheck lint format format-check knip spell check-gen check-code unit coverage test clean reset help

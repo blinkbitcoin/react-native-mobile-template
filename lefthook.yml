@@ -8,7 +8,10 @@ pre-commit:
       run: pnpm exec biome check --write --no-errors-on-unmatched {staged_files} && git add {staged_files}
     eslint:
       glob: 'src/**/*.{ts,tsx}'
-      run: pnpm exec eslint --max-warnings=0 {staged_files}
+      # --no-warn-ignored: ESLint 9 warns (and --max-warnings=0 then fails the
+      # hook) when a staged path matches an `ignores` pattern, e.g. the
+      # generated src/i18n/locales/**/messages.ts catalogs.
+      run: pnpm exec eslint --max-warnings=0 --no-warn-ignored {staged_files}
     typos:
       run: typos {staged_files}
 commit-msg:
