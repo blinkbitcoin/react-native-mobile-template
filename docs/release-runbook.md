@@ -411,6 +411,41 @@ Without it the lane fails at the APK step, after a successful bundle — the
 Note that the universal APK is signed with the **upload** key, not Play's app
 signing key, so it will not install over a Play-installed copy of the app.
 
+## Rehearsing lanes locally (DRY_RUN=1)
+
+`DRY_RUN=1` makes every store call in `fastlane/lanes/shared.rb` log its
+arguments and return canned data instead of talking to App Store Connect or
+Play, so a whole promotion can be walked on a laptop with no credentials. The
+log redacts credential-shaped arguments itself, so it is safe to paste into a
+PR. Give the lanes the two files a real run would have:
+
+```bash
+# a build-info.json for the commit you are rehearsing
+APP_VERSION=1.2.3 APP_BUILD_NUMBER=1054 BUILD_INFO_PATH=/tmp/build-info.json \
+  bash scripts/release/build-info.sh
+# store notes for the same range
+node scripts/release/notes.mjs --from-commits --out /tmp/notes
+
+export DRY_RUN=1 APP_VERSION=1.2.3 APP_BUILD_NUMBER=1054
+export BUILD_INFO_FILE=/tmp/build-info.json
+export RELEASE_NOTES_STORE_FILE=/tmp/notes/notes-store.txt
+export STORE_NOTES_JSON=/tmp/notes/store-notes.json
+export IOS_BUNDLE_ID=... IOS_SCHEME=... ANDROID_PACKAGE=...
+export TESTFLIGHT_EXTERNAL_GROUP=... PLAY_SERVICE_ACCOUNT_JSON='{"type":"service_account"}'
+# Credential values are never used under DRY_RUN=1; give them obvious dummies.
+export ASC_KEY_ID=DUMMY ASC_ISSUER_ID=DUMMY ASC_KEY_P8_BASE64=DUMMY
+
+bundle exec fastlane ios upload_internal
+bundle exec fastlane android rollout percent:50
+```
+
+Two things to expect. The lanes **write** into `fastlane/metadata/` (release
+notes and `changelogs/<versionCode>.txt`), so rehearse in a scratch copy of the
+checkout or restore the tree afterwards. And both `release_production` lanes
+stop on the shipped placeholder prose (`Replace this text ...`) in
+`description.txt` / `full_description.txt` — that gate is the point, so replace
+the copy for your own app before reading anything into the failure.
+
 ## Future stores
 
 `fastlane/lanes/future.rb` holds deliberate stubs that fail loudly rather than
