@@ -18,7 +18,7 @@ place so `make init` can strip it completely.
 
 - `docs/web-files.txt` — the file list (`assets/favicon.png`, `e2e/web/`,
   `playwright.config.ts`, `src/app/+html.tsx`, the `.web.tsx` fallbacks), the
-  same list `scripts/init.manifest.json` consumes.
+  same list `scripts/init.manifest.json` (added with `make init`) consumes.
 - Non-file removals: the `app.config.ts` `web:` block, the `metro.config.js`
   web branch, `package.json` `web` / `build:web` / `test:e2e:web`, Makefile
   `web` / `build-web` / `e2e-web`, `scripts/e2e/web.sh`,

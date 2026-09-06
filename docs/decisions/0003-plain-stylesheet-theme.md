@@ -33,8 +33,8 @@ instead of calling `StyleSheet.create` inline.
 
 ## Alternatives
 
-- **Unistyles** — rejected for now, documented as the upgrade path in
-  `docs/architecture.md`; revisit if theme switching or breakpoints get hot.
+- **Unistyles** — rejected for now, but the intended upgrade path: it replaces
+  `createStyles` and nothing else. Revisit if breakpoints or variants get hot.
 - **NativeWind** — not recommended: an untypeable dialect plus a Babel
   transform, for ergonomics only.
 - **styled-components / emotion** — rejected: runtime cost, weak checking.
