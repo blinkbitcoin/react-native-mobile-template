@@ -1,0 +1,227 @@
+name: release-production
+# The only manually triggered step in the path, and the only one behind a
+# required reviewer. It never builds: it acts on the binary that beta already
+# soaked, through the App Store Connect and Play APIs.
+#
+#   action=release   submit to the App Store / roll out on Play, mark the
+#                    GitHub release latest, publish OTA production, deploy web
+#   action=rollout   ramp the Play staged rollout to play_rollout_percent
+#   action=halt      pause the iOS phased release and halt the Play rollout
+#   action=resume    resume the iOS phased release, resume Play at the percent
+#   action=complete  finish the iOS phased release and take Play to 100%
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to act on (e.g. v1.2.3)
+        type: string
+        required: true
+      action:
+        description: What to do with that release
+        type: choice
+        required: true
+        default: release
+        options: [release, rollout, halt, resume, complete]
+      play_rollout_percent:
+        description: Play staged-rollout percentage (rollout/resume; release uses it as the initial fraction)
+        type: string
+        required: false
+        default: "10"
+      ios_phased_release:
+        description: Use App Store phased release for action=release
+        type: boolean
+        required: false
+        default: true
+      platforms:
+        description: Which stores to act on
+        type: choice
+        required: false
+        default: both
+        options: [both, ios, android]
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  prepare:
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/expo-prepare.yml@v0
+    permissions:
+      contents: read
+    with:
+      ref: ${{ inputs.tag }}
+      stage: production
+      build-number-offset: ${{ fromJSON(vars.BUILD_NUMBER_OFFSET || '1000') }}
+
+  # ---- action=release -------------------------------------------------------
+
+  ios-release:
+    needs: prepare
+    if: ${{ inputs.action == 'release' && inputs.platforms != 'android' }}
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/fastlane-lane.yml@v0
+    permissions:
+      contents: read
+    with:
+      platform: ios
+      lane: release_production
+      runner: ubuntu-latest
+      # Required reviewers, "prevent self-review" and the `v*` tag pattern live
+      # on this environment; it is what makes production a two-person action.
+      environment: production
+      artifacts: release-meta
+      env-json: '{"IOS_PHASED_RELEASE": "${{ inputs.ios_phased_release }}"}'
+      version: ${{ needs.prepare.outputs.version }}
+      build-number: ${{ needs.prepare.outputs.build-number }}
+      ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
+      ios-scheme: ${{ vars.IOS_SCHEME }}
+      android-package: ${{ vars.ANDROID_PACKAGE }}
+      timeout-minutes: 90
+    secrets:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+
+  android-release:
+    needs: prepare
+    if: ${{ inputs.action == 'release' && inputs.platforms != 'ios' }}
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/fastlane-lane.yml@v0
+    permissions:
+      contents: read
+    with:
+      platform: android
+      lane: release_production
+      runner: ubuntu-latest
+      environment: production
+      artifacts: release-meta
+      env-json: '{"PLAY_ROLLOUT": "${{ inputs.play_rollout_percent }}", "PLAY_UPDATE_PRIORITY": "${{ vars.PLAY_UPDATE_PRIORITY }}"}'
+      version: ${{ needs.prepare.outputs.version }}
+      build-number: ${{ needs.prepare.outputs.build-number }}
+      ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
+      ios-scheme: ${{ vars.IOS_SCHEME }}
+      android-package: ${{ vars.ANDROID_PACKAGE }}
+    secrets:
+      PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+
+  # ---- action=halt | resume | complete (iOS phased release) -----------------
+
+  ios-phased:
+    needs: prepare
+    if: ${{ contains(fromJSON('["halt", "resume", "complete"]'), inputs.action) && inputs.platforms != 'android' }}
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/fastlane-lane.yml@v0
+    permissions:
+      contents: read
+    with:
+      platform: ios
+      lane: phased
+      # The lane takes pause|resume|complete; `halt` is this workflow's
+      # cross-platform word for the same thing.
+      lane-args: action:${{ inputs.action == 'halt' && 'pause' || inputs.action }}
+      runner: ubuntu-latest
+      environment: production
+      artifacts: release-meta
+      version: ${{ needs.prepare.outputs.version }}
+      build-number: ${{ needs.prepare.outputs.build-number }}
+      ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
+      ios-scheme: ${{ vars.IOS_SCHEME }}
+      android-package: ${{ vars.ANDROID_PACKAGE }}
+    secrets:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+
+  # ---- action=rollout | resume | complete (Play staged rollout) -------------
+
+  android-rollout:
+    needs: prepare
+    if: ${{ contains(fromJSON('["rollout", "resume", "complete"]'), inputs.action) && inputs.platforms != 'ios' }}
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/fastlane-lane.yml@v0
+    permissions:
+      contents: read
+    with:
+      platform: android
+      lane: rollout
+      lane-args: percent:${{ inputs.action == 'complete' && '100' || inputs.play_rollout_percent }}
+      runner: ubuntu-latest
+      environment: production
+      artifacts: release-meta
+      version: ${{ needs.prepare.outputs.version }}
+      build-number: ${{ needs.prepare.outputs.build-number }}
+      ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
+      ios-scheme: ${{ vars.IOS_SCHEME }}
+      android-package: ${{ vars.ANDROID_PACKAGE }}
+    secrets:
+      PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+
+  # ---- action=halt (Play) ---------------------------------------------------
+
+  android-halt:
+    needs: prepare
+    if: ${{ inputs.action == 'halt' && inputs.platforms != 'ios' }}
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/fastlane-lane.yml@v0
+    permissions:
+      contents: read
+    with:
+      platform: android
+      lane: halt
+      runner: ubuntu-latest
+      environment: production
+      artifacts: release-meta
+      version: ${{ needs.prepare.outputs.version }}
+      build-number: ${{ needs.prepare.outputs.build-number }}
+      ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
+      ios-scheme: ${{ vars.IOS_SCHEME }}
+      android-package: ${{ vars.ANDROID_PACKAGE }}
+    secrets:
+      PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+
+  # ---- action=release only: mark latest, publish OTA, deploy web ------------
+
+  github-release:
+    needs: [prepare, ios-release, android-release]
+    # A status function in the `if` drops the implicit success() requirement, so
+    # a job skipped by `platforms` does not skip this one; `!failure()` still
+    # holds the line on a store job that actually failed.
+    if: ${{ !failure() && !cancelled() && inputs.action == 'release' }}
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/github-release.yml@v0
+    permissions:
+      contents: write
+    with:
+      mode: latest
+      tag: ${{ inputs.tag }}
+      assets-artifacts: release-meta
+    secrets:
+      RELEASE_TAGGER_APP_ID: ${{ secrets.RELEASE_TAGGER_APP_ID }}
+      RELEASE_TAGGER_APP_PRIVATE_KEY: ${{ secrets.RELEASE_TAGGER_APP_PRIVATE_KEY }}
+
+  ota-production:
+    needs: [prepare, github-release]
+    if: ${{ !failure() && !cancelled() && inputs.action == 'release' && vars.OTA_ENABLED == 'true' }}
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/expo-ota-publish.yml@v0
+    permissions:
+      contents: read
+    with:
+      ota-enabled: ${{ vars.OTA_ENABLED == 'true' }}
+      ref: ${{ inputs.tag }}
+      channel: production
+      rollout: 100
+      environment: production
+      ota-cli-version: ${{ vars.OTA_CLI_VERSION }}
+      baseline-tag: ${{ inputs.tag }}
+    secrets:
+      OTA_PUBLISH_TOKEN: ${{ secrets.OTA_PUBLISH_TOKEN }}
+
+  web:
+    needs: [prepare, github-release]
+    # The site tracks what is actually live in the stores, so it deploys from
+    # the production dispatch rather than from the tag push.
+    if: ${{ !failure() && !cancelled() && inputs.action == 'release' }}
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/web.yml@v0
+    permissions:
+      contents: read
+      # The called `deploy` job (environment `github-pages`) needs these, and a
+      # called job can only narrow the caller's token, never widen it.
+      pages: write
+      id-token: write
+    with:
+      ref: ${{ inputs.tag }}
+      deploy: true

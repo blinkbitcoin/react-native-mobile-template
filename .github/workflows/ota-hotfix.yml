@@ -1,0 +1,85 @@
+name: ota-hotfix
+# A JS-only fix, shipped to an already-installed binary without a store review.
+# Only for changes that do not move the native fingerprint: the gate in
+# `expo-ota-publish.yml` compares this commit's fingerprints against the
+# baseline release's `build-info.json` and dies on any mismatch, because an
+# update whose JS expects a native module the installed binary lacks crashes on
+# launch for every user on the channel and cannot be recalled.
+#
+# Anything that touches native code is a new store build, not a hotfix.
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Update channel to publish to
+        type: choice
+        required: true
+        default: internal
+        options: [internal, beta, production]
+      ref:
+        description: Commit, branch or tag whose JS becomes the update
+        type: string
+        required: true
+      rollout:
+        description: Rollout percentage 0-100
+        type: string
+        required: false
+        default: "10"
+      baseline_tag:
+        description: Release tag whose build-info.json is the fingerprint baseline (empty uses the latest release)
+        type: string
+        required: false
+        default: ""
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+    steps:
+      - name: Resolve the fingerprint baseline tag
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BASELINE_TAG: ${{ inputs.baseline_tag }}
+        run: |
+          set -euo pipefail
+          tag="$BASELINE_TAG"
+          if [ -z "$tag" ]; then
+            # The store build currently installed on the channel is the latest
+            # release; `--exclude-pre-releases` keeps the `-build.N` internal
+            # pre-releases out of the answer.
+            tag="$(gh release list --limit 1 --exclude-pre-releases \
+              --json tagName --jq '.[0].tagName // empty')"
+          fi
+          if [ -z "$tag" ]; then
+            echo "no baseline release found; pass baseline_tag explicitly" >&2
+            exit 1
+          fi
+          echo "baseline: $tag"
+          echo "tag=$tag" >>"$GITHUB_OUTPUT"
+
+  publish:
+    needs: baseline
+    if: ${{ vars.OTA_ENABLED == 'true' }}
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/expo-ota-publish.yml@v0
+    permissions:
+      contents: read
+    with:
+      ota-enabled: ${{ vars.OTA_ENABLED == 'true' }}
+      ref: ${{ inputs.ref }}
+      channel: ${{ inputs.channel }}
+      rollout: ${{ fromJSON(inputs.rollout) }}
+      # A production hotfix goes through the same required reviewer as a store
+      # release; internal and beta do not gate.
+      environment: ${{ inputs.channel == 'production' && 'production' || '' }}
+      ota-cli-version: ${{ vars.OTA_CLI_VERSION }}
+      baseline-tag: ${{ needs.baseline.outputs.tag }}
+    secrets:
+      OTA_PUBLISH_TOKEN: ${{ secrets.OTA_PUBLISH_TOKEN }}

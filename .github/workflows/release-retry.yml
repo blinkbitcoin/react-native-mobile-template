@@ -1,0 +1,43 @@
+name: release-retry
+# `release-beta.yml` refuses to promote until that commit's `release-internal`
+# run is green. When beta is published before internal finishes (or while it is
+# red), the beta run fails at the gate and there is nothing to re-trigger it —
+# `release: published` fires once. This workflow closes that hole: whenever an
+# internal run for main concludes successfully, it re-runs the failed jobs of a
+# beta run for the same commit.
+on:
+  workflow_run:
+    workflows: [release-internal]
+    types: [completed]
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  retry-beta:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      # `gh run rerun` writes to the Actions API.
+      actions: write
+    steps:
+      - name: Re-run a beta run blocked on the green gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          run_id="$(gh run list --workflow release-beta.yml --commit "$HEAD_SHA" \
+            --status failure --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+          if [ -z "$run_id" ]; then
+            echo "no failed release-beta run for $HEAD_SHA - nothing to retry"
+            exit 0
+          fi
+          # --failed re-runs only the jobs that failed, so the promotion picks
+          # up where the gate stopped it instead of promoting twice.
+          gh run rerun "$run_id" --failed

@@ -1,0 +1,157 @@
+name: release-internal
+# Every commit on main becomes a signed, uploaded internal build:
+# prepare -> build both platforms -> upload to TestFlight internal / Play
+# internal -> a `vX.Y.Z-build.N` GitHub pre-release carrying every artifact ->
+# an optional OTA publish on the `internal` channel.
+#
+# `release-beta.yml` promotes exactly the build this workflow produced for the
+# release commit, so this run going green is the gate for the whole path.
+on:
+  push:
+    branches: [main]
+    paths-ignore: [docs/**, "**.md"]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  prepare:
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/expo-prepare.yml@v0
+    permissions:
+      contents: read
+    with:
+      stage: internal
+      # `build-number-offset` is a `number` input, and an unset repo variable is
+      # the empty string, which fails input validation rather than falling back
+      # to the workflow default. fromJSON turns the fallback into a real number.
+      build-number-offset: ${{ fromJSON(vars.BUILD_NUMBER_OFFSET || '1000') }}
+
+  build-ios:
+    needs: prepare
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/expo-build-ios.yml@v0
+    permissions:
+      contents: read
+    with:
+      environment: internal
+      version: ${{ needs.prepare.outputs.version }}
+      build-number: ${{ needs.prepare.outputs.build-number }}
+      stage: internal
+      xcode: ${{ vars.XCODE_VERSION }}
+      macos-runner: ${{ vars.RNW_MACOS_RUNNER || 'macos-26' }}
+      # All five Fastfile contract variables are asserted in `before_all` for
+      # every lane on both platforms, so the Android id is required here too.
+      ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
+      ios-scheme: ${{ vars.IOS_SCHEME }}
+      android-package: ${{ vars.ANDROID_PACKAGE }}
+    secrets:
+      MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+      MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+      MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+
+  build-android:
+    needs: prepare
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/expo-build-android.yml@v0
+    permissions:
+      contents: read
+    with:
+      environment: internal
+      version: ${{ needs.prepare.outputs.version }}
+      build-number: ${{ needs.prepare.outputs.build-number }}
+      stage: internal
+      android-package: ${{ vars.ANDROID_PACKAGE }}
+      ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
+      ios-scheme: ${{ vars.IOS_SCHEME }}
+    secrets:
+      ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+      ANDROID_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+      ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+      ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+      PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+
+  publish-ios:
+    needs: [prepare, build-ios]
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/fastlane-lane.yml@v0
+    permissions:
+      contents: read
+    with:
+      platform: ios
+      lane: upload_internal
+      # Transporter (the upload path pilot/upload_to_testflight uses) only
+      # ships on macOS, so this lane cannot run on ubuntu.
+      runner: ${{ vars.RNW_MACOS_RUNNER || 'macos-26' }}
+      environment: internal
+      # `*` merges every artifact this run produced into $RNW_ASSETS_DIR, which
+      # is where the lane looks for app.ipa, build-info.json and the notes.
+      artifacts: "*"
+      env-json: '{"TESTFLIGHT_INTERNAL_GROUP": "${{ vars.TESTFLIGHT_INTERNAL_GROUP }}"}'
+      version: ${{ needs.prepare.outputs.version }}
+      build-number: ${{ needs.prepare.outputs.build-number }}
+      ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
+      ios-scheme: ${{ vars.IOS_SCHEME }}
+      android-package: ${{ vars.ANDROID_PACKAGE }}
+      timeout-minutes: 60
+    secrets:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+
+  publish-android:
+    needs: [prepare, build-android]
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/fastlane-lane.yml@v0
+    permissions:
+      contents: read
+    with:
+      platform: android
+      lane: upload_internal
+      runner: ubuntu-latest
+      environment: internal
+      artifacts: "*"
+      env-json: '{"PLAY_UPDATE_PRIORITY": "${{ vars.PLAY_UPDATE_PRIORITY }}"}'
+      version: ${{ needs.prepare.outputs.version }}
+      build-number: ${{ needs.prepare.outputs.build-number }}
+      ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
+      ios-scheme: ${{ vars.IOS_SCHEME }}
+      android-package: ${{ vars.ANDROID_PACKAGE }}
+    secrets:
+      PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+
+  github-prerelease:
+    needs: [prepare, publish-ios, publish-android]
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/github-release.yml@v0
+    permissions:
+      # The called job creates a release; a called workflow can only narrow the
+      # caller's token, so `contents: write` has to be granted here.
+      contents: write
+    with:
+      mode: create-prerelease
+      tag: v${{ needs.prepare.outputs.version }}-build.${{ needs.prepare.outputs.build-number }}
+      sha: ${{ github.sha }}
+      title: v${{ needs.prepare.outputs.version }} build ${{ needs.prepare.outputs.build-number }}
+      assets-artifacts: "*"
+    secrets:
+      RELEASE_TAGGER_APP_ID: ${{ secrets.RELEASE_TAGGER_APP_ID }}
+      RELEASE_TAGGER_APP_PRIVATE_KEY: ${{ secrets.RELEASE_TAGGER_APP_PRIVATE_KEY }}
+
+  ota-internal:
+    needs: [prepare, github-prerelease]
+    if: ${{ vars.OTA_ENABLED == 'true' }}
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/expo-ota-publish.yml@v0
+    permissions:
+      contents: read
+    with:
+      ota-enabled: ${{ vars.OTA_ENABLED == 'true' }}
+      channel: internal
+      rollout: 100
+      environment: internal
+      ota-cli-version: ${{ vars.OTA_CLI_VERSION }}
+      # The pre-release this run just created carries the build-info.json of
+      # the binary now installed on the internal track, which is exactly the
+      # fingerprint baseline the gate has to compare against.
+      baseline-tag: v${{ needs.prepare.outputs.version }}-build.${{ needs.prepare.outputs.build-number }}
+    secrets:
+      OTA_PUBLISH_TOKEN: ${{ secrets.OTA_PUBLISH_TOKEN }}

@@ -1,0 +1,112 @@
+name: release-beta
+# Fires when release-please's PR is merged and the `vX.Y.Z` release is
+# published. It never builds: it waits for that exact commit's
+# `release-internal` run to be green and then promotes the binary that run
+# already uploaded, so beta ships bytes that were tested on internal.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to promote (e.g. v1.2.3)
+        type: string
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  prepare:
+    # A `-build.N` pre-release from release-internal also publishes a `release`
+    # event; only a real release may promote.
+    if: ${{ github.event_name == 'workflow_dispatch' || !github.event.release.prerelease }}
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/expo-prepare.yml@v0
+    permissions:
+      contents: read
+      # `require-green-workflow` runs `gh run list` against the gated workflow;
+      # without this the gate cannot see release-internal's runs.
+      actions: read
+    with:
+      ref: ${{ inputs.tag || github.event.release.tag_name }}
+      stage: beta
+      build-number-offset: ${{ fromJSON(vars.BUILD_NUMBER_OFFSET || '1000') }}
+      # A promotion must never ship a binary whose own build never went green.
+      require-green-workflow: release-internal.yml
+
+  promote-ios:
+    needs: prepare
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/fastlane-lane.yml@v0
+    permissions:
+      contents: read
+    with:
+      platform: ios
+      lane: promote_beta
+      # Promotion is an App Store Connect API call; no Xcode, no macOS minutes.
+      runner: ubuntu-latest
+      environment: beta
+      artifacts: release-meta
+      env-json: '{"TESTFLIGHT_EXTERNAL_GROUP": "${{ vars.TESTFLIGHT_EXTERNAL_GROUP }}"}'
+      version: ${{ needs.prepare.outputs.version }}
+      build-number: ${{ needs.prepare.outputs.build-number }}
+      ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
+      ios-scheme: ${{ vars.IOS_SCHEME }}
+      android-package: ${{ vars.ANDROID_PACKAGE }}
+    secrets:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+
+  promote-android:
+    needs: prepare
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/fastlane-lane.yml@v0
+    permissions:
+      contents: read
+    with:
+      platform: android
+      lane: promote_beta
+      runner: ubuntu-latest
+      environment: beta
+      artifacts: release-meta
+      version: ${{ needs.prepare.outputs.version }}
+      build-number: ${{ needs.prepare.outputs.build-number }}
+      ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
+      ios-scheme: ${{ vars.IOS_SCHEME }}
+      android-package: ${{ vars.ANDROID_PACKAGE }}
+    secrets:
+      PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+
+  github-release:
+    needs: [prepare, promote-ios, promote-android]
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/github-release.yml@v0
+    permissions:
+      contents: write
+    with:
+      mode: promote
+      tag: ${{ inputs.tag || github.event.release.tag_name }}
+      # build-info.json and the store notes ride along so the release is the
+      # single record of what beta got — and so the OTA gate below has a
+      # fingerprint baseline to download.
+      assets-artifacts: release-meta
+    secrets:
+      RELEASE_TAGGER_APP_ID: ${{ secrets.RELEASE_TAGGER_APP_ID }}
+      RELEASE_TAGGER_APP_PRIVATE_KEY: ${{ secrets.RELEASE_TAGGER_APP_PRIVATE_KEY }}
+
+  ota-beta:
+    needs: [prepare, github-release]
+    if: ${{ vars.OTA_ENABLED == 'true' }}
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/expo-ota-publish.yml@v0
+    permissions:
+      contents: read
+    with:
+      ota-enabled: ${{ vars.OTA_ENABLED == 'true' }}
+      ref: ${{ inputs.tag || github.event.release.tag_name }}
+      channel: beta
+      rollout: 100
+      environment: beta
+      ota-cli-version: ${{ vars.OTA_CLI_VERSION }}
+      # The release being promoted is the binary now on the beta track.
+      baseline-tag: ${{ inputs.tag || github.event.release.tag_name }}
+    secrets:
+      OTA_PUBLISH_TOKEN: ${{ secrets.OTA_PUBLISH_TOKEN }}

@@ -1,0 +1,55 @@
+name: release-please
+# Keeps one "chore(main): release X.Y.Z" PR open against main. Merging that PR
+# is the only human action that cuts a release: it bumps package.json, writes
+# the CHANGELOG section, tags `vX.Y.Z` and publishes the GitHub release, which
+# is what `release-beta.yml` listens for.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  # Shared with every other release workflow, and never cancelling: a half-cut
+  # release is worse than a queued one.
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release-created: ${{ steps.release.outputs.release_created }}
+      tag-name: ${{ steps.release.outputs.tag_name }}
+    env:
+      # The `secrets` context is not available in a step-level `if:`, so the app
+      # id is mirrored into `env` purely so the token step can branch on whether
+      # it was configured. Only the id, never the private key.
+      RELEASE_TAGGER_APP_ID: ${{ secrets.RELEASE_TAGGER_APP_ID }}
+    steps:
+      # A release created with the default GITHUB_TOKEN does not trigger other
+      # workflows, so `release-beta.yml` (`release: published`) would never fire
+      # and the release PR would also be blocked by an org ruleset that forbids
+      # Actions-authored pushes. Configure both secrets or neither.
+      - name: GitHub App token
+        id: app-token
+        if: ${{ env.RELEASE_TAGGER_APP_ID != '' }}
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.RELEASE_TAGGER_APP_ID }}
+          private-key: ${{ secrets.RELEASE_TAGGER_APP_PRIVATE_KEY }}
+      # Manifest mode only. `release-type`, `package-name`,
+      # `include-component-in-tag`, `bump-minor-pre-major` and
+      # `changelog-sections` all live in release-please-config.json under
+      # packages["."] — passing any of them inline here makes the action ignore
+      # both the config file and the manifest.
+      - name: Release please
+        id: release
+        uses: googleapis/release-please-action@v5
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          token: ${{ steps.app-token.outputs.token || github.token }}

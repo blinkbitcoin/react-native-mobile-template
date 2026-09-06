@@ -28,7 +28,7 @@
     "modules/**/android/**"
   ],
   "ignoreDependencies": ["ts-node", "expo-system-ui"],
-  "ignoreBinaries": ["typos", "maestro", "xcrun", "adb"],
+  "ignoreBinaries": ["typos", "maestro", "xcrun", "adb", "make"],
   "jest": {
     "config": "jest.config.ts"
   },

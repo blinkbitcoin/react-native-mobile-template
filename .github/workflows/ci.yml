@@ -14,6 +14,11 @@ concurrency:
 jobs:
   checks:
     uses: blinkbitcoin/react-native-workflows/.github/workflows/checks.yml@v0
+    with:
+      # Runs `pnpm check:release` (= `make check-release`): Ruby syntax, a
+      # fastlane lane parse and the lane unit tests. Needs Ruby, which is why
+      # the toggle is off by default in the reusable workflow.
+      release-checks: true
   unit:
     needs: checks
     if: ${{ needs.checks.outputs.docs-only != 'true' }}
