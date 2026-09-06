@@ -20,7 +20,7 @@ const config: Config = {
   // The (?!\.pnpm/) guard skips pnpm's nested `.pnpm/<pkg>/node_modules/` hop so the
   // exclusion list below matches against the real inner package name, not the pnpm store dir.
   transformIgnorePatterns: [
-    'node_modules/(?!\\.pnpm/)(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|@lingui/.*|@messageformat/.*|msw|@mswjs/.*|until-async|standard-navigation)',
+    'node_modules/(?!\\.pnpm/)(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|@lingui/.*|@messageformat/.*|msw|@mswjs/.*|@open-draft/.*|@bundled-es-modules/.*|until-async|rettime|outvariant|strict-event-emitter|is-node-process|headers-polyfill|path-to-regexp|cookie|statuses|tough-cookie|picocolors|standard-navigation)',
   ],
   testPathIgnorePatterns: ['/node_modules/', '/e2e/', '/plugins/', '/scripts/'],
   collectCoverageFrom: [

@@ -8,6 +8,8 @@
     "node": ">=24"
   },
   "dependencies": {
+    "@apollo/client": "^4.2.12",
+    "@graphql-typed-document-node/core": "^3.2.0",
     "@lingui/core": "^6.6.0",
     "@lingui/react": "^6.6.0",
     "expo": "~57.0.20",
@@ -20,18 +22,23 @@
     "expo-sqlite": "~57.0.2",
     "expo-status-bar": "~57.0.1",
     "expo-updates": "~57.0.21",
+    "graphql": "^16.14.2",
     "react": "19.2.3",
     "react-native": "0.86.3",
     "react-native-gesture-handler": "~2.32.0",
     "react-native-reanimated": "4.5.1",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.2",
+    "rxjs": "^7.8.2",
     "zod": "^4.5.4"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.11",
     "@commitlint/cli": "^21.2.2",
     "@commitlint/config-conventional": "^21.2.2",
+    "@graphql-codegen/cli": "^7.4.0",
+    "@graphql-codegen/client-preset": "^6.1.3",
+    "@graphql-tools/schema": "^10.1.0",
     "@lingui/babel-plugin-lingui-macro": "^6.6.0",
     "@lingui/cli": "^6.6.0",
     "@testing-library/react-native": "^14.0.1",
@@ -41,11 +48,14 @@
     "eslint": "^9.39.5",
     "eslint-config-expo": "^57.0.2",
     "globals": "^17.12.0",
+    "graphql-yoga": "^5.22.0",
     "jest": "^30.5.1",
     "jest-expo": "~57.0.5",
     "knip": "^6.34.0",
     "lefthook": "^2.1.12",
+    "msw": "^2.15.0",
     "ts-node": "^10.9.2",
+    "tsx": "^4.23.13",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -69,6 +79,9 @@
     "knip": "knip --strict",
     "spell": "typos",
     "i18n:extract": "lingui extract --clean && lingui compile",
-    "i18n:check": "bash scripts/check-i18n.sh"
+    "i18n:check": "bash scripts/check-i18n.sh",
+    "codegen": "graphql-codegen --config codegen.ts",
+    "codegen:check": "bash scripts/check-codegen.sh",
+    "mock-api": "tsx mocks/server.ts"
   }
 }

@@ -23,5 +23,11 @@ onlyBuiltDependencies:
   - sharp
 allowBuilds:
   '@parcel/watcher': true
+  # Added for Task 11 (GraphQL tooling): esbuild's postinstall installs its
+  # platform binary (tsx and graphql-codegen depend on it).
+  esbuild: true
   lefthook: true
+  # msw's postinstall only copies the browser service worker (unused here, we
+  # run msw/node), but strictDepBuilds requires an explicit decision.
+  msw: true
   unrs-resolver: true

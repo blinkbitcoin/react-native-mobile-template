@@ -1,13 +1,16 @@
+import '@testing-library/react-native';
 import { type RenderOptions, render } from '@testing-library/react-native';
 import type { PropsWithChildren, ReactElement } from 'react';
+import { ApolloProvider } from '../graphql/ApolloProvider';
 import { I18nProvider } from '../i18n/I18nProvider';
 import { ThemeProvider } from '../theme/ThemeProvider';
 
-// Providers are appended here as the layers land (theme, i18n, apollo).
-function Providers({ children }: PropsWithChildren) {
+export function Providers({ children }: PropsWithChildren) {
   return (
     <ThemeProvider>
-      <I18nProvider>{children}</I18nProvider>
+      <I18nProvider>
+        <ApolloProvider>{children}</ApolloProvider>
+      </I18nProvider>
     </ThemeProvider>
   );
 }

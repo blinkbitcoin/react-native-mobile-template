@@ -1,21 +1,17 @@
 import { Stack } from 'expo-router';
-import { renderRouter, screen } from 'expo-router/testing-library';
-import { I18nProvider } from '@/i18n/I18nProvider';
+import { renderRouter, screen, waitFor } from 'expo-router/testing-library';
+import { Providers } from '@/test/render';
 import { HomeScreen } from './HomeScreen';
 
-function TestLayout() {
-  return (
-    <I18nProvider>
-      <Stack />
-    </I18nProvider>
-  );
-}
+const routes = { _layout: () => <Stack />, index: HomeScreen, 'details/[id]': () => null };
 
 test('home screen shows the title and links to details', async () => {
-  await renderRouter(
-    { _layout: TestLayout, index: HomeScreen, 'details/[id]': () => null },
-    { initialUrl: '/' },
-  );
+  await renderRouter(routes, { initialUrl: '/', wrapper: Providers });
   expect(screen.getByTestId('home-title')).toBeOnTheScreen();
   expect(screen.getByTestId('home-open-details')).toBeOnTheScreen();
+});
+
+test('home shows the hello greeting from the (mock) API', async () => {
+  await renderRouter(routes, { initialUrl: '/', wrapper: Providers });
+  await waitFor(() => expect(screen.getByTestId('home-hello')).toHaveTextContent('Hello, world!'));
 });

@@ -13,7 +13,7 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#: src/app/_layout.tsx:14
+#: src/app/_layout.tsx:16
 #: src/features/details/DetailsScreen.tsx:9
 msgid "Details"
 msgstr "Details"
@@ -22,7 +22,7 @@ msgstr "Details"
 msgid "Go home"
 msgstr "Go home"
 
-#: src/features/home/HomeScreen.tsx:12
+#: src/features/home/HomeScreen.tsx:17
 #: src/i18n/i18n.test.tsx:10
 msgid "Home"
 msgstr "Home"
@@ -31,7 +31,7 @@ msgstr "Home"
 msgid "Not found"
 msgstr "Not found"
 
-#: src/features/home/HomeScreen.tsx:15
+#: src/features/home/HomeScreen.tsx:21
 msgid "Open details"
 msgstr "Open details"
 

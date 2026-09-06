@@ -23,12 +23,18 @@ android: ## Prebuild if needed, build and launch on an Android emulator
 web: ## Expo web dev server (web target)
 	pnpm web
 
+mock-api: ## Local GraphQL mock API on :4000
+	pnpm mock-api
+
 prebuild: ## Regenerate ios/ and android/ locally (debugging plugins only; never commit them)
 	pnpm prebuild
 
 # ---------- Codegen ----------
 i18n: ## Extract + compile message catalogs
 	pnpm i18n:extract
+
+codegen: ## Regenerate typed GraphQL documents
+	pnpm codegen
 
 # ---------- Quality gates (each is what CI runs) ----------
 typecheck: ## tsc --noEmit
@@ -51,6 +57,7 @@ spell: ## Spell-check with typos
 
 check-gen: ## Generated-file drift (i18n, codegen)
 	pnpm i18n:check
+	pnpm codegen:check
 
 check-code: typecheck lint format-check knip spell ## Fast local gate: types + lint + format + knip + spell
 
@@ -71,4 +78,4 @@ reset: clean ## clean + reinstall
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: doctor install start ios android web prebuild i18n typecheck lint format format-check knip spell check-gen check-code unit coverage test clean reset help
+.PHONY: doctor install start ios android web mock-api prebuild i18n codegen typecheck lint format format-check knip spell check-gen check-code unit coverage test clean reset help

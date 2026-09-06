@@ -33,10 +33,16 @@
     "expo-status-bar",
     "expo-updates",
     "expo-system-ui",
-    "zod"
+    "zod",
+    "@apollo/client",
+    "graphql",
+    "rxjs",
+    "@graphql-typed-document-node/core"
   ],
   "ignoreBinaries": ["typos", "maestro", "xcrun", "adb"],
-  "jest": { "config": "jest.config.ts" },
+  "jest": {
+    "config": "jest.config.ts"
+  },
   "expo": true,
   "graphql-codegen": true,
   "playwright": true

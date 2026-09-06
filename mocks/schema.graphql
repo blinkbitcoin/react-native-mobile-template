@@ -1,0 +1,16 @@
+"""
+Hello-world schema. Replace with your API's schema (or point codegen.ts at the real endpoint).
+"""
+type Query {
+  hello(name: String): String!
+  viewer: Viewer
+}
+
+type Mutation {
+  updateDisplayName(name: String!): Viewer!
+}
+
+type Viewer {
+  id: ID!
+  displayName: String!
+}
