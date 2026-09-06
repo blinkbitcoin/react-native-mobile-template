@@ -1,8 +1,8 @@
 import type { HelloNativeModuleType } from './src/HelloNative.types';
 
 export class HelloNativeError extends Error {
-  constructor(message: string) {
-    super(message);
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = 'HelloNativeError';
   }
 }
@@ -18,9 +18,10 @@ function module_(): HelloNativeModuleType {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     native = require('./src/HelloNativeModule').default as HelloNativeModuleType;
     return native;
-  } catch {
+  } catch (cause) {
     throw new HelloNativeError(
       'HelloNative is not available in this runtime (Expo Go or web). Build a dev client: make ios / make android.',
+      { cause },
     );
   }
 }
@@ -30,7 +31,10 @@ export function hello(name: string): string {
   return module_().hello(name);
 }
 
-export function getBuildStamp(): Promise<string> {
+// `async` on purpose: a missing native module must surface as a rejection, so
+// callers can rely on the declared `Promise<string>` contract and a single
+// `.catch()` instead of also guarding the synchronous call.
+export async function getBuildStamp(): Promise<string> {
   return module_().getBuildStamp();
 }
 

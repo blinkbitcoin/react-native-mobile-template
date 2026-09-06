@@ -22,3 +22,33 @@ test('info exposes runtime metadata', () => {
     enabled: false,
   });
 });
+
+test('applyIfAvailable resolves false when the update check rejects', async () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    jest.resetModules();
+    await jest.isolateModulesAsync(async () => {
+      jest.doMock('expo-updates', () => ({
+        isEnabled: true,
+        updateId: null,
+        channel: null,
+        runtimeVersion: 'test-runtime',
+        checkForUpdateAsync: jest.fn(async () => {
+          throw new Error('NotAvailableInDevClientException');
+        }),
+        fetchUpdateAsync: jest.fn(async () => ({ isNew: false })),
+        reloadAsync: jest.fn(async () => {}),
+        setUpdateRequestHeadersOverride: jest.fn(),
+      }));
+      /* eslint-disable @typescript-eslint/no-require-imports -- both modules have to come from the isolated registry */
+      const isolated = require('./updates') as typeof import('./updates');
+      const IsolatedUpdates = require('expo-updates') as typeof import('expo-updates');
+      /* eslint-enable @typescript-eslint/no-require-imports */
+
+      await expect(isolated.updates.applyIfAvailable()).resolves.toBe(false);
+      expect(IsolatedUpdates.reloadAsync).not.toHaveBeenCalled();
+    });
+  } finally {
+    warn.mockRestore();
+  }
+});

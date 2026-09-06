@@ -12,11 +12,7 @@ export function NativeDemoCard() {
     greeting = e instanceof HelloNativeError ? e.message : 'error';
   }
   useEffect(() => {
-    // `getBuildStamp` throws synchronously when the native module is missing
-    // (web, Expo Go, Jest), so start the chain off a resolved promise and let
-    // the single `catch` below handle both failure modes.
-    Promise.resolve()
-      .then(getBuildStamp)
+    getBuildStamp()
       .then(setStamp)
       .catch(() => setStamp('unavailable'));
   }, []);

@@ -15,18 +15,25 @@ test('platformName is exposed', () => {
   expect(platformName).toBe('mock');
 });
 
-test('missing native module produces a helpful error', () => {
+test('missing native module rejects and throws helpfully', async () => {
   // Jest keeps a loaded manual mock in its mock registry, and that cached entry
-  // wins over a later `doMock` factory; resetting the registries first lets the
+  // wins over a later `doMock`; resetting the registries first lets the
   // throwing factory below stand in for an absent native module.
   jest.resetModules();
-  jest.isolateModules(() => {
+  await jest.isolateModulesAsync(async () => {
     jest.doMock('../src/HelloNativeModule', () => {
       throw new Error("Cannot find native module 'HelloNative'");
     });
     // eslint-disable-next-line @typescript-eslint/no-require-imports -- the wrapper has to be re-required inside the isolated module registry
     const isolated = require('..') as typeof import('..');
+
     expect(() => isolated.hello('x')).toThrow(/make ios/);
+    await expect(isolated.getBuildStamp()).rejects.toThrow(isolated.HelloNativeError);
+    await expect(isolated.getBuildStamp()).rejects.toThrow(/make ios/);
     expect(isolated.platformName).toBe('unavailable');
+
+    // The underlying loader failure stays attached for diagnosis.
+    const cause = await isolated.getBuildStamp().catch((e: unknown) => (e as Error).cause);
+    expect(cause).toBeInstanceOf(Error);
   });
 });
