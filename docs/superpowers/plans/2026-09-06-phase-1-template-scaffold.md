@@ -3328,7 +3328,7 @@ Claude-Session: https://claude.ai/code/session_01SpyYZEnJaLFih75JB4EQAW"
 
 **Files:** none new. Modify: `docs/superpowers/plans/2026-09-06-phase-1-template-scaffold.md` (tick boxes), `README.md` (minimal placeholder so the repo is not headless; the real README is Phase 4).
 
-- [ ] **Step 1: Minimal README**
+- [x] **Step 1: Minimal README**
 
 ```markdown
 # react-native-mobile-template
@@ -3342,7 +3342,7 @@ Expo SDK 57 store-app template (work in progress; see docs/superpowers/).
     make check && make unit
 ```
 
-- [ ] **Step 2: Fresh-clone verification**
+- [x] **Step 2: Fresh-clone verification**
 
 Run:
 ```bash
@@ -3351,17 +3351,17 @@ mise trust && mise install && make doctor && make install && make check && make 
 ```
 Expected: every command exits 0 on a clean clone (no reliance on files ignored by git). Record the exact output tail of each gate in the task summary.
 
-- [ ] **Step 3: Simulator and E2E verification (from the main checkout)**
+- [x] **Step 3: Simulator and E2E verification (from the main checkout)**
 
 Run: `make mock-api` and `make start` in the background, `make ios`, then `make e2e-ios`, then `make e2e-web`. If an Android emulator is available (`emulator -list-avds`), also `make android` and `make e2e-android`.
 Expected: all Maestro flows pass on iOS (Android too when available); Playwright smoke passes. Note any skipped platform explicitly.
 
-- [ ] **Step 4: Coverage check**
+- [x] **Step 4: Coverage check**
 
 Run: `make coverage`
 Expected: thresholds met (global 80/80, 100/100 for config, lib, modules index, plugins). The `coverage/` directory is git-ignored.
 
-- [ ] **Step 5: Commit and tag the phase**
+- [x] **Step 5: Commit and tag the phase**
 
 ```bash
 git add -A

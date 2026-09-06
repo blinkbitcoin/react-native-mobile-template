@@ -5,7 +5,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 if git rev-parse --verify origin/main >/dev/null 2>&1; then
-  changed="$(git diff --name-only origin/main...HEAD || true)"
+  # A fresh clone of a branch with no merge base against main would otherwise
+  # print git's "no merge base" error; the check is advisory either way.
+  changed="$(git diff --name-only origin/main...HEAD 2>/dev/null || true)"
   if echo "$changed" | grep -qE '^(app\.config\.ts|plugins/|modules/|src/graphql/|scripts/|Makefile)' && ! echo "$changed" | grep -q '^docs/'; then
     echo "warning: architecture-relevant changes without a docs/ update" >&2
   fi

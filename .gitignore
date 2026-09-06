@@ -41,6 +41,9 @@ yarn-error.*
 # generated native folders (Continuous Native Generation: never commit these)
 /ios
 /android
+# Gradle output for local modules, produced by `make android`
+modules/*/android/build/
+modules/*/android/.cxx/
 
 # Playwright / Maestro / coverage / build output
 /coverage

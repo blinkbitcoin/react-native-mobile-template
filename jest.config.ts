@@ -38,8 +38,11 @@ const config: Config = {
       displayName: 'plugins',
       testEnvironment: 'node',
       testMatch: ['<rootDir>/plugins/**/*.test.ts'],
+      // `.tsx` is in the pattern even though no plugin suite uses JSX: coverage
+      // options are global, so this project also instruments the app's untested
+      // `.tsx` files (e.g. platform variants) and needs a transform for them.
       transform: {
-        '^.+\\.ts$': ['babel-jest', { presets: ['babel-preset-expo'] }],
+        '^.+\\.tsx?$': ['babel-jest', { presets: ['babel-preset-expo'] }],
       },
     },
   ],
@@ -48,6 +51,7 @@ const config: Config = {
     'modules/*/index.ts',
     'plugins/*.ts',
     '!src/**/*.test.*',
+    '!src/**/*.d.ts',
     '!plugins/*.test.ts',
     '!src/test/**',
     '!src/graphql/generated/**',
