@@ -44,7 +44,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         ]
       : [],
   },
+  // init:web-start
   web: { bundler: 'metro', output: 'static', favicon: './assets/favicon.png' },
+  // init:web-end
   runtimeVersion: { policy: 'fingerprint' },
   updates: otaEnabled
     ? {

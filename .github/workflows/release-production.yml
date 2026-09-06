@@ -311,6 +311,7 @@ jobs:
     secrets:
       OTA_PUBLISH_TOKEN: ${{ secrets.OTA_PUBLISH_TOKEN }}
 
+  # init:web-start
   web:
     # Pure ordering: the site should not go live before the stores have accepted
     # the release. Neither job's outputs are read here.
@@ -332,3 +333,4 @@ jobs:
       # the one failure mode nothing downstream would catch. It adds a browser
       # e2e run (~15-20 min) to the dispatch on code CI already tested at merge.
       playwright: true
+  # init:web-end

@@ -1,0 +1,257 @@
+{
+  "$comment": "Declarative touch list for scripts/init.mjs. Every rename token and every web removal in the template is listed here exactly once; init.mjs contains no hard-coded paths. `{{...}}` placeholders are filled from the answers: name, slug, scheme, iosBundleId, androidPackage, iosBundleIdRe, androidPackageRe (dot-escaped, for regex literals in test fixtures) and owner.",
+  "rename": {
+    "$comment": "perFile runs before tokens: it disambiguates strings a blanket replace would get wrong (the iOS bundle id and the Android package are the same literal in the template but differ afterwards, and `blinkbitcoin` also names the reusable-workflow repo, which must NOT be renamed).",
+    "perFile": [
+      {
+        "path": "app.config.ts",
+        "replace": [
+          [
+            "process.env.IOS_BUNDLE_ID ?? 'com.example.rnmt'",
+            "process.env.IOS_BUNDLE_ID ?? '{{iosBundleId}}'"
+          ],
+          [
+            "process.env.ANDROID_PACKAGE ?? 'com.example.rnmt'",
+            "process.env.ANDROID_PACKAGE ?? '{{androidPackage}}'"
+          ]
+        ]
+      },
+      {
+        "path": "scripts/e2e/maestro-ios.sh",
+        "replace": [["APP_ID:-com.example.rnmt.dev", "APP_ID:-{{iosBundleId}}.dev"]]
+      },
+      {
+        "path": "scripts/e2e/maestro-android.sh",
+        "replace": [["APP_ID:-com.example.rnmt.dev", "APP_ID:-{{androidPackage}}.dev"]]
+      },
+      {
+        "path": "scripts/release/verify.test.mjs",
+        "replace": [
+          ["package: name='com.example.rnmt'", "package: name='{{androidPackage}}'"],
+          [
+            "vc_badging_field ${arg} name`), 'com.example.rnmt'",
+            "vc_badging_field ${arg} name`), '{{androidPackage}}'"
+          ],
+          [
+            "<key>CFBundleIdentifier</key><string>com.example.rnmt</string>",
+            "<key>CFBundleIdentifier</key><string>{{iosBundleId}}</string>"
+          ],
+          ["IOS_BUNDLE_ID: 'com.example.rnmt'", "IOS_BUNDLE_ID: '{{iosBundleId}}'"],
+          ["/ok bundle-id: com\\.example\\.rnmt/", "/ok bundle-id: {{iosBundleIdRe}}/"]
+        ]
+      },
+      {
+        "path": "modules/hello-native/ios/HelloNative.podspec",
+        "replace": [
+          ["github.com/blinkbitcoin/react-native-mobile-template", "github.com/{{owner}}/{{slug}}"]
+        ]
+      },
+      {
+        "path": "scripts/release/fixtures/release-body.md",
+        "replace": [["github.com/acme/rn-mobile-template", "github.com/{{owner}}/{{slug}}"]]
+      },
+      {
+        "path": ".github/CODEOWNERS",
+        "optional": true,
+        "replace": [["@blinkbitcoin/", "@{{owner}}/"]]
+      }
+    ],
+    "$comment2": "Ordered, longest-first token replacements applied to every path/glob below. Bare `rnmt` runs last, after every qualified form has already been rewritten.",
+    "tokens": [
+      ["exp+react-native-mobile-template", "exp+{{slug}}"],
+      ["react-native-mobile-template", "{{slug}}"],
+      ["rn-mobile-template", "{{slug}}"],
+      ["RN Mobile Template", "{{name}}"],
+      ["com.example.rnmt", "{{androidPackage}}"],
+      ["rnmt", "{{scheme}}"]
+    ],
+    "paths": [
+      ".env.development",
+      ".env.example",
+      ".env.production",
+      ".maestro/flows/deep-link.yaml",
+      "app.config.ts",
+      "certs/README.md",
+      "docs/ci.md",
+      "fastlane/lanes/android.rb",
+      "fastlane/metadata/android/en-US/full_description.txt",
+      "fastlane/metadata/android/en-US/title.txt",
+      "fastlane/metadata/ios/en-US/description.txt",
+      "fastlane/metadata/ios/en-US/name.txt",
+      "fastlane/release-notes-context.md",
+      "modules/hello-native/ios/HelloNative.podspec",
+      "package.json",
+      "plugins/with-android-release-signing.ts",
+      "release-please-config.json",
+      "scripts/e2e/maestro-android.sh",
+      "scripts/e2e/maestro-ios.sh",
+      "scripts/release/fixtures/ota/AndroidManifest.xml",
+      "scripts/release/fixtures/ota/strings.xml",
+      "scripts/release/fixtures/release-body.md",
+      "scripts/release/verify.test.mjs",
+      "src/lib/native-intent.test.ts",
+      "src/lib/native-intent.ts"
+    ],
+    "$comment3": "Globs catch files whose content is not fixed (README/AGENTS/docs are rewritten often); a glob that matches nothing is not an error.",
+    "globs": [
+      "*.md",
+      "docs/*.md",
+      "docs/decisions/*.md",
+      ".github/*.md",
+      ".github/CODEOWNERS",
+      ".github/ISSUE_TEMPLATE/*.yml",
+      "deploy/ota/*",
+      "CHANGELOG.md"
+    ]
+  },
+  "web": {
+    "$comment": "Applied only when the web target is dropped (--no-web).",
+    "filesList": "docs/web-files.txt",
+    "packageJson": "package.json",
+    "makefile": "Makefile",
+    "knipConfig": "knip.json",
+    "commitlintConfig": "commitlint.config.mjs",
+    "files": [
+      "playwright.config.ts",
+      "scripts/e2e/web.sh",
+      ".github/workflows/web.yml",
+      "docs/web-files.txt",
+      "docs/decisions/0006-web-opt-in.md"
+    ],
+    "packageScripts": ["web", "build:web", "test:e2e:web"],
+    "packageDependencies": ["@expo/metro-runtime", "react-dom", "react-native-web"],
+    "packageDevDependencies": ["@playwright/test"],
+    "makeTargets": ["web", "build-web", "e2e-web"],
+    "commitlintScopes": ["web"],
+    "knipPlugins": ["playwright"],
+    "markedBlocks": [
+      { "path": "app.config.ts", "marker": "init:web" },
+      { "path": "metro.config.js", "marker": "init:web" },
+      { "path": ".github/workflows/release-production.yml", "marker": "init:web" }
+    ],
+    "edits": [
+      {
+        "path": "src/features/settings/NativeDemoCard.test.tsx",
+        "blocks": [{ "from": "^test\\('the web variant", "until": "^\\}\\);$" }],
+        "lines": ["NativeDemoCard\\.web"]
+      },
+      {
+        "path": ".gitignore",
+        "lines": ["^/playwright-report$", "^web-build/$"],
+        "replace": [
+          [
+            "# Playwright / Maestro / coverage / build output",
+            "# Maestro / coverage / build output"
+          ]
+        ]
+      },
+      {
+        "path": "AGENTS.md",
+        "optional": true,
+        "$comment": "Surgical, because the doc scrub below would take the whole layout line and the whole scope-enum line with it.",
+        "replace": [["; e2e/web/ is Playwright", ""], ["docs e2e web`", "docs e2e`"]]
+      },
+      {
+        "path": "mocks/README.md",
+        "optional": true,
+        "replace": [["Jest (and Playwright,\nshould you add it) instead use", "Jest instead uses"]]
+      },
+      {
+        "path": "docs/release-runbook.md",
+        "optional": true,
+        "replace": [["App Store + Play + web + OTA", "App Store + Play + OTA"]]
+      },
+      {
+        "path": "README.md",
+        "optional": true,
+        "replace": [[", Maestro on device, Playwright on web |", ", Maestro on device |"]]
+      },
+      {
+        "path": "docs/README.md",
+        "optional": true,
+        "replace": [
+          [
+            "adding a Maestro flow, Playwright, forensics artifacts",
+            "adding a Maestro flow, forensics artifacts"
+          ]
+        ]
+      },
+      {
+        "path": "docs/architecture.md",
+        "optional": true,
+        "replace": [
+          [
+            "Jest talks to the same schema through MSW instead of the yoga server. The\nPlaywright suite runs against the yoga server itself, which\n`playwright.config.ts` starts on port 4000. See `mocks/README.md`.",
+            "Jest talks to the same schema through MSW instead of the yoga server. See\n`mocks/README.md`."
+          ]
+        ]
+      },
+      {
+        "path": "docs/native-extensions.md",
+        "optional": true,
+        "replace": [
+          [
+            "consumes all three, and\n`NativeDemoCard.web.tsx` is the web fallback. A Maestro assertion on",
+            "consumes all three. A Maestro assertion on"
+          ]
+        ]
+      },
+      {
+        "path": "docs/decisions/0005-apollo4-client-preset.md",
+        "optional": true,
+        "replace": [["`msw.ts` (Jest, Playwright).", "`msw.ts` (Jest)."]]
+      },
+      {
+        "path": "docs/ci.md",
+        "optional": true,
+        "replace": [
+          [
+            "Ten files, in two groups: four that run on every change, and six that make\nreleases.",
+            "Nine files, in two groups: three that run on every change, and six that make\nreleases."
+          ],
+          ["`expo-ota-publish.yml`, `web.yml`", "`expo-ota-publish.yml`"],
+          [
+            "Two script-contract details are load-bearing:",
+            "One script-contract detail is load-bearing:"
+          ]
+        ]
+      }
+    ],
+    "$comment2": "The scrub only takes whole table rows and whole paragraphs that are entirely about the web target. Anything web-specific inside an otherwise general sentence or row is handled by an anchored `replace` in `edits` above, because deleting the line would take the sentence with it. Missing files and non-matching patterns are fine.",
+    "docScrub": {
+      "globs": ["*.md", "docs/*.md", "docs/decisions/*.md", ".github/*.md"],
+      "lines": [
+        "^\\s*\\|.*`make (web|build-web|e2e-web)`",
+        "^\\s*\\|\\s*`web\\.yml`",
+        "^\\s*\\|.*`e2e/web/?`",
+        "^\\s*\\|\\s*`playwright-report`",
+        "^\\s*\\|\\s*`github-pages`",
+        "^\\s*\\|.*web-files\\.txt",
+        "^- deploys the web export"
+      ],
+      "bullets": ["PLAYWRIGHT_SKIP_EXPORT"],
+      "$comment": "PLAYWRIGHT_SKIP_EXPORT is both a bullet (ci.md) and a standalone paragraph (testing.md); bullets run first, so each file loses exactly its own shape.",
+      "paragraphs": [
+        "PLAYWRIGHT_SKIP_EXPORT",
+        "^## Playwright$",
+        "^`make e2e-web` runs",
+        "^`make web` starts the Expo web dev server"
+      ]
+    }
+  },
+  "selfDelete": {
+    "paths": [
+      "scripts/init.mjs",
+      "scripts/init.test.mjs",
+      "scripts/init.manifest.json",
+      "docs/template-usage.md"
+    ],
+    "makeTargets": ["init"],
+    "markedBlocks": [{ "path": "README.md", "marker": "init:usage", "optional": true }],
+    "docScrub": {
+      "globs": ["*.md", "docs/*.md", ".github/*.md"],
+      "lines": ["`make init`", "template-usage\\.md"],
+      "paragraphs": []
+    }
+  }
+}
