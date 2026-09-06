@@ -31,8 +31,8 @@ the same commit.
 
 | File | Trigger | Calls | Notes |
 | --- | --- | --- | --- |
-| `release-please.yml` | `push` to `main` (skipping `docs/**`, `**.md`), `workflow_dispatch` | `googleapis/release-please-action@v5`, `actions/create-github-app-token@v2` | Keeps one release PR open. Calls no reusable workflow from the workflows repo |
-| `release-internal.yml` | `push` to `main` (same paths-ignore), `workflow_dispatch` | `expo-prepare.yml`, `expo-build-ios.yml`, `expo-build-android.yml`, `fastlane-lane.yml`, `github-release.yml`, `expo-ota-publish.yml` | The only workflow that builds binaries |
+| `release-please.yml` | `push` to `main` (all paths), `workflow_dispatch` | `googleapis/release-please-action@v5`, `actions/create-github-app-token@v2` | Keeps one release PR open. Calls no reusable workflow from the workflows repo |
+| `release-internal.yml` | `push` to `main` (skipping `docs/**`, `**.md`), `workflow_dispatch` | `expo-prepare.yml`, `expo-build-ios.yml`, `expo-build-android.yml`, `fastlane-lane.yml`, `github-release.yml`, `expo-ota-publish.yml` | The only workflow that builds binaries |
 | `release-beta.yml` | `release: published`, `workflow_dispatch` (`tag`) | `expo-prepare.yml`, `fastlane-lane.yml`, `github-release.yml`, `expo-ota-publish.yml` | Promotes the binary internal already built and tested. Never builds |
 | `release-production.yml` | `workflow_dispatch` (`tag`, `action`) | `expo-prepare.yml`, `fastlane-lane.yml`, `github-release.yml`, `expo-ota-publish.yml`, `web.yml` | `action` selects release, rollout, halt, resume or complete |
 | `release-retry.yml` | `workflow_run` on a completed `release-internal` for `main` | nothing: it re-runs a failed beta run with `gh` | Closes the hole where `release: published` fires once, before internal is green |
