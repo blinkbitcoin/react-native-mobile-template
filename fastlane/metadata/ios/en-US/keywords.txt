@@ -1,0 +1,1 @@
+template,starter,mobile,productivity,tools,utility,offline,fast

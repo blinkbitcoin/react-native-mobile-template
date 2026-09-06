@@ -1,0 +1,3 @@
+RN Mobile Template is the app you get before you have written a single screen of your own. It ships the parts every mobile product needs anyway: navigation, a design system, translated copy, a typed data layer, and a release process that puts a build in front of testers on the day you ask for it.
+
+Replace this text with the story of your own app before you submit. Say what it does, who it is for, and what changes for someone after they install it. Keep it concrete: the first two lines are all most people read, and the rest is what convinces the ones who keep going.

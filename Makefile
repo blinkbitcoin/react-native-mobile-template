@@ -82,7 +82,12 @@ check-docs: ## Docs freshness + AGENTS.md command table
 bundle-secrets-check: ## Export the bundle and assert no non-public keys leaked
 	pnpm check-bundle-secrets
 
-check: check-code check-gen check-deps check-ci check-docs ## Every static gate CI runs (no tests/builds)
+check-release: ## Ruby syntax + fastlane lane parse + lane unit tests
+	for f in fastlane/Fastfile fastlane/lanes/*.rb; do ruby -c $$f; done
+	FASTLANE_SKIP_ENV_ASSERT=1 bundle exec fastlane lanes
+	bundle exec ruby -Ifastlane/test fastlane/test/lanes_test.rb
+
+check: check-code check-gen check-deps check-ci check-docs check-release ## Every static gate CI runs (no tests/builds)
 
 test-scripts: ## node:test for scripts/*.test.mjs
 	pnpm test:scripts
@@ -114,4 +119,4 @@ reset: clean ## clean + reinstall
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: doctor install start ios android web mock-api prebuild build-web i18n codegen typecheck lint format format-check knip spell check-gen check-prebuild check-code check-deps check-ci check-docs bundle-secrets-check check test-scripts unit coverage e2e-ios e2e-android e2e-web test clean reset help
+.PHONY: doctor install start ios android web mock-api prebuild build-web i18n codegen typecheck lint format format-check knip spell check-gen check-prebuild check-code check-deps check-ci check-docs bundle-secrets-check check-release check test-scripts unit coverage e2e-ios e2e-android e2e-web test clean reset help

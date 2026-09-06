@@ -52,5 +52,12 @@ modules/*/android/.cxx/
 /test-results
 /.maestro/output
 
+# Ruby gems for fastlane/cocoapods (Gemfile.lock is committed, the gems are not)
+/vendor/bundle
+
+# fastlane run output
+/fastlane/report.xml
+/fastlane/README.md
+
 # react-native-workflows self-checkout (also added to .git/info/exclude by its setup action)
 /.rnw

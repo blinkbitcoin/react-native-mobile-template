@@ -1,0 +1,7 @@
+# Code signing is read-only everywhere: certificates and profiles are created
+# once by a human running `bundle exec fastlane match appstore` locally, never
+# by CI.
+git_url(ENV['MATCH_GIT_URL'])
+storage_mode('git')
+type('appstore')
+readonly(true)

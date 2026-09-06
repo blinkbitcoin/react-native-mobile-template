@@ -1,0 +1,4 @@
+# Identifiers come from the environment so the same lanes serve every flavour
+# of this template (see .env.example and docs/release-runbook.md).
+app_identifier(ENV['IOS_BUNDLE_ID'])
+package_name(ENV['ANDROID_PACKAGE'])
