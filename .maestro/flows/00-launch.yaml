@@ -24,9 +24,20 @@ tags: [smoke]
           timeout: 90000
       - tapOn:
           text: '^Continue$'
-      # `Continue` hands over to the dev menu itself; close it.
-      - tapOn:
-          id: 'xmark'
+      # `Continue` hands over to the dev menu itself; close it. The close
+      # button is an iOS-only SF Symbol (`xmark`); on Android the dev menu is a
+      # sheet that the hardware back key dismisses.
+      - runFlow:
+          when:
+            platform: iOS
+          commands:
+            - tapOn:
+                id: 'xmark'
+      - runFlow:
+          when:
+            platform: Android
+          commands:
+            - back
 # `assertVisible` has no `timeout` property in Maestro 2.x; `extendedWaitUntil`
 # is the supported way to wait out a cold start.
 - extendedWaitUntil:
