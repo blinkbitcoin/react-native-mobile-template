@@ -3,11 +3,8 @@
 export const isEnabled = false;
 export const updateId: string | null = null;
 export const channel: string | null = null;
-export const runtimeVersion: string | null = null;
-export async function checkForUpdateAsync() {
-  return { isAvailable: false, isRollBackToEmbedded: false } as const;
-}
-export async function fetchUpdateAsync() {
-  return { isNew: false, isRollBackToEmbedded: false } as const;
-}
-export async function reloadAsync() {}
+export const runtimeVersion: string | null = 'test-runtime';
+export const checkForUpdateAsync = jest.fn(async () => ({ isAvailable: false }));
+export const fetchUpdateAsync = jest.fn(async () => ({ isNew: false }));
+export const reloadAsync = jest.fn(async () => {});
+export const setUpdateRequestHeadersOverride = jest.fn();

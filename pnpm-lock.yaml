@@ -157,6 +157,9 @@ importers:
       react:
         specifier: 19.2.3
         version: 19.2.3
+      react-error-boundary:
+        specifier: ^6.1.4
+        version: 6.1.4(@types/react@19.2.18)(react@19.2.3)
       react-native:
         specifier: 0.86.3
         version: 0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.87.1(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1)
@@ -6045,6 +6048,15 @@ packages:
     resolution: {integrity: sha512-rVprimfGBG3DR+Tq0IQG2DT5PxKth1WIGDmj5yPmlzr4YBe7uyE+Du4oVqTDXZSHGGGXRtTJEGSSePyQCMBglQ==}
     peerDependencies:
       react: ^19.2.8
+
+  react-error-boundary@6.1.4:
+    resolution: {integrity: sha512-7FgvbyjCFhu4dtKSZu807cW1MWG2nWAM4bwGqUByAtHVJXtlzoCJX0SSyZRyFrb+aBd7wtJkcOR4DsxXVEuDsA==}
+    peerDependencies:
+      '@types/react': ^18.0.0 || ^19.0.0
+      react: ^18.0.0 || ^19.0.0
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
 
   react-fast-compare@3.2.2:
     resolution: {integrity: sha512-nsO+KSNgo1SbJqJEYRE9ERzo7YtYbou/OqjSQKxV7jcKox7+usiUVZOAC+XnDOABXggQTno0Y1CpVnuWEc1boQ==}
@@ -14329,6 +14341,12 @@ snapshots:
     dependencies:
       react: 19.2.3
       scheduler: 0.27.0
+
+  react-error-boundary@6.1.4(@types/react@19.2.18)(react@19.2.3):
+    dependencies:
+      react: 19.2.3
+    optionalDependencies:
+      '@types/react': 19.2.18
 
   react-fast-compare@3.2.2: {}
 
