@@ -126,6 +126,33 @@ test('useUpdateInfo applies an available update once and then throttles', async 
   expect(Updates.checkForUpdateAsync).not.toHaveBeenCalled();
 });
 
+test('useUpdateInfo does not touch state after the hook unmounts', async () => {
+  jest.replaceProperty(globals, '__DEV__', false);
+  jest.replaceProperty(Updates, 'isEnabled', true);
+  // The throttle lives in module scope and the previous test armed it; moving
+  // the clock past the window is how the next real check gets through too.
+  jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 2 * 60 * 60 * 1000);
+  let release: (() => void) | undefined;
+  checkForUpdateAsync.mockImplementation(async () => {
+    await new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    return { isAvailable: false } as UpdateCheckResult;
+  });
+  // `info()` is read only to refresh state, so it stands in for the update the
+  // unmounted hook must not make.
+  const info = jest.spyOn(updates, 'info');
+
+  const { unmount } = await renderHook(() => useUpdateInfo());
+  const settled = info.mock.calls.length;
+  unmount();
+  release?.();
+  await new Promise((resolve) => setImmediate(resolve));
+
+  expect(Updates.checkForUpdateAsync).toHaveBeenCalled();
+  expect(info).toHaveBeenCalledTimes(settled);
+});
+
 test('applyIfAvailable resolves false when the update check rejects', async () => {
   const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
   try {

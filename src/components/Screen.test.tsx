@@ -31,3 +31,32 @@ test('extra view props reach the container in both variants', async () => {
   // The non-scrolling variant carries both style layers on the view itself.
   expect(StyleSheet.flatten(body.props.style)).toMatchObject({ flex: 1, flexGrow: 1 });
 });
+
+test('a caller style is merged over the defaults in both variants', async () => {
+  await renderWithProviders(
+    <>
+      <Screen testID="styled-plain" accessibilityLabel="plain body" style={{ padding: 42 }}>
+        <AppText>content</AppText>
+      </Screen>
+      <Screen
+        testID="styled-scroll"
+        scroll
+        accessibilityLabel="scrolling body"
+        style={{ backgroundColor: 'rebeccapurple' }}
+      >
+        <AppText>content</AppText>
+      </Screen>
+    </>,
+  );
+
+  // Merged, not replaced: the defaults survive next to the caller's override.
+  expect(StyleSheet.flatten(screen.getByLabelText('plain body').props.style)).toMatchObject({
+    flex: 1,
+    flexGrow: 1,
+    padding: 42,
+  });
+  expect(StyleSheet.flatten(screen.getByLabelText('scrolling body').props.style)).toMatchObject({
+    flex: 1,
+    backgroundColor: 'rebeccapurple',
+  });
+});

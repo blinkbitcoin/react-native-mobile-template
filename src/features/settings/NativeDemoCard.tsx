@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AppText } from '@/components/AppText';
 import { Card } from '@/components/Card';
-import { getBuildStamp, HelloNativeError, hello } from '../../../modules/hello-native';
+import { getBuildStamp, hello } from '../../../modules/hello-native';
 
 export function NativeDemoCard() {
   const [stamp, setStamp] = useState('…');
@@ -9,7 +9,10 @@ export function NativeDemoCard() {
   try {
     greeting = hello('Maestro');
   } catch (e) {
-    greeting = e instanceof HelloNativeError ? e.message : 'error';
+    // `HelloNativeError` carries the "build a dev client" hint and a native bug
+    // carries its own message; both are Errors, so the message is always the
+    // more useful thing to show than a generic 'error' placeholder.
+    greeting = e instanceof Error ? e.message : String(e);
   }
   useEffect(() => {
     getBuildStamp()

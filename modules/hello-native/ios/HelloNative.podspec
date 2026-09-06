@@ -8,7 +8,7 @@ Pod::Spec.new do |s|
   s.platforms      = {
     :ios => '16.4'
   }
-  s.source         = { git: 'https://github.com/blinkbitcoin/react-native-mobile-template' }
+  s.source         = { git: 'https://github.com/blinkbitcoin/react-native-mobile-template.git' }
   s.static_framework = true
 
   s.dependency 'ExpoModulesCore'

@@ -15,10 +15,10 @@ jest.mock('../../../modules/hello-native', () => ({
   },
 }));
 
-test('an unexpected native failure degrades to a placeholder', async () => {
+test('an unexpected native failure degrades to its message', async () => {
   await renderWithProviders(<NativeDemoCard />);
 
-  expect(screen.getByTestId('native-hello')).toHaveTextContent('error');
+  expect(screen.getByTestId('native-hello')).toHaveTextContent('unexpected native failure');
   await waitFor(() =>
     expect(screen.getByTestId('native-build-stamp')).toHaveTextContent('build-stamp:unavailable'),
   );

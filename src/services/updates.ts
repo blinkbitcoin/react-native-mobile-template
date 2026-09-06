@@ -52,10 +52,18 @@ export function useUpdateInfo() {
     if (__DEV__ || !Updates.isEnabled) return;
     if (Date.now() - lastCheck < ONE_HOUR) return;
     lastCheck = Date.now();
+    // The check outlives a screen the user navigates away from; setting state on
+    // the unmounted hook is a leak warning and, in a test, a stray act() update.
+    let mounted = true;
     void updates
       .applyIfAvailable()
       .catch((e: unknown) => logger.warn('update check failed', { e: String(e) }))
-      .finally(() => setInfo(updates.info()));
+      .finally(() => {
+        if (mounted) setInfo(updates.info());
+      });
+    return () => {
+      mounted = false;
+    };
   }, []);
   return info;
 }

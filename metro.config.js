@@ -3,6 +3,11 @@ const { getDefaultConfig } = require('expo/metro-config');
 
 const config = getDefaultConfig(__dirname);
 
+// init:web-start
+// expo-sqlite's web implementation (wa-sqlite) imports a .wasm file, which is
+// not a Metro asset extension by default.
+config.resolver.assetExts.push('wasm');
+
 // `expo export --platform web` renders the routes in a Node bundle first
 // (web.output: 'static'). Under the `node` + `import` conditions, `tslib`
 // resolves to `tslib/modules/index.js`, which default-imports the UMD
@@ -10,10 +15,6 @@ const config = getDefaultConfig(__dirname);
 // @apollo/client) crashes with "Cannot destructure property '__extends'".
 // Pinning the web resolution to tslib's ESM build exports the helpers directly.
 // Native bundles resolve tslib normally and are untouched.
-// expo-sqlite's web implementation (wa-sqlite) imports a .wasm file, which is
-// not a Metro asset extension by default.
-config.resolver.assetExts.push('wasm');
-
 const defaultResolveRequest = config.resolver.resolveRequest;
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   const resolve = defaultResolveRequest ?? context.resolveRequest;
@@ -22,5 +23,6 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   }
   return resolve(context, moduleName, platform);
 };
+// init:web-end
 
 module.exports = config;

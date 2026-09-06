@@ -109,7 +109,15 @@
       "linter": {
         "rules": {
           "style": {
-            "noRestrictedImports": "off"
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "expo-secure-store": "Use the typed wrapper in src/lib/secure-store.ts",
+                  "expo-sqlite/kv-store": "Use src/lib/storage.ts"
+                }
+              }
+            }
           }
         }
       }

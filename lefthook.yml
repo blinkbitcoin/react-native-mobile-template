@@ -30,11 +30,14 @@ pre-push:
       run: pnpm knip
     unit:
       run: pnpm test -- --changedSince=origin/main --passWithNoTests
+# Both hooks pass git's own arguments straight through: the script works out
+# which two revisions to compare (lefthook's `{1}` templating expanded inside
+# `HEAD@{1}`, which made git reject `HEAD@0` on every merge).
 post-merge:
   commands:
     install:
-      run: git diff --name-only HEAD@{1} HEAD | grep -q pnpm-lock.yaml && pnpm install --frozen-lockfile || true
+      run: bash scripts/hooks/install-if-lockfile-changed.sh post-merge {1}
 post-checkout:
   commands:
     install:
-      run: git diff --name-only {1} {2} | grep -q pnpm-lock.yaml && pnpm install --frozen-lockfile || true
+      run: bash scripts/hooks/install-if-lockfile-changed.sh post-checkout {1} {2} {3}
