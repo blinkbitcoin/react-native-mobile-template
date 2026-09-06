@@ -175,3 +175,28 @@ Tests: `scripts/release/resolve-version.test.mjs` (node:test) builds fixture git
 - Spec Part B coverage: layout (T1), env contract + helpers (T1), lanes (T4), versioning + build number + injection (T2), release-please + notes (T2/T3/T7), workflows split (T6/T7), channel model + OTA toggle + server (T2/T6/T7), verification gates (T5), secrets/vars table + runbook (T7), rollback matrix (T7). Screenshot automation out of scope (dirs only).
 - Interfaces: `RNW_OUTPUT_DIR`, `BUILD_INFO_FILE`, `RELEASE_NOTES_STORE_FILE` names consistent across lanes, scripts and workflows; `store-notes.json` schema shared by T3 and T4's `release_production`; `build-info.json` schema shared by T2, T5, T6.
 - Implementer judgement points: fastlane 2.238 option names (verify against `fastlane action <name>`), Spaceship phased-release API, bundletool availability on macOS runners (install via `brew install bundletool` or download the jar), `eoas` CLI flags (confirm at setup; fallback documented).
+
+## Rulings recorded during execution (2026-09-06/07)
+
+- Both repos merged fast-forward to `main` (template 3578deb, workflows fbc91b3), tag `phase-3-complete` in both; workflows repo re-tagged `v0.1.0`/`v0`/`v0.1` (local only, no remotes).
+- Root `release-please-config.json` + `.release-please-manifest.json` (manifest mode only); the release-please PR must be squash- or rebase-merged, and both `resolve-version.sh` copies also read the release subject from `HEAD^2` on a merge commit. Resolution order: HEAD tag → release-please release commit subject → `RELEASE_PR_TITLE` → open release PR → last stable tag patch+1 (prereleases ignored; no tags → 0.0.1).
+- The workflows repo owns `require-green-run.sh` (expo-prepare input `require-green-workflow`); the two `resolve-version.sh` copies are contract-identical, not byte-identical (the workflows copy sources `lib/common.sh`).
+- `DRY_RUN=1` lives in `shared.rb` from Task 1: `store_action` logs redacted args and returns canned per-action data; `api_key`/`phased` short-circuit under dry-run.
+- fastlane runs lanes with cwd `fastlane/`: lanes resolve paths via `repo_root`; workflows absolutise every path variable; binaries are read from `RNW_ASSETS_DIR` > `RNW_OUTPUT_DIR` and fastlane-lane.yml exports `RNW_OUTPUT_DIR=$RNW_ASSETS_DIR`.
+- `fingerprint.config.js` uses string skip names (a config `sourceSkips` REPLACES the defaults); the fingerprint CLI is `npx --no fingerprint fingerprint:generate`.
+- Non-secret build env reaches CI builds only through the `build-env` JSON input (credential-looking and `RNW_*`/`PATH`-class keys refused; `APP_VARIANT=production` set there); App Review details are the seven `APP_REVIEW_*` secrets on `fastlane-lane.yml` (the spec's `APP_REVIEW_CONTACT_*` naming is superseded).
+- OTA verify gates assert what prebuild writes: iOS `EXUpdatesRuntimeVersion = file:fingerprint` resolved against `EXUpdates.bundle/fingerprint`; Android `@string/expo_runtime_version` with the XML-escaped channel header JSON; committed real-prebuild fixtures with an integrity test. The Hermes dev-server check scans only dev-only literals (the `localhost:8081/assets/...` match is a string-table adjacency artifact).
+- Store workflows share `concurrency: release` (constant group, cancel false); beta and production pass `release-tag` and use expo-prepare's `sha` output; beta promotes the `-build.N` pre-release assets with `from-tag`/`delete-source` and appends `## Store notes`; production appends a stage line.
+- `check-release` runs in CI via checks.yml `release-checks: true`; bundletool is installed from a pinned `BUNDLETOOL_VERSION`.
+- bats assertions must be `|| fail` (bash 3.2 ignores `set -e` for `[[ ]]`, and `! cmd` is exempt everywhere); `test/assertions-enforced.bats` guards it.
+- Acceptance: 9-lane `DRY_RUN=1` matrix clean, cross-repo contract check passes; live store uploads were NOT exercised (no credentials in the environment).
+
+### Deferred minors (carry to Phase 4 polish)
+
+- `loggable_args` does not descend arrays and its pattern is case-sensitive; `STORE_NOTES_SUFFIX` not frozen.
+- `ios.rb` should prefer `ios/<IOS_SCHEME>/Info.plist` over the first glob match.
+- Spec still names `APP_REVIEW_CONTACT_*` (line ~134) — correct in the docs pass.
+- Runbook `verify-ios.sh` synopsis omits `[--strict]`; a build-time `--dev false` assertion belongs in the workflow.
+- Android `ota-runtime-version` resolution is a `skip` until a real OTA-on AAB proves the `assets/fingerprint` path (watch the first OTA-on Android build).
+- workflows `test/resolve-version.bats` cross-copy case should read the template path from `RNW_TEMPLATE_DIR` and say when parity was not verified.
+- `aab-matches-apk` compares manifest fields only; `bundletool --ks-pass=file:` and the eoas flags/`EXPO_TOKEN` mapping remain unverified until a real run; `BUNDLETOOL_VERSION` digest unverified offline.
