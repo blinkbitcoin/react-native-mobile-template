@@ -48,6 +48,15 @@ generated `CHANGELOG.md` section. **Merging it is the only human action that
 cuts a release**: it bumps `package.json`, tags `vX.Y.Z` and publishes the
 GitHub release.
 
+**Squash-merge it** (rebase also works). The release commit's subject is one of
+the sources `resolve-version.sh` reads to stamp the build that ships with this
+release — see [Versions and build numbers](#versions-and-build-numbers) — and a
+squash or rebase merge carries the PR title, `chore(main): release X.Y.Z`, onto
+main. A "Create a merge commit" merge writes `Merge pull request #N from …`
+instead; the script recovers by reading the merge's second parent, but squash is
+the setting that keeps this simple. Settings → General → Pull Requests: allow
+squash merging and make it the default.
+
 Optionally edit the release's `## Store notes` section first — see
 [Store notes](#store-notes). The section is read at promotion time, not at
 release time, so editing it before step 3 finishes is safe.
@@ -109,6 +118,11 @@ and takes Play to 100%. `action: halt` stops both. See
   release PR's title → the newest stable tag with its patch bumped → `0.0.1`.
   Prerelease tags are ignored at every step. Internal builds therefore already
   carry the version that will be released.
+  - The subject source is read from HEAD, and from HEAD's *second parent* when
+    HEAD is a merge commit — so a release PR merged with GitHub's "Create a
+    merge commit" button (whose own subject is `Merge pull request #N from …`)
+    still resolves. Squash or rebase merging keeps it on HEAD directly; see
+    step 2.
   - The subject source is what makes that true on the one commit where it
     matters. `release-please` and `release-internal` are triggered by the same
     push to main and run concurrently, so on the release commit the `vX.Y.Z` tag

@@ -3,6 +3,14 @@ name: release-please
 # is the only human action that cuts a release: it bumps package.json, writes
 # the CHANGELOG section, tags `vX.Y.Z` and publishes the GitHub release, which
 # is what `release-beta.yml` listens for.
+#
+# Merge that PR with **squash** (or rebase). `scripts/release/resolve-version.sh`
+# reads the release commit's `chore(main): release X.Y.Z` subject to stamp the
+# build that ships with the release — release-internal runs on the same push and
+# the tag does not exist yet, so the subject is the only source that is right on
+# that commit. Squash and rebase both put the PR title on main; a merge commit
+# writes `Merge pull request #N from …` and the script has to fall back to the
+# merge's second parent to find it.
 on:
   push:
     branches: [main]
