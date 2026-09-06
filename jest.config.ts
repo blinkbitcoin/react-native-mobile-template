@@ -1,13 +1,4 @@
 import type { Config } from 'jest';
-// jest-expo's own preset only registers babel-jest for `.[jt]sx?` files (see
-// jest-preset.js). Lingui 6 ships ESM-only `.mjs` files (no CJS build), so
-// `@lingui/react`/`@lingui/core` need the same babel-jest transform applied
-// to `.mjs` too, or Jest tries to `require()` their raw ESM and throws. We
-// can't deep-merge `transform` (Jest replaces the preset's key wholesale if
-// we set our own), so we spread the preset's transform map and add one entry.
-// jest-expo ships no type declarations for this subpath.
-// @ts-expect-error -- no declaration file for 'jest-expo/jest-preset.js'
-import jestExpoPreset from 'jest-expo/jest-preset.js';
 
 const config: Config = {
   preset: 'jest-expo',
@@ -18,9 +9,12 @@ const config: Config = {
     '^expo-sqlite/kv-store$': '<rootDir>/src/test/mocks/expo-sqlite-kv-store.ts',
     '^expo-updates$': '<rootDir>/src/test/mocks/expo-updates.ts',
   },
+  // Lingui 6 ships `.mjs`, which jest-expo's transform does not cover; Jest
+  // merges this with the preset's own `transform` map (see
+  // mergeOptionWithPreset in jest-config), so jest-expo's `.[jt]sx?` entry
+  // stays intact.
   transform: {
-    ...jestExpoPreset.transform,
-    '\\.mjs$': jestExpoPreset.transform['\\.[jt]sx?$'],
+    '\\.mjs$': 'babel-jest',
   },
   // The (?!\.pnpm/) guard skips pnpm's nested `.pnpm/<pkg>/node_modules/` hop so the
   // exclusion list below matches against the real inner package name, not the pnpm store dir.
