@@ -493,6 +493,61 @@ vc_ota_verdict() { # <expected true|false|''> <actual true|false|absent>
   fi
 }
 
+# The two settings that decide whether a published update is ever offered to a
+# binary. Both are invisible failures: an update "publishes fine" and reaches
+# nobody, and nothing surfaces it until someone notices.
+#
+# The runtime version is what the client sends as `expo-runtime-version`. Under
+# `runtimeVersion: { policy: 'fingerprint' }` (app.config.ts) `expo prebuild`
+# resolves it to the fingerprint hash and writes it into Expo.plist /
+# AndroidManifest.xml, which is the same hash build-info.json records -- so when
+# build-info.json is at hand the two must agree.
+vc_runtime_version_verdict() { # <actual> <expected, may be empty>
+  if [ -z "$1" ]; then
+    printf 'FAIL updates are enabled but the artifact carries no runtime version (it would never be offered an update)\n'
+  elif [ -z "$2" ]; then
+    printf 'ok runtime version %s (no build-info fingerprint to compare against)\n' "$1"
+  elif [ "$1" = "$2" ]; then
+    printf 'ok runtime version %s matches the build fingerprint\n' "$1"
+  else
+    printf 'FAIL runtime version %s does not match the build fingerprint %s\n' "$1" "$2"
+  fi
+}
+
+# The channel the binary asks for, sent as the `expo-channel-name` request
+# header. A store build must ask for `production`: the internal and beta
+# channels are published to from the same pipeline, and a binary pointed at one
+# of those would take an update that was never meant for the public.
+vc_channel_verdict() { # <actual> <expected>
+  if [ -z "$1" ]; then
+    printf 'FAIL updates are enabled but no expo-channel-name request header is set\n'
+  elif [ "$1" = "$2" ]; then
+    printf 'ok update channel %s\n' "$1"
+  else
+    printf 'FAIL update channel %s, expected %s\n' "$1" "$2"
+  fi
+}
+
+# The fingerprint build-info.json records for a platform. Empty when there is no
+# build-info.json (a local build), no node to read it with, or no fingerprint in
+# it: that means "nothing to compare against", never "mismatch".
+vc_build_info_fingerprint() { # <build-info.json path> <ios|android>
+  [ -f "$1" ] || return 0
+  command -v node >/dev/null 2>&1 || return 0
+  VC_BUILD_INFO_PATH="$1" VC_BUILD_INFO_PLATFORM="$2" node -e '
+const info = require("node:fs").readFileSync(process.env.VC_BUILD_INFO_PATH, "utf8");
+process.stdout.write(String(JSON.parse(info)?.fingerprint?.[process.env.VC_BUILD_INFO_PLATFORM] ?? ""));
+' 2>/dev/null || true
+}
+
+# One string field out of a flat JSON object. The Android manifest carries the
+# whole request-header map as a single meta-data value, e.g.
+# `{"expo-channel-name":"production"}`, and no JSON tool is guaranteed on a
+# runner that can read an AAB.
+vc_json_string_field() { # <json text> <field>
+  printf '%s' "$1" | sed -n "s/.*\"$2\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -1
+}
+
 vc_bool() { # <value> -> true | false | '' (empty in, empty out)
   case "$1" in
     '') printf '' ;;

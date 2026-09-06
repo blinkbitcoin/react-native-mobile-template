@@ -16,7 +16,8 @@
 # not pass.
 #
 # Env read: APP_VERSION, APP_BUILD_NUMBER, ANDROID_PACKAGE, OTA_ENABLED,
-#           BUILD_INFO_FILE (default build-info.json), ANDROID_HOME,
+#           BUILD_INFO_FILE (default: the build-info.json next to the APK,
+#           else the one at the repo root), ANDROID_HOME,
 #           BUNDLETOOL_JAR, EXPO_PUBLIC_*.
 set -euo pipefail
 
@@ -73,6 +74,16 @@ for f in "$aab" "$apk"; do
     exit 2
   }
 done
+
+# build-info.json is the release's provenance record; the `android build` lane
+# merges `artifacts.aabSha256` / `artifacts.apkSha256` into a copy of it next to
+# the artifacts it just produced. That copy is therefore the default here, and
+# $BUILD_INFO_FILE (which CI sets to the release-meta copy) overrides it.
+build_info="${BUILD_INFO_FILE:-}"
+if [ -z "$build_info" ]; then
+  build_info="$(dirname "$apk")/build-info.json"
+  [ -f "$build_info" ] || build_info="$repo_root/build-info.json"
+fi
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
@@ -178,6 +189,21 @@ else
     vc_verdict ota "$(vc_ota_verdict "$ota_expected" "$ota_actual")"
 
     if [ "$ota_actual" = 'true' ]; then
+      # The value of a meta-data element, read from the two lines that follow
+      # its name (the manifest dump wraps name and value onto separate lines).
+      updates_meta() { # <meta-data name>
+        printf '%s\n' "$aab_manifest" | grep -A2 "$1" |
+          sed -n 's/.*android:value="\([^"]*\)".*/\1/p' | head -1
+      }
+      # A runtime version that does not match the fingerprint this build was
+      # made from means the binary silently receives no updates for its life.
+      vc_verdict ota-runtime-version \
+        "$(vc_runtime_version_verdict "$(updates_meta 'expo.modules.updates.EXPO_RUNTIME_VERSION')" "$(vc_build_info_fingerprint "$build_info" android)")"
+      # The request headers arrive as one JSON string in a single meta-data value.
+      vc_verdict ota-channel \
+        "$(vc_channel_verdict \
+          "$(vc_json_string_field "$(updates_meta 'expo.modules.updates.UPDATES_CONFIGURATION_REQUEST_HEADERS_KEY')" 'expo-channel-name')" \
+          "${OTA_CHANNEL:-production}")"
       if vc_contains "$aab_manifest" 'expo.modules.updates.CODE_SIGNING_CERTIFICATE'; then
         cert="$repo_root/certs/expo-updates-cert.pem"
         if [ -f "$cert" ] && command -v shasum >/dev/null 2>&1; then
@@ -249,10 +275,8 @@ else
 fi
 
 # --- provenance -------------------------------------------------------------
-# build-info.json is the release's provenance record; the workflow fills in
-# `artifacts.apkSha256` as each artifact lands. Absent, there is nothing to
+# Resolved next to the argument parsing above. Absent, there is nothing to
 # compare against and the check is skipped rather than invented.
-build_info="${BUILD_INFO_FILE:-$repo_root/build-info.json}"
 if [ ! -f "$build_info" ]; then
   vc_skip apk-sha "no build-info.json at $build_info"
 elif ! vc_require_cmd apk-sha node shasum; then

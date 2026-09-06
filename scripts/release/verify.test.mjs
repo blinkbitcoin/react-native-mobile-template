@@ -410,6 +410,62 @@ test('OTA_ENABLED is read the way app.config.ts reads it', () => {
   assert.equal(sh('vc_bool ""'), '');
 });
 
+test('a binary with no runtime version fails: it would never be offered an update', () => {
+  assert.match(
+    sh('vc_runtime_version_verdict "" ""'),
+    /^FAIL updates are enabled but the artifact carries no runtime version/,
+  );
+});
+
+test('the runtime version is compared against the build fingerprint when there is one', () => {
+  assert.equal(
+    sh('vc_runtime_version_verdict abc123 abc123'),
+    'ok runtime version abc123 matches the build fingerprint',
+  );
+  assert.equal(
+    sh('vc_runtime_version_verdict abc123 def456'),
+    'FAIL runtime version abc123 does not match the build fingerprint def456',
+  );
+  // No build-info.json to compare against is not a mismatch.
+  assert.match(
+    sh('vc_runtime_version_verdict abc123 ""'),
+    /^ok runtime version abc123 \(no build-info/,
+  );
+});
+
+test('a store build must ask for the production channel', () => {
+  assert.equal(sh('vc_channel_verdict production production'), 'ok update channel production');
+  assert.equal(
+    sh('vc_channel_verdict internal production'),
+    'FAIL update channel internal, expected production',
+  );
+  assert.match(
+    sh('vc_channel_verdict "" production'),
+    /^FAIL updates are enabled but no expo-channel-name request header/,
+  );
+});
+
+test('the channel is read out of the manifest request-header JSON', () => {
+  const json = '{"expo-channel-name":"production","other":"x"}';
+  assert.equal(sh(`vc_json_string_field '${json}' expo-channel-name`), 'production');
+  assert.equal(sh(`vc_json_string_field '${json}' missing`), '');
+  assert.equal(
+    sh(`vc_json_string_field '{"expo-channel-name": "beta"}' expo-channel-name`),
+    'beta',
+  );
+});
+
+test('a fingerprint is read out of build-info.json, and absence is not a mismatch', () =>
+  withTempDir((dir) => {
+    const file = path.join(dir, 'build-info.json');
+    writeFileSync(file, JSON.stringify({ fingerprint: { ios: 'aaa', android: 'bbb' } }));
+    assert.equal(sh(`vc_build_info_fingerprint "${file}" ios`), 'aaa');
+    assert.equal(sh(`vc_build_info_fingerprint "${file}" android`), 'bbb');
+    assert.equal(sh(`vc_build_info_fingerprint "${dir}/absent.json" ios`), '');
+    writeFileSync(file, 'not json');
+    assert.equal(sh(`vc_build_info_fingerprint "${file}" ios`), '');
+  }));
+
 test('the template placeholder certificate warns but does not fail', () => {
   assert.match(
     sh('vc_cert_placeholder_verdict "$VC_PLACEHOLDER_CERT_SHA256"'),
@@ -617,9 +673,36 @@ function machOArm64() {
  * arm64 binary, a Hermes bundle. Tests that want a specific defect override
  * exactly that one thing, so a FAIL in their output can only be the defect.
  */
+/**
+ * The Expo.plist `expo prebuild` writes with OTA on. `runtime` is what the
+ * fingerprint policy resolves to at prebuild time; omitting a key drops it,
+ * which is exactly the defect the OTA checks exist to catch.
+ */
+function expoPlist({
+  enabled = true,
+  url = 'https://updates.example.com/manifest',
+  runtime = 'fp-abc',
+  channel = 'production',
+} = {}) {
+  const entries = [`<key>EXUpdatesEnabled</key><${enabled}/>`];
+  if (url) entries.push(`<key>EXUpdatesURL</key><string>${url}</string>`);
+  if (runtime) entries.push(`<key>EXUpdatesRuntimeVersion</key><string>${runtime}</string>`);
+  if (channel) {
+    entries.push(
+      `<key>EXUpdatesRequestHeaders</key><dict><key>expo-channel-name</key><string>${channel}</string></dict>`,
+    );
+  }
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+${entries.join('\n')}
+</dict></plist>
+`;
+}
+
 function fakeApp(
   dir,
-  { version = '1.2.3', build = '42', bundle = HERMES_MAGIC, arch = machOArm64() } = {},
+  { version = '1.2.3', build = '42', bundle = HERMES_MAGIC, arch = machOArm64(), expo = null } = {},
 ) {
   const app = path.join(dir, 'Fake.app');
   mkdirSync(app, { recursive: true });
@@ -637,6 +720,7 @@ function fakeApp(
   );
   writeFileSync(path.join(app, 'Fake'), arch);
   writeFileSync(path.join(app, 'main.jsbundle'), bundle);
+  if (expo) writeFileSync(path.join(app, 'Expo.plist'), expo);
   return app;
 }
 
@@ -720,6 +804,83 @@ test('verify-ios.sh skips every signing check under --no-signing', macOnly, () =
   }),
 );
 
+// I5: a runtime version or channel that is wrong is invisible -- the update
+// publishes fine and reaches nobody -- so these two are the OTA checks that
+// have to be end-to-end against a real Expo.plist.
+test('verify-ios.sh accepts an Expo.plist that would actually receive updates', macOnly, () =>
+  withTempDir((dir) => {
+    const app = fakeApp(dir, { expo: expoPlist() });
+    writeFileSync(
+      path.join(dir, 'build-info.json'),
+      JSON.stringify({ fingerprint: { ios: 'fp-abc', android: 'fp-xyz' } }),
+    );
+    const { stdout } = run(verifyIos, [app, '--no-signing'], {
+      APP_VERSION: '1.2.3',
+      APP_BUILD_NUMBER: '42',
+      OTA_ENABLED: 'true',
+      BUILD_INFO_FILE: path.join(dir, 'build-info.json'),
+    });
+    assert.match(
+      stdout,
+      /ok ota-runtime-version: runtime version fp-abc matches the build fingerprint/,
+    );
+    assert.match(stdout, /ok ota-channel: update channel production/);
+    assert.doesNotMatch(stdout, /^FAIL ota-/m, stdout);
+  }),
+);
+
+test('verify-ios.sh fails a build with no runtime version and the wrong channel', macOnly, () =>
+  withTempDir((dir) => {
+    const app = fakeApp(dir, { expo: expoPlist({ runtime: '', channel: 'internal' }) });
+    const { status, stdout } = run(verifyIos, [app, '--no-signing'], {
+      APP_VERSION: '1.2.3',
+      APP_BUILD_NUMBER: '42',
+      OTA_ENABLED: 'true',
+      BUILD_INFO_FILE: path.join(dir, 'absent.json'),
+    });
+    assert.equal(status, 1);
+    assert.match(
+      stdout,
+      /FAIL ota-runtime-version: updates are enabled but the artifact carries no runtime version/,
+    );
+    assert.match(stdout, /FAIL ota-channel: update channel internal, expected production/);
+  }),
+);
+
+test('verify-ios.sh fails a runtime version that is not the build fingerprint', macOnly, () =>
+  withTempDir((dir) => {
+    const app = fakeApp(dir, { expo: expoPlist({ runtime: 'stale-fp' }) });
+    writeFileSync(
+      path.join(dir, 'build-info.json'),
+      JSON.stringify({ fingerprint: { ios: 'fp-abc' } }),
+    );
+    const { status, stdout } = run(verifyIos, [app, '--no-signing'], {
+      APP_VERSION: '1.2.3',
+      APP_BUILD_NUMBER: '42',
+      OTA_ENABLED: 'true',
+      BUILD_INFO_FILE: path.join(dir, 'build-info.json'),
+    });
+    assert.equal(status, 1);
+    assert.match(stdout, /FAIL ota-runtime-version: runtime version stale-fp does not match/);
+  }),
+);
+
+test('verify-ios.sh leaves the OTA checks alone when updates are off', macOnly, () =>
+  withTempDir((dir) => {
+    const app = fakeApp(dir, {
+      expo: expoPlist({ enabled: false, url: '', runtime: '', channel: '' }),
+    });
+    const { status, stdout } = run(verifyIos, [app, '--no-signing'], {
+      APP_VERSION: '1.2.3',
+      APP_BUILD_NUMBER: '42',
+      OTA_ENABLED: 'false',
+    });
+    assert.equal(status, 0, stdout);
+    assert.doesNotMatch(stdout, /ota-runtime-version/);
+    assert.doesNotMatch(stdout, /ota-channel/);
+  }),
+);
+
 test('verify-ios.sh refuses an artifact that holds no .app', () =>
   withTempDir((dir) => {
     const empty = path.join(dir, 'Empty.xcarchive');
@@ -776,10 +937,14 @@ const ANDROID_TOOL_CHECKS = [
   'signing-cert',
 ];
 
-/** A PATH and SDK with no aapt2, apksigner or bundletool on them. */
+/**
+ * A PATH and SDK with no aapt2, apksigner or bundletool on them. node stays on
+ * it: the provenance check reads build-info.json with it, and dropping node
+ * would turn every apk-sha assertion into "requires node".
+ */
 function withoutAndroidTools(dir) {
   return {
-    PATH: '/usr/bin:/bin',
+    PATH: `${path.dirname(process.execPath)}:/usr/bin:/bin`,
     ANDROID_HOME: path.join(dir, 'no-sdk'),
     ANDROID_SDK_ROOT: '',
     BUNDLETOOL_JAR: '',
@@ -793,6 +958,65 @@ function fakeAndroidArtifacts(dir) {
   writeFileSync(apk, 'not really an apk');
   return [aab, apk];
 }
+
+// I2: the "APK derived from the exact AAB" gate. Nothing wrote
+// `artifacts.apkSha256` before, so this check was a permanent skip that read as
+// coverage the release did not have; the `android build` lane records it now.
+test('verify-android.sh compares the APK against the checksum the build recorded', () =>
+  withTempDir((dir) => {
+    const [aab, apk] = fakeAndroidArtifacts(dir);
+    const sha = createHash('sha256').update(readFileSync(apk)).digest('hex');
+    // Next to the APK, which is where the build lane writes its merged copy and
+    // therefore this gate's default when BUILD_INFO_FILE is not set.
+    writeFileSync(
+      path.join(dir, 'build-info.json'),
+      JSON.stringify({ artifacts: { apkSha256: sha } }),
+    );
+    const { stdout } = run(verifyAndroid, [aab, apk], withoutAndroidTools(dir));
+    assert.match(stdout, new RegExp(`^ok apk-sha: APK SHA-256 ${sha}`, 'm'), stdout);
+  }));
+
+test('verify-android.sh fails an APK that is not the one the build produced', () =>
+  withTempDir((dir) => {
+    const [aab, apk] = fakeAndroidArtifacts(dir);
+    writeFileSync(
+      path.join(dir, 'build-info.json'),
+      JSON.stringify({ artifacts: { apkSha256: 'deadbeef' } }),
+    );
+    const { status, stdout } = run(verifyAndroid, [aab, apk], withoutAndroidTools(dir));
+    assert.equal(status, 1);
+    assert.match(stdout, /^FAIL apk-sha: APK SHA-256 /m, stdout);
+  }));
+
+test('verify-android.sh skips apk-sha when no checksum was recorded', () =>
+  withTempDir((dir) => {
+    const [aab, apk] = fakeAndroidArtifacts(dir);
+    writeFileSync(path.join(dir, 'build-info.json'), JSON.stringify({ artifacts: {} }));
+    const { stdout } = run(verifyAndroid, [aab, apk], withoutAndroidTools(dir));
+    assert.match(
+      stdout,
+      /^skip apk-sha: build-info\.json carries no artifacts\.apkSha256/m,
+      stdout,
+    );
+  }));
+
+test('BUILD_INFO_FILE overrides the copy next to the APK', () =>
+  withTempDir((dir) => {
+    const [aab, apk] = fakeAndroidArtifacts(dir);
+    writeFileSync(
+      path.join(dir, 'build-info.json'),
+      JSON.stringify({
+        artifacts: { apkSha256: createHash('sha256').update(readFileSync(apk)).digest('hex') },
+      }),
+    );
+    const other = path.join(dir, 'elsewhere.json');
+    writeFileSync(other, JSON.stringify({ artifacts: { apkSha256: 'deadbeef' } }));
+    const { status } = run(verifyAndroid, [aab, apk], {
+      ...withoutAndroidTools(dir),
+      BUILD_INFO_FILE: other,
+    });
+    assert.equal(status, 1);
+  }));
 
 test('verify-android.sh keeps every check row when its tool is missing', () =>
   withTempDir((dir) => {

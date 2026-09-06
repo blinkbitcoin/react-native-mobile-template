@@ -15,7 +15,9 @@
 # not pass.
 #
 # Env read: APP_VERSION, APP_BUILD_NUMBER, IOS_BUNDLE_ID, OTA_ENABLED,
-#           EXPO_PUBLIC_* (values must be inlined in the bundle).
+#           OTA_CHANNEL (default production), BUILD_INFO_FILE (default
+#           build-info.json at the repo root), EXPO_PUBLIC_* (values must be
+#           inlined in the bundle).
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -176,6 +178,8 @@ elif vc_require_cmd signing codesign; then
 fi
 
 # --- OTA (expo-updates) -----------------------------------------------------
+build_info="${BUILD_INFO_FILE:-$repo_root/build-info.json}"
+
 expo_plist="$app/Expo.plist"
 ota_expected="$(vc_bool "${OTA_ENABLED:-}")"
 if [ ! -f "$expo_plist" ]; then
@@ -192,6 +196,13 @@ elif vc_require_cmd ota plutil; then
     else
       vc_fail ota-url 'updates are enabled but Expo.plist carries no EXUpdatesURL'
     fi
+    # A runtime version that does not match the fingerprint this build was made
+    # from means the binary silently receives no updates for its whole life.
+    vc_verdict ota-runtime-version \
+      "$(vc_runtime_version_verdict "$(plist_value EXUpdatesRuntimeVersion "$expo_plist")" "$(vc_build_info_fingerprint "$build_info" ios)")"
+    # `EXUpdatesRequestHeaders` is a dict; plutil reads into it by key path.
+    vc_verdict ota-channel \
+      "$(vc_channel_verdict "$(plist_value 'EXUpdatesRequestHeaders.expo-channel-name' "$expo_plist")" "${OTA_CHANNEL:-production}")"
     cert="$repo_root/certs/expo-updates-cert.pem"
     if [ -f "$cert" ] && command -v shasum >/dev/null 2>&1; then
       vc_verdict ota-cert "$(vc_cert_placeholder_verdict "$(shasum -a 256 "$cert" | cut -d' ' -f1)")"
