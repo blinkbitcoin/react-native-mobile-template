@@ -102,6 +102,52 @@ test('the release subject wins over an open release-please PR title', () => {
   );
 });
 
+test('a merge commit of the release PR resolves through its second parent', () => {
+  // GitHub's "Create a merge commit" button writes "Merge pull request #N …"
+  // as the subject, so the release commit is the merge's *second* parent. This
+  // is the case that silently fell back to the patch bump.
+  const root = mkdtempSync(path.join(tmpdir(), 'resolve-version-'));
+  roots.push(root);
+  const git = (...args) => execFileSync('git', args, { cwd: root, stdio: 'pipe' });
+  git('init', '--quiet', '--initial-branch=main');
+  git('config', 'user.email', 'test@example.com');
+  git('config', 'user.name', 'Test');
+  git('config', 'commit.gpgsign', 'false');
+  git('commit', '--quiet', '--allow-empty', '-m', 'commit 1');
+  git('tag', 'v1.4.2');
+  git('checkout', '--quiet', '-b', 'release-please--branches--main');
+  git('commit', '--quiet', '--allow-empty', '-m', 'chore(main): release 1.5.0');
+  git('checkout', '--quiet', 'main');
+  git(
+    'merge',
+    '--quiet',
+    '--no-ff',
+    '-m',
+    'Merge pull request #9 from release-please--branches--main',
+    'release-please--branches--main',
+  );
+
+  assert.equal(resolve(root).APP_VERSION, '1.5.0');
+});
+
+test('an ordinary merge commit is not read as a release', () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'resolve-version-'));
+  roots.push(root);
+  const git = (...args) => execFileSync('git', args, { cwd: root, stdio: 'pipe' });
+  git('init', '--quiet', '--initial-branch=main');
+  git('config', 'user.email', 'test@example.com');
+  git('config', 'user.name', 'Test');
+  git('config', 'commit.gpgsign', 'false');
+  git('commit', '--quiet', '--allow-empty', '-m', 'commit 1');
+  git('tag', 'v1.4.2');
+  git('checkout', '--quiet', '-b', 'feature');
+  git('commit', '--quiet', '--allow-empty', '-m', 'feat: something');
+  git('checkout', '--quiet', 'main');
+  git('merge', '--quiet', '--no-ff', '-m', 'Merge pull request #9 from feature', 'feature');
+
+  assert.equal(resolve(root).APP_VERSION, '1.4.3');
+});
+
 test('an ordinary commit subject does not look like a release', () => {
   for (const subject of [
     'feat: release 9.9.9 notes',
