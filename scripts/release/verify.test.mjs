@@ -514,12 +514,35 @@ test('the template placeholder certificate warns but does not fail', () => {
   assert.match(sh('vc_cert_placeholder_verdict deadbeef'), /^ok code-signing certificate is not/);
 });
 
+const placeholderCert = path.join(here, '..', '..', 'certs', 'expo-updates-cert.pem');
+
 test('the shipped certificate is the one the placeholder check knows about', () => {
   // If someone regenerates certs/expo-updates-cert.pem this test is the thing
   // that says the constant has to move with it.
-  const pem = readFileSync(path.join(here, '..', '..', 'certs', 'expo-updates-cert.pem'));
+  const pem = readFileSync(placeholderCert);
+  // The gates hash the file as checked out, so its line endings are part of the
+  // constant. .gitattributes pins the repo to LF; a CRLF copy hashes to
+  // something else, which is exactly how the constant drifted from the file
+  // once already (it held the CRLF hash and the warning never fired).
+  assert.ok(
+    !pem.includes(0x0d),
+    'certs/expo-updates-cert.pem must stay LF-only (see .gitattributes: * text=auto eol=lf)',
+  );
   const shipped = createHash('sha256').update(pem).digest('hex');
-  assert.equal(sh('printf %s "$VC_PLACEHOLDER_CERT_SHA256"'), shipped);
+  assert.equal(
+    sh('printf %s "$VC_PLACEHOLDER_CERT_SHA256"'),
+    shipped,
+    `certs/expo-updates-cert.pem hashes to ${shipped}: set VC_PLACEHOLDER_CERT_SHA256 in scripts/release/lib/verify-common.sh to that value (rotating the placeholder means moving the constant with it)`,
+  );
+});
+
+test('the gate actually warns for the certificate this repo ships', () => {
+  // End to end through the same command the gates run, so the constant, the
+  // committed file and `shasum` cannot agree in pairs and still drift.
+  assert.match(
+    sh(`vc_cert_placeholder_verdict "$(shasum -a 256 "${placeholderCert}" | cut -d' ' -f1)"`),
+    /^warn certs\/expo-updates-cert\.pem is still the template placeholder/,
+  );
 });
 
 test('signing certificate fingerprints compare without colons or case', () => {

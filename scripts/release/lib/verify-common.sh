@@ -603,7 +603,14 @@ vc_bool() { # <value> -> true | false | '' (empty in, empty out)
 # the committed certificate can never verify a real manifest. Shipping OTA with
 # it still in place is a warning, not a failure -- the wiring is correct, the
 # trust chain is not.
-VC_PLACEHOLDER_CERT_SHA256='08af4ad6ac07063185116ea03b10b266a796c0ae441c9e0a34d121d434d982f6'
+#
+# It is `shasum -a 256 certs/expo-updates-cert.pem` of the file as checked out --
+# what the gates hash -- and .gitattributes (`* text=auto eol=lf`) is what makes
+# that the same everywhere: the same certificate with CRLF endings hashes to
+# something else entirely, which is how this constant first drifted from the
+# file. Rotating the placeholder means updating this line; verify.test.mjs
+# recomputes it from the committed certificate and fails until it matches.
+VC_PLACEHOLDER_CERT_SHA256='6480b2a40db40672e247e45812efa56116f6b3c0a19d024b09080c55c1fac334'
 
 vc_cert_placeholder_verdict() { # <sha256 of the pem>
   if [ "$1" = "$VC_PLACEHOLDER_CERT_SHA256" ]; then
