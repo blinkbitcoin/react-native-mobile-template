@@ -1,29 +1,33 @@
 appId: ${APP_ID}
 tags: [smoke]
 ---
+# `stopApp: false` (and no `clearState`) on purpose: the runner has already
+# foregrounded the app through the `expo-development-client` deep link
+# (`scripts/e2e/maestro-{ios,android}.sh` locally, `$RNW/scripts/e2e/app-launch.sh`
+# in CI), which is the only reliable way to reach the bundle on a simulator or
+# emulator. Restarting or clearing state here would drop the dev client back on
+# its launcher screen, whose "DEVELOPMENT SERVERS" list is populated by Bonjour
+# discovery — which does not work on a simulator or in CI, so the flow would
+# hang there forever.
 - launchApp:
-    clearState: true
-# `clearState` also wipes expo-dev-client's state, so a local dev build lands on
-# the launcher instead of the app and then greets the first launch with the
-# developer-menu onboarding sheet. Both are dev-client-only: the block is
-# skipped for release builds, which boot straight into the bundle.
+    stopApp: false
+# Belt and braces, all optional and all no-ops on the happy path: React
+# Native's LogBox overlay (dev builds only) and, if the dev client did land on
+# its launcher anyway, the manual "connect to Metro" taps.
+- tapOn:
+    text: 'Dismiss'
+    optional: true
 - runFlow:
     when:
       visible:
         text: 'DEVELOPMENT SERVERS'
     commands:
-      - extendedWaitUntil:
-          visible:
-            text: 'http://.*:8081'
-          timeout: 30000
       - tapOn:
           text: 'http://.*:8081'
-      - extendedWaitUntil:
-          visible:
-            text: '^Continue$'
-          timeout: 90000
+          optional: true
       - tapOn:
           text: '^Continue$'
+          optional: true
       # `Continue` hands over to the dev menu itself; close it. The close
       # button is an iOS-only SF Symbol (`xmark`); on Android the dev menu is a
       # sheet that the hardware back key dismisses.
@@ -33,6 +37,7 @@ tags: [smoke]
           commands:
             - tapOn:
                 id: 'xmark'
+                optional: true
       - runFlow:
           when:
             platform: Android
