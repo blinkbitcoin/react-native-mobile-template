@@ -41,13 +41,24 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: release-${{ github.ref }}
+  # A constant group, not one keyed on github.ref: `github.ref` is
+  # refs/heads/main on a push or a dispatch and refs/tags/vX.Y.Z on a
+  # `release: published` event, so a ref-keyed group put release-beta in a
+  # queue of its own and let it touch a store while release-internal or a
+  # production dispatch was in one. Every workflow that talks to App Store
+  # Connect, Play or the update server shares this one queue.
+  group: release
   cancel-in-progress: false
 jobs:
   prepare:
     uses: blinkbitcoin/react-native-workflows/.github/workflows/expo-prepare.yml@v0
     permissions:
       contents: read
+      # expo-prepare declares `actions: read` statically (its green-workflow
+      # gate runs `gh run list`), and a called workflow can only narrow the
+      # caller's token — so it has to be granted here even though this caller
+      # sets no `require-green-workflow`.
+      actions: read
     with:
       # The tag, not a ref: it fixes the checkout, the stamped commit
       # (`TAG^{commit}`, exposed as the `sha` output) and the store notes, which
@@ -224,6 +235,55 @@ jobs:
       mode: latest
       tag: ${{ inputs.tag }}
       assets-artifacts: release-meta
+    secrets:
+      RELEASE_TAGGER_APP_ID: ${{ secrets.RELEASE_TAGGER_APP_ID }}
+      RELEASE_TAGGER_APP_PRIVATE_KEY: ${{ secrets.RELEASE_TAGGER_APP_PRIVATE_KEY }}
+
+  # A production dispatch otherwise leaves no record on the release of which
+  # stage it reached — which release went out, when, to which stores, at what
+  # rollout. The section is marker-delimited and rewritten in place, so the
+  # release body always shows the *last* production action.
+  #
+  # `production-stage.md` is deliberately not one of github-release's fixed
+  # asset globs: `append` regenerates SHA256SUMS over whatever of that set is in
+  # the download directory, and an artifact carrying one of those names would
+  # replace the checksums of the release's binaries.
+  stage-note:
+    needs: [prepare, ios-release, android-release, ios-phased, android-rollout, android-halt]
+    if: ${{ !failure() && !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Write the stage line
+        env:
+          ACTION: ${{ inputs.action }}
+          PLATFORMS: ${{ inputs.platforms }}
+          ROLLOUT: ${{ inputs.play_rollout_percent }}
+        run: |
+          set -euo pipefail
+          mkdir -p section
+          printf '%s at %s, platforms %s, rollout %s%%\n' \
+            "$ACTION" "$(date -u '+%Y-%m-%d %H:%M UTC')" "$PLATFORMS" "$ROLLOUT" \
+            > section/production-stage.md
+          cat section/production-stage.md
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-stage
+          path: section/production-stage.md
+          if-no-files-found: error
+
+  stage-append:
+    needs: [prepare, stage-note]
+    if: ${{ !failure() && !cancelled() }}
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/github-release.yml@v0
+    permissions:
+      contents: write
+    with:
+      mode: append
+      tag: ${{ inputs.tag }}
+      append-title: Production
+      notes-artifact: release-stage
+      notes-file: production-stage.md
     secrets:
       RELEASE_TAGGER_APP_ID: ${{ secrets.RELEASE_TAGGER_APP_ID }}
       RELEASE_TAGGER_APP_PRIVATE_KEY: ${{ secrets.RELEASE_TAGGER_APP_PRIVATE_KEY }}

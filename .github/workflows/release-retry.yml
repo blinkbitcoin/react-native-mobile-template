@@ -36,6 +36,14 @@ jobs:
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
+          # `--commit` is the internal run's head sha, which is the release
+          # commit. A `release: published` beta run's head sha is the default
+          # branch tip at publish time, so if a commit lands on main between the
+          # release commit and this run going green, no beta run matches and the
+          # retry no-ops. That is accepted: the operator can re-run release-beta
+          # by hand, and matching more loosely risks re-running a beta promotion
+          # for a different release.
+          #
           # Not `--status failure`: a beta run that was cancelled or timed out
           # (including one evicted from a concurrency group) needs the same
           # retry, so filter on "concluded, but not successfully" instead.

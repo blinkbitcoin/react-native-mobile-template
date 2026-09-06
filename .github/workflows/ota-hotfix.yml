@@ -33,14 +33,25 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: release-${{ github.ref }}
+  # A constant group, not one keyed on github.ref: `github.ref` is
+  # refs/heads/main on a push or a dispatch and refs/tags/vX.Y.Z on a
+  # `release: published` event, so a ref-keyed group put release-beta in a
+  # queue of its own and let it touch a store while release-internal or a
+  # production dispatch was in one. Every workflow that talks to App Store
+  # Connect, Play or the update server shares this one queue.
+  group: release
   cancel-in-progress: false
 jobs:
   baseline:
+    # Same gate as `publish`: without it a dispatch on a repo with OTA off burns
+    # a runner and then fails with "no baseline release found", which reads as a
+    # hotfix problem rather than "OTA is not enabled here".
+    if: ${{ vars.OTA_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       tag: ${{ steps.resolve.outputs.tag }}
+      fp-ios: ${{ steps.resolve.outputs.fp-ios }}
     steps:
       - name: Resolve the fingerprint baseline tag
         id: resolve
@@ -64,6 +75,18 @@ jobs:
           fi
           echo "baseline: $tag"
           echo "tag=$tag" >>"$GITHUB_OUTPUT"
+          # The baseline release carries the build-info.json of the binary now
+          # installed on the channel, and its iOS fingerprint is exactly the
+          # runtime version the update will be served under — which is what the
+          # publish's manifest smoke check has to ask the server for. Without it
+          # a hotfix, the publish most likely to be made under pressure, is the
+          # one publish nobody verifies actually served anything.
+          fp=''
+          if gh release download "$tag" --pattern build-info.json --dir . --clobber 2>/dev/null; then
+            fp="$(node -e 'process.stdout.write(String(require("./build-info.json")?.fingerprint?.ios ?? ""))' 2>/dev/null || true)"
+          fi
+          [ -n "$fp" ] || echo "no fingerprint.ios on $tag; the manifest smoke check will be skipped" >&2
+          echo "fp-ios=$fp" >>"$GITHUB_OUTPUT"
 
   publish:
     needs: baseline
@@ -83,5 +106,10 @@ jobs:
       environment: ${{ inputs.channel == 'production' && 'production' || '' }}
       ota-cli-version: ${{ vars.OTA_CLI_VERSION }}
       baseline-tag: ${{ needs.baseline.outputs.tag }}
+      # Recovered from the baseline release above, so a hotfix gets the same
+      # "did the server actually serve this?" check as every other publish. An
+      # empty runtime version skips the check rather than failing the publish.
+      manifest-url: ${{ needs.baseline.outputs.fp-ios != '' && vars.EXPO_UPDATES_URL || '' }}
+      runtime-version: ${{ needs.baseline.outputs.fp-ios }}
     secrets:
       OTA_PUBLISH_TOKEN: ${{ secrets.OTA_PUBLISH_TOKEN }}

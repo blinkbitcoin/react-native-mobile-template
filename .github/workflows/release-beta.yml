@@ -15,7 +15,13 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: release-${{ github.ref }}
+  # A constant group, not one keyed on github.ref: `github.ref` is
+  # refs/heads/main on a push or a dispatch and refs/tags/vX.Y.Z on a
+  # `release: published` event, so a ref-keyed group put release-beta in a
+  # queue of its own and let it touch a store while release-internal or a
+  # production dispatch was in one. Every workflow that talks to App Store
+  # Connect, Play or the update server shares this one queue.
+  group: release
   cancel-in-progress: false
 jobs:
   prepare:
@@ -136,6 +142,52 @@ jobs:
       # release is the single record of what beta got — and so the OTA gate
       # below has a fingerprint baseline to download.
       assets-artifacts: release-meta
+    secrets:
+      RELEASE_TAGGER_APP_ID: ${{ secrets.RELEASE_TAGGER_APP_ID }}
+      RELEASE_TAGGER_APP_PRIVATE_KEY: ${{ secrets.RELEASE_TAGGER_APP_PRIVATE_KEY }}
+
+  # The store notes are what beta testers and, later, App Review actually read,
+  # and until now nothing showed the operator what the pipeline would ship. The
+  # runbook's override flow ("edit the `## Store notes` section of the release
+  # body") also expected a section that was never written.
+  #
+  # The section is re-uploaded under a name that is deliberately *not* one of
+  # github-release's fixed asset globs: `append` uploads whatever of that set is
+  # in the download directory and regenerates SHA256SUMS over it, so handing it
+  # `release-meta` here would replace the checksums of the promoted binaries
+  # with the checksums of four metadata files.
+  store-notes-section:
+    needs: [prepare, github-release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-meta
+          path: meta
+      - name: Rename the notes so it is not one of the release's fixed assets
+        run: |
+          set -euo pipefail
+          mkdir -p section
+          cp meta/notes-store.txt section/store-notes-section.md
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-store-notes
+          path: section/store-notes-section.md
+          if-no-files-found: error
+
+  store-notes:
+    needs: [prepare, store-notes-section]
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/github-release.yml@v0
+    permissions:
+      contents: write
+    with:
+      # Marker-delimited and idempotent across re-runs, so a retry is safe.
+      mode: append
+      tag: ${{ inputs.tag || github.event.release.tag_name }}
+      append-title: Store notes
+      notes-artifact: release-store-notes
+      notes-file: store-notes-section.md
     secrets:
       RELEASE_TAGGER_APP_ID: ${{ secrets.RELEASE_TAGGER_APP_ID }}
       RELEASE_TAGGER_APP_PRIVATE_KEY: ${{ secrets.RELEASE_TAGGER_APP_PRIVATE_KEY }}
