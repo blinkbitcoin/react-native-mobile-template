@@ -67,8 +67,28 @@ check-prebuild: ## Prebuild both platforms into a temp dir and assert plugin out
 
 check-code: typecheck lint format-check knip spell ## Fast local gate: types + lint + format + knip + spell
 
+check-deps: ## SDK drift, vulnerability audit, lockfile provenance, licenses
+	pnpm deps:check
+	pnpm deps:audit
+	pnpm deps:licenses
+
+check-ci: ## Lint the CI itself: actionlint (workflows) + shellcheck (scripts)
+	bash scripts/shellcheck.sh
+	@if [ -d .github/workflows ]; then actionlint; else echo "no workflows yet"; fi
+
+check-docs: ## Docs freshness + AGENTS.md command table
+	bash scripts/check-docs.sh
+
+bundle-secrets-check: ## Export the bundle and assert no non-public keys leaked
+	pnpm check-bundle-secrets
+
+check: check-code check-gen check-deps check-ci check-docs ## Every static gate CI runs (no tests/builds)
+
+test-scripts: ## node:test for scripts/*.test.mjs
+	pnpm test:scripts
+
 unit: ## Unit + component tests
-	pnpm test
+	pnpm test && pnpm test:scripts
 
 coverage: ## Tests with coverage thresholds (what CI enforces)
 	pnpm test:coverage
@@ -94,4 +114,4 @@ reset: clean ## clean + reinstall
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: doctor install start ios android web mock-api prebuild build-web i18n codegen typecheck lint format format-check knip spell check-gen check-prebuild check-code unit coverage e2e-ios e2e-android e2e-web test clean reset help
+.PHONY: doctor install start ios android web mock-api prebuild build-web i18n codegen typecheck lint format format-check knip spell check-gen check-prebuild check-code check-deps check-ci check-docs bundle-secrets-check check test-scripts unit coverage e2e-ios e2e-android e2e-web test clean reset help

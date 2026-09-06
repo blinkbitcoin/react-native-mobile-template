@@ -31,3 +31,13 @@ allowBuilds:
   # run msw/node), but strictDepBuilds requires an explicit decision.
   msw: true
   unrs-resolver: true
+auditConfig:
+  # image-size (transitive: metro -> @react-native/metro-config -> metro ->
+  # image-size, pulled in by react-native/expo tooling itself, not app code)
+  # has two unpatched high-severity DoS advisories (infinite loop parsing
+  # malformed ICNS/JXL/HEIF images). No fixed release exists at this Expo SDK
+  # 57 line and the app never decodes untrusted image files through this
+  # dependency (it's only used by Metro's own asset pipeline at build time).
+  ignoreGhsas:
+    - GHSA-w3rx-r6r6-pgpr
+    - GHSA-5p2g-fcmc-qvqq
