@@ -1,6 +1,6 @@
 # Testing
 
-Four runners, each with a job. Nothing here needs a network.
+Five runners, each with a job. Nothing here needs a network.
 
 ## The layers
 
@@ -43,6 +43,7 @@ booting React Native:
 | --- | --- |
 | `scripts/doctor.test.mjs` | The toolchain check |
 | `scripts/check-licenses.test.mjs` | The SPDX allowlist logic |
+| `scripts/init.test.mjs` | The template rename and web-removal script behind `make init` |
 | `scripts/release/resolve-version.test.mjs` | Version resolution for a build |
 | `scripts/release/notes.test.mjs` | Store notes from a release body or from commits |
 | `scripts/release/verify.test.mjs` | The artifact verification helpers |

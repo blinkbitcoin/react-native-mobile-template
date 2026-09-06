@@ -78,7 +78,7 @@ Add a rule to one side only, and record which side in the config comment.
 | `make check-gen` | `pnpm i18n:check`, `pnpm codegen:check` | Drift in generated catalogs and generated GraphQL documents |
 | `make check-deps` | `pnpm deps:check`, `pnpm deps:audit`, `pnpm deps:licenses` | Expo SDK drift (`expo install --check` and `expo-doctor`), high-severity vulnerabilities in production dependencies, lockfile provenance (`scripts/check-lockfile.sh`), and the license allowlist (`scripts/check-licenses.mjs`) |
 | `make check-ci` | `scripts/shellcheck.sh`, `actionlint` | The CI itself: every `scripts/**/*.sh`, and the workflow files |
-| `make check-docs` | `scripts/check-docs.sh` | Warns when architecture-relevant paths changed with no `docs/` change. Fails when `AGENTS.md` names a `make` target that does not exist |
+| `make check-docs` | `scripts/check-docs.sh` | Warns when architecture-relevant paths changed with no `docs/` change. Fails when `AGENTS.md`'s command table and the Makefile's `##`-documented targets disagree in either direction |
 | `make check-release` | `ruby -c` over the Fastfile and lanes, `fastlane lanes`, and the minitest suite in `fastlane/test/lanes_test.rb` | That the lanes parse and that their pure logic still behaves. Needs `bundle install` first, and talks to no store |
 
 Not in `make check`, because each is slow or needs a build:
@@ -123,8 +123,9 @@ dependencies, which is the point.
 There is deliberately **no** `knip` script in `package.json`. `expo-doctor`'s
 "Check package.json for common issues" fails when a script name collides with
 a binary in `node_modules/.bin`, and `make check-deps` runs `expo-doctor`. The
-Makefile and CI both reach the binary directly, which is the supported path.
-Leave it alone.
+Makefile and the pre-push hook both run `pnpm knip`, which resolves the binary
+from `node_modules/.bin` precisely because no script of that name exists. That
+is the supported path. Leave it alone.
 
 ## Commit conventions
 

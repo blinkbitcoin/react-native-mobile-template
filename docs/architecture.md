@@ -70,8 +70,9 @@ written back when the app goes to background or inactive
 (`src/graphql/cache.ts`). A corrupt snapshot is logged and dropped, never
 fatal.
 
-Jest and the Playwright suite talk to the same schema through MSW instead of
-the yoga server. See `mocks/README.md`.
+Jest talks to the same schema through MSW instead of the yoga server. The
+Playwright suite runs against the yoga server itself, which
+`playwright.config.ts` starts on port 4000. See `mocks/README.md`.
 
 ## Config and env flow
 
@@ -163,7 +164,9 @@ matching native layer.
 
 There is one binary, promoted internal to beta to production, and it bakes the
 `expo-channel-name: production` request header. `src/services/updates.ts`
-exposes `updates.info()`, a throttled `applyIfAvailable()` (once an hour, and
-never in `__DEV__`), and `switchChannel()`, which overrides that header at
+exposes `updates.info()`, `applyIfAvailable()`, the `useUpdateInfo()` hook that
+calls it at most once an hour and never in `__DEV__` (a direct call to
+`applyIfAvailable()` is neither throttled nor dev-gated), and `switchChannel()`,
+which overrides that header at
 runtime for dev and QA only. The override is per install and does not survive a
 reinstall. Full detail in [ota.md](ota.md).

@@ -1,12 +1,20 @@
 # CI
 
-This repo runs no CI logic of its own. Every job lives in
+This repo runs almost no CI logic of its own. Nearly every job lives in
 [`blinkbitcoin/react-native-workflows`](https://github.com/blinkbitcoin/react-native-workflows)
-and the four files in `.github/workflows/` are thin callers that pick inputs.
-The workflows repo's `docs/consumer-guide.md` is the contract; this page is the
-template's half of it.
+and the ten files in `.github/workflows/` are thin callers that pick inputs.
+Two of the ten are the exception and are described below. The workflows repo's
+`docs/consumer-guide.md` is the contract; this page is the template's half of
+it.
 
-## The four callers
+## The callers
+
+Ten files, in two groups: four that run on every change, and six that make
+releases. The release group is documented in
+[release-runbook.md](release-runbook.md) and [ota.md](ota.md); the table below
+is the inventory.
+
+### Everyday CI
 
 | File | Trigger | Calls | Notes |
 | --- | --- | --- | --- |
@@ -18,6 +26,21 @@ template's half of it.
 `push` is deliberately scoped to `main` only: a PR branch in this repo would
 otherwise fire both `push` and `pull_request` and run the whole suite twice for
 the same commit.
+
+### Release and OTA
+
+| File | Trigger | Calls | Notes |
+| --- | --- | --- | --- |
+| `release-please.yml` | `push` to `main` (skipping `docs/**`, `**.md`), `workflow_dispatch` | `googleapis/release-please-action@v5`, `actions/create-github-app-token@v2` | Keeps one release PR open. Calls no reusable workflow from the workflows repo |
+| `release-internal.yml` | `push` to `main` (same paths-ignore), `workflow_dispatch` | `expo-prepare.yml`, `expo-build-ios.yml`, `expo-build-android.yml`, `fastlane-lane.yml`, `github-release.yml`, `expo-ota-publish.yml` | The only workflow that builds binaries |
+| `release-beta.yml` | `release: published`, `workflow_dispatch` (`tag`) | `expo-prepare.yml`, `fastlane-lane.yml`, `github-release.yml`, `expo-ota-publish.yml` | Promotes the binary internal already built and tested. Never builds |
+| `release-production.yml` | `workflow_dispatch` (`tag`, `action`) | `expo-prepare.yml`, `fastlane-lane.yml`, `github-release.yml`, `expo-ota-publish.yml`, `web.yml` | `action` selects release, rollout, halt, resume or complete |
+| `release-retry.yml` | `workflow_run` on a completed `release-internal` for `main` | nothing: it re-runs a failed beta run with `gh` | Closes the hole where `release: published` fires once, before internal is green |
+| `ota-hotfix.yml` | `workflow_dispatch` (`channel`, `ref`, rollout) | `expo-ota-publish.yml` | JavaScript-only fixes. The fingerprint gate rejects anything native |
+
+On a repo that never turns OTA on, the store path still works: only the `ota-*`
+jobs are skipped, through `if: vars.OTA_ENABLED == 'true'`, and `ota-hotfix.yml`
+skips both of its jobs. See [ota.md](ota.md).
 
 ## How CI maps to `make`
 
@@ -144,7 +167,10 @@ Locally the same debug tree lands in `.maestro/output/` (gitignored).
 
 ## Pinning and bumping the workflows version
 
-Every `uses:` is pinned to the moving major tag:
+Every `uses:` that points at the workflows repo is pinned to the moving major
+tag. Eight of the ten files carry at least one, and several carry many:
+`release-production.yml` alone has ten. `release-please.yml` and
+`release-retry.yml` call no reusable workflow at all.
 
 ```yaml
 uses: blinkbitcoin/react-native-workflows/.github/workflows/checks.yml@v0
@@ -156,14 +182,17 @@ uses: blinkbitcoin/react-native-workflows/.github/workflows/checks.yml@v0
 
 To bump:
 
-- **Pin harder** — replace `@v0` with a full tag (`@v0.3.1`) in all four files
-  for byte-reproducible runs; you then upgrade deliberately.
-- **After the workflows repo reaches 1.0.0** — move all four files to `@v1` in
-  one commit and read that release's notes; `v1` behaves the same way (a moving
+- **Pin harder** — replace `@v0` with a full tag (`@v0.3.1`) in every workflow
+  file for byte-reproducible runs; you then upgrade deliberately.
+- **After the workflows repo reaches 1.0.0** — move all of them to `@v1` in one
+  commit and read that release's notes; `v1` behaves the same way (a moving
   major tag), it just tracks a different major line.
 
-Keep the four files on the same pin. They share the `.rnw/` self-checkout and
-the script contract; mixing versions across callers is untested.
+Change every `uses:` in one pass, release workflows included. A bump that only
+touches the everyday-CI files leaves the release path on the old line, which is
+exactly where a version mismatch is hardest to notice. `grep -rn '@v0'
+.github/workflows` is the check. All callers share the `.rnw/` self-checkout
+and the script contract; mixing versions across them is untested.
 
 ## `.rnw/`
 
@@ -171,5 +200,5 @@ Every job checks the workflows repo out into `$GITHUB_WORKSPACE/.rnw` and
 reaches its scripts through `$RNW`. Nothing in this repo references
 `react-native-workflows` paths directly. Local tooling that walks the whole
 tree ignores it: `biome.json` (`!**/.rnw`), `eslint.config.mjs`
-(`.rnw/**`), `tsconfig.json` (`exclude`), `knip.json` (`ignore`), `typos.toml`
-(`extend-exclude`) and `.gitignore` (`/.rnw`).
+(`.rnw/**`), `tsconfig.json` (`exclude`), `typos.toml` (`extend-exclude`) and
+`.gitignore` (`/.rnw`).

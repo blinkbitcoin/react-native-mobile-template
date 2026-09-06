@@ -1,7 +1,8 @@
 # Documentation index
 
 Start here. Every page below is kept next to the code it describes, and every
-command it quotes is one the repo actually has (`make help` lists them all).
+`make` target it quotes is one the repo actually has (`make help` lists them
+all).
 
 ## Which doc when
 
