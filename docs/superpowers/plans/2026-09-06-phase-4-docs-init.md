@@ -85,3 +85,25 @@ scripts/init.mjs  scripts/init.test.mjs  scripts/init.manifest.json  scripts/che
 
 ## Self-review notes
 - Spec Part C docs outline fully covered (T1–T4), init spec (T5), confusion audit items each mapped to a doc or check (T1/T4), parked minors (T6). Dependencies on Phase 3: links to `docs/release-runbook.md` and `docs/ota.md`, `fastlane/` in CODEOWNERS, `Appfile` env defaults in the init rename list — T5 must read Phase 3's actual files before writing the manifest.
+
+## Rulings recorded during execution (2026-09-07)
+
+- Merged fast-forward to `main` at f527638 (tag `phase-4-complete`); workflows repo main at 63733b3 (tag `phase-4-complete`). All local, no remotes.
+- Tasks 1–6 ran in parallel on disjoint file sets in one shared checkout; commits must be made with `git commit -- <paths>` (a plain `git add <paths>` + `git commit` sweeps in other tasks' staged files).
+- `docs/README.md` links `docs/decisions/README.md` (ADR index, Task 3) and `docs/template-usage.md` (Task 5); README's "Using this template" block sits between `<!-- init:usage-start/end -->` markers and is stripped by `make init`.
+- Generated GraphQL code and compiled Lingui catalogs are tracked (guarded by `make check-gen`); only `ios/` and `android/` are ignored.
+- `make init`: plan → validate every anchor/marker/path (exit 2, tree untouched, when stale) → mutate; `--yes` requires `--web` or `--no-web`; `--owners` is the GitHub owner login; `docs/superpowers/**` ships with the template and is excluded from the rename sweep; byte-exact snapshots of the lines `--no-web` removes from docs/testing.md, docs/README.md and AGENTS.md guard against over-deletion; the web strip also removes the release-production web job and the `web` commitlint scope from every doc.
+- `scripts/check-docs.sh` is strict in both directions between AGENTS.md's command table and the Makefile's `##` targets; `make help` lists targets with digits.
+- `make install` also installs Ruby gems (`NO_BUNDLE=1` skips); `make doctor` checks the gem set; jest `testTimeout` 15 s in both projects.
+- The placeholder-cert hash constant had been computed from a CRLF copy, so the "still the template placeholder" warning never fired; fixed with a guard test that recomputes the hash from the committed `.pem` (LF-only asserted).
+- lefthook post-merge/post-checkout use `scripts/hooks/install-if-lockfile-changed.sh` (hook args + `ORIG_HEAD`), replacing the broken `HEAD@{1}` form.
+- Spec text corrected: `APP_REVIEW_*` (not `APP_REVIEW_CONTACT_*`); ADRs record ESLint 9 and compiled Lingui catalogs where the spec's sketches were stale.
+
+### Deferred minors / follow-ups
+
+- `renderWithProviders` duplicates the provider wrapper instead of parameterising `Providers`.
+- `ios_info_plist`'s glob fallback picks silently when the scheme directory has no plist.
+- docs/ci.md's workflow counts are manifest-rewritten but not asserted against `.github/workflows/`; nothing enforces prose agreement between docs beyond the strict command table.
+- Android `ota-runtime-version` stays a `skip` until a real OTA-on AAB proves the `assets/fingerprint` path.
+- Android `mapping.txt` is a permanent verify `skip` until minification is enabled; JS source-map retention for crash reporting is an open decision.
+- `RNW_TEMPLATE_DIR` in the workflows repo's parity test defaults to a machine-local path.
