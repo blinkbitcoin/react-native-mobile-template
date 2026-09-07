@@ -9,6 +9,10 @@ const config: Config = {
     {
       displayName: 'app',
       preset: 'jest-expo',
+      // 15s, not Jest's 5s. The screen-level RNTL suites finish well inside a
+      // second when the machine is idle, but two SettingsScreen tests went over
+      // 5s under load, which is a flake, not a real failure.
+      testTimeout: 15000,
       setupFiles: ['<rootDir>/src/test/env.ts'],
       setupFilesAfterEnv: ['<rootDir>/src/test/setup.ts'],
       moduleNameMapper: {
@@ -37,6 +41,7 @@ const config: Config = {
     {
       displayName: 'plugins',
       testEnvironment: 'node',
+      testTimeout: 15000,
       testMatch: ['<rootDir>/plugins/**/*.test.ts'],
       // `.tsx` is in the pattern even though no plugin suite uses JSX: coverage
       // options are global, so this project also instruments the app's untested
