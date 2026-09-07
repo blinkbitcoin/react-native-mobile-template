@@ -10,8 +10,17 @@ init: ## Rename this template into your app (interactive; --yes for CI)
 doctor: ## Check the local toolchain (run this first)
 	node scripts/doctor.mjs
 
-install: ## Install dependencies (frozen lockfile) and git hooks
+# One step, both toolchains: `make check` ends in `check-release`, which needs
+# the fastlane gems, so a fresh clone that only ran `pnpm install` fails a gate
+# it was never told about. NO_BUNDLE=1 skips the Ruby half (CI images that
+# install gems in their own step, or a machine with no ruby yet).
+install: ## Install dependencies (pnpm + Ruby gems) and git hooks
 	pnpm install --frozen-lockfile
+	@if [ "$(NO_BUNDLE)" = "1" ]; then \
+		echo "NO_BUNDLE=1: skipping bundle install (make check-release will need it)"; \
+	else \
+		bundle config set --local path vendor/bundle && bundle install; \
+	fi
 
 # ---------- Run ----------
 start: ## Metro for the dev client
@@ -119,7 +128,7 @@ check-release: ## Ruby syntax + fastlane lane parse + lane unit tests
 
 check: check-code check-gen check-deps check-ci check-docs check-release ## Every static gate CI runs (no tests/builds)
 
-test-scripts: ## node:test for scripts/*.test.mjs
+test-scripts: ## node:test for scripts/**/*.test.mjs
 	pnpm test:scripts
 
 unit: ## Unit + component tests

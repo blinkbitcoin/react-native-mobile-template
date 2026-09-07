@@ -11,5 +11,6 @@ shellcheck = "0.11.0"
 typos = "latest"
 
 [env]
-# Expo telemetry off everywhere; Android SDK path for `expo run:android`
+# Expo telemetry off everywhere. ANDROID_HOME is deliberately not set here: it is
+# machine-specific, so `make doctor` checks that you exported it instead.
 EXPO_NO_TELEMETRY = "1"

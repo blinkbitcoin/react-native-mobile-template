@@ -43,5 +43,13 @@
       "optional": true
     }
   ],
+  "$comment": "`commands` are pass/fail, not versioned: the check is the exit status. `bundle check` is here because `make check` ends in `check-release`, which cannot run without the fastlane gems.",
+  "commands": [
+    {
+      "name": "ruby gems",
+      "command": "bundle check",
+      "hint": "make install (or: bundle config set --local path vendor/bundle && bundle install)"
+    }
+  ],
   "env": [{ "name": "ANDROID_HOME", "hint": "export ANDROID_HOME=$HOME/Library/Android/sdk" }]
 }

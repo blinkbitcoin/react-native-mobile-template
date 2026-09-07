@@ -47,7 +47,10 @@ for rev in "$old" "$new"; do
   git rev-parse --verify --quiet "$rev^{commit}" >/dev/null || exit 0
 done
 
-if git diff --name-only "$old" "$new" -- "$LOCKFILE" | grep -q .; then
+# `git diff --quiet`, not `git diff --name-only | grep -q .`: `grep -q` exits on
+# its first match and can kill the still-writing `git` with SIGPIPE, which under
+# `set -o pipefail` reports 141 and silently skips the install.
+if ! git diff --quiet "$old" "$new" -- "$LOCKFILE"; then
   echo "$LOCKFILE changed: ${install_cmd[*]}"
   "${install_cmd[@]}"
 fi

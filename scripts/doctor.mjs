@@ -37,6 +37,21 @@ export function checkTool(tool) {
   return { ok: true, version: found.join('.') };
 }
 
+/**
+ * A pass/fail probe: no version to parse, the exit status is the answer.
+ * `run` is injectable so the unit test can exercise both branches without
+ * depending on what happens to be installed on the machine.
+ */
+export function checkCommand(entry, run = execSync) {
+  try {
+    run(entry.command, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    return { ok: true };
+  } catch (error) {
+    const detail = (error.stdout ?? error.stderr ?? '').trim().split('\n')[0];
+    return { ok: false, reason: detail || 'command failed' };
+  }
+}
+
 function main() {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const req = JSON.parse(readFileSync(path.join(here, 'doctor.requirements.json'), 'utf8'));
@@ -51,6 +66,15 @@ function main() {
     } else {
       failures++;
       process.stdout.write(`FAIL  ${tool.name}: ${result.reason}. Fix: ${tool.hint}\n`);
+    }
+  }
+  for (const entry of req.commands ?? []) {
+    const result = checkCommand(entry);
+    if (result.ok) {
+      process.stdout.write(`ok    ${entry.name}\n`);
+    } else {
+      failures++;
+      process.stdout.write(`FAIL  ${entry.name}: ${result.reason}. Fix: ${entry.hint}\n`);
     }
   }
   for (const v of req.env) {
