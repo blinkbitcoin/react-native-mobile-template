@@ -58,6 +58,15 @@
         "path": ".github/CODEOWNERS",
         "optional": true,
         "replace": [["@blinkbitcoin/", "@{{owner}}/", "+"]]
+      },
+      {
+        "path": ".github/ISSUE_TEMPLATE/bug_report.yml",
+        "$comment": "The owner half of the link; the repo half is renamed by the token pass, which runs after this one.",
+        "replace": [["github.com/blinkbitcoin/", "github.com/{{owner}}/", "+"]]
+      },
+      {
+        "path": ".github/ISSUE_TEMPLATE/config.yml",
+        "replace": [["github.com/blinkbitcoin/", "github.com/{{owner}}/", "+"]]
       }
     ],
     "$comment2": "Ordered, longest-first token replacements applied to every path/glob below. Bare `rnmt` runs last, after every qualified form has already been rewritten.",
@@ -170,6 +179,42 @@
         "replace": [["; e2e/web/ is Playwright", ""], ["docs e2e web`", "docs e2e`"]]
       },
       {
+        "$comment": "The other three places the commitlint scope enum is spelled out for a reader. Anchored, not scrubbed: in quality.md the enum is a table row that also carries `docs` and `e2e`, and in the other two it is mid-sentence.",
+        "path": "CONTRIBUTING.md",
+        "optional": true,
+        "replace": [["docs e2e web`", "docs e2e`"]]
+      },
+      {
+        "path": ".github/PULL_REQUEST_TEMPLATE.md",
+        "optional": true,
+        "replace": [["docs e2e web`)", "docs e2e`)"]]
+      },
+      {
+        "path": "docs/quality.md",
+        "optional": true,
+        "replace": [["| `docs` | `e2e` | `web` | |", "| `docs` | `e2e` | | |"]]
+      },
+      {
+        "$comment": "Two web residues in .github/: an ignore rule for a dependency this run just deleted, and a Platform option for a target the app no longer has.",
+        "path": ".github/dependabot.yml",
+        "replace": [
+          [
+            "\n      - dependency-name: react-dom\n        update-types:\n          ['version-update:semver-major', 'version-update:semver-minor']",
+            ""
+          ]
+        ]
+      },
+      {
+        "path": ".github/ISSUE_TEMPLATE/bug_report.yml",
+        "lines": ["^\\s*- Web$"]
+      },
+      {
+        "$comment": "The ADR itself is deleted above; this is its row in the index.",
+        "path": "docs/decisions/README.md",
+        "optional": true,
+        "lines": ["^\\s*\\| \\[0006\\]"]
+      },
+      {
         "path": "mocks/README.md",
         "optional": true,
         "replace": [["Jest (and Playwright,\nshould you add it) instead use", "Jest instead uses"]]
@@ -231,7 +276,11 @@
           [
             "Two script-contract details are load-bearing:",
             "One script-contract detail is load-bearing:"
-          ]
+          ],
+          ["the ten files in", "the nine files in"],
+          ["Two of the ten are the exception", "Two of the nine are the exception"],
+          ["Eight of the ten files carry", "Seven of the nine files carry"],
+          ["`release-production.yml` alone has ten.", "`release-production.yml` alone has nine."]
         ]
       },
       {
@@ -295,10 +344,26 @@
     ],
     "docScrub": {
       "globs": ["*.md", "docs/*.md", ".github/*.md"],
-      "lines": ["^\\s*\\|\\s*`make init`", "^\\s*\\|.*template-usage\\.md"],
+      "lines": [
+        "^\\s*\\|\\s*`make init`",
+        "^\\s*\\|.*template-usage\\.md",
+        "^\\s*\\|\\s*`scripts/init\\.test\\.mjs`"
+      ],
       "paragraphs": []
     },
     "edits": [
+      {
+        "path": "AGENTS.md",
+        "optional": true,
+        "$comment": "The layout block names the init script and its doc page; both are going away, and a line scrub would take the whole inventory line.",
+        "replace": [
+          ["check-*.sh, doctor, init, hooks/, release/", "check-*.sh, doctor, hooks/, release/"],
+          [
+            "ota, ota-and-crash-reporting, template-usage, decisions/",
+            "ota, ota-and-crash-reporting, decisions/"
+          ]
+        ]
+      },
       {
         "path": "docs/README.md",
         "optional": true,

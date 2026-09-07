@@ -45,6 +45,11 @@ import {
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const RENAME_TOKENS = /rnmt|RN Mobile Template|react-native-mobile-template|rn-mobile-template/;
+// `blinkbitcoin` is two different things: the GitHub owner of THIS repo, which
+// init must rewrite, and the owner of the reusable-workflow repo, which it must
+// not. Blanking the second is what makes the first greppable.
+const WORKFLOWS_REPO = /blinkbitcoin\/react-native-workflows/g;
+const namesTheOwner = (text) => text.replace(WORKFLOWS_REPO, '').includes('blinkbitcoin');
 // `react-native-webview` and `--dev-client` are native, not web: the negative
 // lookaheads keep the sweep from flagging them.
 const WEB_TOKENS = /react-native-web(?![\w-])|[Pp]laywright|build:web|--dev(?!-client)/;
@@ -415,6 +420,36 @@ describe('the manifest', () => {
     const missing = files.filter((rel) => !covered.has(rel));
     assert.deepEqual(missing, [], `manifest does not cover: ${missing.join(', ')}`);
   });
+
+  // The owner is the other rename token, and the one that produces dead links
+  // rather than an odd-looking string, so it gets its own sweep.
+  test('it covers every file that names the GitHub owner', () => {
+    const covered = new Set([
+      ...manifest.rename.perFile.map((entry) => entry.path),
+      ...manifest.selfDelete.paths,
+    ]);
+    const tracked = spawnSync(
+      'git',
+      [
+        'grep',
+        '-l',
+        '-I',
+        '-F',
+        'blinkbitcoin',
+        '--',
+        '.',
+        ':!docs/superpowers',
+        ':!pnpm-lock.yaml',
+      ],
+      { cwd: REPO, encoding: 'utf8' },
+    );
+    const files = tracked.stdout.split('\n').filter(Boolean);
+    assert.ok(files.length > 0, 'git grep found nothing — the owner token is wrong');
+    const owned = files.filter((rel) => namesTheOwner(readFileSync(path.join(REPO, rel), 'utf8')));
+    assert.ok(owned.length > 0, 'every hit was the workflows repo — the filter is wrong');
+    const missing = owned.filter((rel) => !covered.has(rel));
+    assert.deepEqual(missing, [], `owner not renamed in: ${missing.join(', ')}`);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -608,6 +643,75 @@ describe('init --yes --no-web', () => {
     assert.deepEqual(offenders, []);
   });
 
+  test('rewrites the GitHub owner, and only where it is this repo', () => {
+    const offenders = files
+      .filter(([rel]) => rel !== 'pnpm-lock.yaml')
+      .filter(([, text]) => namesTheOwner(text))
+      .map(([rel]) => rel);
+    assert.deepEqual(offenders, []);
+    // The three links a new contributor sees first, all live.
+    const config = readFileSync(path.join(root, '.github/ISSUE_TEMPLATE/config.yml'), 'utf8');
+    assert.match(config, /github\.com\/acme-inc\/acme-wallet\/security\/policy/);
+    assert.match(config, /github\.com\/acme-inc\/acme-wallet\/blob\/main\/CONTRIBUTING\.md/);
+    assert.match(
+      readFileSync(path.join(root, '.github/ISSUE_TEMPLATE/bug_report.yml'), 'utf8'),
+      /github\.com\/acme-inc\/acme-wallet\/blob\/main\/SECURITY\.md/,
+    );
+    // The reusable-workflow repo keeps its owner.
+    assert.match(
+      readFileSync(path.join(root, '.github/workflows/ci.yml'), 'utf8'),
+      /blinkbitcoin\/react-native-workflows/,
+    );
+  });
+
+  // The commit-msg hook rejects `web` afterwards, so a doc that still lists it
+  // walks the contributor into a failing commit.
+  test('drops the `web` commit scope from every place it is spelled out', () => {
+    for (const rel of [
+      'AGENTS.md',
+      'CONTRIBUTING.md',
+      '.github/PULL_REQUEST_TEMPLATE.md',
+      'docs/quality.md',
+    ]) {
+      assert.doesNotMatch(readFileSync(path.join(root, rel), 'utf8'), /docs e2e web`/, rel);
+    }
+    const quality = readFileSync(path.join(root, 'docs/quality.md'), 'utf8');
+    assert.doesNotMatch(quality, /\| `web` \|/);
+    // The neighbours in that table cell survive.
+    assert.match(quality, /\| `docs` \| `e2e` \| \| \|/);
+  });
+
+  test('drops the two web residues in .github/ and the ADR index row', () => {
+    assert.doesNotMatch(
+      readFileSync(path.join(root, '.github/dependabot.yml'), 'utf8'),
+      /react-dom/,
+    );
+    // The neighbouring ignore rules are untouched.
+    assert.match(
+      readFileSync(path.join(root, '.github/dependabot.yml'), 'utf8'),
+      /- dependency-name: react\n/,
+    );
+    assert.doesNotMatch(
+      readFileSync(path.join(root, '.github/ISSUE_TEMPLATE/bug_report.yml'), 'utf8'),
+      /^\s*- Web$/m,
+    );
+    assert.doesNotMatch(
+      readFileSync(path.join(root, 'docs/decisions/README.md'), 'utf8'),
+      /0006-web-opt-in/,
+    );
+  });
+
+  // One paragraph disagreeing with three others is worse than all four being
+  // stale, because the reader cannot tell which one to trust.
+  test('rewrites every workflow-file count in docs/ci.md, not just the first', () => {
+    const ci = readFileSync(path.join(root, 'docs/ci.md'), 'utf8');
+    assert.doesNotMatch(ci, /\b[Tt]en\b/);
+    assert.match(ci, /the nine files in/);
+    assert.match(ci, /Two of the nine are the exception/);
+    assert.match(ci, /Seven of the nine files carry/);
+    assert.match(ci, /`release-production\.yml` alone has nine\./);
+  });
+
   test('replaced the placeholders with the answers', () => {
     const config = readFileSync(path.join(root, 'app.config.ts'), 'utf8');
     assert.match(config, /name: isDev \? 'Acme Wallet \(dev\)' : 'Acme Wallet'/);
@@ -681,6 +785,8 @@ describe('init --yes --no-web', () => {
   test('removes exactly these lines from docs/testing.md', () => {
     assert.deepEqual(removedLines(REPO, root, 'docs/testing.md'), [
       '| E2E, web | Playwright | `e2e/web/` | `make e2e-web` |',
+      // Not web: the suite it names is one of the files init deletes.
+      '| `scripts/init.test.mjs` | The template rename and web-removal script behind `make init` |',
       '## Playwright',
       '`make e2e-web` runs `scripts/e2e/web.sh`, which exports the site with',
       '`pnpm build:web --dev` and then runs the suite in `e2e/web/`.',
@@ -705,7 +811,11 @@ describe('init --yes --no-web', () => {
 
   test('removes exactly these lines from AGENTS.md', () => {
     assert.deepEqual(removedLines(REPO, root, 'AGENTS.md'), [
+      // Two layout lines are rewritten, not deleted: they name the init script
+      // and its doc page, both of which are gone afterwards.
+      'scripts/            check-*.sh, doctor, init, hooks/, release/ (verify, notes, version), e2e/',
       '.maestro/           Maestro flows (native e2e); e2e/web/ is Playwright',
+      '                    release-runbook, ota, ota-and-crash-reporting, template-usage, decisions/',
       '| `make init` | Rename this template into your app, then delete itself (template only; `docs/template-usage.md`) |',
       '| `make web` | Expo web dev server |',
       '| `make build-web` | Static web export into `dist/` |',
@@ -736,10 +846,14 @@ describe('init --yes --web', () => {
   test('still renames and still deletes itself', () => {
     assert.equal(existsSync(path.join(root, 'scripts/init.mjs')), false);
     assert.equal(existsSync(path.join(root, 'docs/template-usage.md')), false);
-    const offenders = textFiles(root)
-      .filter(([, text]) => RENAME_TOKENS.test(text))
-      .map(([rel]) => rel);
+    const files = textFiles(root);
+    const offenders = files.filter(([, text]) => RENAME_TOKENS.test(text)).map(([rel]) => rel);
     assert.deepEqual(offenders, []);
+    const owners = files
+      .filter(([rel]) => rel !== 'pnpm-lock.yaml')
+      .filter(([, text]) => namesTheOwner(text))
+      .map(([rel]) => rel);
+    assert.deepEqual(owners, []);
   });
 
   test('drops the init:web markers but keeps what they wrapped', () => {
