@@ -47,8 +47,13 @@ export function checkCommand(entry, run = execSync) {
     run(entry.command, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
     return { ok: true };
   } catch (error) {
-    const detail = (error.stdout ?? error.stderr ?? '').trim().split('\n')[0];
-    return { ok: false, reason: detail || 'command failed' };
+    // Whichever stream carried the message: `bundle check` writes its
+    // "Could not find ..." to stderr and leaves stdout empty, so `??` (which
+    // only falls through on null) would report nothing useful.
+    const detail = [error.stdout, error.stderr]
+      .map((stream) => String(stream ?? '').trim())
+      .find(Boolean);
+    return { ok: false, reason: detail?.split('\n')[0] || 'command failed' };
   }
 }
 

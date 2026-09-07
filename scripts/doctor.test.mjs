@@ -31,6 +31,16 @@ test('checkCommand reports the exit status, not a version', () => {
   });
   assert.equal(failing.ok, false);
   assert.equal(failing.reason, "Could not find gem 'fastlane'.");
+
+  // `bundle check` reports on stderr with an empty stdout, which is exactly the
+  // case a `??` chain would swallow.
+  const onStderr = checkCommand({ command: 'bundle check' }, () => {
+    throw Object.assign(new Error('exit 1'), {
+      stdout: '',
+      stderr: 'The following gems are missing\n * fastlane\n',
+    });
+  });
+  assert.equal(onStderr.reason, 'The following gems are missing');
 });
 
 // The missing-gems case is a documented `make doctor` failure, so the entry
