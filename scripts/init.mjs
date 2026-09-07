@@ -6,11 +6,20 @@
 // finishing gates). Zero npm dependencies: it runs before `pnpm install` has
 // necessarily been re-run.
 //
+// Order of business: build the plan, validate EVERY anchor, marker and target
+// the plan depends on against the files as they are now, and only then write.
+// A stale anchor exits 2 with the list and leaves the tree untouched, because a
+// half-stripped repo is much worse than one that refused to start.
+//
 //   node scripts/init.mjs                      interactive
 //   node scripts/init.mjs --dry-run            print the touch list, change nothing
 //   node scripts/init.mjs --yes --name "Acme" --slug acme --scheme acme \
 //     --ios-bundle-id com.acme.app --android-package com.acme.app \
 //     --owners acme --no-web
+//
+// POSIX only: the rewrites are line-oriented on LF and the sub-processes are
+// spawned without a shell, so a CRLF checkout or a Windows `pnpm.cmd` is out of
+// scope (the template's toolchain is mise on macOS/Linux either way).
 //
 // Env escape hatches (used by scripts/init.test.mjs):
 //   INIT_SKIP_INSTALL=1   skip `pnpm install`, codegen, i18n and `make check-code`
@@ -34,7 +43,7 @@ const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = path.resolve(SCRIPT_DIR, '..');
 
 // ---------------------------------------------------------------------------
-// Validation
+// Answer validation
 // ---------------------------------------------------------------------------
 
 export const RULES = {
@@ -86,6 +95,11 @@ export function validateAnswers(answers) {
 
 const escapeRe = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+/** How many times `needle` occurs in `text` (non-overlapping). */
+export function countOccurrences(text, needle) {
+  return text.split(needle).length - 1;
+}
+
 /** Fill `{{placeholder}}` holes from the answers object. */
 export function renderTemplate(template, answers) {
   return template.replace(/\{\{(\w+)\}\}/g, (whole, key) => {
@@ -94,7 +108,10 @@ export function renderTemplate(template, answers) {
   });
 }
 
-/** Apply ordered [from, to] literal replacements. `to` may contain placeholders. */
+/**
+ * Apply ordered `[from, to]` (or `[from, to, count]`) literal replacements.
+ * `to` may contain placeholders; `count` is only read by the validator.
+ */
 export function applyTokens(text, replacements, answers) {
   let out = text;
   for (const [from, to] of replacements) {
@@ -121,10 +138,7 @@ export function removeLines(text, patterns) {
   return kept.join('\n');
 }
 
-/**
- * Drop blank-line-delimited paragraphs containing a match. Used for the doc
- * bullets and the one Jest case that only exists for the web variant.
- */
+/** Drop blank-line-delimited paragraphs containing a match. */
 export function removeParagraphs(text, patterns) {
   if (patterns.length === 0) return text;
   const res = patterns.map((p) => new RegExp(p));
@@ -136,33 +150,46 @@ export function removeParagraphs(text, patterns) {
   return kept.join('\n\n') + trailing;
 }
 
+const isBullet = (line) => line !== undefined && /^\s*[-*] /.test(line);
+
 /**
- * Remove the Markdown list item containing a match, wrapping lines included.
- * A list is a single blank-line-delimited paragraph, so `removeParagraphs`
- * would take its neighbours with it.
+ * Remove the Markdown list item containing a match, wrapping lines included —
+ * and only that item. A whole list is one blank-line-delimited paragraph, so
+ * `removeParagraphs` would take the item's neighbours with it; walking back to
+ * "some earlier bullet" without a guard would eat every bullet above a match
+ * that is not in a list at all. So: the match must sit on a list-item line or on
+ * one of its continuation lines (no blank line in between), otherwise this pass
+ * leaves the file alone and the `paragraphs` pass deals with it.
  */
 export function removeBullets(text, patterns) {
   const lines = text.split('\n');
-  const isBullet = (line) => line !== undefined && /^\s*[-*] /.test(line);
   for (const pattern of patterns) {
     const re = new RegExp(pattern);
-    for (let hit = lines.findIndex((line) => re.test(line)); hit !== -1; ) {
-      let start = hit;
-      while (start > 0 && !isBullet(lines[start])) start -= 1;
-      if (!isBullet(lines[start])) break;
+    for (let i = 0; i < lines.length; i += 1) {
+      if (!re.test(lines[i])) continue;
+      let start = i;
+      while (start >= 0 && !isBullet(lines[start])) {
+        // A blank line ends the item: the match is not inside a list item.
+        if (lines[start] === '') {
+          start = -1;
+          break;
+        }
+        start -= 1;
+      }
+      if (start < 0 || !isBullet(lines[start])) continue;
       let end = start + 1;
       while (end < lines.length && lines[end] !== '' && !isBullet(lines[end])) end += 1;
       lines.splice(start, end - start);
-      hit = lines.findIndex((line) => re.test(line));
+      i = start - 1;
     }
   }
   return lines.join('\n');
 }
 
 /**
- * Remove each `{ from, until }` span: the first line matching `from` through the
- * next line matching `until`, inclusive, plus the blank line that follows. This
- * is for code that cannot carry markers (a `test(...)` call in a suite this task
+ * Remove every `{ from, until }` span: a line matching `from` through the next
+ * line matching `until`, inclusive, plus the blank line that follows. This is
+ * for code that cannot carry markers (a `test(...)` call in a suite this task
  * does not own) and that blank lines run straight through.
  */
 export function removeBlocks(text, blocks) {
@@ -170,17 +197,20 @@ export function removeBlocks(text, blocks) {
   for (const { from, until } of blocks) {
     const fromRe = new RegExp(from);
     const untilRe = new RegExp(until);
-    const start = lines.findIndex((line) => fromRe.test(line));
-    if (start === -1) continue;
-    let end = start;
-    while (end < lines.length && !untilRe.test(lines[end])) end += 1;
-    if (end === lines.length) throw new Error(`no line matching ${until} after ${from}`);
-    if (lines[end + 1] === '') end += 1;
-    lines.splice(start, end - start + 1);
-    if (lines[start - 1] === '' && lines[start] === undefined) lines.pop();
+    for (let start = lines.findIndex((line) => fromRe.test(line)); start !== -1; ) {
+      let end = start;
+      while (end < lines.length && !untilRe.test(lines[end])) end += 1;
+      if (end === lines.length) throw new Error(`no line matching ${until} after ${from}`);
+      if (lines[end + 1] === '') end += 1;
+      lines.splice(start, end - start + 1);
+      start = lines.findIndex((line) => fromRe.test(line));
+    }
   }
   return lines.join('\n');
 }
+
+/** Collapse the run of blank lines a removal can leave behind. */
+const collapseBlankRuns = (text) => text.replace(/\n{3,}/g, '\n\n');
 
 /**
  * Remove `<comment> marker-start` .. `<comment> marker-end` inclusive. The
@@ -204,7 +234,12 @@ export function removeMarkedBlock(text, marker) {
     }
     if (depth === 0) out.push(line);
   }
-  return { text: out.join('\n'), found };
+  return { text: collapseBlankRuns(out.join('\n')), found };
+}
+
+/** Drop the marker lines but keep what they wrap (the "web is kept" case). */
+export function removeMarkerLines(text, marker) {
+  return removeLines(text, [`${escapeRe(marker)}-(start|end)`]);
 }
 
 /**
@@ -315,103 +350,16 @@ function expandGlobs(root, patterns) {
   return [...new Set(patterns.flatMap((pattern) => expandGlob(root, pattern)))];
 }
 
-function run(command, args, { cwd, allowFailure = false } = {}) {
+function run(command, args, { cwd } = {}) {
   const result = spawnSync(command, args, { cwd, stdio: 'inherit', shell: false });
-  if (result.status !== 0 && !allowFailure) {
+  if (result.status !== 0) {
     throw new Error(`${command} ${args.join(' ')} exited ${result.status ?? 'null'}`);
   }
-  return result.status ?? 1;
+  return result.status;
 }
-
-// ---------------------------------------------------------------------------
-// The plan
-// ---------------------------------------------------------------------------
 
 export function loadManifest(root = REPO_ROOT) {
   return JSON.parse(readFileSync(path.join(root, 'scripts/init.manifest.json'), 'utf8'));
-}
-
-/**
- * Everything the run would touch, as `{ action, path, detail }` rows. `--dry-run`
- * prints this and stops; the real run walks the same list.
- */
-export function buildPlan(root, manifest, { web }) {
-  const plan = [];
-  const seenRewrite = new Set();
-  const addRewrite = (rel, detail) => {
-    const key = `${rel} ${detail}`;
-    if (seenRewrite.has(key)) return;
-    seenRewrite.add(key);
-    plan.push({ action: 'rewrite', path: rel, detail });
-  };
-
-  for (const entry of manifest.rename.perFile) {
-    if (!exists(root, entry.path)) {
-      if (entry.optional) continue;
-      throw new Error(`manifest lists a missing file: ${entry.path}`);
-    }
-    addRewrite(entry.path, 'rename (anchored)');
-  }
-  for (const rel of manifest.rename.paths) {
-    if (!exists(root, rel)) throw new Error(`manifest lists a missing file: ${rel}`);
-    addRewrite(rel, 'rename (tokens)');
-  }
-  for (const rel of expandGlobs(root, manifest.rename.globs)) {
-    addRewrite(rel, 'rename (tokens)');
-  }
-
-  if (!web) {
-    for (const rel of webFiles(root, manifest)) {
-      if (exists(root, rel)) plan.push({ action: 'delete', path: rel, detail: 'web target' });
-    }
-    plan.push({
-      action: 'rewrite',
-      path: manifest.web.packageJson,
-      detail: 'drop web scripts and deps',
-    });
-    plan.push({
-      action: 'rewrite',
-      path: manifest.web.makefile,
-      detail: `drop targets: ${manifest.web.makeTargets.join(', ')}`,
-    });
-    plan.push({
-      action: 'rewrite',
-      path: manifest.web.knipConfig,
-      detail: `drop plugins: ${manifest.web.knipPlugins.join(', ')}`,
-    });
-    plan.push({
-      action: 'rewrite',
-      path: manifest.web.commitlintConfig,
-      detail: `drop scopes: ${manifest.web.commitlintScopes.join(', ')}`,
-    });
-    for (const block of manifest.web.markedBlocks) {
-      plan.push({ action: 'rewrite', path: block.path, detail: `drop ${block.marker} block` });
-    }
-    for (const edit of manifest.web.edits) {
-      if (exists(root, edit.path))
-        plan.push({ action: 'rewrite', path: edit.path, detail: 'drop web references' });
-    }
-    for (const rel of expandGlobs(root, manifest.web.docScrub.globs)) {
-      plan.push({ action: 'rewrite', path: rel, detail: 'scrub web doc rows' });
-    }
-  }
-
-  for (const rel of manifest.selfDelete.paths) {
-    plan.push({ action: 'delete', path: rel, detail: 'self-delete' });
-  }
-  plan.push({
-    action: 'rewrite',
-    path: manifest.web.makefile,
-    detail: `drop targets: ${manifest.selfDelete.makeTargets.join(', ')}`,
-  });
-  for (const block of manifest.selfDelete.markedBlocks) {
-    if (exists(root, block.path))
-      plan.push({ action: 'rewrite', path: block.path, detail: `drop ${block.marker} block` });
-  }
-  for (const rel of expandGlobs(root, manifest.selfDelete.docScrub.globs)) {
-    plan.push({ action: 'rewrite', path: rel, detail: 'scrub template-usage rows' });
-  }
-  return plan;
 }
 
 function webFiles(root, manifest) {
@@ -422,6 +370,234 @@ function webFiles(root, manifest) {
         .filter((line) => line && !line.startsWith('#'))
     : [];
   return [...new Set([...listed, ...manifest.web.files])];
+}
+
+// ---------------------------------------------------------------------------
+// Preflight: does every anchor the manifest declares still exist?
+// ---------------------------------------------------------------------------
+
+/**
+ * Check one `edits`-shaped entry against the file as it is now. Every anchor is
+ * in the manifest *because* it matches today, so a non-match is drift, not an
+ * optional case.
+ * @returns {string[]} problems, empty when the entry is sound.
+ */
+export function validateEdit(root, entry) {
+  const problems = [];
+  if (!exists(root, entry.path)) {
+    if (!entry.optional) problems.push(`${entry.path}: missing (the manifest lists it)`);
+    return problems;
+  }
+  const text = read(root, entry.path);
+  const lines = text.split('\n');
+
+  for (const [from, , count] of entry.replace ?? []) {
+    // A number is an exact count; "+" means "one or more", for the replace-all
+    // anchors whose count is not itself meaningful (CODEOWNERS rows, fixture links).
+    const wanted = count ?? 1;
+    const actual = countOccurrences(text, from);
+    const ok = wanted === '+' ? actual >= 1 : actual === wanted;
+    if (!ok) {
+      problems.push(
+        `${entry.path}: anchor occurs ${actual}x, expected ${wanted}x: ${JSON.stringify(from)}`,
+      );
+    }
+  }
+  for (const { from, until } of entry.blocks ?? []) {
+    const start = lines.findIndex((line) => new RegExp(from).test(line));
+    if (start === -1) {
+      problems.push(`${entry.path}: no line matches block start /${from}/`);
+      continue;
+    }
+    if (!lines.slice(start).some((line) => new RegExp(until).test(line))) {
+      problems.push(`${entry.path}: no line matches block end /${until}/ after /${from}/`);
+    }
+  }
+  for (const pattern of entry.lines ?? []) {
+    if (!lines.some((line) => new RegExp(pattern).test(line))) {
+      problems.push(`${entry.path}: no line matches /${pattern}/`);
+    }
+  }
+  for (const pattern of entry.paragraphs ?? []) {
+    if (!new RegExp(pattern, 'm').test(text)) {
+      problems.push(`${entry.path}: no paragraph matches /${pattern}/`);
+    }
+  }
+  return problems;
+}
+
+function validateMarkedBlock(root, block) {
+  if (!exists(root, block.path)) {
+    return block.optional ? [] : [`${block.path}: missing (the manifest lists it)`];
+  }
+  const text = read(root, block.path);
+  const starts = countOccurrences(text, `${block.marker}-start`);
+  const ends = countOccurrences(text, `${block.marker}-end`);
+  if (starts !== 1 || ends !== 1) {
+    return [`${block.path}: expected one ${block.marker}-start/-end pair, found ${starts}/${ends}`];
+  }
+  return [];
+}
+
+function validateScrub(root, scrub, label) {
+  const problems = [];
+  const files = expandGlobs(root, scrub.globs).map((rel) => [rel, read(root, rel)]);
+  const matches = (pattern, test) =>
+    files.some(([, text]) => test(new RegExp(pattern, 'm'), text.split('\n'), text));
+  for (const pattern of scrub.lines ?? []) {
+    if (!matches(pattern, (re, lines) => lines.some((line) => re.test(line)))) {
+      problems.push(`${label}: no line in any scrubbed file matches /${pattern}/`);
+    }
+  }
+  for (const pattern of scrub.bullets ?? []) {
+    if (!matches(pattern, (re, lines) => lines.some((line) => re.test(line)))) {
+      problems.push(`${label}: no line in any scrubbed file matches /${pattern}/`);
+    }
+  }
+  for (const pattern of scrub.paragraphs ?? []) {
+    if (!matches(pattern, (re, _lines, text) => re.test(text))) {
+      problems.push(`${label}: no paragraph in any scrubbed file matches /${pattern}/`);
+    }
+  }
+  return problems;
+}
+
+/**
+ * Everything that has to be true before the first byte is written.
+ * @returns {string[]} problems, empty when the run can proceed.
+ */
+export function validatePlan(root, manifest, { web }) {
+  const problems = [];
+
+  for (const entry of manifest.rename.perFile) problems.push(...validateEdit(root, entry));
+  for (const rel of manifest.rename.paths) {
+    if (!exists(root, rel)) problems.push(`${rel}: missing (rename.paths lists it)`);
+  }
+
+  if (!web) {
+    const cfg = manifest.web;
+    for (const rel of webFiles(root, manifest)) {
+      if (!exists(root, rel)) problems.push(`${rel}: missing (the web file list names it)`);
+    }
+    if (exists(root, cfg.packageJson)) {
+      const pkg = JSON.parse(read(root, cfg.packageJson));
+      for (const key of cfg.packageScripts) {
+        if (!(key in (pkg.scripts ?? {}))) problems.push(`${cfg.packageJson}: no script "${key}"`);
+      }
+      for (const key of cfg.packageDependencies) {
+        if (!(key in (pkg.dependencies ?? {})))
+          problems.push(`${cfg.packageJson}: no dependency "${key}"`);
+      }
+      for (const key of cfg.packageDevDependencies) {
+        if (!(key in (pkg.devDependencies ?? {})))
+          problems.push(`${cfg.packageJson}: no devDependency "${key}"`);
+      }
+    }
+    if (exists(root, cfg.knipConfig)) {
+      const knip = JSON.parse(read(root, cfg.knipConfig));
+      for (const key of cfg.knipPlugins) {
+        if (!(key in knip)) problems.push(`${cfg.knipConfig}: no "${key}" plugin key`);
+      }
+    }
+    problems.push(
+      ...validateEdit(root, {
+        path: cfg.makefile,
+        lines: cfg.makeTargets.map((target) => `^${escapeRe(target)}:`),
+      }),
+      ...validateEdit(root, {
+        path: cfg.commitlintConfig,
+        lines: cfg.commitlintScopes.map((scope) => `^\\s*'${escapeRe(scope)}',\\s*$`),
+      }),
+    );
+    for (const block of cfg.markedBlocks) problems.push(...validateMarkedBlock(root, block));
+    for (const entry of cfg.edits) problems.push(...validateEdit(root, entry));
+    problems.push(...validateScrub(root, cfg.docScrub, 'web.docScrub'));
+  } else {
+    // Kept web still means the markers go: they point at a script that is
+    // about to delete itself.
+    for (const block of manifest.web.markedBlocks)
+      problems.push(...validateMarkedBlock(root, block));
+  }
+
+  const self = manifest.selfDelete;
+  for (const rel of self.paths) {
+    if (!exists(root, rel)) problems.push(`${rel}: missing (selfDelete.paths lists it)`);
+  }
+  problems.push(
+    ...validateEdit(root, {
+      path: manifest.web.makefile,
+      lines: self.makeTargets.map((target) => `^${escapeRe(target)}:`),
+    }),
+  );
+  for (const block of self.markedBlocks) problems.push(...validateMarkedBlock(root, block));
+  for (const entry of self.edits ?? []) problems.push(...validateEdit(root, entry));
+  problems.push(...validateScrub(root, self.docScrub, 'selfDelete.docScrub'));
+
+  return problems;
+}
+
+// ---------------------------------------------------------------------------
+// The plan
+// ---------------------------------------------------------------------------
+
+/**
+ * Everything the run would touch, as `{ action, path, detail }` rows. `--dry-run`
+ * prints this and stops; the real run walks the same list. Purely descriptive —
+ * `validatePlan` is what decides whether the run may start.
+ */
+export function buildPlan(root, manifest, { web }) {
+  const plan = [];
+  const seen = new Set();
+  const add = (action, rel, detail) => {
+    const key = `${action} ${rel} ${detail}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    plan.push({ action, path: rel, detail });
+  };
+
+  for (const entry of manifest.rename.perFile) {
+    if (exists(root, entry.path)) add('rewrite', entry.path, 'rename (anchored)');
+  }
+  for (const rel of manifest.rename.paths) add('rewrite', rel, 'rename (tokens)');
+  for (const rel of expandGlobs(root, manifest.rename.globs)) {
+    add('rewrite', rel, 'rename (tokens)');
+  }
+
+  const cfg = manifest.web;
+  if (!web) {
+    for (const rel of webFiles(root, manifest)) add('delete', rel, 'web target');
+    add('rewrite', cfg.packageJson, 'drop web scripts and deps');
+    add('rewrite', cfg.makefile, `drop targets: ${cfg.makeTargets.join(', ')}`);
+    add('rewrite', cfg.knipConfig, `drop plugins: ${cfg.knipPlugins.join(', ')}`);
+    add('rewrite', cfg.commitlintConfig, `drop scopes: ${cfg.commitlintScopes.join(', ')}`);
+    for (const block of cfg.markedBlocks) {
+      add('rewrite', block.path, `drop ${block.marker} block`);
+    }
+    for (const entry of cfg.edits) {
+      if (exists(root, entry.path)) add('rewrite', entry.path, 'drop web references');
+    }
+    for (const rel of expandGlobs(root, cfg.docScrub.globs)) {
+      add('rewrite', rel, 'scrub web doc rows');
+    }
+  } else {
+    for (const block of cfg.markedBlocks) {
+      add('rewrite', block.path, `drop ${block.marker} marker lines (keep the block)`);
+    }
+  }
+
+  const self = manifest.selfDelete;
+  for (const rel of self.paths) add('delete', rel, 'self-delete');
+  add('rewrite', cfg.makefile, `drop targets: ${self.makeTargets.join(', ')}`);
+  for (const block of self.markedBlocks) {
+    if (exists(root, block.path)) add('rewrite', block.path, `drop ${block.marker} block`);
+  }
+  for (const entry of self.edits ?? []) {
+    if (exists(root, entry.path)) add('rewrite', entry.path, 'drop template-usage references');
+  }
+  for (const rel of expandGlobs(root, self.docScrub.globs)) {
+    add('rewrite', rel, 'scrub template-usage rows');
+  }
+  return plan;
 }
 
 // ---------------------------------------------------------------------------
@@ -440,87 +616,88 @@ function applyRename(root, manifest, answers) {
   }
 }
 
+function applyEdits(root, entries) {
+  for (const entry of entries) {
+    if (!exists(root, entry.path)) continue;
+    let text = read(root, entry.path);
+    if (entry.replace) text = applyTokens(text, entry.replace, {});
+    if (entry.blocks) text = removeBlocks(text, entry.blocks);
+    if (entry.lines) text = removeLines(text, entry.lines);
+    if (entry.paragraphs) text = removeParagraphs(text, entry.paragraphs);
+    write(root, entry.path, text);
+  }
+}
+
 function applyDocScrub(root, scrub) {
   for (const rel of expandGlobs(root, scrub.globs)) {
     const before = read(root, rel);
     const after = removeParagraphs(
-      removeBullets(removeLines(before, scrub.lines), scrub.bullets ?? []),
-      scrub.paragraphs,
+      removeBullets(removeLines(before, scrub.lines ?? []), scrub.bullets ?? []),
+      scrub.paragraphs ?? [],
     );
     if (after !== before) write(root, rel, after);
   }
 }
 
 function applyWebRemoval(root, manifest) {
-  const web = manifest.web;
+  const cfg = manifest.web;
   for (const rel of webFiles(root, manifest)) {
     rmSync(abs(root, rel), { recursive: true, force: true });
   }
 
   write(
     root,
-    web.packageJson,
-    rewriteJson(read(root, web.packageJson), (pkg) => {
-      for (const key of web.packageScripts) delete pkg.scripts?.[key];
-      for (const key of web.packageDependencies) delete pkg.dependencies?.[key];
-      for (const key of web.packageDevDependencies) delete pkg.devDependencies?.[key];
+    cfg.packageJson,
+    rewriteJson(read(root, cfg.packageJson), (pkg) => {
+      for (const key of cfg.packageScripts) delete pkg.scripts[key];
+      for (const key of cfg.packageDependencies) delete pkg.dependencies[key];
+      for (const key of cfg.packageDevDependencies) delete pkg.devDependencies[key];
     }),
   );
-
   write(
     root,
-    web.knipConfig,
-    rewriteJson(read(root, web.knipConfig), (knip) => {
-      for (const key of web.knipPlugins) delete knip[key];
+    cfg.knipConfig,
+    rewriteJson(read(root, cfg.knipConfig), (knip) => {
+      for (const key of cfg.knipPlugins) delete knip[key];
     }),
   );
-
-  write(root, web.makefile, removeMakeTargets(read(root, web.makefile), web.makeTargets));
-
+  write(root, cfg.makefile, removeMakeTargets(read(root, cfg.makefile), cfg.makeTargets));
   write(
     root,
-    web.commitlintConfig,
+    cfg.commitlintConfig,
     removeLines(
-      read(root, web.commitlintConfig),
-      web.commitlintScopes.map((scope) => `^\\s*'${escapeRe(scope)}',\\s*$`),
+      read(root, cfg.commitlintConfig),
+      cfg.commitlintScopes.map((scope) => `^\\s*'${escapeRe(scope)}',\\s*$`),
     ),
   );
 
-  for (const block of web.markedBlocks) {
-    const { text, found } = removeMarkedBlock(read(root, block.path), block.marker);
-    if (!found) throw new Error(`${block.path}: no ${block.marker}-start marker found`);
-    write(root, block.path, text);
+  for (const block of cfg.markedBlocks) {
+    write(root, block.path, removeMarkedBlock(read(root, block.path), block.marker).text);
   }
-
-  for (const edit of web.edits) {
-    if (!exists(root, edit.path)) {
-      if (edit.optional) continue;
-      throw new Error(`manifest lists a missing file: ${edit.path}`);
-    }
-    let text = read(root, edit.path);
-    if (edit.replace) text = applyTokens(text, edit.replace, {});
-    if (edit.blocks) text = removeBlocks(text, edit.blocks);
-    if (edit.lines) text = removeLines(text, edit.lines);
-    if (edit.paragraphs) text = removeParagraphs(text, edit.paragraphs);
-    write(root, edit.path, text);
-  }
-
-  applyDocScrub(root, web.docScrub);
+  applyEdits(root, cfg.edits);
+  applyDocScrub(root, cfg.docScrub);
 }
 
-function applySelfDelete(root, manifest) {
+function applySelfDelete(root, manifest, { web }) {
+  if (web) {
+    // The block stays, the markers do not — they name a script that is going away.
+    for (const block of manifest.web.markedBlocks) {
+      write(root, block.path, removeMarkerLines(read(root, block.path), block.marker));
+    }
+  }
+  const self = manifest.selfDelete;
   write(
     root,
     manifest.web.makefile,
-    removeMakeTargets(read(root, manifest.web.makefile), manifest.selfDelete.makeTargets),
+    removeMakeTargets(read(root, manifest.web.makefile), self.makeTargets),
   );
-  for (const block of manifest.selfDelete.markedBlocks) {
+  for (const block of self.markedBlocks) {
     if (!exists(root, block.path)) continue;
-    const { text } = removeMarkedBlock(read(root, block.path), block.marker);
-    write(root, block.path, text);
+    write(root, block.path, removeMarkedBlock(read(root, block.path), block.marker).text);
   }
-  applyDocScrub(root, manifest.selfDelete.docScrub);
-  for (const rel of manifest.selfDelete.paths) {
+  applyEdits(root, self.edits ?? []);
+  applyDocScrub(root, self.docScrub);
+  for (const rel of self.paths) {
     rmSync(abs(root, rel), { recursive: true, force: true });
   }
 }
@@ -531,15 +708,17 @@ function applySelfDelete(root, manifest) {
 
 const USAGE = `make init — rename this template into your app.
 
-  --yes                 non-interactive; every value below must be supplied
-  --dry-run             print the touch list and exit without changing anything
-  --name <str>          display name, e.g. "Acme Wallet"
-  --slug <str>          Expo slug / package name, e.g. acme-wallet
-  --ios-bundle-id <id>  e.g. com.acme.wallet
+  --yes                  non-interactive; every value below must be supplied,
+                         including --web or --no-web
+  --dry-run              print the touch list and exit without changing anything
+                         (defaults to --no-web, like the prompt does)
+  --name <str>           display name, e.g. "Acme Wallet"
+  --slug <str>           Expo slug / package name, e.g. acme-wallet
+  --ios-bundle-id <id>   e.g. com.acme.wallet
   --android-package <id> e.g. com.acme.wallet
-  --scheme <str>        deep-link scheme, e.g. acme
-  --owners <org>        GitHub org or user that owns the repo, e.g. acme
-  --web | --no-web      keep or strip the web target (see docs/web-files.txt)
+  --scheme <str>         deep-link scheme, e.g. acme
+  --owners <org>         GitHub org or user that owns the repo, e.g. acme
+  --web | --no-web       keep or strip the web target (see docs/web-files.txt)
 `;
 
 export const DRY_RUN_PLACEHOLDERS = {
@@ -615,15 +794,22 @@ export async function main(argv, root = REPO_ROOT) {
   let web = options.web;
 
   if (options.dryRun) {
-    // The touch list does not depend on the values, so a dry run never prompts:
-    // whatever was not passed on the command line gets an obvious placeholder.
+    // A dry run never prompts: the touch list does not depend on the values, so
+    // anything missing gets an obvious placeholder. `web` defaults the way the
+    // prompt does — dropped — so the bare form shows the bigger, riskier list.
     answers = { ...DRY_RUN_PLACEHOLDERS, ...answers };
-  } else if (!options.yes) {
+    if (web === null) web = false;
+  } else if (options.yes) {
+    if (web === null) {
+      console.error('--yes needs --web or --no-web: say whether to keep the web target.');
+      console.error(`\n${USAGE}`);
+      return 2;
+    }
+  } else {
     answers.web = web ?? undefined;
     answers = await prompt(answers);
     web = answers.web;
   }
-  if (web === null || web === undefined) web = true;
 
   const errors = validateAnswers(answers);
   if (errors.length > 0) {
@@ -633,30 +819,50 @@ export async function main(argv, root = REPO_ROOT) {
   }
   const filled = deriveAnswers(answers);
 
+  // Preflight before the first write: a stale anchor stops the run rather than
+  // leaving a half-renamed, half-stripped tree behind.
+  const problems = validatePlan(root, manifest, { web });
+  if (problems.length > 0) {
+    console.error('scripts/init.manifest.json no longer matches this repo:\n');
+    for (const problem of problems) console.error(`  ${problem}`);
+    console.error('\nNothing was changed. Update the manifest anchors and run init again.');
+    return 2;
+  }
+
   const plan = buildPlan(root, manifest, { web });
   if (options.dryRun) {
     console.log(`init --dry-run: ${plan.length} operations (nothing was changed)\n`);
-    for (const row of plan)
+    for (const row of plan) {
       console.log(`  ${row.action.padEnd(7)} ${row.path.padEnd(52)} ${row.detail}`);
+    }
     console.log(`\nweb target: ${web ? 'kept' : 'removed'}`);
     return 0;
   }
 
   applyRename(root, manifest, filled);
   if (!web) applyWebRemoval(root, manifest);
-  applySelfDelete(root, manifest);
+  applySelfDelete(root, manifest, { web });
 
   if (process.env.INIT_SKIP_INSTALL !== '1') {
     run('pnpm', ['install'], { cwd: root });
     run('pnpm', ['codegen'], { cwd: root });
     // Renaming touches no message id, so the catalogs must come back unchanged.
     run('pnpm', ['i18n:check'], { cwd: root });
-    // The JSON rewrites above are parse/stringify, which is valid JSON but not
-    // necessarily Biome's line-width choice; format before the gate reads it.
-    run('pnpm', ['format'], { cwd: root });
-    run('make', ['check-code'], { cwd: root });
   } else {
     console.log('INIT_SKIP_INSTALL=1: skipping install, codegen, i18n and check-code');
+  }
+
+  // The JSON rewrites above are parse/stringify: valid JSON, but not always
+  // Biome's line-width choice. Formatting only needs node_modules, not a fresh
+  // install, so it runs whenever Biome is there — otherwise a skipped-install
+  // run ends with an unformatted tree and a red `make check-code`.
+  // Biome directly, not `pnpm format`: pnpm would re-run the `prepare` lifecycle
+  // (`lefthook install`), which needs a git repo the scratch copies do not have.
+  if (exists(root, 'node_modules/.bin/biome')) {
+    run(abs(root, 'node_modules/.bin/biome'), ['format', '--write', '.'], { cwd: root });
+  }
+  if (process.env.INIT_SKIP_INSTALL !== '1') {
+    run('make', ['check-code'], { cwd: root });
   }
 
   if (process.env.INIT_SKIP_COMMIT !== '1') {
@@ -664,9 +870,7 @@ export async function main(argv, root = REPO_ROOT) {
     run(
       'git',
       ['commit', '-m', `chore(app): initialize ${filled.slug} from react-native-mobile-template`],
-      {
-        cwd: root,
-      },
+      { cwd: root },
     );
   } else {
     console.log('INIT_SKIP_COMMIT=1: leaving the changes uncommitted');
@@ -686,9 +890,11 @@ const invokedDirectly =
 
 if (invokedDirectly) {
   main(process.argv.slice(2))
-    .then((code) => process.exit(code))
+    .then((code) => {
+      process.exitCode = code;
+    })
     .catch((error) => {
       console.error(error.message);
-      process.exit(1);
+      process.exitCode = 1;
     });
 }

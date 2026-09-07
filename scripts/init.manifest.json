@@ -36,24 +36,28 @@
             "<key>CFBundleIdentifier</key><string>com.example.rnmt</string>",
             "<key>CFBundleIdentifier</key><string>{{iosBundleId}}</string>"
           ],
-          ["IOS_BUNDLE_ID: 'com.example.rnmt'", "IOS_BUNDLE_ID: '{{iosBundleId}}'"],
+          ["IOS_BUNDLE_ID: 'com.example.rnmt'", "IOS_BUNDLE_ID: '{{iosBundleId}}'", 2],
           ["/ok bundle-id: com\\.example\\.rnmt/", "/ok bundle-id: {{iosBundleIdRe}}/"]
         ]
       },
       {
         "path": "modules/hello-native/ios/HelloNative.podspec",
         "replace": [
-          ["github.com/blinkbitcoin/react-native-mobile-template", "github.com/{{owner}}/{{slug}}"]
+          [
+            "github.com/blinkbitcoin/react-native-mobile-template",
+            "github.com/{{owner}}/{{slug}}",
+            2
+          ]
         ]
       },
       {
         "path": "scripts/release/fixtures/release-body.md",
-        "replace": [["github.com/acme/rn-mobile-template", "github.com/{{owner}}/{{slug}}"]]
+        "replace": [["github.com/acme/rn-mobile-template", "github.com/{{owner}}/{{slug}}", "+"]]
       },
       {
         "path": ".github/CODEOWNERS",
         "optional": true,
-        "replace": [["@blinkbitcoin/", "@{{owner}}/"]]
+        "replace": [["@blinkbitcoin/", "@{{owner}}/", "+"]]
       }
     ],
     "$comment2": "Ordered, longest-first token replacements applied to every path/glob below. Bare `rnmt` runs last, after every qualified form has already been rewritten.",
@@ -125,14 +129,28 @@
     "commitlintScopes": ["web"],
     "knipPlugins": ["playwright"],
     "markedBlocks": [
-      { "path": "app.config.ts", "marker": "init:web" },
-      { "path": "metro.config.js", "marker": "init:web" },
-      { "path": ".github/workflows/release-production.yml", "marker": "init:web" }
+      {
+        "path": "app.config.ts",
+        "marker": "init:web"
+      },
+      {
+        "path": "metro.config.js",
+        "marker": "init:web"
+      },
+      {
+        "path": ".github/workflows/release-production.yml",
+        "marker": "init:web"
+      }
     ],
     "edits": [
       {
         "path": "src/features/settings/NativeDemoCard.test.tsx",
-        "blocks": [{ "from": "^test\\('the web variant", "until": "^\\}\\);$" }],
+        "blocks": [
+          {
+            "from": "^test\\('the web variant",
+            "until": "^\\}\\);$"
+          }
+        ],
         "lines": ["NativeDemoCard\\.web"]
       },
       {
@@ -215,6 +233,27 @@
             "One script-contract detail is load-bearing:"
           ]
         ]
+      },
+      {
+        "path": ".github/workflows/release-production.yml",
+        "$comment": "The job goes with the marker block; these two comments advertise it and actionlint cannot see comments.",
+        "replace": [
+          ["publish OTA production, deploy web", "publish OTA production"],
+          [
+            "mark latest, publish OTA, deploy web ------------",
+            "mark latest, publish OTA ------------------------"
+          ]
+        ]
+      },
+      {
+        "path": "metro.config.js",
+        "$comment": "The resolver fix it names is inside the init:web block.",
+        "replace": [
+          [
+            "// Expo's default Metro config plus one resolver fix.",
+            "// Expo's default Metro config."
+          ]
+        ]
       }
     ],
     "$comment2": "The scrub only takes whole table rows and whole paragraphs that are entirely about the web target. Anything web-specific inside an otherwise general sentence or row is handled by an anchored `replace` in `edits` above, because deleting the line would take the sentence with it. Missing files and non-matching patterns are fine.",
@@ -247,11 +286,30 @@
       "docs/template-usage.md"
     ],
     "makeTargets": ["init"],
-    "markedBlocks": [{ "path": "README.md", "marker": "init:usage", "optional": true }],
+    "markedBlocks": [
+      {
+        "path": "README.md",
+        "marker": "init:usage",
+        "optional": true
+      }
+    ],
     "docScrub": {
       "globs": ["*.md", "docs/*.md", ".github/*.md"],
-      "lines": ["`make init`", "template-usage\\.md"],
+      "lines": ["^\\s*\\|\\s*`make init`", "^\\s*\\|.*template-usage\\.md"],
       "paragraphs": []
-    }
+    },
+    "edits": [
+      {
+        "path": "docs/README.md",
+        "optional": true,
+        "$comment": "Under --no-web the row is already gone and this is a no-op; under --web the file stays but make init does not.",
+        "replace": [
+          [
+            "The list of web-only files, read by `make init` when web is declined. Data, not prose",
+            "The list of web-only files. Data, not prose"
+          ]
+        ]
+      }
+    ]
   }
 }

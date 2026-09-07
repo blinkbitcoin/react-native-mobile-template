@@ -32,7 +32,9 @@ It asks for seven things and validates each one:
 | GitHub owner | `acme` | the org or user that owns the repo |
 | Keep the web target? | `n` | see [what `--no-web` removes](#what---no-web-removes) |
 
-Non-interactive (CI, or a scripted scratch copy):
+Non-interactive (CI, or a scripted scratch copy). `--yes` requires an explicit
+`--web` or `--no-web`: there is no safe default for "should this app have a web
+build", so it asks rather than guessing.
 
 ```bash
 make init ARGS='--yes \
@@ -44,8 +46,19 @@ make init ARGS='--yes \
 To see exactly what would be touched without changing anything:
 
 ```bash
-make init ARGS=--dry-run
+make init ARGS=--dry-run            # the --no-web list, matching the prompt default
+make init ARGS='--dry-run --web'    # the shorter, web-keeping list
 ```
+
+A dry run is a real preflight, not just a print: before listing anything it
+checks every path, marker and text anchor the manifest names against the files
+as they are now. A real run does the same and refuses to start — exit 2, tree
+untouched — if any of them has drifted, rather than leaving a half-renamed,
+half-stripped repo behind.
+
+`init` is POSIX-only: its rewrites are line-oriented on LF endings and it spawns
+sub-processes without a shell. That matches the template's toolchain (mise on
+macOS and Linux); Windows is untested.
 
 ## 3. What changed
 
@@ -66,8 +79,11 @@ and, with `--no-web`, the removed dependencies), `pnpm codegen` and
 and no message id), `pnpm format`, and `make check-code`.
 
 **Deleted** — `scripts/init.mjs`, `scripts/init.test.mjs`,
-`scripts/init.manifest.json`, this file, the Makefile's `init` target and the
-README's "Using this template" section.
+`scripts/init.manifest.json`, this file, the Makefile's `init` target, the
+README's "Using this template" section, and the doc rows that pointed at any of
+them. The `// init:web-start` / `// init:web-end` comments go too: with
+`--no-web` they take their block with them, with `--web` only the comment lines
+go and the block stays.
 
 **Committed** — `chore(app): initialize <slug> from react-native-mobile-template`,
 with the git hooks enabled, so commitlint and the pre-commit gate run on it.

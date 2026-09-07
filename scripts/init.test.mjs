@@ -15,6 +15,7 @@ import {
   rmSync,
   statSync,
   symlinkSync,
+  writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -32,11 +33,13 @@ import {
   removeLines,
   removeMakeTargets,
   removeMarkedBlock,
+  removeMarkerLines,
   removeParagraphs,
   renderTemplate,
   rewriteJson,
   validateAnswers,
   validateField,
+  validatePlan,
 } from './init.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -184,6 +187,22 @@ describe('removeMarkedBlock', () => {
     assert.equal(found, false);
     assert.equal(text, 'a\nb\n');
   });
+
+  test('collapses the blank-line run the removal leaves behind', () => {
+    const { text } = removeMarkedBlock(
+      ['a', '', '// init:web-start', 'body', '// init:web-end', '', 'b'].join('\n'),
+      'init:web',
+    );
+    assert.equal(text, 'a\n\nb');
+  });
+
+  test('removeMarkerLines keeps the block and drops only the markers', () => {
+    const text = removeMarkerLines(
+      ['a', '  // init:web-start', '  web: {},', '  // init:web-end', 'b'].join('\n'),
+      'init:web',
+    );
+    assert.equal(text, 'a\n  web: {},\nb');
+  });
 });
 
 describe('removeLines / removeParagraphs', () => {
@@ -240,6 +259,33 @@ describe('removeLines / removeParagraphs', () => {
     assert.match(after, /A following paragraph/);
     assert.doesNotMatch(after, /drop me/);
     assert.doesNotMatch(after, /second line/);
+  });
+
+  // The bug this guard exists for: a match in ordinary prose used to make the
+  // walk-back run past blank lines and headings to *some* earlier bullet, delete
+  // that innocent item, and repeat until the list above it was gone.
+  test('removeBullets leaves a match that is not in a list item completely alone', () => {
+    const text = [
+      '## A section',
+      '',
+      '- an unrelated bullet',
+      '  with a wrapped line.',
+      '- another unrelated bullet',
+      '',
+      'A paragraph that mentions PLAYWRIGHT_SKIP_EXPORT in passing.',
+      '',
+    ].join('\n');
+    assert.equal(removeBullets(text, ['PLAYWRIGHT_SKIP_EXPORT']), text);
+    // The paragraphs pass is what handles that shape.
+    assert.doesNotMatch(removeParagraphs(text, ['PLAYWRIGHT_SKIP_EXPORT']), /in passing/);
+  });
+
+  test('removeBullets and removeBlocks handle every occurrence, not just the first', () => {
+    const bullets = ['- drop A web', '- keep', '- drop B web', ''].join('\n');
+    assert.equal(removeBullets(bullets, [' web$']), '- keep\n');
+
+    const blocks = ['S one', 'E', 'keep', 'S two', 'E', ''].join('\n');
+    assert.equal(removeBlocks(blocks, [{ from: '^S ', until: '^E$' }]), 'keep');
   });
 
   test('removeBlocks refuses a span with no terminator', () => {
@@ -319,17 +365,22 @@ describe('the manifest', () => {
     }
   });
 
-  test('every anchored perFile replacement still matches the file it names', () => {
-    for (const entry of manifest.rename.perFile) {
-      if (entry.optional && !existsSync(path.join(REPO, entry.path))) continue;
-      const text = readFileSync(path.join(REPO, entry.path), 'utf8');
-      for (const [from] of entry.replace) {
-        assert.ok(
-          text.includes(from),
-          `${entry.path}: anchored replacement no longer matches: ${from}`,
-        );
-      }
-    }
+  // The drift alarm. Every anchor, marker, scrub pattern, make target, package
+  // script and dependency the manifest names is in there *because* it matches
+  // the repo today; `validatePlan` is what init runs before its first write, so
+  // asserting it is empty here is what stops a doc reflow from turning into a
+  // silent no-op (or a half-stripped tree) later.
+  test('validatePlan is clean in both modes', () => {
+    assert.deepEqual(validatePlan(REPO, manifest, { web: false }), []);
+    assert.deepEqual(validatePlan(REPO, manifest, { web: true }), []);
+  });
+
+  test('validatePlan reports a drifted anchor instead of shrugging', () => {
+    const drifted = structuredClone(manifest);
+    drifted.web.edits[0].replace = [['a string that is not in that file', 'x']];
+    const problems = validatePlan(REPO, drifted, { web: false });
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /anchor occurs 0x, expected 1x/);
   });
 
   test('it covers every file in the repo that still carries a rename token', () => {
@@ -397,7 +448,7 @@ after(() => {
   for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true });
 });
 
-function copyRepo() {
+function copyRepo({ git = false } = {}) {
   const dir = mkdtempSync(path.join(tmpdir(), 'rnmt-init-'));
   tempDirs.push(dir);
   const root = path.join(dir, 'app');
@@ -418,7 +469,44 @@ function copyRepo() {
   }
   // Symlinked, not copied: init only reads package.json here (INIT_SKIP_INSTALL).
   symlinkSync(path.join(REPO, 'node_modules'), path.join(root, 'node_modules'), 'dir');
+  if (git) {
+    const git4 = (...args) =>
+      spawnSync('git', args, { cwd: root, encoding: 'utf8', env: { ...process.env } });
+    git4('init', '-q');
+    git4('add', '-A');
+    git4(
+      '-c',
+      'user.email=t@example.com',
+      '-c',
+      'user.name=t',
+      'commit',
+      '-qm',
+      'base',
+      '--no-verify',
+    );
+  }
   return root;
+}
+
+const gitStatus = (root) =>
+  spawnSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).stdout;
+
+/**
+ * The non-blank lines `before` has that `after` does not, in order. Blank lines
+ * are ignored because reflowing around a removal shifts them harmlessly.
+ */
+function removedLines(beforeRoot, afterRoot, rel) {
+  const before = readFileSync(path.join(beforeRoot, rel), 'utf8').split('\n');
+  const after = readFileSync(path.join(afterRoot, rel), 'utf8').split('\n');
+  const remaining = new Map();
+  for (const line of after) remaining.set(line, (remaining.get(line) ?? 0) + 1);
+  const gone = [];
+  for (const line of before) {
+    const left = remaining.get(line) ?? 0;
+    if (left > 0) remaining.set(line, left - 1);
+    else if (line !== '') gone.push(line);
+  }
+  return gone;
 }
 
 function runInit(root, args) {
@@ -586,6 +674,46 @@ describe('init --yes --no-web', () => {
     const before = readFileSync(path.join(REPO, 'pnpm-workspace.yaml'), 'utf8');
     assert.equal(readFileSync(path.join(root, 'pnpm-workspace.yaml'), 'utf8'), before);
   });
+
+  // The gate for over-deletion. Every other assertion here looks for what should
+  // be *absent*, so a scrub that ate innocent prose used to pass them all. These
+  // two pin the removal down to the line.
+  test('removes exactly these lines from docs/testing.md', () => {
+    assert.deepEqual(removedLines(REPO, root, 'docs/testing.md'), [
+      '| E2E, web | Playwright | `e2e/web/` | `make e2e-web` |',
+      '## Playwright',
+      '`make e2e-web` runs `scripts/e2e/web.sh`, which exports the site with',
+      '`pnpm build:web --dev` and then runs the suite in `e2e/web/`.',
+      '`playwright.config.ts` starts two web servers for it: the mock API on 4000 and',
+      '`expo serve dist` on 8089.',
+      'Setting `PLAYWRIGHT_SKIP_EXPORT` skips the export and tests whatever is',
+      'already in `dist/`. CI sets it so Playwright exercises the exact artifact the',
+      'deploy job would publish, instead of a second, possibly different export.',
+      '| `playwright-report` | the web job | The Playwright HTML report with traces and screenshots |',
+    ]);
+  });
+
+  test('removes exactly these lines from docs/README.md', () => {
+    assert.deepEqual(removedLines(REPO, root, 'docs/README.md'), [
+      '| Turn this template into your own app | [template-usage.md](template-usage.md) |',
+      // Rewritten, not deleted: the row survives without the Playwright mention.
+      '| [testing.md](testing.md) | The test layers, coverage rules, RNTL notes, adding a Maestro flow, Playwright, forensics artifacts |',
+      '| [template-usage.md](template-usage.md) | What `make init` renames and removes when you adopt the template |',
+      '| [web-files.txt](web-files.txt) | The list of web-only files, read by `make init` when web is declined. Data, not prose |',
+    ]);
+  });
+
+  test('removes exactly these lines from AGENTS.md', () => {
+    assert.deepEqual(removedLines(REPO, root, 'AGENTS.md'), [
+      '.maestro/           Maestro flows (native e2e); e2e/web/ is Playwright',
+      '| `make init` | Rename this template into your app, then delete itself (template only; `docs/template-usage.md`) |',
+      '| `make web` | Expo web dev server |',
+      '| `make build-web` | Static web export into `dist/` |',
+      '| `make e2e-web` | Web export (dev env, mock API) + Playwright smoke |',
+      '  ci release deps deps-dev docs e2e web`. Squash merges take the PR title as the',
+      '| Web e2e | `e2e/web/` | `make e2e-web` |',
+    ]);
+  });
 });
 
 describe('init --yes --web', () => {
@@ -613,6 +741,27 @@ describe('init --yes --web', () => {
       .map(([rel]) => rel);
     assert.deepEqual(offenders, []);
   });
+
+  test('drops the init:web markers but keeps what they wrapped', () => {
+    for (const rel of [
+      'app.config.ts',
+      'metro.config.js',
+      '.github/workflows/release-production.yml',
+    ]) {
+      assert.doesNotMatch(readFileSync(path.join(root, rel), 'utf8'), /init:web-(start|end)/, rel);
+    }
+    assert.match(readFileSync(path.join(root, 'metro.config.js'), 'utf8'), /tslib\.es6\.mjs/);
+    assert.match(
+      readFileSync(path.join(root, '.github/workflows/release-production.yml'), 'utf8'),
+      /^ {2}web:$/m,
+    );
+  });
+
+  test('keeps the web-files.txt doc row, reworded now that make init is gone', () => {
+    const index = readFileSync(path.join(root, 'docs/README.md'), 'utf8');
+    assert.match(index, /\| \[web-files\.txt\]\(web-files\.txt\) \| The list of web-only files\./);
+    assert.doesNotMatch(index, /make init/);
+  });
 });
 
 describe('init --yes with a bad value', () => {
@@ -622,5 +771,67 @@ describe('init --yes with a bad value', () => {
     assert.equal(result.status, 2);
     assert.match(result.stderr, /^owner:/m);
     assert.ok(existsSync(path.join(root, 'scripts/init.mjs')));
+  });
+
+  test('--yes without --web or --no-web exits 2 rather than guessing', () => {
+    const root = copyRepo();
+    const result = runInit(root, ['--yes', ...ANSWERS]);
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /--yes needs --web or --no-web/);
+    assert.ok(existsSync(path.join(root, 'scripts/init.mjs')));
+  });
+});
+
+describe('init preflight', () => {
+  test('a drifted anchor stops the run before the first write', () => {
+    const root = copyRepo({ git: true });
+    // Reflow the sentence docs/ci.md's anchored replacement points at, the way
+    // a later docs change would.
+    const ci = path.join(root, 'docs/ci.md');
+    writeFileSync(
+      ci,
+      readFileSync(ci, 'utf8').replace(
+        'Two script-contract details are load-bearing:',
+        'Two script-contract details matter here:',
+      ),
+    );
+    spawnSync('git', ['add', '-A'], { cwd: root });
+    spawnSync(
+      'git',
+      [
+        '-c',
+        'user.email=t@example.com',
+        '-c',
+        'user.name=t',
+        'commit',
+        '-qm',
+        'reflow',
+        '--no-verify',
+      ],
+      { cwd: root },
+    );
+
+    const result = runInit(root, ['--yes', '--no-web', ...ANSWERS]);
+    assert.equal(result.status, 2, result.stdout);
+    assert.match(result.stderr, /no longer matches this repo/);
+    assert.match(result.stderr, /docs\/ci\.md: anchor occurs 0x/);
+    assert.match(result.stderr, /Nothing was changed/);
+    // The whole point: not one byte was written before it gave up.
+    assert.equal(gitStatus(root), '');
+    assert.ok(existsSync(path.join(root, 'scripts/init.mjs')));
+    assert.ok(existsSync(path.join(root, 'playwright.config.ts')));
+  });
+
+  test('--dry-run defaults to --no-web, the way the prompt does', () => {
+    const root = copyRepo({ git: true });
+    const bare = runInit(root, ['--dry-run']);
+    const noWeb = runInit(root, ['--dry-run', '--no-web']);
+    const web = runInit(root, ['--dry-run', '--web']);
+    assert.equal(bare.status, 0, bare.stderr);
+    assert.equal(bare.stdout, noWeb.stdout);
+    assert.notEqual(bare.stdout, web.stdout);
+    assert.match(bare.stdout, /web target: removed/);
+    assert.match(web.stdout, /web target: kept/);
+    assert.equal(gitStatus(root), '');
   });
 });
