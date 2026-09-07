@@ -19,7 +19,7 @@ source. CI lives in a reusable-workflow repo
 ```sh
 mise trust && mise install   # toolchain: Node, pnpm, Ruby, Java
 make doctor                  # verify it (prints one line per tool)
-make install                 # dependencies + git hooks
+make install                 # pnpm dependencies, Ruby gems, git hooks
 make mock-api                # terminal 1: GraphQL mock API on :4000
 make start                   # terminal 2: Metro for the dev client
 make ios                     # or: make android — builds and launches

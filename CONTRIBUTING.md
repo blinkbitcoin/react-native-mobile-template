@@ -7,13 +7,15 @@ change.
 ## Setup
 
 ```sh
-mise install     # toolchain (node, pnpm, ruby, java, ...)
-make doctor      # verify it
-make install     # dependencies (frozen lockfile) + git hooks
+mise trust && mise install   # toolchain (node, pnpm, ruby, java, ...)
+make doctor                  # verify it
+make install                 # pnpm dependencies, Ruby gems, git hooks
 ```
 
-`make install` runs `lefthook install`, so the hooks below are active from then
-on. See [`docs/local-dev.md`](docs/local-dev.md) for first-run details and
+`make install` does all three: `pnpm install --frozen-lockfile`, `bundle
+install` into `vendor/bundle` (the fastlane gems `make check-release` needs),
+and `lefthook install` through pnpm's `prepare` script, so the hooks below are
+active from then on. `NO_BUNDLE=1 make install` skips the Ruby half. See [`docs/local-dev.md`](docs/local-dev.md) for first-run details and
 troubleshooting.
 
 ## Branching

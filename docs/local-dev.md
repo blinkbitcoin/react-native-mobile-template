@@ -6,8 +6,11 @@ Tool versions live in `.mise.toml` and are installed with
 [mise](https://mise.jdx.dev):
 
 ```sh
-mise install
+mise trust && mise install
 ```
+
+`mise trust` is needed once per clone: mise refuses to read a `.mise.toml` it
+has not been told to trust.
 
 | Tool | Pinned to | Needed by |
 | --- | --- | --- |
@@ -29,14 +32,15 @@ make doctor
 
 `scripts/doctor.mjs` reads `scripts/doctor.requirements.json` and reports
 node, pnpm, java, ruby, watchman, xcodebuild (macOS, 26.4+), pod (macOS),
-adb, and maestro (optional), plus the `ANDROID_HOME` environment variable.
-Each failure prints its own fix hint. Run it before asking anyone why a build
-fails.
+adb, and maestro (optional), plus the `ANDROID_HOME` environment variable and
+`bundle check` (the fastlane gems `make check-release` needs — `make install`
+installs them). Each failure prints its own fix hint. Run it before asking
+anyone why a build fails.
 
 ## First run
 
 ```sh
-make install      # pnpm install --frozen-lockfile, and installs the git hooks
+make install      # pnpm deps, Ruby gems (vendor/bundle) and the git hooks
 make mock-api     # terminal 1: GraphQL mock API on http://localhost:4000/graphql
 make start        # terminal 2: Metro for the dev client
 make ios          # terminal 3: prebuild if needed, build, launch the simulator
@@ -100,8 +104,10 @@ make prebuild        # expo prebuild --clean, writes ios/ and android/
 make check-prebuild  # prebuilds both platforms into a temp dir and asserts the plugin output
 ```
 
-`make check-prebuild` is the one that runs in `make check`. It never touches
-your `./ios` or `./android`: it copies the repo into a temp directory twice,
+`make check-prebuild` is **not** part of `make check` — it runs two full
+prebuilds, which is too slow for the static gate (see
+[quality.md](quality.md)); run it yourself before pushing a native change. It
+never touches your `./ios` or `./android`: it copies the repo into a temp directory twice,
 once with OTA off and once with `OTA_ENABLED=true`, and greps the generated
 projects for the plugin output. `make clean` removes the generated projects
 and the caches; `make reset` also reinstalls `node_modules`.
@@ -112,7 +118,9 @@ The prebuild-diff workflow for a plugin change is in
 ## Git hooks
 
 `pnpm install` runs `lefthook install` through the `prepare` script, so the
-hooks in `lefthook.yml` are active after `make install`.
+hooks in `lefthook.yml` are active after `make install`. (`make install` also
+runs `bundle install` into `vendor/bundle`; `NO_BUNDLE=1 make install` skips
+that half.)
 
 | Hook | Runs |
 | --- | --- |
@@ -145,7 +153,7 @@ CI runs the same checks, so an escape hatch defers work, it does not remove it.
 | The dev client sits on its launcher screen | Open the `expo-development-client` deep link. See above |
 | Type errors in `src/graphql/generated/` | Do not edit it. Run `make codegen`. It imports `@graphql-typed-document-node/core`, which is why that package is a direct dependency |
 | A release Android build dies in `createBundleReleaseJsAndAssets` with "Cannot find module 'babel-preset-expo'" | `publicHoistPattern` in `pnpm-workspace.yaml` exists for this. Do not remove that entry. See [quality.md](quality.md) |
-| `make check-release` says to run `bundle install` | Do that. Ruby gems are not committed |
+| `make check-release` says to run `bundle install` | You skipped the Ruby half of `make install` (`NO_BUNDLE=1`, or an older clone). Re-run `make install`. Ruby gems are not committed |
 
 ## Editors
 

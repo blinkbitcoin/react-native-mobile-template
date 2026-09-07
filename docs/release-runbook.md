@@ -454,7 +454,8 @@ Two things only ever **warn**:
 
 `make check-release` runs the same lane checks CI runs (Ruby syntax, a fastlane
 lane parse, the lane unit tests) and is wired to `pnpm check:release`, which
-`ci.yml` turns on via `release-checks: true`. It needs `bundle install` first.
+`ci.yml` turns on via `release-checks: true`. It needs the Ruby gems, which
+`make install` installs into `vendor/bundle`.
 
 **bundletool.** The `android build` lane derives the universal APK from the
 signed `.aab` with bundletool, and no runner image or laptop ships it. CI

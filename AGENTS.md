@@ -25,10 +25,11 @@ src/test/           jest setup, render helper, mocks
 plugins/            Expo config plugins (with-*.ts) + their tests
 modules/            local native modules (hello-native)
 mocks/              GraphQL mock API (server.ts, msw.ts, schema.graphql)
-scripts/            check-*.sh, doctor, release/ (verify, notes, version), e2e/
+scripts/            check-*.sh, doctor, init, hooks/, release/ (verify, notes, version), e2e/
 .maestro/           Maestro flows (native e2e); e2e/web/ is Playwright
 fastlane/           store lanes + metadata; deploy/ota/ is the update server
-docs/               architecture, local-dev, quality, testing, ci, release-runbook, ota
+docs/               architecture, local-dev, quality, testing, ci, native-extensions,
+                    release-runbook, ota, ota-and-crash-reporting, template-usage, decisions/
 ```
 
 ## Commands
@@ -39,7 +40,7 @@ Every row is a make target; nothing here is run through pnpm directly.
 |---|---|
 | `make init` | Rename this template into your app, then delete itself (template only; `docs/template-usage.md`) |
 | `make doctor` | Check the local toolchain (run this first) |
-| `make install` | Install dependencies (frozen lockfile) and git hooks |
+| `make install` | Install dependencies (pnpm + Ruby gems) and git hooks |
 | `make clean` | Remove generated native projects, caches and build output |
 | `make reset` | clean + reinstall |
 | `make help` | Show every target with its description |

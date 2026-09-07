@@ -11,7 +11,7 @@ checked against the repository rather than believed.
 | [0003](0003-plain-stylesheet-theme.md) | Theming with plain `StyleSheet` and typed tokens, no styling dependency | 2026-09-05 |
 | [0004](0004-lingui-i18n.md) | Lingui macros with catalogs compiled to committed TypeScript, no Metro transformer | 2026-09-05 |
 | [0005](0005-apollo4-client-preset.md) | Apollo Client 4, `TypedDocumentNode` from the codegen client preset, one mock schema | 2026-09-05 |
-| [0006](0006-web-opt-in.md) | Web is a separable target that `make init` can strip completely | 2026-09-05 |
+| [0006](0006-web-opt-in.md) | Web is a separable target that can be stripped completely at adoption | 2026-09-05 |
 | [0007](0007-mise-not-nix.md) | `mise` pins the toolchain for humans and CI, not Nix | 2026-09-05 |
 | [0008](0008-release-please-and-store-notes.md) | release-please in manifest mode owns versioning; store notes are generated prose | 2026-09-05 |
 | [0009](0009-e2e-launch-by-deep-link.md) | E2E foregrounds the dev client by deep link; the launcher's Bonjour discovery never works | 2026-09-06 |

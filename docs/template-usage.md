@@ -11,7 +11,7 @@ Use the GitHub "Use this template" button (or clone and re-point `origin`), then
 ```bash
 mise trust && mise install   # toolchain (Node, pnpm, Ruby, ...)
 make doctor                  # verify it
-make install                 # dependencies + git hooks
+make install                 # pnpm dependencies, Ruby gems, git hooks
 ```
 
 ## 2. Run `make init`
@@ -65,18 +65,23 @@ macOS and Linux); Windows is untested.
 Everything `init` touches is declared in `scripts/init.manifest.json`; the
 script itself hard-codes no paths.
 
-**Renamed** — the display name, slug, bundle id, package and scheme in
-`app.config.ts`, `package.json`, `release-please-config.json`, the `.env*`
-files, `.maestro/flows/deep-link.yaml`, the Maestro launch scripts,
-`fastlane/metadata/**` and `fastlane/release-notes-context.md`, the
-`certs/README.md` example command, the local Expo module podspec, the release
-fixtures and `src/lib/native-intent.ts` with its test, plus every Markdown file
-in the repo root, `docs/` and `.github/`.
+**Renamed** — the display name, slug, bundle id, package, scheme and GitHub
+owner. `scripts/init.manifest.json` is the authoritative list; in summary it
+covers `app.config.ts`, `package.json`, `release-please-config.json`, the
+`.env*` files, `.maestro/flows/deep-link.yaml`, the Maestro launch scripts,
+`fastlane/metadata/**`, `fastlane/release-notes-context.md`,
+`fastlane/lanes/android.rb`, the `certs/README.md` example command, the local
+Expo module podspec, `plugins/with-android-release-signing.ts`, the release
+fixtures, `src/lib/native-intent.ts` with its test, `deploy/ota/*`, and every
+Markdown file in the repo root, `docs/`, `docs/decisions/` and `.github/` —
+plus `.github/CODEOWNERS` and `.github/ISSUE_TEMPLATE/*.yml`, where the
+`blinkbitcoin` owner segment becomes your `--owners` value.
 
 **Then, in order:** `pnpm install` (the lockfile picks up the new package name
 and, with `--no-web`, the removed dependencies), `pnpm codegen` and
 `pnpm i18n:check` (both must be no-ops — renaming touches no GraphQL document
-and no message id), `pnpm format`, and `make check-code`.
+and no message id), Biome's formatter (invoked directly, not through `pnpm
+format` — see the comment in `scripts/init.mjs`), and `make check-code`.
 
 **Deleted** — `scripts/init.mjs`, `scripts/init.test.mjs`,
 `scripts/init.manifest.json`, this file, the Makefile's `init` target, the
@@ -100,10 +105,14 @@ The web target is opt-in. Answering "no" deletes the files listed in
 `web`, `build:web` and `test:e2e:web` package scripts, the `web`, `build-web`
 and `e2e-web` make targets, the `react-dom`, `react-native-web`,
 `@expo/metro-runtime` and `@playwright/test` dependencies, the commitlint `web`
-scope and `knip.json`'s `playwright` plugin; and removes the marker-delimited
-web blocks from `app.config.ts`, `metro.config.js` and
-`.github/workflows/release-production.yml`, the web rows from the docs, and the
-web-variant case from `src/features/settings/NativeDemoCard.test.tsx`.
+scope — from `commitlint.config.mjs` and from the four places the enum is
+spelled out for readers (`AGENTS.md`, `CONTRIBUTING.md`, `docs/quality.md`,
+`.github/PULL_REQUEST_TEMPLATE.md`) — and `knip.json`'s `playwright` plugin; and
+removes the marker-delimited web blocks from `app.config.ts`, `metro.config.js`
+and `.github/workflows/release-production.yml`, the web rows from the docs, the
+`react-dom` ignore from `.github/dependabot.yml`, the `Web` platform option from
+the bug-report issue template, and the web-variant case from
+`src/features/settings/NativeDemoCard.test.tsx`.
 
 Answering "yes" keeps all of it, and `make e2e-web` keeps working.
 
