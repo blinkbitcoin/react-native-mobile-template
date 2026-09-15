@@ -1,5 +1,6 @@
 import {
   allowConsole,
+  assertSilent,
   type ConsoleLike,
   createConsoleRecorder,
   formatCall,
@@ -141,6 +142,32 @@ test('the failure message names every call and points at the usual cause', () =>
   expect(message).toContain('console.warn: deprecated');
   expect(message).toContain('await waitFor');
   expect(formatCall({ method: 'warn', message: 'x' })).toBe('console.warn: x');
+});
+
+// `assertSilent` is what the ambient `afterEach` calls. Driving it here is the
+// only way to reach its throwing branch: an `afterEach` cannot fail itself and
+// then report on it.
+test('assertSilent stops the recorder and says nothing when the test was silent', () => {
+  const { target, seen } = fakeConsole();
+  const recorder = createConsoleRecorder(target);
+  recorder.start();
+  expect(() => {
+    assertSilent(recorder);
+  }).not.toThrow();
+  // It stops as well as asserts: the real methods are back afterwards.
+  target.warn('passed through');
+  expect(seen).toEqual(['real warn passed through']);
+});
+
+test('assertSilent throws a message naming every unexpected line', () => {
+  const { target } = fakeConsole();
+  const recorder = createConsoleRecorder(target);
+  recorder.start();
+  target.error('not wrapped in act(...)');
+  target.warn('and a warning');
+  expect(() => {
+    assertSilent(recorder);
+  }).toThrow(/console\.error: not wrapped in act\(\.\.\.\)[\s\S]*console\.warn: and a warning/);
 });
 
 // The two integration cases below run against the live guard installed by

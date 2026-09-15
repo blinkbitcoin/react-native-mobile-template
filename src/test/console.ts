@@ -123,15 +123,25 @@ export const allowConsole = (method: GuardedConsoleMethod, matcher?: ConsoleMatc
   recorder.allow(method, matcher);
 };
 
+/**
+ * Stop `target` and throw when it recorded output no allowance covered. Split
+ * out of `installConsoleGuard` for the same reason `createConsoleRecorder` is a
+ * factory: the ambient `afterEach` cannot observe its own failure, so this is
+ * the seam a test drives directly.
+ */
+export const assertSilent = (target: ConsoleRecorder): void => {
+  const unexpected = target.stop();
+  if (unexpected.length > 0) {
+    throw new Error(formatFailure(unexpected));
+  }
+};
+
 /** Wire the recorder into the ambient Jest lifecycle. Called from setup files. */
 export const installConsoleGuard = (): void => {
   beforeEach(() => {
     recorder.start();
   });
   afterEach(() => {
-    const unexpected = recorder.stop();
-    if (unexpected.length > 0) {
-      throw new Error(formatFailure(unexpected));
-    }
+    assertSilent(recorder);
   });
 };

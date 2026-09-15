@@ -73,22 +73,31 @@ is offset by a small thoroughly tested one.
 - `coveragePathIgnorePatterns` lists everything with no behaviour to assert.
   Each entry carries a one-line reason in `jest.config.ts`, and an entry
   without one is not mergeable. Today: ambient `.d.ts` declarations, the Jest
-  harness under `src/test/`, generated GraphQL, compiled Lingui catalogs, the
-  three pure re-export route barrels under `src/app/`, and the
-  `requireNativeModule` binding under `modules/*/src/`.
+  setup files and manual mocks under `src/test/`, generated GraphQL, compiled
+  Lingui catalogs, the three pure re-export route barrels under `src/app/`,
+  and the `requireNativeModule` binding under `modules/*/src/`.
 
   It is spread into both Jest projects rather than declared once at the root:
   unlike the other coverage options this one is project-scoped, and a
   root-level copy is silently ignored when `projects` is set.
 
-An exclusion is a claim that the file cannot be meaningfully tested. A native
-module's TypeScript wrapper does **not** qualify just because the native half
-is Swift or Kotlin — `modules/hello-native/index.ts` validates input and maps
-the missing-module failure, and it is tested. If a branch really is
-unreachable, prefer restructuring the code to delete it over excluding the
+An exclusion is a claim that the file cannot be meaningfully tested, and "it is
+test infrastructure" is not that claim. `src/test/console.ts` and
+`src/test/render.tsx` are ordinary modules with ordinary logic, so they are
+measured like any other file. Only the three setup files are excluded, and for
+a mechanical reason: every suite runs them, but they run *before* the project's
+instrumentation is installed, so they report 0% however thoroughly they are
+exercised.
+
+A native module's TypeScript wrapper does **not** qualify either, just because
+the native half is Swift or Kotlin — `modules/hello-native/index.ts` validates
+input and maps the missing-module failure, and it is tested. If a branch really
+is unreachable, prefer restructuring the code to delete it over excluding the
 file: that is why the root layout's global error handler moved to
 `src/lib/global-error-handler.ts`, where the "no hook on web" case is a value a
-test passes rather than a branch no test can take.
+test passes rather than a branch no test can take, and why `assertSilent()` is
+split out of `installConsoleGuard()` — an `afterEach` cannot observe its own
+failure, so the throwing branch needs a seam a test can call.
 
 ### Files with nothing to cover
 
@@ -145,9 +154,11 @@ const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
 That is how `src/lib/logger.test.ts` — the suite whose whole job is to check
 what reaches the console — keeps passing.
 
-`src/test/console.test.ts` unit-tests the recorder directly (an `afterEach`
-cannot observe its own failure) and covers both opt-outs against the live
-guard.
+`src/test/console.test.ts` unit-tests the recorder directly and covers both
+opt-outs against the live guard. Two seams exist because an `afterEach` cannot
+observe its own failure: `createConsoleRecorder(target)` takes the console to
+record, and `assertSilent(recorder)` is the `afterEach` body — the only way to
+reach the branch that throws is to call it from a test.
 
 ## Writing a component test
 

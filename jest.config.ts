@@ -13,9 +13,13 @@ const coveragePathIgnorePatterns = [
   '/node_modules/',
   // Ambient type declarations: erased at build time, no runtime statements.
   '\\.d\\.ts$',
-  // The Jest harness itself (setup files, module mocks, render helpers):
-  // instrumenting it measures the test rig rather than the app.
-  '<rootDir>/src/test/',
+  // Jest setup files: every suite runs them, but they execute before this
+  // project's instrumentation is installed, so they report 0% however
+  // thoroughly they run. Not measurable units, rather than untested ones.
+  '<rootDir>/src/test/(env|setup|setup\\.plugins)\\.ts$',
+  // Jest manual mocks: stand-ins for native modules, wired in through
+  // `moduleNameMapper`. Fixtures, not app behaviour.
+  '<rootDir>/src/test/mocks/',
   // GraphQL codegen output: written by `make gen`, reviewed as a diff.
   '<rootDir>/src/graphql/generated/',
   // Compiled Lingui catalogs: written by `make i18n` from the `.po` files.
