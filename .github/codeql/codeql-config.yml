@@ -1,0 +1,48 @@
+# CodeQL configuration, read by BOTH the CI analysis
+# (.github/workflows/codeql.yml, which passes this path to
+# github/codeql-action/init) and the local run (`make codeql`, which parses the
+# suite and the packs out of this file). One file, so local and CI cannot
+# disagree about what was scanned or with which queries.
+name: react-native-mobile-template
+
+# `security-and-quality`: the default security suite plus the
+# maintainability/reliability queries that GitHub sells separately as "Code
+# quality". They overlap Biome and ESLint in places; the non-overlapping half is
+# dataflow, which neither linter does.
+queries:
+  - uses: security-and-quality
+
+# This pack is not optional decoration - it is the suppression mechanism.
+# `AlertSuppression.ql` is what makes an inline
+#
+#     // codeql[js/some-rule-id]
+#
+# comment (alone on its line, covering the line below it) actually suppress one
+# finding. WITHOUT this pack the marker is silently ignored: the comment sits in
+# the file looking like it works while the alert keeps coming back. esign lost
+# three rounds to one JWT false positive exactly that way.
+#
+# And a marker is the right tool, not an API/UI dismissal:
+#   - a dismissal is keyed to the alert's FINGERPRINT, so it evaporates the next
+#     time the file moves or the lines around it shift, and the alert re-opens
+#     with nobody having changed anything;
+#   - a marker travels with the code, is reviewed in the diff that adds it, and
+#     silences exactly one site rather than the whole query - the same rule
+#     firing somewhere else still shows up.
+# So: suppress in the source, with a comment saying why, never in the UI.
+packs:
+  - codeql/javascript-queries:AlertSuppression.ql
+
+# Generated, compiled, vendored or native output: scanning it reports findings
+# nobody can fix in this repo, and the generators are the real review surface.
+# `make codeql` mirrors this list as LGTM_INDEX_FILTERS so a local database
+# holds the same files a CI one does.
+paths-ignore:
+  - src/graphql/generated # graphql-codegen output (`make codegen`)
+  - src/i18n/locales/*/messages.ts # compiled Lingui catalogs (`make i18n`)
+  - ios # expo prebuild output, never committed
+  - android # expo prebuild output, never committed
+  - dist # web export
+  - coverage # jest reports
+  - vendor/bundle # fastlane's gems
+  - .rnw # the workflows repo, checked out beside us on a runner

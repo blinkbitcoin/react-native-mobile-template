@@ -1,0 +1,29 @@
+name: codeql
+on:
+  push:
+    branches: [main]
+    # No path filter here, deliberately: the reusable workflow's `changes` job
+    # runs the same classifier `ci.yml` relies on, so the docs rule lives in
+    # exactly one place. A filter on this file would be a second, narrower copy
+    # of it - the defect that was removed from `ci.yml`.
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly, so a query published since the last push still gets to run against
+    # an idle main. A schedule has no base sha, so the classifier fails open and
+    # everything is analysed - which is the point.
+    - cron: '17 6 * * 1'
+permissions:
+  contents: read
+concurrency:
+  # Unlike the release groups, an interrupted scan costs nothing and the next
+  # push re-runs it from scratch, so superseded runs are cancelled.
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  # The called workflow declares the `security-events: write` / `actions: read`
+  # escalation on its own analyze job, so nothing is granted here.
+  # Keep this OUT of the required-checks ruleset: CodeQL is informational and a
+  # runner hiccup must not be able to block a merge.
+  codeql:
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/codeql.yml@v0

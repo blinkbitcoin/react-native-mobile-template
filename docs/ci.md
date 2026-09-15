@@ -2,14 +2,14 @@
 
 This repo runs almost no CI logic of its own. Nearly every job lives in
 [`blinkbitcoin/react-native-workflows`](https://github.com/blinkbitcoin/react-native-workflows)
-and the ten files in `.github/workflows/` are thin callers that pick inputs.
-Two of the ten are the exception and are described below. The workflows repo's
+and the eleven files in `.github/workflows/` are thin callers that pick inputs.
+Two of the eleven are the exception and are described below. The workflows repo's
 `docs/consumer-guide.md` is the contract; this page is the template's half of
 it.
 
 ## The callers
 
-Ten files, in two groups: four that run on every change, and six that make
+Eleven files, in two groups: five that run on every change, and six that make
 releases. The release group is documented in
 [release-runbook.md](release-runbook.md) and [ota.md](ota.md); the table below
 is the inventory.
@@ -22,6 +22,7 @@ is the inventory.
 | `web.yml` | `pull_request`, `release: published` | `web.yml` | PR = dev export + Playwright smoke; release = production export + Pages deploy |
 | `pr-closed.yml` | `pull_request: closed` | `pr-closed.yml` | cancels the closed PR's in-flight runs; needs `actions: write` |
 | `pr-title.yml` | `pull_request: edited` (only when the title changed) | `pr-title.yml` | `opened`/`synchronize` are already covered by `checks.yml`'s `commitlint` |
+| `codeql.yml` | `push` to `main`, `pull_request` to `main`, `schedule` (Mon 06:17 UTC) | `codeql.yml` | CodeQL advanced setup. Informational — **never** a required check. Config in `.github/codeql/codeql-config.yml`; `make codeql` runs the same queries locally |
 
 `push` is deliberately scoped to `main` only: a PR branch in this repo would
 otherwise fire both `push` and `pull_request` and run the whole suite twice for
@@ -74,6 +75,7 @@ locally means the same commands passed the same way in CI.
 | `unit.yml` | `test:coverage`, `test:scripts` | `make coverage`, `make test-scripts` (`make unit` runs `test` + `test:scripts`) |
 | `e2e.yml` | Maestro flows in `.maestro/` against a debug build | `make e2e-ios` / `make e2e-android` (after `make mock-api`, `make start`, `make ios`/`make android`) |
 | `web.yml` | `build:web`, `test:e2e:web` | `make build-web`, `make e2e-web` |
+| `codeql.yml` | no consumer script: the CodeQL action reads `.github/codeql/codeql-config.yml` | `make codeql` (same config, same suite, same packs) |
 
 Two script-contract details are load-bearing:
 
