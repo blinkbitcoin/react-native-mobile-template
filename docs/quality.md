@@ -104,7 +104,7 @@ Each gate has one supported escape hatch. Use it, with a comment saying why.
 | ESLint | `// eslint-disable-next-line <rule> -- <reason>` | The code |
 | knip | An `ignore`, `ignoreDependencies`, `ignoreBinaries` or `ignoreUnresolved` entry, or the `knipignore` JSDoc tag on an export | `knip.json` |
 | typos | An entry under `[default.extend-words]`, or a path in `extend-exclude` | `typos.toml` |
-| Vulnerability audit | `auditConfig.ignoreGhsas` with the advisory id and a paragraph on why it cannot be exploited here | `pnpm-workspace.yaml` |
+| Vulnerability audit | `auditConfig.ignoreGhsas`, one comment **per id** — the advisory, the dependency path that pulls it in, why it is unreachable from app code, and what should make us look again | `pnpm-workspace.yaml` |
 | Expo SDK version check | `expo.install.exclude` | `package.json` |
 | `minimumReleaseAge` | `minimumReleaseAgeExclude`, pinned as `name@exact-version` so the guard still applies to later releases | `pnpm-workspace.yaml` |
 | Package build scripts | `onlyBuiltDependencies` or `allowBuilds`. `strictDepBuilds` forces an explicit decision | `pnpm-workspace.yaml` |
@@ -113,6 +113,18 @@ Each gate has one supported escape hatch. Use it, with a comment saying why.
 
 Rules of thumb: suppress the narrowest scope that works, put the reason in the
 suppression itself, and never widen an ignore pattern to hide one file.
+
+**An audit ignore without a per-entry reason is not mergeable.** One comment
+covering a block of ids is the failure mode this rule exists for: the ids
+outlive the reason, the list only ever grows, and nobody can tell which entry
+is still true. Each id gets its own four answers — which advisory, which
+dependency path pulls it in, why app code cannot reach the vulnerable call, and
+what would make it worth re-checking (usually a first patched release, or an
+Expo SDK bump that moves the pin). An advisory you cannot answer all four for
+is one to fix, not to ignore. In CI the audit is advisory on a pull request and
+blocking on `main` (`audit-soft-on-pr` in
+[the workflows' consumer guide](https://github.com/blinkbitcoin/react-native-workflows/blob/main/docs/consumer-guide.md)),
+so an ignore added to get a PR green is an ignore that was never needed.
 
 ## CodeQL, and why suppression is a source comment
 

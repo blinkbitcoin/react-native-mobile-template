@@ -32,14 +32,49 @@ allowBuilds:
   msw: true
   unrs-resolver: true
 auditConfig:
-  # image-size (transitive: metro -> @react-native/metro-config -> metro ->
-  # image-size, pulled in by react-native/expo tooling itself, not app code)
-  # has two unpatched high-severity DoS advisories (infinite loop parsing
-  # malformed ICNS/JXL/HEIF images). No fixed release exists at this Expo SDK
-  # 57 line and the app never decodes untrusted image files through this
-  # dependency (it's only used by Metro's own asset pipeline at build time).
+  # One reasoned entry per advisory - id, the path that pulls it in, why it is
+  # unreachable from this app, and what should make us look again. An id with
+  # no such comment is not mergeable (docs/quality.md, "Suppressing something,
+  # correctly"): a bare list decays into a permanent allowlist nobody dares
+  # shorten. Re-read these whenever `pnpm audit --prod` gets quieter than the
+  # list is long.
   ignoreGhsas:
+    # GHSA-w3rx-r6r6-pgpr (CVE-2025-71330, high) - image-size <= 2.0.2: an
+    # ICNS entry whose length field is 0 never advances the parser's offset, so
+    # the while loop spins and the Node event loop is blocked for good.
+    #
+    # Path (every one of the 8 that `pnpm audit --prod` reports ends the same
+    # way): . > expo* > react-native > @react-native/community-cli-plugin >
+    # @react-native/metro-config > metro-config > metro > image-size@1.2.1.
+    # It arrives with react-native's own bundler, not with anything this app
+    # chose, so there is no direct dependency to move off.
+    #
+    # Unreachable from app code: the single caller is metro's src/Assets.js,
+    # which reads the dimensions of files already in this repo while building a
+    # bundle. It is a build-time tool over first-party inputs on a developer
+    # machine or a CI runner - the app binary does not ship metro, and nothing
+    # at runtime hands it an attacker-supplied ICNS. Committing a malicious
+    # ICNS to hang your own bundler is not a threat model.
+    #
+    # Re-evaluate when: the advisory gains a first patched version (it has none
+    # as of 2026-09-16 - `first_patched_version: null` on the GitHub advisory),
+    # or metro's pin moves past it on an Expo SDK bump, or metro starts reading
+    # images from anywhere but the project tree. Drop the id and let the audit
+    # speak; do not widen this to the package.
     - GHSA-w3rx-r6r6-pgpr
+    # GHSA-5p2g-fcmc-qvqq (CVE-2025-71329, high) - image-size <= 2.0.2: the
+    # same class of bug in the JXL and HEIF parsers. A box declaring size 0
+    # leaves the offset where it was, and the parser loops forever.
+    #
+    # Same dependency, same version, same single caller as the entry above:
+    # metro@0.87.0's src/Assets.js, reached through react-native >
+    # @react-native/community-cli-plugin > @react-native/metro-config >
+    # metro-config > metro. The two advisories are listed separately rather
+    # than as "the image-size ones" so that a future fix for one of them does
+    # not quietly keep the other suppressed.
+    #
+    # Re-evaluate when: it gains a first patched version (none as of
+    # 2026-09-16), or the Expo SDK 57 line's metro pin moves off image-size 1.x.
     - GHSA-5p2g-fcmc-qvqq
 
 # babel.config.js names `babel-preset-expo`, and @babel/core resolves a preset
