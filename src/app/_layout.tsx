@@ -5,27 +5,12 @@ import { StatusBar } from 'expo-status-bar';
 // variant, including production builds that never mount the dev menu.
 import '@/services/auth';
 import { Providers } from '../components/Providers';
-import { crashReporting } from '../lib/crash-reporting';
+import { installGlobalErrorHandler } from '../lib/global-error-handler';
 
-/**
- * React Native's global error hook. It is absent on web and under Jest, hence
- * the `typeof` guard below.
- */
-declare const ErrorUtils: {
-  getGlobalHandler: () => (error: unknown, isFatal?: boolean) => void;
-  setGlobalHandler: (handler: (error: unknown, isFatal?: boolean) => void) => void;
-};
-
-// Module scope so it runs exactly once per bundle load: errors thrown outside
-// React's render tree still reach the crash reporter, and chaining to the
-// previous handler keeps the red box in dev / termination in release.
-if (typeof ErrorUtils !== 'undefined') {
-  const previous = ErrorUtils.getGlobalHandler();
-  ErrorUtils.setGlobalHandler((error, isFatal) => {
-    crashReporting.captureException(error, { isFatal: isFatal === true });
-    previous(error, isFatal);
-  });
-}
+// Module scope so it runs exactly once per bundle load. The body lives in
+// `src/lib` because a file under `src/app` cannot hold a colocated test: the
+// router would treat it as a route.
+installGlobalErrorHandler();
 
 function RootStack() {
   // `useLingui` subscribes to locale activation, so the header titles below
