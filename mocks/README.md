@@ -6,8 +6,9 @@
 server, and the tests — moves with it in one step.
 
 There are two ways to run that schema. `pnpm mock-api` (or `make mock-api`) starts a
-[graphql-yoga](https://the-guild.dev/graphql/yoga-server) server on `http://localhost:4000/graphql`,
-which is what simulators and devices point at through `EXPO_PUBLIC_API_URL`. Jest (and Playwright,
+[graphql-yoga](https://the-guild.dev/graphql/yoga-server) server on `$MOCK_API_PORT`
+(`APP_PORT_BASE` + 2; `make ports` prints it, `docs/local-dev.md` explains it), which is what
+simulators and devices point at through `EXPO_PUBLIC_API_URL`. Jest (and Playwright,
 should you add it) instead use `msw.ts`, whose handlers execute the very same executable schema
 in-process via MSW. Both paths share `executable-schema.ts` and `resolvers.ts`, so a test can never
 pass against a hand-written response that the real server would not produce. These files are

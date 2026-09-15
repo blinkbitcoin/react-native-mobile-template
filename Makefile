@@ -3,6 +3,16 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
+# Every port derives from APP_PORT_BASE (default 8080) plus a fixed offset;
+# `scripts/ports.mjs` is the table and the ONLY thing that derives one. mise
+# exports the base and nothing else, on purpose: a mirrored METRO_PORT in the
+# environment is indistinguishable from a deliberate per-service override, and
+# `APP_PORT_BASE=8090 make start` would then quietly stay on the default. So the
+# run targets eval the helper, which also means they work in a shell with no
+# mise activated. EXPO_PUBLIC_API_URL comes from that eval too: it is baked into
+# the bundle, so .env.development stays the bare-`expo start` default.
+PORTS := eval "$$(node scripts/ports.mjs --sh)"
+
 # ---------- Setup ----------
 init: ## Rename this template into your app (interactive; --yes for CI)
 	node scripts/init.mjs $(ARGS)
@@ -23,20 +33,23 @@ install: ## Install dependencies (pnpm + Ruby gems) and git hooks
 	fi
 
 # ---------- Run ----------
-start: ## Metro for the dev client
-	pnpm start
+ports: ## Print the ports derived from APP_PORT_BASE
+	@node scripts/ports.mjs
+
+start: ## Metro for the dev client (APP_PORT_BASE+1)
+	@$(PORTS) && pnpm start --port "$$METRO_PORT"
 
 ios: ## Prebuild if needed, build and launch on the iOS simulator
-	pnpm ios
+	@$(PORTS) && pnpm ios
 
 android: ## Prebuild if needed, build and launch on an Android emulator
-	pnpm android
+	@$(PORTS) && pnpm android
 
 web: ## Expo web dev server (web target)
-	pnpm web
+	@$(PORTS) && pnpm web
 
-mock-api: ## Local GraphQL mock API on :4000
-	pnpm mock-api
+mock-api: ## Local GraphQL mock API (APP_PORT_BASE+2)
+	@$(PORTS) && pnpm mock-api
 
 prebuild: ## Regenerate ios/ and android/ locally (debugging plugins only; never commit them)
 	pnpm prebuild
@@ -139,13 +152,13 @@ coverage: ## Tests with coverage thresholds (what CI enforces)
 
 # ---------- End-to-end ----------
 e2e-ios: ## Maestro flows on iOS (needs: make mock-api, make start, make ios)
-	pnpm test:e2e:ios
+	@$(PORTS) && pnpm test:e2e:ios
 
 e2e-android: ## Maestro flows on Android (needs: make mock-api, make start, make android)
-	pnpm test:e2e:android
+	@$(PORTS) && pnpm test:e2e:android
 
 e2e-web: ## Web export (dev env, mock API) + Playwright smoke
-	pnpm test:e2e:web
+	@$(PORTS) && pnpm test:e2e:web
 
 test: unit check-code ## Unit tests + code checks
 
@@ -158,4 +171,4 @@ reset: clean ## clean + reinstall
 help: ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: init doctor install start ios android web mock-api prebuild build-web version verify-ios verify-android release-notes i18n codegen typecheck lint format format-check knip spell check-gen check-prebuild check-code check-deps check-ci check-docs bundle-secrets-check check-release check test-scripts unit coverage e2e-ios e2e-android e2e-web test clean reset help
+.PHONY: init doctor install ports start ios android web mock-api prebuild build-web version verify-ios verify-android release-notes i18n codegen typecheck lint format format-check knip spell check-gen check-prebuild check-code check-deps check-ci check-docs bundle-secrets-check check-release check test-scripts unit coverage e2e-ios e2e-android e2e-web test clean reset help

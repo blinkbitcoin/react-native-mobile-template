@@ -36,7 +36,7 @@ test('home shows a user-facing message when the query fails', async () => {
   const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
   try {
     server.use(
-      http.post('http://localhost:4000/graphql', () =>
+      http.post('http://localhost/graphql', () =>
         HttpResponse.json({ errors: [{ message: 'boom' }] }),
       ),
     );

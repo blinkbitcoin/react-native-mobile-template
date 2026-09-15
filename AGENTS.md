@@ -47,11 +47,12 @@ Every row is a make target; nothing here is run through pnpm directly.
 
 | Run | |
 |---|---|
-| `make start` | Metro for the dev client |
+| `make ports` | Print the ports derived from `APP_PORT_BASE` |
+| `make start` | Metro for the dev client (`APP_PORT_BASE`+1) |
 | `make ios` | Prebuild if needed, build and launch on the iOS simulator |
 | `make android` | Prebuild if needed, build and launch on an Android emulator |
 | `make web` | Expo web dev server |
-| `make mock-api` | Local GraphQL mock API on :4000 |
+| `make mock-api` | Local GraphQL mock API (`APP_PORT_BASE`+2) |
 | `make prebuild` | Regenerate `ios/`/`android/` locally (plugin debugging only) |
 | `make build-web` | Static web export into `dist/` |
 
@@ -103,6 +104,13 @@ Every row is a make target; nothing here is run through pnpm directly.
   never hand-edited; `make check-gen` fails on drift.
 - **Never `cp -R generated/. .`** when scaffolding from a generator: it clobbers
   `.git/`. Use `rsync -a --exclude .git generated/ .`.
+- **Never hardcode a port.** Every port is `APP_PORT_BASE` (default 8080) plus a
+  fixed offset, and `scripts/ports.mjs` is the only thing that derives one —
+  mise exports the base, the Makefile's run targets eval the helper. Never
+  mirror a derived port into `.mise.toml`: it then reads as a per-service
+  override and `APP_PORT_BASE=8090` stops working. `scripts/ports.test.mjs`
+  fails on a bare literal and names the file; see
+  [docs/local-dev.md](docs/local-dev.md).
 - **User-visible strings go through Lingui** (`t`/`Trans` macros), then
   `make i18n`. No bare literals in JSX.
 - **Secrets go through `src/lib/secure-store`**, never `expo-secure-store`

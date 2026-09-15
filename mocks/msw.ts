@@ -2,7 +2,7 @@ import { execute, parse } from 'graphql';
 import { HttpResponse, http } from 'msw';
 import { contextFromHeaders, createSchema } from './executable-schema';
 
-export function createHandlers(url = 'http://localhost:4000/graphql') {
+export function createHandlers(url = 'http://localhost/graphql') {
   const schema = createSchema();
   return [
     http.post(url, async ({ request }) => {

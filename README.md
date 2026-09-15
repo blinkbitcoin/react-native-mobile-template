@@ -20,7 +20,7 @@ source. CI lives in a reusable-workflow repo
 mise trust && mise install   # toolchain: Node, pnpm, Ruby, Java
 make doctor                  # verify it (prints one line per tool)
 make install                 # pnpm dependencies, Ruby gems, git hooks
-make mock-api                # terminal 1: GraphQL mock API on :4000
+make mock-api                # terminal 1: GraphQL mock API (make ports says where)
 make start                   # terminal 2: Metro for the dev client
 make ios                     # or: make android — builds and launches
 make check && make unit      # every static gate, then the tests

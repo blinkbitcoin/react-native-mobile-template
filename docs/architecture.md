@@ -57,7 +57,7 @@ flowchart LR
   Hook --> Apollo["ApolloClient (src/graphql/client.ts)"]
   Apollo --> Links["error -> retry -> auth -> http"]
   Links --> API["EXPO_PUBLIC_API_URL"]
-  API --> Mock["mocks/ yoga server :4000 (dev, Maestro)"]
+  API --> Mock["mocks/ yoga server, APP_PORT_BASE+2 (dev, Maestro)"]
   API --> Real["real GraphQL API (production)"]
   Apollo --> Cache["InMemoryCache"]
   Cache --> KV["expo-sqlite/kv-store via src/lib/storage.ts"]
@@ -72,7 +72,8 @@ fatal.
 
 Jest talks to the same schema through MSW instead of the yoga server. The
 Playwright suite runs against the yoga server itself, which
-`playwright.config.ts` starts on port 4000. See `mocks/README.md`.
+`playwright.config.ts` starts on the derived mock-API port. See
+`mocks/README.md`.
 
 ## Config and env flow
 

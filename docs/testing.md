@@ -174,13 +174,16 @@ Override one operation for a single test with `server.use(...)`:
 
 ```tsx
 server.use(
-  http.post('http://localhost:4000/graphql', () =>
+  http.post('http://localhost/graphql', () =>
     HttpResponse.json({ errors: [{ message: 'boom' }] }),
   ),
 );
 ```
 
-`afterEach` resets the handlers.
+`afterEach` resets the handlers. The URL has no port on purpose: no server is
+listening, `src/test/env.ts` sets `EXPO_PUBLIC_API_URL` to the same value, and
+`scripts/ports.test.mjs` rejects a bare port literal (see
+[local-dev.md](local-dev.md)).
 
 ## Native module and plugin tests
 
@@ -212,7 +215,7 @@ make e2e-ios     # or make e2e-android
 mock API, open the `expo-development-client` deep link (see
 [local-dev.md](local-dev.md)), and run `maestro test .maestro` with
 `--debug-output .maestro/output --flatten-debug-output`. Android also sets up
-`adb reverse` for ports 8081 and 4000.
+`adb reverse` for the Metro and mock-API ports.
 
 ### Adding a flow
 
@@ -240,8 +243,8 @@ mock API, open the `expo-development-client` deep link (see
 
 `make e2e-web` runs `scripts/e2e/web.sh`, which exports the site with
 `pnpm build:web --dev` and then runs the suite in `e2e/web/`.
-`playwright.config.ts` starts two web servers for it: the mock API on 4000 and
-`expo serve dist` on 8089.
+`playwright.config.ts` starts two web servers for it: the mock API and
+`expo serve dist`, both on ports derived from `APP_PORT_BASE`.
 
 Setting `PLAYWRIGHT_SKIP_EXPORT` skips the export and tests whatever is
 already in `dist/`. CI sets it so Playwright exercises the exact artifact the

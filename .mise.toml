@@ -23,3 +23,14 @@ _.path = ["node_modules/.bin"]
 # Per-machine overrides, gitignored by the `.env*.local` rule. Absent by
 # default, and mise is happy when the file does not exist.
 _.file = [".env.local"]
+
+# The one port knob, so `APP_PORT_BASE=8090` in a second worktree moves Metro,
+# the mock API and the web preview together. Declared here (after `_.file`, so a
+# per-machine .env.local can set it) purely to give the variable a default and a
+# visible home. The *derived* ports are deliberately NOT mirrored here: they
+# have one producer, `scripts/ports.mjs`, which the Makefile's run targets eval.
+# A mirror would sit in the environment as a concrete METRO_PORT=8081, which the
+# helper cannot tell from a deliberate per-service override — and the base would
+# then silently stop working. scripts/ports.test.mjs asserts the three service
+# variables never come back here.
+APP_PORT_BASE = "{{ env.APP_PORT_BASE | default(value='8080') }}"

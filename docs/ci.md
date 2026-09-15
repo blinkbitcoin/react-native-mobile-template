@@ -104,9 +104,13 @@ on its own — hence the explicit `||` fallback.
 `expo-development-client` deep link rather than a plain launch:
 
 ```
-rnmt://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081        # iOS
-rnmt://expo-development-client/?url=http%3A%2F%2F10.0.2.2%3A8081         # Android (10.0.2.2 is the host from the emulator)
+rnmt://expo-development-client/?url=http%3A%2F%2Flocalhost%3A$METRO_PORT  # iOS
+rnmt://expo-development-client/?url=http%3A%2F%2F10.0.2.2%3A$METRO_PORT   # Android (10.0.2.2 is the host from the emulator)
 ```
+
+`METRO_PORT` is `APP_PORT_BASE` + 1 (`scripts/ports.mjs`). Its default is also
+the workflows repo's `RNW_METRO_PORT` default, so CI and a default local run
+reach the app on the same port.
 
 This matters because `expo-dev-client`'s launcher screen finds Metro over
 Bonjour, which does not work on a simulator or emulator (and certainly not on a
@@ -127,9 +131,9 @@ Consequences encoded in this repo:
 
 ## Mock-API hooks
 
-The flows talk to the local GraphQL mock API (`pnpm mock-api`, port 4000).
-`ci.yml` wires the workflows' generic E2E hooks to two small scripts in this
-repo:
+The flows talk to the local GraphQL mock API (`pnpm mock-api`, on
+`APP_PORT_BASE` + 2). `ci.yml` wires the workflows' generic E2E hooks to two
+small scripts in this repo:
 
 ```yaml
 e2e-setup-script: scripts/e2e/ci-mock-api-up.sh
@@ -143,6 +147,11 @@ e2e-teardown-script: scripts/e2e/ci-mock-api-down.sh
 - **Teardown** kills that pid if it is still alive and always exits `0`. It runs
   with `if: always()`, so it must never turn a diagnosable failure into a
   confusing one.
+
+Setup also runs `adb reverse` for the derived mock-API port when a device is
+attached. The workflows repo reverses `RNW_MOCK_API_PORT`, whose default still
+predates `APP_PORT_BASE`; until it derives its ports from the same base, the
+hook covers the gap.
 
 The paths are consumer-relative file paths run with `bash`, not `package.json`
 script names. The workflows repo's own `self-smoke.yml` points at these exact

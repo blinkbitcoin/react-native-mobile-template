@@ -3,10 +3,12 @@
 # simulator and Metro is running (make start). CI uses react-native-workflows.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+# Assigns METRO_PORT, MOCK_API_PORT and the rest from APP_PORT_BASE
+# (scripts/ports.mjs); an already-exported per-service variable wins.
+eval "$(node scripts/ports.mjs --sh)"
 bash scripts/e2e/wait-for-mock-api.sh
 APP_ID="${APP_ID:-com.example.rnmt.dev}"
 SCHEME="${SCHEME:-rnmt}"
-METRO_PORT="${METRO_PORT:-8081}"
 # Foreground the app through the expo-development-client deep link, exactly as
 # react-native-workflows' scripts/e2e/app-launch.sh does. The dev client's own
 # launcher screen discovers Metro over Bonjour, which does not work on a

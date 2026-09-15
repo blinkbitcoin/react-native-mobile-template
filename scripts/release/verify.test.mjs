@@ -332,7 +332,7 @@ test('Hermes bytecode is recognised by its magic and plain JS is not', () =>
 
 const envExample = [
   '# comment',
-  'EXPO_PUBLIC_API_URL=http://localhost:4000/graphql',
+  'EXPO_PUBLIC_API_URL=http://localhost/graphql',
   'EXPO_PUBLIC_APP_NAME=RN Mobile Template',
   'EXPO_PUBLIC_WEB_DOMAIN=',
   '# APP_VERSION is not public',

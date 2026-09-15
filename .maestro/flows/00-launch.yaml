@@ -27,8 +27,16 @@ tags: [smoke]
       visible:
         text: 'DEVELOPMENT SERVERS'
     commands:
+      # Any port, deliberately: Metro's is derived from APP_PORT_BASE
+      # (scripts/ports.mjs) and CI picks its own, so a literal would pin the
+      # flow to one worktree. `${METRO_PORT}` is not the answer either - this
+      # suite also runs from react-native-workflows, which passes only APP_ID,
+      # and Maestro aborts a flow on an unresolved variable. The cost, accepted:
+      # this tap can no longer tell the right dev server from any dev server. It
+      # is `optional: true` and only reached if the dev client landed on its
+      # launcher at all, so the blast radius is one fallback tap.
       - tapOn:
-          text: 'http://.*:8081'
+          text: 'http://.*:[0-9]+'
           optional: true
       - tapOn:
           text: '^Continue$'

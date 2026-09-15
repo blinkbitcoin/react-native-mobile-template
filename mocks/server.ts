@@ -1,5 +1,6 @@
 import { createServer } from 'node:http';
 import { createYoga } from 'graphql-yoga';
+import { resolvePorts } from '../scripts/ports.mjs';
 import { contextFromHeaders, createSchema } from './executable-schema';
 
 const yoga = createYoga({
@@ -7,7 +8,8 @@ const yoga = createYoga({
   context: ({ request }) => contextFromHeaders(request.headers),
   graphqlEndpoint: '/graphql',
 });
-const port = Number(process.env.MOCK_API_PORT ?? 4000);
+// MOCK_API_PORT wins; otherwise APP_PORT_BASE + 2 (scripts/ports.mjs).
+const port = resolvePorts(process.env).mockApi;
 createServer(yoga).listen(port, () => {
   console.log(`mock GraphQL API on http://localhost:${port}/graphql`);
 });
