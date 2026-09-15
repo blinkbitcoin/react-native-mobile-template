@@ -8,9 +8,18 @@ java = "temurin-17"
 ruby = "3.3"
 actionlint = "1.7.12"
 shellcheck = "0.11.0"
-typos = "latest"
+# Pinned, not "latest": react-native-workflows pins the same version, so the two
+# repos can never disagree about what counts as a typo.
+typos = "1.50.1"
 
 [env]
 # Expo telemetry off everywhere. ANDROID_HOME is deliberately not set here: it is
 # machine-specific, so `make doctor` checks that you exported it instead.
 EXPO_NO_TELEMETRY = "1"
+# Locally installed CLIs (biome, eslint, expo, ...) on PATH, so they run without
+# a `pnpm exec` prefix. This is the useful half of a direnv `.envrc`; see
+# docs/decisions/0007-mise-not-nix.md.
+_.path = ["node_modules/.bin"]
+# Per-machine overrides, gitignored by the `.env*.local` rule. Absent by
+# default, and mise is happy when the file does not exist.
+_.file = [".env.local"]

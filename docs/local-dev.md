@@ -20,9 +20,17 @@ has not been told to trust.
 | ruby | 3.3 | fastlane and CocoaPods |
 | actionlint | 1.7.12 | `make check-ci` |
 | shellcheck | 0.11.0 | `make check-ci` |
-| typos | latest | `make spell` |
+| typos | 1.50.1 | `make spell` |
 
-mise also exports `EXPO_NO_TELEMETRY=1`.
+`typos` is pinned rather than `latest` so this repo and
+`react-native-workflows` can never disagree about what counts as a typo.
+
+mise's `[env]` block also exports `EXPO_NO_TELEMETRY=1`, puts
+`node_modules/.bin` on `PATH` (so `biome`, `eslint` and `expo` run without a
+`pnpm exec` prefix), and loads `.env.local` if you have one — a gitignored file
+for per-machine overrides. There is no `.envrc`: see
+[decisions/0007-mise-not-nix.md](decisions/0007-mise-not-nix.md) for why direnv
+is not a second mechanism here.
 
 Then check the rest of the machine:
 
