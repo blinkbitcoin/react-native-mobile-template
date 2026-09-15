@@ -139,6 +139,11 @@ LEFTHOOK=0 git commit      # skip every hook for one command
 
 CI runs the same checks, so an escape hatch defers work, it does not remove it.
 
+For a standing personal tweak, write `lefthook-local.yml` instead — it is
+gitignored and merges over `lefthook.yml`, so your workaround does not become
+everyone's. `pre-commit` is skipped outright during a merge or a rebase: those
+commits already passed the hook once.
+
 ## Troubleshooting
 
 | Symptom | Fix |

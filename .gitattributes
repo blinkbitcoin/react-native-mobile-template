@@ -4,6 +4,11 @@
 *.ttf binary
 *.p12 binary
 *.jks binary
+# Prebuild output that gets diffed by hand while debugging config plugins:
+# Xcode manages the project file's encoding and line endings itself, and
+# gradlew.bat only works with CRLF.
+*.pbxproj -text
+*.bat text eol=crlf
 src/graphql/generated/** linguist-generated=true
 src/i18n/locales/**/messages.ts linguist-generated=true
 pnpm-lock.yaml linguist-generated=true

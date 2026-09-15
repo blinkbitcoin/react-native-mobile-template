@@ -1,11 +1,28 @@
 # Git hooks. Installed by `pnpm install` (prepare script). Escape hatches:
-# `git commit --no-verify`, `LEFTHOOK=0 git push`.
+# `git commit --no-verify`, `LEFTHOOK=0 git push` for a one-off skip; personal
+# tweaks go in lefthook-local.yml (gitignored). See CONTRIBUTING.md.
+
+min_version: 2.0.0
+
 pre-commit:
   parallel: true
+  # Nothing to check on merge/rebase replays - those commits already passed.
+  skip:
+    - merge
+    - rebase
   commands:
     biome:
       glob: '*.{ts,tsx,js,mjs,json,graphql}'
-      run: pnpm exec biome check --write --no-errors-on-unmatched {staged_files} && git add {staged_files}
+      run: pnpm exec biome check --write --no-errors-on-unmatched {staged_files}
+      # stage_fixed, not `… && git add {staged_files}`: lefthook restages only
+      # the files biome actually rewrote, and does it after its own
+      # partially-staged-file handling rather than by shelling out to git from
+      # inside the command. (Measured on lefthook 2.1.12: both forms leave an
+      # unstaged hunk of a partially staged file alone, because lefthook hides
+      # unstaged changes for the duration of pre-commit either way. The point
+      # of the flag here is that the guarantee comes from lefthook rather than
+      # from that hiding behaviour happening to be on.)
+      stage_fixed: true
     eslint:
       glob: 'src/**/*.{ts,tsx}'
       # --no-warn-ignored: ESLint 9 warns (and --max-warnings=0 then fails the

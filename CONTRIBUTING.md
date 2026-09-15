@@ -63,6 +63,10 @@ safety net, not a substitute for `make check`. Escape hatches exist
 (`git commit --no-verify`, `LEFTHOOK=0 git push`) for genuinely broken tooling;
 CI still runs the full gate.
 
+For a standing personal tweak rather than a one-off skip, put it in
+`lefthook-local.yml` — it is gitignored, it merges over `lefthook.yml`, and it
+keeps your workaround out of everyone else's checkout.
+
 ## Docs ship with the code
 
 A change to `app.config.ts`, `plugins/`, `modules/`, `src/graphql/`, `scripts/`
