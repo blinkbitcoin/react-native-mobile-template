@@ -46,11 +46,13 @@ test('useAuth stops updating state once unmounted', async () => {
   const { result, unmount } = await renderHook(() => useAuth());
   await waitFor(() => expect(result.current.signedIn).toBe(false));
   unmount();
-  // A notify() after unmount must not reach setSignedIn; React would warn and
-  // the listener set would keep the unmounted hook alive.
-  await act(async () => {
-    await auth.signInMock();
-  });
+  // A notify() after unmount must not reach setSignedIn; React would warn
+  // through console.error — which the console guard turns into a failure — and
+  // the listener set would keep the unmounted hook alive. Deliberately not
+  // wrapped in act(): RNTL's unmount() closes its own act scope, so any act()
+  // afterwards trips React 19's overlapping-act check even with an empty body,
+  // and post-unmount work performs no React work to flush by definition.
+  await auth.signInMock();
   expect(result.current.signedIn).toBe(false);
   await auth.signOut();
 });
