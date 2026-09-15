@@ -1,0 +1,56 @@
+#!/usr/bin/env node
+// Renders a pass/fail badge for a CI job group (Unit, E2E) from the result
+// GitHub hands a dependent job (`needs.<job>.result`), so a branch's README can
+// show "Unit: passing" the same way it shows measured coverage.
+//
+//   node scripts/badges/status-badge.mjs <name> <label> <result> [--out DIR]
+//   e.g. node scripts/badges/status-badge.mjs unit Unit success
+//
+// An unknown result is an error, not a green badge: a typo or a result value
+// GitHub adds later must be visible, and "we could not tell" is not "passing".
+import { mkdirSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { BadgeError, renderBadgeJson, renderBadgeSvg, STATUS_RESULTS } from './badge.mjs';
+import { argValue, BADGE_DIR } from './coverage-badge.mjs';
+
+/** Write `<name>.svg` + `<name>.json` into `outDir`; returns the badge. */
+export function writeStatusBadge({ outDir = BADGE_DIR, name, label, result }) {
+  if (!/^[a-z0-9-]+$/.test(String(name))) {
+    throw new BadgeError(`status-badge: name must be a file-safe slug, got "${name}"`);
+  }
+  if (!label) throw new BadgeError('status-badge: a label is required');
+  const known = STATUS_RESULTS[result];
+  if (!known) {
+    throw new BadgeError(
+      `status-badge: unknown job result "${result}" — expected one of ${Object.keys(STATUS_RESULTS).join(', ')}`,
+    );
+  }
+  const badge = { label, message: known.message, color: known.color };
+  mkdirSync(outDir, { recursive: true });
+  writeFileSync(path.join(outDir, `${name}.svg`), renderBadgeSvg(badge));
+  writeFileSync(path.join(outDir, `${name}.json`), renderBadgeJson(badge));
+  return badge;
+}
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
+  const argv = process.argv.slice(2);
+  const [name, label, result] = argv;
+  try {
+    const badge = writeStatusBadge({
+      outDir: argValue(argv, '--out', BADGE_DIR),
+      name,
+      label,
+      result,
+    });
+    console.log(`status-badge: ${badge.label}: ${badge.message}`);
+  } catch (e) {
+    if (!(e instanceof BadgeError)) throw e;
+    console.error(e.message);
+    console.error(
+      'usage: status-badge.mjs <name> <label> <' +
+        `${Object.keys(STATUS_RESULTS).join('|')}> [--out DIR]`,
+    );
+    process.exit(1);
+  }
+}

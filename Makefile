@@ -157,6 +157,12 @@ coverage: ## Tests with coverage thresholds (what CI enforces)
 	pnpm test:coverage
 	pnpm check:coverage-empty
 
+# Same entry point CI calls, so what you see locally is what gh-pages gets.
+# The job results default to success here; set BADGE_UNIT/BADGE_E2E to any of
+# success|failure|cancelled|skipped to see the other colours.
+badges: ## Render the CI badges into coverage/badge/ (run make coverage first)
+	@BADGE_UNIT="$${BADGE_UNIT:-success}" BADGE_E2E="$${BADGE_E2E:-success}" pnpm badges:render
+
 # ---------- End-to-end ----------
 e2e-ios: ## Maestro flows on iOS (needs: make mock-api, make start, make ios)
 	@$(PORTS) && pnpm test:e2e:ios
@@ -178,4 +184,4 @@ reset: clean ## clean + reinstall
 help: ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: init doctor install ports start ios android web mock-api prebuild build-web version verify-ios verify-android release-notes i18n codegen typecheck lint format format-check knip spell check-gen check-prebuild check-code check-deps check-ci check-docs bundle-secrets-check check-release check codeql test-scripts unit coverage e2e-ios e2e-android e2e-web test clean reset help
+.PHONY: init doctor install ports start ios android web mock-api prebuild build-web version verify-ios verify-android release-notes i18n codegen typecheck lint format format-check knip spell check-gen check-prebuild check-code check-deps check-ci check-docs bundle-secrets-check check-release check codeql test-scripts unit coverage badges e2e-ios e2e-android e2e-web test clean reset help

@@ -25,7 +25,7 @@ src/test/           jest setup, render helper, mocks
 plugins/            Expo config plugins (with-*.ts) + their tests
 modules/            local native modules (hello-native)
 mocks/              GraphQL mock API (server.ts, msw.ts, schema.graphql)
-scripts/            check-*.sh, doctor, init, hooks/, release/ (verify, notes, version), e2e/
+scripts/            check-*.sh, doctor, init, hooks/, release/ (verify, notes, version), e2e/, badges/
 .maestro/           Maestro flows (native e2e); e2e/web/ is Playwright
 fastlane/           store lanes + metadata; deploy/ota/ is the update server
 docs/               architecture, local-dev, quality, testing, ci, native-extensions,
@@ -86,6 +86,7 @@ Every row is a make target; nothing here is run through pnpm directly.
 | `make unit` | Unit + component tests |
 | `make test-scripts` | `node:test` for `scripts/**/*.test.mjs` |
 | `make coverage` | Tests with the coverage thresholds CI enforces |
+| `make badges` | Render the CI badges into `coverage/badge/` (after `make coverage`) |
 | `make e2e-ios` | Maestro flows on iOS (needs mock-api, start, ios) |
 | `make e2e-android` | Maestro flows on Android (needs mock-api, start, android) |
 | `make e2e-web` | Web export (dev env, mock API) + Playwright smoke |

@@ -90,6 +90,7 @@
     "test": "jest",
     "test:coverage": "jest --coverage",
     "check:coverage-empty": "node scripts/check-coverage-empty.mjs",
+    "badges:render": "node scripts/badges/render.mjs",
     "test:e2e:ios": "bash scripts/e2e/maestro-ios.sh",
     "test:e2e:android": "bash scripts/e2e/maestro-android.sh",
     "test:e2e:web": "bash scripts/e2e/web.sh",
