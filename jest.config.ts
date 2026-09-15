@@ -42,6 +42,9 @@ const config: Config = {
       displayName: 'plugins',
       testEnvironment: 'node',
       testTimeout: 15000,
+      // The console guard applies to both projects; this one gets its own setup
+      // file because `src/test/setup.ts` pulls in RNTL and MSW.
+      setupFilesAfterEnv: ['<rootDir>/src/test/setup.plugins.ts'],
       testMatch: ['<rootDir>/plugins/**/*.test.ts'],
       // `.tsx` is in the pattern even though no plugin suite uses JSX: coverage
       // options are global, so this project also instruments the app's untested

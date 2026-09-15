@@ -114,6 +114,11 @@ Every row is a make target; nothing here is run through pnpm directly.
   application code; `biome.json` turns `noConsole` off only for
   `src/lib/logger.ts` (the sink itself) and for tooling that legitimately writes
   to stdout: `scripts/**`, `plugins/**`, `mocks/**`, `*.config.*`, `codegen.ts`.
+- **Tests are silent.** `console.error`/`console.warn` during a test fails it
+  (`src/test/console.ts`, both Jest projects). A console line is usually a
+  missing `await waitFor`, not a logging need; a deliberate one opts out with
+  `allowConsole(method, matcher)` or by spying on the method. The guard and its
+  test are the only `noConsole` exemptions besides the ones above.
 - **Routes-only rule:** files in `src/app/` compose screens from `src/features`
   and `src/components` and may not import `@apollo/client`, `@/graphql`,
   `@/services` or `@/lib`. Only `src/app/_layout.tsx` and

@@ -30,6 +30,8 @@ enforces.
   and `/scripts/`.
 - `plugins`: plain node, matching `plugins/**/*.test.ts`. Config plugins run
   inside the Expo CLI, not in a React Native runtime, so they get no preset.
+  Its only setup file is `src/test/setup.plugins.ts`, which installs the
+  console guard below and nothing else.
 
 Coverage options are global, which is why they sit at the top level and not in
 either project.
@@ -72,6 +74,53 @@ commit.
 `plugins/*.ts`, and excludes tests, type declarations, `src/test/**`, the
 generated GraphQL and i18n output, and `src/app/**`. Routes are excluded
 because they are thin: the screens they mount are tested directly.
+
+## Tests are silent
+
+A `console.error` or `console.warn` during a test fails that test. Both Jest
+projects install the guard: the `app` project through `src/test/setup.ts`, the
+`plugins` project through `src/test/setup.plugins.ts`. Both call
+`installConsoleGuard()` from `src/test/console.ts`, which imports nothing so the
+plain-node project can load it without RNTL or MSW.
+
+`console.log` is deliberately *not* guarded. Metro, jest-expo and the Expo
+modules log progress through it in ways the app suite does not control.
+
+The rule earns its keep because the app logs through `src/lib/logger`, so the
+console is left for the framework — and React Native reports un-acted state
+updates, invalid props and failed prop types through `console.error`. **A
+console line in a test is almost always a missing `await waitFor`, not a
+logging need.** Fix the test before reaching for an opt-out.
+
+Two opt-outs, both explicit and both scoped to one test:
+
+```ts
+import { allowConsole } from '@/test/console';
+
+test('the error link logs the GraphQL error', async () => {
+  allowConsole('warn', 'GraphQL error in X'); // string, RegExp, or omitted
+  // …
+});
+```
+
+`allowConsole(method, matcher?)` permits matching output on that method only;
+anything unmatched still fails. Without a matcher every line on that method is
+allowed for the test, which is the blunt form — prefer a matcher, so the
+allowance doubles as an assertion on what was logged.
+
+The second opt-out is a spy: a test that asserts on the logging takes the
+method over and the recorder never sees the call.
+
+```ts
+const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+```
+
+That is how `src/lib/logger.test.ts` — the suite whose whole job is to check
+what reaches the console — keeps passing.
+
+`src/test/console.test.ts` unit-tests the recorder directly (an `afterEach`
+cannot observe its own failure) and covers both opt-outs against the live
+guard.
 
 ## Writing a component test
 

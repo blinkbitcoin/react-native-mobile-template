@@ -58,7 +58,7 @@
   },
   "overrides": [
     {
-      "includes": ["src/lib/logger.ts"],
+      "includes": ["src/lib/logger.ts", "src/test/console.ts", "src/test/console.test.ts"],
       "linter": { "rules": { "suspicious": { "noConsole": "off" } } }
     },
     {

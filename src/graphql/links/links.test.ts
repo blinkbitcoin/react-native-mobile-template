@@ -1,6 +1,7 @@
 import { ApolloClient, ApolloLink, execute, gql, InMemoryCache, Observable } from '@apollo/client';
 import { crashReporting } from '@/lib/crash-reporting';
 import { SecureKey, secureStore } from '@/lib/secure-store';
+import { allowConsole } from '@/test/console';
 import { createAuthLink } from './auth';
 import { createErrorLink, onUnauthenticated } from './error';
 
@@ -91,6 +92,9 @@ test('auth link treats a secure-store failure as "no token"', async () => {
 });
 
 test('error link emits onUnauthenticated for UNAUTHENTICATED codes', async () => {
+  // The link logs every GraphQL error through `logger.warn` by design; the
+  // matcher keeps that an assertion rather than a blanket silence.
+  allowConsole('warn', 'GraphQL error in X');
   const cb = jest.fn();
   const off = onUnauthenticated(cb);
   const link = ApolloLink.from([
@@ -103,6 +107,7 @@ test('error link emits onUnauthenticated for UNAUTHENTICATED codes', async () =>
 });
 
 test('error link does not emit onUnauthenticated for other GraphQL errors', async () => {
+  allowConsole('warn', 'GraphQL error in X');
   const cb = jest.fn();
   const off = onUnauthenticated(cb);
   const link = ApolloLink.from([
@@ -115,6 +120,7 @@ test('error link does not emit onUnauthenticated for other GraphQL errors', asyn
 });
 
 test('error link reports network errors to the crash reporter', async () => {
+  allowConsole('error', 'Network error in X');
   const captureException = jest.spyOn(crashReporting, 'captureException').mockImplementation();
   const cb = jest.fn();
   const off = onUnauthenticated(cb);
