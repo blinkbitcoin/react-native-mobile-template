@@ -18,9 +18,9 @@ is the inventory.
 
 | File | Trigger | Calls | Notes |
 | --- | --- | --- | --- |
-| `ci.yml` | `push` to `main` (all paths), `pull_request` (`opened`, `synchronize`, `reopened`, `labeled`), `workflow_dispatch` | `checks.yml`, `unit.yml`, `e2e.yml` | `unit` and `e2e` both `needs: checks` and skip when `checks` reports `docs-only` — on a push as well as a PR |
+| `ci.yml` | `push` to `main` (all paths), `pull_request` (`opened`, `synchronize`, `reopened`, `labeled`), `workflow_dispatch` | `checks.yml`, `unit.yml`, `e2e.yml`, `badges.yml` | `unit` and `e2e` both `needs: checks` and skip when `checks` reports `docs-only` — on a push as well as a PR; `badges` runs under `always()` and publishes this branch's badges (see [Badges](#badges)) |
 | `web.yml` | `pull_request`, `release: published` | `web.yml` | PR = dev export + Playwright smoke; release = production export + Pages deploy |
-| `pr-closed.yml` | `pull_request: closed` | `pr-closed.yml` | cancels the closed PR's in-flight runs; needs `actions: write` |
+| `pr-closed.yml` | `pull_request: closed` | `pr-closed.yml` | cancels the closed PR's in-flight runs and drops its `gh-pages` badge directory; needs `actions: write` and `contents: write` |
 | `pr-title.yml` | `pull_request: edited` (only when the title changed) | `pr-title.yml` | `opened`/`synchronize` are already covered by `checks.yml`'s `commitlint` |
 | `codeql.yml` | `push` to `main`, `pull_request` to `main`, `schedule` (Mon 06:17 UTC) | `codeql.yml` | CodeQL advanced setup. Informational — **never** a required check.<br>Config in `.github/codeql/codeql-config.yml`; `make codeql` runs the same queries locally |
 
@@ -194,6 +194,51 @@ The two E2E jobs also pass their builds between jobs as `ios-app` and
 `android-apk`; those are plumbing, not forensics.
 
 Locally the same debug tree lands in `.maestro/output/` (gitignored).
+
+## Badges
+
+The README's three badges are real, per-branch and measured. `ci.yml`'s
+`badges` job renders them from the run's own results and publishes them to the
+`gh-pages` branch:
+
+```
+gh-pages
+└── badges/
+    ├── main/{unit,e2e,coverage}.svg (+ .json)
+    └── <branch>/…
+```
+
+| Badge | Source |
+| --- | --- |
+| `unit.svg` | the `unit` job's result (`success` → passing, `failure` → failing, `cancelled`/`skipped` → grey) |
+| `e2e.svg` | the `e2e` job's result, same map |
+| `coverage.svg` | `coverage/coverage-summary.json` from the `coverage` artifact — Jest's `json-summary` reporter, never scraped HTML |
+
+Rendering is this repo's job (`scripts/badges/`, `pnpm badges:render`, run
+locally with `make badges`); publishing is the workflows repo's
+(`scripts/ci/publish-badges.sh`). That is the same seam `checks.yml` uses for
+typecheck and lint: the reusable workflow calls a named consumer script.
+
+Three details are deliberate:
+
+- **The job runs under `always()`** so a red Unit still gets a red badge — but
+  it skips when an upstream job was *cancelled*, when the change was docs-only,
+  on release events, and on PRs from forks (which have no write token).
+- **Only a Unit *failure* writes the red coverage placeholder.** A *skipped*
+  Unit renders no coverage badge at all, so a docs-only PR leaves the branch's
+  published coverage badge exactly as it was instead of blanking it.
+- **Closing a PR removes `badges/<branch>/`** (`pr-closed.yml`), which is why
+  that caller grants `contents: write`.
+
+**Coexistence with the web target.** `web.yml` deploys the web export to GitHub
+Pages through `actions/deploy-pages`, which is an *artifact* deploy and does not
+read any branch. The badges live on a `gh-pages` branch and are served from
+`raw.githubusercontent.com`, not from the Pages site, so the two do not collide
+— **as long as the repo's Pages source stays "GitHub Actions"**. Switching it to
+"Deploy from a branch → gh-pages" would make every web deploy fight the badge
+commits and publish the badge directory as the site. Two repo settings go with
+this: keep that Pages source, and exempt `gh-pages` from the PR-approval ruleset
+so the default `GITHUB_TOKEN` can push to it.
 
 ## Pinning and bumping the workflows version
 

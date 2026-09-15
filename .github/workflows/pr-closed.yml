@@ -3,7 +3,7 @@ on:
   pull_request:
     types: [closed]
 permissions:
-  contents: read
+  contents: write # required: pr-closed.yml's badges-cleanup job pushes the gh-pages branch
   actions: write # required: pr-closed.yml's cancel job needs this to cancel runs
 jobs:
   pr-closed:

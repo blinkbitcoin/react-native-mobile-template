@@ -9,10 +9,15 @@ Continuous Native Generation: `ios/` and `android/` are build output, never
 source. CI lives in a reusable-workflow repo
 (`blinkbitcoin/react-native-workflows`); this repo pins and calls it.
 
-<!-- Badge slots — fill these in once the repo has a CI run and a release:
-[![CI](https://github.com/<owner>/<repo>/actions/workflows/ci.yml/badge.svg)](https://github.com/<owner>/<repo>/actions/workflows/ci.yml)
-[![Release](https://github.com/<owner>/<repo>/actions/workflows/release-internal.yml/badge.svg)](https://github.com/<owner>/<repo>/actions/workflows/release-internal.yml)
--->
+[![Unit](https://raw.githubusercontent.com/blinkbitcoin/react-native-mobile-template/gh-pages/badges/main/unit.svg)](https://github.com/blinkbitcoin/react-native-mobile-template/actions/workflows/ci.yml)
+[![E2E](https://raw.githubusercontent.com/blinkbitcoin/react-native-mobile-template/gh-pages/badges/main/e2e.svg)](https://github.com/blinkbitcoin/react-native-mobile-template/actions/workflows/ci.yml)
+[![Coverage](https://raw.githubusercontent.com/blinkbitcoin/react-native-mobile-template/gh-pages/badges/main/coverage.svg)](https://github.com/blinkbitcoin/react-native-mobile-template/actions/workflows/ci.yml)
+
+`ci.yml`'s `badges` job renders these per branch and publishes them to the
+`gh-pages` branch as `badges/<branch>/`, so the ones above are `main`'s and
+every other branch has its own set. They appear after the first CI run on
+`main`; until then GitHub serves a broken image. See
+[docs/ci.md](docs/ci.md#badges).
 
 ## 60-second start
 

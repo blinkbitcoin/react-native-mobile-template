@@ -39,3 +39,22 @@ jobs:
       dev-client: true
       e2e-setup-script: scripts/e2e/ci-mock-api-up.sh
       e2e-teardown-script: scripts/e2e/ci-mock-api-down.sh
+  badges:
+    needs: [checks, unit, e2e]
+    # always(), so a red Unit still gets a red badge. A cancelled upstream job
+    # says nothing about the branch, and a docs-only change never ran the jobs
+    # the badges describe - in both cases the published badges stay as they are.
+    # badges.yml itself also skips release events and fork PRs (no push token).
+    if: >-
+      always() &&
+      needs.checks.result != 'cancelled' &&
+      needs.unit.result != 'cancelled' &&
+      needs.e2e.result != 'cancelled' &&
+      needs.checks.outputs.docs-only != 'true'
+    permissions:
+      contents: write # publish-badges.sh pushes the gh-pages branch
+    uses: blinkbitcoin/react-native-workflows/.github/workflows/badges.yml@v0
+    with:
+      unit-result: ${{ needs.unit.result }}
+      e2e-result: ${{ needs.e2e.result }}
+      docs-only: ${{ needs.checks.outputs.docs-only }}
