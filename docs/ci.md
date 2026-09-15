@@ -39,6 +39,13 @@ with the `docs-globs` input, never with a second list here. `release-internal.ym
 keeps its `paths-ignore`: that one is not a docs classification but a "do not
 cut a build for this" rule, and it calls no classifier.
 
+What that costs: only `unit` and `e2e` skip on a docs-only change.
+`checks.yml`'s `code` job has no `docs-only` gate, so a documentation push to
+`main` now runs typecheck, lint, format, knip, spell and audit — a couple of
+minutes that used to be zero, because the workflow did not trigger at all.
+That is the trade: those are exactly the checks a documentation change can
+break. The expensive half, the native matrix, still skips.
+
 ### Release and OTA
 
 | File | Trigger | Calls | Notes |

@@ -81,6 +81,8 @@ iOS app `ios-app-{ver}-{os}-{arch}-xcode{x}-{hash}` (exact); APK `android-apk-{v
 ### Consumer `ci.yml` (mobile template, ~20 lines)
 `on: push main (paths-ignore docs), pull_request [opened,synchronize,reopened,labeled], workflow_dispatch`; `permissions: contents: read`; `concurrency: ci-${{ github.ref }}` cancel unless main. Jobs `checks` → `unit` (if not docs-only) → `e2e` (`ios: vars.E2E_IOS == 'true' || label e2e:ios`, `macos-runner: vars.RNW_MACOS_RUNNER || 'macos-latest'`), each `uses: blinkbitcoin/react-native-workflows/.github/workflows/<x>.yml@v1`. Separate small `web.yml`, `pr-closed.yml`, `pr-title.yml`, plus release workflows from Part B.
 
+> **Superseded 2026-09-16 (PR 3, "docs-only classification becomes the single source").** `ci.yml`'s `push` trigger carries **no** `paths-ignore`: it was a second, narrower docs rule beside `checks.yml`'s classifier (it missed `LICENSE` and the issue/PR templates), and it existed only because the classifier saw no base on a push. `checks.yml` now falls back to `github.event.before`, so the `changes` job classifies pushes too and is the single source. The rest of this paragraph still holds.
+
 ## Part B: Release layer (fastlane + release workflows + OTA)
 
 ### Verified (2026-09-05)
