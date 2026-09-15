@@ -15,12 +15,17 @@ queries:
 # This pack is not optional decoration - it is the suppression mechanism.
 # `AlertSuppression.ql` is what makes an inline
 #
+#     // Why this cannot happen here.
 #     // codeql[js/some-rule-id]
+#     const value = untrusted;
 #
-# comment (alone on its line, covering the line below it) actually suppress one
-# finding. WITHOUT this pack the marker is silently ignored: the comment sits in
-# the file looking like it works while the alert keeps coming back. esign lost
-# three rounds to one JWT false positive exactly that way.
+# comment actually suppress one finding. A marker alone on its line covers that
+# line and the one immediately BELOW it, so it has to be the last line before
+# the code: the reason goes ABOVE the marker, never between the marker and the
+# code, or the marker covers the reason and the finding quietly stays open.
+# WITHOUT this pack the marker is ignored either way: the comment sits in the
+# file looking like it works while the alert keeps coming back. esign lost three
+# rounds to one JWT false positive exactly that way.
 #
 # And a marker is the right tool, not an API/UI dismissal:
 #   - a dismissal is keyed to the alert's FINGERPRINT, so it evaporates the next
