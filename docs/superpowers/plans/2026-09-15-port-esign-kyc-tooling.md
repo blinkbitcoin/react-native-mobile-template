@@ -67,7 +67,7 @@ The `&&` slot is non-empty, so the family's own documented expression pitfall do
 
 ## PR 4 — Audit policy
 
-`checks.yml` gains `audit-soft-on-pr` (bool, default true). The Audit step gains `timeout-minutes: 5`, `continue-on-error: ${{ inputs.audit-soft-on-pr && github.event_name == 'pull_request' }}` and a **step-level** `NPM_CONFIG_FETCH_TIMEOUT: '270000'`. Step-level matters: esign `aebdd28` shows a workflow-level fetch timeout overriding the step budget and turning main red at 61s. `scripts/checks/audit.sh` is unchanged.
+`checks.yml` gains `audit-soft-on-pr` (bool, default true). The Audit step gains `timeout-minutes: 5`, `continue-on-error: ${{ inputs.audit-soft-on-pr && github.event_name == 'pull_request' }}` and a **step-level** `NPM_CONFIG_FETCH_TIMEOUT: '270000'`. Step-level matters: esign `aebdd28` shows a workflow-level fetch timeout overriding the step budget and turning main red at 61s. **Correction made during execution:** pnpm does NOT read `npm_config_*` (measured on pnpm 12.3.4 and 11.27.0 — `NPM_CONFIG_FETCH_TIMEOUT` yields `undefined`), so the plan's `NPM_CONFIG_FETCH_TIMEOUT` alone would have been a no-op against `pnpm audit`; both `PNPM_CONFIG_FETCH_TIMEOUT` and the npm spelling are set at step level. `scripts/checks/audit.sh` is unchanged.
 
 Template: split the single comment above `pnpm-workspace.yaml`'s `auditConfig.ignoreGhsas` into one reasoned comment per GHSA (advisory, the path that pulls it in, why it is unreachable from app code, the re-evaluation trigger). Document in `docs/quality.md` that an ignore without a per-entry reason is not mergeable.
 
