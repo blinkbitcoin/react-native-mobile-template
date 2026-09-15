@@ -119,9 +119,17 @@ covering a block of ids is the failure mode this rule exists for: the ids
 outlive the reason, the list only ever grows, and nobody can tell which entry
 is still true. Each id gets its own four answers — which advisory, which
 dependency path pulls it in, why app code cannot reach the vulnerable call, and
-what would make it worth re-checking (usually a first patched release, or an
-Expo SDK bump that moves the pin). An advisory you cannot answer all four for
-is one to fix, not to ignore. In CI the audit is advisory on a pull request and
+what would make it worth re-checking. An advisory you cannot answer all four
+for is one to fix, not to ignore.
+
+The fourth answer is the one that rots, so make it checkable: a date, a version
+or a named upstream change, not "when a fix exists". Read both sources before
+writing it — GitHub's advisory record and the npm registry data `pnpm audit`
+actually prints disagree in practice, and a fix can be published while the
+GitHub record still says `first_patched_version: null`. When the fix is real
+but not yet installable, say what is holding it (a `minimumReleaseAge` window,
+a transitive pin) and from when it stops holding. In CI the audit is advisory
+on a pull request and
 blocking on `main` (`audit-soft-on-pr` in
 [the workflows' consumer guide](https://github.com/blinkbitcoin/react-native-workflows/blob/main/docs/consumer-guide.md)),
 so an ignore added to get a PR green is an ignore that was never needed.

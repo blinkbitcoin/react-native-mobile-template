@@ -36,45 +36,72 @@ auditConfig:
   # unreachable from this app, and what should make us look again. An id with
   # no such comment is not mergeable (docs/quality.md, "Suppressing something,
   # correctly"): a bare list decays into a permanent allowlist nobody dares
-  # shorten. Re-read these whenever `pnpm audit --prod` gets quieter than the
-  # list is long.
+  # shorten. Keep each run of comment lines under 32 - pnpm's YAML parser
+  # rejects more ("too many consecutive comments"), and that is a parse error.
+  #
+  # Both ids below are image-size and share one blocker, stated once here.
+  # The fix exists upstream and is not installable yet. pnpm's own audit prints
+  # `Vulnerable versions <=2.0.2` / `Patched versions >=2.0.3`; the GitHub
+  # advisory API agrees on the range (`vulnerable_version_range: "<= 2.0.2"`)
+  # while still carrying `first_patched_version: null`, so "no fixed release
+  # exists" reads true from GitHub alone and is wrong. 2.0.3 and 2.0.4 were
+  # both published 2026-09-14, and two things block an override to ^2.0.4:
+  #
+  #   1. minimumReleaseAge (above) refuses it - verified, not assumed: pnpm
+  #      fails with ERR_PNPM_NO_MATURE_MATCHING_VERSION, "image-size@2.0.4 was
+  #      published at 2026-09-14T16:38:44Z, within the minimumReleaseAge
+  #      cutoff". The newest version old enough to install is 2.0.2, which is
+  #      inside the vulnerable range. Waiving a supply-chain guard to patch a
+  #      build-time DoS we cannot reach is the wrong trade.
+  #   2. metro@0.87.0 declares `"image-size": "^1.0.2"` - a forced major.
+  #
+  # Compatibility is not the blocker, so the follow-up is cheap: metro's call
+  # shape `(0, interop(require('image-size')).default)(buffer)` works against
+  # 2.0.4 (its CJS build sets `__esModule` and a callable `default`) and gives
+  # identical width/height for all six files in assets/ under both versions.
+  # So from 2026-09-17, when 2.0.4 matures, add `overrides: image-size: ^2.0.4`
+  # and delete both ids - or delete them with no override at all once an Expo
+  # SDK bump moves metro's own range off image-size 1.x.
   ignoreGhsas:
-    # GHSA-w3rx-r6r6-pgpr (CVE-2025-71330, high) - image-size <= 2.0.2: an
-    # ICNS entry whose length field is 0 never advances the parser's offset, so
-    # the while loop spins and the Node event loop is blocked for good.
+    # GHSA-w3rx-r6r6-pgpr (CVE-2025-71330, high, CWE-835) - image-size <=2.0.2:
+    # an ICNS entry whose length field is 0 never advances the parser's offset,
+    # so the while loop spins and the Node event loop is blocked for good.
     #
-    # Path (every one of the 8 that `pnpm audit --prod` reports ends the same
-    # way): . > expo* > react-native > @react-native/community-cli-plugin >
-    # @react-native/metro-config > metro-config > metro > image-size@1.2.1.
-    # It arrives with react-native's own bundler, not with anything this app
-    # chose, so there is no direct dependency to move off.
+    # Path: metro@0.87.0 is the only package in this tree that depends on
+    # image-size at all (`"image-size": "^1.0.2"`, resolved to 1.2.1), so every
+    # path is a different route into the same metro and ends
+    # ... > @react-native/community-cli-plugin > @react-native/metro-config >
+    # metro-config > metro > image-size. `pnpm audit --prod` prints three of
+    # them and then "... Found 100 paths" - 100 is pnpm's display cap, not a
+    # count, and the fan-out is expo/react-native re-entering their own graph,
+    # not a second dependent. It arrives with react-native's bundler, not with
+    # anything this app chose, so there is no direct dependency to move off.
     #
-    # Unreachable from app code: the single caller is metro's src/Assets.js,
-    # which reads the dimensions of files already in this repo while building a
-    # bundle. It is a build-time tool over first-party inputs on a developer
-    # machine or a CI runner - the app binary does not ship metro, and nothing
-    # at runtime hands it an attacker-supplied ICNS. Committing a malicious
-    # ICNS to hang your own bundler is not a threat model.
+    # Unreachable from app code: the single caller is metro's src/Assets.js
+    # (one call, `getImageSize(content)`), reading the dimensions of files
+    # already in this repo while building a bundle. Build-time tool, first-party
+    # input, developer machine or CI runner - the app binary does not ship
+    # metro, and nothing at runtime hands it an attacker-supplied ICNS.
+    # Committing a malicious ICNS to hang your own bundler is not a threat
+    # model.
     #
-    # Re-evaluate when: the advisory gains a first patched version (it has none
-    # as of 2026-09-16 - `first_patched_version: null` on the GitHub advisory),
-    # or metro's pin moves past it on an Expo SDK bump, or metro starts reading
-    # images from anywhere but the project tree. Drop the id and let the audit
-    # speak; do not widen this to the package.
+    # Re-evaluate: from 2026-09-17 per the override note above. Sooner if metro
+    # ever reads images from outside the project tree.
     - GHSA-w3rx-r6r6-pgpr
-    # GHSA-5p2g-fcmc-qvqq (CVE-2025-71329, high) - image-size <= 2.0.2: the
-    # same class of bug in the JXL and HEIF parsers. A box declaring size 0
+    # GHSA-5p2g-fcmc-qvqq (CVE-2025-71329, high, CWE-835) - image-size <=2.0.2:
+    # the same class of bug in the JXL and HEIF parsers. A box declaring size 0
     # leaves the offset where it was, and the parser loops forever.
     #
-    # Same dependency, same version, same single caller as the entry above:
-    # metro@0.87.0's src/Assets.js, reached through react-native >
-    # @react-native/community-cli-plugin > @react-native/metro-config >
-    # metro-config > metro. The two advisories are listed separately rather
-    # than as "the image-size ones" so that a future fix for one of them does
-    # not quietly keep the other suppressed.
+    # Path: identical to the entry above - same sole dependent (metro@0.87.0),
+    # same resolved image-size@1.2.1, same display-capped path list.
     #
-    # Re-evaluate when: it gains a first patched version (none as of
-    # 2026-09-16), or the Expo SDK 57 line's metro pin moves off image-size 1.x.
+    # Unreachable for the same reason and at the same single call site: metro
+    # reads repo assets at bundle time. The two ids are listed separately
+    # rather than as "the image-size ones" so a fix landing for one cannot
+    # quietly keep the other suppressed - and note the fix here is the same
+    # release, so in practice they will be deleted together.
+    #
+    # Re-evaluate: from 2026-09-17 per the override note above.
     - GHSA-5p2g-fcmc-qvqq
 
 # babel.config.js names `babel-preset-expo`, and @babel/core resolves a preset
