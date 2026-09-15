@@ -1,5 +1,6 @@
 import { renderHook, waitFor } from '@testing-library/react-native';
 import * as Updates from 'expo-updates';
+import { logger } from '@/lib/logger';
 import { updates, useUpdateInfo } from './updates';
 
 const checkForUpdateAsync = Updates.checkForUpdateAsync as jest.MockedFunction<
@@ -151,6 +152,25 @@ test('useUpdateInfo does not touch state after the hook unmounts', async () => {
 
   expect(Updates.checkForUpdateAsync).toHaveBeenCalled();
   expect(info).toHaveBeenCalledTimes(settled);
+});
+
+test('useUpdateInfo logs rather than escaping when the apply step rejects', async () => {
+  jest.replaceProperty(globals, '__DEV__', false);
+  jest.replaceProperty(Updates, 'isEnabled', true);
+  // Two earlier tests armed the module-scoped throttle; moving the clock past the
+  // window is how this check gets through.
+  jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 3 * 60 * 60 * 1000);
+  const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+  // `applyIfAvailable` swallows its own failures, so the hook's `.catch` only
+  // runs if a future change lets one through — which is what it guards against.
+  jest.spyOn(updates, 'applyIfAvailable').mockRejectedValue(new Error('update server down'));
+
+  const { result } = await renderHook(() => useUpdateInfo());
+
+  await waitFor(() =>
+    expect(warn).toHaveBeenCalledWith('update check failed', { e: 'Error: update server down' }),
+  );
+  expect(result.current.runtimeVersion).toBe('test-runtime');
 });
 
 test('applyIfAvailable resolves false when the update check rejects', async () => {

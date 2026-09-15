@@ -1,4 +1,5 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
+import { logger } from '@/lib/logger';
 import { updates } from '@/services/updates';
 import { renderWithProviders } from '@/test/render';
 import { DevMenu } from './DevMenu';
@@ -41,6 +42,29 @@ test('the channel switcher is shown when OTA is enabled and hands the channel to
     expect(switchChannel).toHaveBeenCalledTimes(3);
   } finally {
     switchChannel.mockRestore();
+  }
+});
+
+test('a failing dev-menu action is logged instead of thrown', async () => {
+  const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+  const switchChannel = jest
+    .spyOn(updates, 'switchChannel')
+    .mockRejectedValue(new Error('no update server'));
+  try {
+    await renderWithProviders(<DevMenu />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('settings-channel-beta'));
+    });
+
+    await waitFor(() =>
+      expect(warn).toHaveBeenCalledWith('switch to channel beta failed', {
+        e: 'Error: no update server',
+      }),
+    );
+  } finally {
+    switchChannel.mockRestore();
+    warn.mockRestore();
   }
 });
 
