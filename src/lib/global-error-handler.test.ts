@@ -51,13 +51,20 @@ test('does nothing where the hook is absent, as it is on web', () => {
 
 test('defaults to the ambient ErrorUtils when no hook is passed', () => {
   const globals = globalThis as { ErrorUtils?: ErrorUtilsLike | undefined };
+  const captureException = jest.spyOn(crashReporting, 'captureException').mockImplementation();
   const previous = jest.fn();
   const { errorUtils, current } = fakeErrorUtils(previous);
   const original = globals.ErrorUtils;
+  const error = new Error('boom');
   globals.ErrorUtils = errorUtils;
   try {
     installGlobalErrorHandler();
-    expect(current()).not.toBe(previous);
+    // Not just "a different function": the ambient path must wire up the same
+    // handler the explicit path does, or this test would pass against a no-op.
+    current()(error, true);
+
+    expect(captureException).toHaveBeenCalledWith(error, { isFatal: true });
+    expect(previous).toHaveBeenCalledWith(error, true);
   } finally {
     globals.ErrorUtils = original;
   }

@@ -18,6 +18,11 @@ export function emptyCoverageFiles(summary) {
     .map(([file]) => file);
 }
 
+/** Rows in a coverage-summary.json, excluding the `total` row. */
+export function summaryFiles(summary) {
+  return Object.keys(summary).filter((file) => file !== 'total');
+}
+
 /** One report line per empty file, pointing at the fix. */
 export function formatEmptyFiles(files, root = process.cwd()) {
   return files.map(
@@ -26,14 +31,25 @@ export function formatEmptyFiles(files, root = process.cwd()) {
   );
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
-  let summary;
+/**
+ * Read and parse the summary. An absent or unreadable report is a failure, not
+ * a pass: without it the check would be silently vacuous, which is exactly what
+ * happens if `json-summary` is dropped from `coverageReporters`.
+ */
+export function readSummary(file = SUMMARY_PATH) {
   try {
-    summary = JSON.parse(readFileSync(SUMMARY_PATH, 'utf8'));
+    return { summary: JSON.parse(readFileSync(file, 'utf8')) };
   } catch (e) {
-    console.error(
-      `${SUMMARY_PATH} is missing or unreadable (${e.message}) — run \`make coverage\`, and keep 'json-summary' in jest.config.ts's coverageReporters`,
-    );
+    return {
+      error: `${file} is missing or unreadable (${e.message}) — run \`make coverage\`, and keep 'json-summary' in jest.config.ts's coverageReporters`,
+    };
+  }
+}
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
+  const { summary, error } = readSummary();
+  if (error) {
+    console.error(error);
     process.exit(1);
   }
   const empty = emptyCoverageFiles(summary);
@@ -41,5 +57,5 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
     for (const line of formatEmptyFiles(empty)) console.error(line);
     process.exit(1);
   }
-  console.log(`coverage: no empty rows (${Object.keys(summary).length - 1} files)`);
+  console.log(`coverage: no empty rows (${summaryFiles(summary).length} files)`);
 }

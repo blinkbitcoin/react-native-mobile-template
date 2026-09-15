@@ -1,12 +1,20 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { emptyCoverageFiles, formatEmptyFiles } from './check-coverage-empty.mjs';
+import {
+  emptyCoverageFiles,
+  formatEmptyFiles,
+  readSummary,
+  summaryFiles,
+} from './check-coverage-empty.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const fixture = JSON.parse(readFileSync(path.join(here, 'fixtures/coverage-summary.json'), 'utf8'));
+const FIXTURE = path.join(here, 'fixtures/coverage-summary.json');
+const fixture = JSON.parse(readFileSync(FIXTURE, 'utf8'));
 
 test('reports every file with no statements and skips the totals row', () => {
   assert.deepEqual(emptyCoverageFiles(fixture), [
@@ -41,4 +49,39 @@ test('each line names the file relative to the repo root and the fix', () => {
   assert.equal(lines.length, 1);
   assert.match(lines[0], /^src\/types\/only\.ts has no statements to cover/);
   assert.match(lines[0], /coveragePathIgnorePatterns/);
+});
+
+test('the file count excludes the totals row rather than assuming one', () => {
+  assert.equal(summaryFiles(fixture).length, 3);
+  // A summary with no `total` row must not under-report by one.
+  assert.equal(summaryFiles({ '/repo/src/a.ts': {} }).length, 1);
+});
+
+test('readSummary parses a real summary file', () => {
+  const { summary, error } = readSummary(FIXTURE);
+  assert.equal(error, undefined);
+  assert.deepEqual(summaryFiles(summary).length, 3);
+});
+
+// The two failure paths below are what stops the check from being vacuous when
+// `json-summary` is dropped from `coverageReporters`: no report must read as a
+// failure, never as "no empty rows".
+test('readSummary reports a missing report and names the reporter', () => {
+  const { summary, error } = readSummary(path.join(here, 'fixtures/does-not-exist.json'));
+  assert.equal(summary, undefined);
+  assert.match(error, /is missing or unreadable/);
+  assert.match(error, /json-summary/);
+});
+
+test('readSummary reports a malformed report rather than throwing', async (t) => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'coverage-empty-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const file = path.join(dir, 'coverage-summary.json');
+  writeFileSync(file, '{ not json');
+
+  const { summary, error } = readSummary(file);
+
+  assert.equal(summary, undefined);
+  assert.match(error, /is missing or unreadable/);
+  assert.match(error, /json-summary/);
 });

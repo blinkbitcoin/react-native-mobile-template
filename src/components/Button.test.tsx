@@ -5,6 +5,11 @@ import { Button } from './Button';
 // Pressable feeds `pressed` from Pressability, which listens on the responder
 // handlers rather than an `onPressIn` prop, so `fireEvent(el, 'pressIn')` never
 // reaches it. Granting the responder is the event that actually flips the flag.
+//
+// Shaped against react-native 0.86.3, whose Pressability grant path reads
+// `persist()`, `currentTarget` and `nativeEvent`. An upgrade that reshapes that
+// payload fails this test loudly rather than passing silently: compare with
+// `Libraries/Pressability/Pressability.js` and extend the stub.
 const responderEvent = {
   persist: () => {},
   nativeEvent: {
