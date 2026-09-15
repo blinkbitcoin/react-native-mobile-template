@@ -63,7 +63,7 @@ The `&&` slot is non-empty, so the family's own documented expression pitfall do
 
 **These must land together** (byte-identity is enforced by `test/consumer-contract.bats`): template `ci.yml`, `test/fixtures/consumer-min/.github/workflows/ci.yml`, the first ```yaml block in `docs/consumer-guide.md`, the guide's `paths-ignore` rationale prose and its `docs-globs` row, `README.md:41`, and `docs/ci.md`'s `ci.yml` trigger cell.
 
-**Tests.** `test/changed-class.bats` gains: per-package LICENSE is docs; all-zero base → false/exit 0; unreachable base → false/exit 0 with a notice; a push-shaped range of only `docs/` → true. `consumer-contract.bats` needs no edit — it fails until all three copies match, which is the tripwire.
+**Tests.** `test/changed-class.bats` gains: per-package LICENSE is docs; all-zero base → false/exit 0; unreachable base → false/exit 0 with a notice; a push-shaped range of only `docs/` → true. `consumer-contract.bats` **did** need an edit: it compared the guide against the fixture only, never against the consumer, so a consumer keeping `paths-ignore` passed. Corrected during execution (PR 3 fix round) with a `require_consumer` case; the original claim here was wrong.
 
 ## PR 4 — Audit policy
 
