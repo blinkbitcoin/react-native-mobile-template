@@ -1,10 +1,43 @@
 import type { Config } from 'jest';
 
+/**
+ * Every entry is a claim that the file has no behaviour a test could assert.
+ * The thresholds below are 100%, so anything not on this list has to be tested.
+ *
+ * Unlike the other coverage options this one is scoped to a project, not to the
+ * root config, so both projects below spread it in — a root-level copy is
+ * silently ignored when `projects` is set.
+ */
+const coveragePathIgnorePatterns = [
+  // Jest's own default, which declaring this option would otherwise drop.
+  '/node_modules/',
+  // Ambient type declarations: erased at build time, no runtime statements.
+  '\\.d\\.ts$',
+  // The Jest harness itself (setup files, module mocks, render helpers):
+  // instrumenting it measures the test rig rather than the app.
+  '<rootDir>/src/test/',
+  // GraphQL codegen output: written by `make gen`, reviewed as a diff.
+  '<rootDir>/src/graphql/generated/',
+  // Compiled Lingui catalogs: written by `make i18n` from the `.po` files.
+  '<rootDir>/src/i18n/locales/',
+  // Pure re-export barrels. expo-router route files that only re-export the
+  // screen or handler they point at carry zero statements, so including them
+  // would lift the percentage while asserting nothing.
+  '<rootDir>/src/app/\\(tabs\\)/(index|settings)\\.tsx$',
+  '<rootDir>/src/app/\\+native-intent\\.tsx$',
+  // The `requireNativeModule` binding for the Swift/Kotlin half, plus the
+  // type-only file next to it. The wrapper that validates input and maps the
+  // missing-module failure is `modules/hello-native/index.ts`, and it is tested.
+  '<rootDir>/modules/[^/]+/src/',
+];
+
 const config: Config = {
   // Two projects: the app suite (jest-expo, RN environment) and the config
   // plugins suite (plain node, no RN preset — plugins run inside the Expo CLI).
   // Project-scoped options (setupFiles, moduleNameMapper, transforms, …) must
-  // live inside each project; only coverage options stay at the top level.
+  // live inside each project; only the coverage options Jest treats as global
+  // (`collectCoverageFrom`, `coverageReporters`, `coverageThreshold`) stay at
+  // the top level.
   projects: [
     {
       displayName: 'app',
@@ -37,6 +70,7 @@ const config: Config = {
       // `testMatch`: without it, jest-expo would pick the plugin suites up as
       // well and every plugin test would run twice (once per project).
       testPathIgnorePatterns: ['/node_modules/', '/e2e/', '/plugins/', '/scripts/'],
+      coveragePathIgnorePatterns,
     },
     {
       displayName: 'plugins',
@@ -52,26 +86,22 @@ const config: Config = {
       transform: {
         '^.+\\.tsx?$': ['babel-jest', { presets: ['babel-preset-expo'] }],
       },
+      coveragePathIgnorePatterns,
     },
   ],
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',
+    // Only the module's public wrapper: everything under `modules/*/src/` is
+    // either the `requireNativeModule` bridge or type-only (see the ignore list).
     'modules/*/index.ts',
     'plugins/*.ts',
     '!src/**/*.test.*',
-    '!src/**/*.d.ts',
     '!plugins/*.test.ts',
-    '!src/test/**',
-    '!src/graphql/generated/**',
-    '!src/i18n/locales/**',
-    '!src/app/**',
   ],
+  // `json-summary` is what `scripts/check-coverage-empty.mjs` reads after the run.
+  coverageReporters: ['text', 'lcov', 'json-summary'],
   coverageThreshold: {
-    global: { lines: 80, branches: 80 },
-    'src/config/**': { lines: 100, branches: 100 },
-    'src/lib/**': { lines: 100, branches: 100 },
-    'modules/*/index.ts': { lines: 100, branches: 100 },
-    'plugins/**': { lines: 100, branches: 100 },
+    global: { lines: 100, branches: 100, functions: 100, statements: 100 },
   },
 };
 
