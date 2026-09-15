@@ -149,6 +149,7 @@ unit: ## Unit + component tests
 
 coverage: ## Tests with coverage thresholds (what CI enforces)
 	pnpm test:coverage
+	pnpm check:coverage-empty
 
 # ---------- End-to-end ----------
 e2e-ios: ## Maestro flows on iOS (needs: make mock-api, make start, make ios)

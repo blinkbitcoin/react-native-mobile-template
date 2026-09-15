@@ -8,7 +8,7 @@ Five runners, each with a job. Nothing here needs a network.
 | --- | --- | --- | --- |
 | Unit (pure TS) | Jest, `app` project (jest-expo) | `src/**/*.test.ts` | `make unit` |
 | Component | Jest, RNTL 14 | `src/**/*.test.tsx` | `make unit` |
-| Router | Jest, `renderRouter` from `expo-router/testing-library` | `src/features/**` | `make unit` |
+| Router | Jest, `renderRouter` from `expo-router/testing-library` | `src/routes.test.tsx`,<br>`src/features/**` | `make unit` |
 | Apollo with a real schema | Jest, MSW over the `mocks/` executable schema | anything that renders a query | `make unit` |
 | Native module wrapper | Jest, the manual mock in `modules/hello-native/src/__mocks__/` | `modules/hello-native/__tests__/` | `make unit` |
 | Config plugins | Jest, `plugins` project (plain node) | `plugins/*.test.ts` | `make unit` |
@@ -33,8 +33,9 @@ enforces.
   Its only setup file is `src/test/setup.plugins.ts`, which installs the
   console guard below and nothing else.
 
-Coverage options are global, which is why they sit at the top level and not in
-either project.
+`collectCoverageFrom`, `coverageReporters` and `coverageThreshold` are global,
+which is why they sit at the top level and not in either project.
+`coveragePathIgnorePatterns` is the exception — see [Coverage](#coverage).
 
 ### `pnpm test:scripts`
 
@@ -45,6 +46,7 @@ booting React Native:
 | --- | --- |
 | `scripts/doctor.test.mjs` | The toolchain check |
 | `scripts/check-licenses.test.mjs` | The SPDX allowlist logic |
+| `scripts/check-coverage-empty.test.mjs` | The empty-coverage-row parser |
 | `scripts/init.test.mjs` | The template rename and web-removal script behind `make init` |
 | `scripts/hooks/install-if-lockfile-changed.test.mjs` | The post-merge / post-checkout lockfile-install hook |
 | `scripts/release/resolve-version.test.mjs` | Version resolution for a build |
@@ -55,25 +57,50 @@ booting React Native:
 
 ## Coverage
 
-Thresholds live in `jest.config.ts` and are enforced by `make coverage`:
+`make coverage` enforces **100% of lines, branches, functions and statements**,
+globally. There are no per-zone thresholds: with the global bar at 100% they
+would all be redundant.
 
-| Path | Lines | Branches |
-| --- | --- | --- |
-| Global | 80% | 80% |
-| `src/config/**` | 100% | 100% |
-| `src/lib/**` | 100% | 100% |
-| `modules/*/index.ts` | 100% | 100% |
-| `plugins/**` | 100% | 100% |
-
-The 100% zones are the code that is hard to notice when it breaks: env
-parsing, the storage and crash-reporting wrappers, the native module contract
-and the config plugins. A new file in any of them needs a test in the same
-commit.
+100% is a floor on *reachability*, not a claim that every behaviour is
+asserted — but it makes "this file has no test" a build failure instead of a
+number nobody reads, and it removes the arithmetic where a large untested file
+is offset by a small thoroughly tested one.
 
 `collectCoverageFrom` instruments `src/**/*.{ts,tsx}`, `modules/*/index.ts` and
-`plugins/*.ts`, and excludes tests, type declarations, `src/test/**`, the
-generated GraphQL and i18n output, and `src/app/**`. Routes are excluded
-because they are thin: the screens they mount are tested directly.
+`plugins/*.ts`. Two mechanisms narrow that:
+
+- Test files themselves are dropped in `collectCoverageFrom`.
+- `coveragePathIgnorePatterns` lists everything with no behaviour to assert.
+  Each entry carries a one-line reason in `jest.config.ts`, and an entry
+  without one is not mergeable. Today: ambient `.d.ts` declarations, the Jest
+  harness under `src/test/`, generated GraphQL, compiled Lingui catalogs, the
+  three pure re-export route barrels under `src/app/`, and the
+  `requireNativeModule` binding under `modules/*/src/`.
+
+  It is spread into both Jest projects rather than declared once at the root:
+  unlike the other coverage options this one is project-scoped, and a
+  root-level copy is silently ignored when `projects` is set.
+
+An exclusion is a claim that the file cannot be meaningfully tested. A native
+module's TypeScript wrapper does **not** qualify just because the native half
+is Swift or Kotlin — `modules/hello-native/index.ts` validates input and maps
+the missing-module failure, and it is tested. If a branch really is
+unreachable, prefer restructuring the code to delete it over excluding the
+file: that is why the root layout's global error handler moved to
+`src/lib/global-error-handler.ts`, where the "no hook on web" case is a value a
+test passes rather than a branch no test can take.
+
+### Files with nothing to cover
+
+A re-export barrel or a type-only module has zero statements. istanbul prints
+it as 0% in every column while the totals stay at 100%, so it is a silent way
+to add an untested file without moving the number.
+
+`make coverage` runs `scripts/check-coverage-empty.mjs` after Jest. It reads
+`coverage/coverage-summary.json` — which is why `json-summary` is in
+`coverageReporters` — and fails naming any file with `statements.total === 0`.
+The fix is always the same: ignore the file with a reason, or give it code
+worth testing.
 
 ## Tests are silent
 

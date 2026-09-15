@@ -162,9 +162,13 @@ Every row is a make target; nothing here is run through pnpm directly.
 | Native e2e | `.maestro/flows/` | `make e2e-ios`, `make e2e-android` |
 | Web e2e | `e2e/web/` | `make e2e-web` |
 
-Coverage thresholds (`jest.config.ts`) are global 80% lines/branches, and 100%
-lines/branches for `src/config/**`, `src/lib/**`, `modules/*/index.ts` and
-`plugins/**`. See `docs/testing.md`.
+Coverage (`jest.config.ts`) is 100% lines, branches, functions and statements,
+globally. New code needs a test in the same commit. A file with nothing to
+assert goes in `coveragePathIgnorePatterns` **with a one-line reason**; an entry
+without one is not mergeable, and a native module's TS wrapper does not qualify
+just because the native half is Swift/Kotlin. `make coverage` also fails on any
+file with zero statements (`scripts/check-coverage-empty.mjs`), so a re-export
+barrel cannot lift the number while testing nothing. See `docs/testing.md`.
 
 ## CI, release and troubleshooting
 
