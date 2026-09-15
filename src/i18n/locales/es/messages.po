@@ -21,7 +21,7 @@ msgstr "Canal"
 msgid "Dark"
 msgstr "Oscuro"
 
-#: src/app/_layout.tsx:39
+#: src/app/_layout.tsx:24
 #: src/features/details/DetailsScreen.tsx:9
 msgid "Details"
 msgstr "Detalles"
@@ -30,7 +30,7 @@ msgstr "Detalles"
 msgid "Go home"
 msgstr "Ir al inicio"
 
-#: src/app/_layout.tsx:38
+#: src/app/_layout.tsx:23
 #: src/features/home/HomeScreen.tsx:17
 #: src/i18n/i18n.test.tsx:10
 msgid "Home"
