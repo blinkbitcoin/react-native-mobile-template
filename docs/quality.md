@@ -87,6 +87,7 @@ Not in `make check`, because each is slow or needs a build:
 | --- | --- |
 | `make check-prebuild` | Two prebuilds into temp directories, asserting the config plugin output |
 | `make bundle-secrets-check` | Exports the bundle and asserts no non-public key leaked into it |
+| `make codeql` | CodeQL's `security-and-quality` suite over the whole tree — see below |
 | `make test`, `make unit`, `make coverage` | See [testing.md](testing.md) |
 
 `make lint` and `make check-code` are what the pre-push hook and the CI
@@ -108,9 +109,57 @@ Each gate has one supported escape hatch. Use it, with a comment saying why.
 | `minimumReleaseAge` | `minimumReleaseAgeExclude`, pinned as `name@exact-version` so the guard still applies to later releases | `pnpm-workspace.yaml` |
 | Package build scripts | `onlyBuiltDependencies` or `allowBuilds`. `strictDepBuilds` forces an explicit decision | `pnpm-workspace.yaml` |
 | Coverage | Change the threshold in `jest.config.ts`, deliberately, not silently | `jest.config.ts` |
+| CodeQL | `// codeql[<rule-id>]` alone on the line above, with a second comment saying why. **Never** dismiss the alert in the GitHub UI or API | The code |
 
 Rules of thumb: suppress the narrowest scope that works, put the reason in the
 suppression itself, and never widen an ignore pattern to hide one file.
+
+## CodeQL, and why suppression is a source comment
+
+CodeQL runs two ways from one config file, `.github/codeql/codeql-config.yml`:
+`.github/workflows/codeql.yml` hands that path to
+`github/codeql-action/init`, and `make codeql` parses the suite, the packs and
+the `paths-ignore` list out of the same file. One file, so a local "clean" and a
+CI "clean" mean the same thing.
+
+It is **advanced setup**, not GitHub's Default setup, precisely so those choices
+are files in this repository that a reviewer sees in a diff rather than toggles
+on a settings page. It is **informational**: leave `codeql` out of the required
+checks, because a pack download that times out must not be able to block a
+merge. Alerts land under Security → Code scanning.
+
+`make codeql` needs a CodeQL CLI, which nothing else here does and `make check`
+therefore does not run it. Either route works:
+
+```
+gh extension install github/gh-codeql    # if you already have gh
+brew install codeql                      # or a release from github/codeql-cli-binaries
+```
+
+The first run downloads and compiles the query pack (minutes); later runs reuse
+it. Output lands in the gitignored `.codeql/`, and the command exits non-zero
+while any finding is unsuppressed, so it works as a pre-push gate.
+
+**Suppress a false positive with an inline marker, not a dismissal.** A marker
+
+```ts
+// codeql[js/some-rule-id]
+// Reason it cannot happen here.
+const value = untrusted;
+```
+
+works only because the config loads `codeql/javascript-queries:AlertSuppression.ql`.
+Without that pack the marker is silently ignored — the comment sits there
+looking correct while the alert keeps reappearing, which is how esign lost three
+rounds to one JWT false positive.
+
+The alternative, dismissing the alert through the UI or the API, is worse for
+two concrete reasons: the dismissal is keyed to the alert's *fingerprint*, so it
+evaporates the next time the file moves or the surrounding lines shift and the
+alert re-opens with nobody having changed anything; and it is invisible in
+review. A marker travels with the code, is reviewed in the diff that introduces
+it, and silences exactly one site rather than the whole query — the same rule
+firing elsewhere still reports.
 
 ## knip runs in default mode
 

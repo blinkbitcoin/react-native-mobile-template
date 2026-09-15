@@ -141,6 +141,12 @@ check-release: ## Ruby syntax + fastlane lane parse + lane unit tests
 
 check: check-code check-gen check-deps check-ci check-docs check-release ## Every static gate CI runs (no tests/builds)
 
+# Deliberately NOT in `make check`: the first run downloads and compiles a query
+# pack (minutes) and every run needs a CodeQL CLI, which no other gate does.
+# CI runs the same queries through .github/workflows/codeql.yml.
+codeql: ## CodeQL locally with the same config CI uses (needs a CodeQL CLI)
+	bash scripts/codeql-local.sh
+
 test-scripts: ## node:test for scripts/**/*.test.mjs
 	pnpm test:scripts
 
@@ -172,4 +178,4 @@ reset: clean ## clean + reinstall
 help: ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: init doctor install ports start ios android web mock-api prebuild build-web version verify-ios verify-android release-notes i18n codegen typecheck lint format format-check knip spell check-gen check-prebuild check-code check-deps check-ci check-docs bundle-secrets-check check-release check test-scripts unit coverage e2e-ios e2e-android e2e-web test clean reset help
+.PHONY: init doctor install ports start ios android web mock-api prebuild build-web version verify-ios verify-android release-notes i18n codegen typecheck lint format format-check knip spell check-gen check-prebuild check-code check-deps check-ci check-docs bundle-secrets-check check-release check codeql test-scripts unit coverage e2e-ios e2e-android e2e-web test clean reset help

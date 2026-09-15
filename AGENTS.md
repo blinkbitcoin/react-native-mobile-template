@@ -78,6 +78,7 @@ Every row is a make target; nothing here is run through pnpm directly.
 | `make check-prebuild` | Prebuild both platforms in a temp dir, assert plugin output |
 | `make check-release` | Ruby syntax + fastlane lane parse + lane unit tests |
 | `make bundle-secrets-check` | Export the bundle, assert no non-public keys leaked |
+| `make codeql` | CodeQL with the same config CI uses (needs a CodeQL CLI; not in `make check`) |
 
 | Tests | |
 |---|---|
