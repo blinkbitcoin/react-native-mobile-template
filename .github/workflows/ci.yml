@@ -2,7 +2,10 @@ name: ci
 on:
   push:
     branches: [main]
-    paths-ignore: [docs/**, "**.md"]
+    # No paths-ignore: it would be a second, narrower docs rule that already
+    # disagrees with the classifier's (it misses LICENSE and the issue/PR
+    # templates). checks.yml's `changes` job is the single source - it
+    # classifies pushes too, so a docs-only merge still skips unit and e2e.
   pull_request:
     types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:

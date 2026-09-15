@@ -18,7 +18,7 @@ is the inventory.
 
 | File | Trigger | Calls | Notes |
 | --- | --- | --- | --- |
-| `ci.yml` | `push` to `main` (skipping `docs/**`, `**.md`), `pull_request` (`opened`, `synchronize`, `reopened`, `labeled`), `workflow_dispatch` | `checks.yml`, `unit.yml`, `e2e.yml` | `unit` and `e2e` both `needs: checks` and skip when `checks` reports `docs-only` |
+| `ci.yml` | `push` to `main` (all paths), `pull_request` (`opened`, `synchronize`, `reopened`, `labeled`), `workflow_dispatch` | `checks.yml`, `unit.yml`, `e2e.yml` | `unit` and `e2e` both `needs: checks` and skip when `checks` reports `docs-only` — on a push as well as a PR |
 | `web.yml` | `pull_request`, `release: published` | `web.yml` | PR = dev export + Playwright smoke; release = production export + Pages deploy |
 | `pr-closed.yml` | `pull_request: closed` | `pr-closed.yml` | cancels the closed PR's in-flight runs; needs `actions: write` |
 | `pr-title.yml` | `pull_request: edited` (only when the title changed) | `pr-title.yml` | `opened`/`synchronize` are already covered by `checks.yml`'s `commitlint` |
@@ -26,6 +26,18 @@ is the inventory.
 `push` is deliberately scoped to `main` only: a PR branch in this repo would
 otherwise fire both `push` and `pull_request` and run the whole suite twice for
 the same commit.
+
+`ci.yml` carries **no `paths-ignore`**, deliberately. It used to, back when the
+reusable `checks.yml` derived its diff base from `github.event.pull_request.base.sha`
+alone — empty on a push, so the classifier only ever classified PRs and every
+merge to `main` ran the full matrix. `paths-ignore` was the workaround, and it
+was a second docs rule sitting next to the classifier's: narrower (it missed
+`LICENSE` and the issue/PR templates) and free to drift further. `checks.yml`
+now falls back to `github.event.before` on a push, so one rule answers both
+events and the `changes` job is the single source. Widen what counts as docs
+with the `docs-globs` input, never with a second list here. `release-internal.yml`
+keeps its `paths-ignore`: that one is not a docs classification but a "do not
+cut a build for this" rule, and it calls no classifier.
 
 ### Release and OTA
 
