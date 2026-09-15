@@ -11,7 +11,7 @@ source. CI lives in a reusable-workflow repo
 
 <!-- Badge slots — fill these in once the repo has a CI run and a release:
 [![CI](https://github.com/<owner>/<repo>/actions/workflows/ci.yml/badge.svg)](https://github.com/<owner>/<repo>/actions/workflows/ci.yml)
-[![Release](https://github.com/<owner>/<repo>/actions/workflows/release.yml/badge.svg)](https://github.com/<owner>/<repo>/actions/workflows/release.yml)
+[![Release](https://github.com/<owner>/<repo>/actions/workflows/release-internal.yml/badge.svg)](https://github.com/<owner>/<repo>/actions/workflows/release-internal.yml)
 -->
 
 ## 60-second start
