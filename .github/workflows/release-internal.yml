@@ -1,4 +1,4 @@
-name: release-internal
+name: CD / Internal
 # Every commit on main becomes a signed, uploaded internal build:
 # prepare -> build both platforms -> upload to TestFlight internal / Play
 # internal -> a `vX.Y.Z-build.N` GitHub pre-release carrying every artifact ->
@@ -24,6 +24,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   prepare:
+    name: Prepare
     uses: blinkbitcoin/react-native-workflows/.github/workflows/expo-prepare.yml@v0
     permissions:
       contents: read
@@ -34,6 +35,14 @@ jobs:
       actions: read
     with:
       stage: internal
+      # Both this workflow and ci.yml fire on the same push, so without a gate a
+      # red main still starts a macOS build and, with uploads on, still reaches a
+      # store. This blocks inside the job - polling every 30s, 45-minute cap,
+      # 5-minute discovery window - so prepare holds an ubuntu runner for as long
+      # as CI takes. A workflow_dispatch on a commit whose CI never ran fails the
+      # gate by design: "no run exists" is fatal, because a silently-skipped gate
+      # is exactly what it exists to prevent.
+      require-green-workflow: ci.yml
       # `build-number-offset` is a `number` input, and an unset repo variable is
       # the empty string, which fails input validation rather than falling back
       # to the workflow default. fromJSON turns the fallback into a real number.
@@ -62,6 +71,7 @@ jobs:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
   build-ios:
+    name: Build iOS
     needs: prepare
     uses: blinkbitcoin/react-native-workflows/.github/workflows/expo-build-ios.yml@v0
     permissions:
@@ -104,6 +114,7 @@ jobs:
       ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
 
   build-android:
+    name: Build Android
     needs: prepare
     uses: blinkbitcoin/react-native-workflows/.github/workflows/expo-build-android.yml@v0
     permissions:
@@ -142,6 +153,7 @@ jobs:
       PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
 
   publish-ios:
+    name: Upload iOS
     # Off unless the repository says otherwise, so a checkout with no store
     # credentials still builds, verifies and publishes its artifacts.
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' }}
@@ -177,6 +189,7 @@ jobs:
       ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
 
   publish-android:
+    name: Upload Android
     # Off unless the repository says otherwise, so a checkout with no store
     # credentials still builds, verifies and publishes its artifacts.
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' }}
@@ -201,6 +214,7 @@ jobs:
       PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
 
   github-prerelease:
+    name: GitHub Pre-release
     # The build jobs are named directly rather than reached through the upload
     # jobs: this release carries their artifacts and has never needed a store.
     # `!cancelled() && !failure()` is what lets it run when the uploads are
@@ -230,6 +244,7 @@ jobs:
       RELEASE_TAGGER_APP_PRIVATE_KEY: ${{ secrets.RELEASE_TAGGER_APP_PRIVATE_KEY }}
 
   ota-internal:
+    name: OTA
     needs: [prepare, github-prerelease]
     if: ${{ vars.OTA_ENABLED == 'true' }}
     uses: blinkbitcoin/react-native-workflows/.github/workflows/expo-ota-publish.yml@v0

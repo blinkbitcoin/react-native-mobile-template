@@ -1,4 +1,4 @@
-name: codeql
+name: CI / CodeQL
 on:
   push:
     branches: [main]
@@ -26,4 +26,5 @@ jobs:
   # Keep this OUT of the required-checks ruleset: CodeQL is informational and a
   # runner hiccup must not be able to block a merge.
   codeql:
+    name: Analyze
     uses: blinkbitcoin/react-native-workflows/.github/workflows/codeql.yml@v0

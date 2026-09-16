@@ -1,4 +1,4 @@
-name: release-production
+name: CD / Production
 # The only manually triggered step in the path, and the only one behind a
 # required reviewer. It never builds: it acts on the binary that beta already
 # soaked, through the App Store Connect and Play APIs.
@@ -51,6 +51,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   prepare:
+    name: Prepare
     uses: blinkbitcoin/react-native-workflows/.github/workflows/expo-prepare.yml@v0
     permissions:
       contents: read
@@ -85,6 +86,7 @@ jobs:
   # ---- action=release -------------------------------------------------------
 
   ios-release:
+    name: Release iOS
     needs: prepare
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && (inputs.action == 'release' && inputs.platforms != 'android') }}
     uses: blinkbitcoin/react-native-workflows/.github/workflows/fastlane-lane.yml@v0
@@ -122,6 +124,7 @@ jobs:
       APP_REVIEW_NOTES: ${{ secrets.APP_REVIEW_NOTES }}
 
   android-release:
+    name: Release Android
     needs: prepare
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && (inputs.action == 'release' && inputs.platforms != 'ios') }}
     uses: blinkbitcoin/react-native-workflows/.github/workflows/fastlane-lane.yml@v0
@@ -146,6 +149,7 @@ jobs:
   # ---- action=halt | resume | complete (iOS phased release) -----------------
 
   ios-phased:
+    name: Phased iOS
     needs: prepare
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && (contains(fromJSON('["halt", "resume", "complete"]'), inputs.action) && inputs.platforms != 'android') }}
     uses: blinkbitcoin/react-native-workflows/.github/workflows/fastlane-lane.yml@v0
@@ -174,6 +178,7 @@ jobs:
   # ---- action=rollout | resume | complete (Play staged rollout) -------------
 
   android-rollout:
+    name: Rollout Android
     needs: prepare
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && (contains(fromJSON('["rollout", "resume", "complete"]'), inputs.action) && inputs.platforms != 'ios') }}
     uses: blinkbitcoin/react-native-workflows/.github/workflows/fastlane-lane.yml@v0
@@ -198,6 +203,7 @@ jobs:
   # ---- action=halt (Play) ---------------------------------------------------
 
   android-halt:
+    name: Halt Android
     needs: prepare
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && (inputs.action == 'halt' && inputs.platforms != 'ios') }}
     uses: blinkbitcoin/react-native-workflows/.github/workflows/fastlane-lane.yml@v0
@@ -221,6 +227,7 @@ jobs:
   # ---- action=release only: mark latest, publish OTA, deploy web ------------
 
   github-release:
+    name: GitHub Release
     # `prepare` is ordering, not data: this job keys off `inputs.tag`, but the
     # `release-meta` artifact it attaches only exists once prepare has run.
     needs: [prepare, ios-release, android-release]
@@ -255,6 +262,7 @@ jobs:
   # the download directory, and an artifact carrying one of those names would
   # replace the checksums of the release's binaries.
   stage-note:
+    name: Stage Note
     needs: [prepare, ios-release, android-release, ios-phased, android-rollout, android-halt]
     if: ${{ !failure() && !cancelled() }}
     runs-on: ubuntu-latest
@@ -279,6 +287,7 @@ jobs:
           if-no-files-found: error
 
   stage-append:
+    name: Append Note
     needs: [prepare, stage-note]
     if: ${{ !failure() && !cancelled() }}
     uses: blinkbitcoin/react-native-workflows/.github/workflows/github-release.yml@v0
@@ -295,6 +304,7 @@ jobs:
       RELEASE_TAGGER_APP_PRIVATE_KEY: ${{ secrets.RELEASE_TAGGER_APP_PRIVATE_KEY }}
 
   ota-production:
+    name: OTA
     # github-release is what puts build-info.json on the tag, which is the
     # fingerprint baseline the gate downloads.
     needs: [prepare, github-release]
@@ -319,6 +329,7 @@ jobs:
 
   # init:web-start
   web:
+    name: Web
     # Pure ordering: the site should not go live before the stores have accepted
     # the release. Neither job's outputs are read here.
     needs: [prepare, github-release]

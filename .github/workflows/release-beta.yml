@@ -1,4 +1,4 @@
-name: release-beta
+name: CD / Beta
 # Fires when release-please's PR is merged and the `vX.Y.Z` release is
 # published. It never builds: it waits for that exact commit's
 # `release-internal` run to be green and then promotes the binary that run
@@ -25,6 +25,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   prepare:
+    name: Prepare
     # A `-build.N` pre-release from release-internal also publishes a `release`
     # event; only a real release may promote.
     if: ${{ github.event_name == 'workflow_dispatch' || !github.event.release.prerelease }}
@@ -64,6 +65,7 @@ jobs:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
   promote-ios:
+    name: Promote iOS
     # Off unless the repository says otherwise, so a checkout with no store
     # credentials still runs everything that does not need one.
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' }}
@@ -103,6 +105,7 @@ jobs:
       APP_REVIEW_NOTES: ${{ secrets.APP_REVIEW_NOTES }}
 
   promote-android:
+    name: Promote Android
     # Off unless the repository says otherwise, so a checkout with no store
     # credentials still runs everything that does not need one.
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' }}
@@ -126,6 +129,7 @@ jobs:
       PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
 
   github-release:
+    name: GitHub Release
     # `!cancelled() && !failure()` is what lets this run when the promotions are
     # skipped: a skipped dependency skips its dependents unless the condition
     # uses a status function.
@@ -173,6 +177,7 @@ jobs:
   # `release-meta` here would replace the checksums of the promoted binaries
   # with the checksums of four metadata files.
   store-notes-section:
+    name: Store Notes
     needs: [prepare, github-release]
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -193,6 +198,7 @@ jobs:
           if-no-files-found: error
 
   store-notes:
+    name: Append Notes
     needs: [prepare, store-notes-section]
     uses: blinkbitcoin/react-native-workflows/.github/workflows/github-release.yml@v0
     permissions:
@@ -209,6 +215,7 @@ jobs:
       RELEASE_TAGGER_APP_PRIVATE_KEY: ${{ secrets.RELEASE_TAGGER_APP_PRIVATE_KEY }}
 
   ota-beta:
+    name: OTA
     needs: [prepare, github-release]
     if: ${{ vars.OTA_ENABLED == 'true' }}
     uses: blinkbitcoin/react-native-workflows/.github/workflows/expo-ota-publish.yml@v0

@@ -14,6 +14,56 @@ releases. The release group is documented in
 [release-runbook.md](release-runbook.md) and [ota.md](ota.md); the table below
 is the inventory.
 
+The whole flow, with the **event** that crosses each boundary. Those labels are
+the point: a GitHub run is created per event, not per file, so the Actions UI
+can only ever show you one of these boxes at a time. That is also why these are
+separate workflows rather than one — merging them would produce the same runs
+with most jobs skipped.
+
+```mermaid
+flowchart TD
+  commit["commit pushed / PR opened"] --> CI
+
+  subgraph CI["CI — every change"]
+    direction LR
+    checks["Checks"] --> unit["Unit"] --> e2e["E2E"] --> badges["Badges"]
+  end
+
+  CI -->|"push to main"| rp["CD / Release PR<br/>(release-please)"]
+  CI -->|"push to main"| internal
+
+  subgraph internal["CD / Internal"]
+    direction LR
+    prep["Prepare<br/>(waits for green CI)"] --> builds["Build iOS<br/>Build Android"]
+    builds --> up["Upload iOS<br/>Upload Android"]
+    up --> pre["GitHub Pre-release"]
+  end
+
+  rp -->|"merge the release PR"| tag["tag vX.Y.Z<br/>release published"]
+  tag --> beta
+
+  subgraph beta["CD / Beta"]
+    direction LR
+    bprep["Prepare"] --> promote["Promote iOS<br/>Promote Android"] --> brel["GitHub Release"]
+  end
+
+  beta -->|"workflow_dispatch"| prod
+
+  subgraph prod["CD / Production"]
+    direction LR
+    rel["Release iOS<br/>Release Android"] --> roll["Phased / Rollout"] --> done["Complete or Halt"]
+  end
+
+  pre -.->|"OTA_ENABLED"| ota["OTA publish"]
+  brel -.->|"OTA_ENABLED"| ota
+  prod -.->|"OTA_ENABLED"| ota
+```
+
+Two edges are worth reading twice. `Prepare` in **CD / Internal** waits for CI
+to conclude green for the same commit, so a red `main` never reaches a build or
+a store. And `E2E` sits behind `Unit`, so a failed unit run never pays for a
+twenty-minute Android suite or a macOS runner.
+
 ### Everyday CI
 
 | File | Trigger | Calls | Notes |

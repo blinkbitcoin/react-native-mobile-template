@@ -1,4 +1,4 @@
-name: ota-hotfix
+name: CD / OTA Hotfix
 # A JS-only fix, shipped to an already-installed binary without a store review.
 # Only for changes that do not move the native fingerprint: the gate in
 # `expo-ota-publish.yml` compares this commit's fingerprints against the
@@ -43,6 +43,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   baseline:
+    name: Baseline
     # Same gate as `publish`: without it a dispatch on a repo with OTA off burns
     # a runner and then fails with "no baseline release found", which reads as a
     # hotfix problem rather than "OTA is not enabled here".
@@ -89,6 +90,7 @@ jobs:
           echo "fp-ios=$fp" >>"$GITHUB_OUTPUT"
 
   publish:
+    name: Publish
     needs: baseline
     if: ${{ vars.OTA_ENABLED == 'true' }}
     uses: blinkbitcoin/react-native-workflows/.github/workflows/expo-ota-publish.yml@v0

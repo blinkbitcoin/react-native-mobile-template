@@ -1,4 +1,4 @@
-name: release-retry
+name: CD / Beta Retry
 # `release-beta.yml` refuses to promote until that commit's `release-internal`
 # run is green. When beta is published before internal finishes (or while it is
 # red), the beta run fails at the gate and there is nothing to re-trigger it —
@@ -21,6 +21,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   retry-beta:
+    name: Retry Beta
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
