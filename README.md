@@ -2,9 +2,9 @@
 
 # React Native Mobile Template
 
-**Start on day ninety.**<br>
-An Expo app with the signing, the pipelines, the emulators and the store
-submissions already working.
+The starting point for Blink's React Native apps: an Expo app with the
+signing, the pipelines, the emulators and the store submissions already
+working.
 
 [![Unit](https://raw.githubusercontent.com/blinkbitcoin/react-native-mobile-template/gh-pages/badges/main/unit.svg)](https://github.com/blinkbitcoin/react-native-mobile-template/actions/workflows/ci.yml)
 [![E2E](https://raw.githubusercontent.com/blinkbitcoin/react-native-mobile-template/gh-pages/badges/main/e2e.svg)](https://github.com/blinkbitcoin/react-native-mobile-template/actions/workflows/ci.yml)
@@ -20,11 +20,11 @@ submissions already working.
 Every React Native project pays the same tax before it ships anything. Signing
 that only fails on a Tuesday. An emulator that hangs in CI and nowhere else.
 The eleventh linter. A release nobody remembers the order of. Months of it,
-and none of it is your app.
+and none of it is the app itself.
 
-This repo is that tax, already paid. Press **Use this template**, run `make
-init`, and you get an app that builds, tests itself on real devices, and ships
-to both stores from a merged pull request.
+That tax is paid here once. Press **Use this template**, run `make init`, and
+the result is an app that builds, tests itself on real devices, and ships to
+both stores from a merged pull request.
 
 ```mermaid
 flowchart LR
@@ -35,7 +35,7 @@ flowchart LR
 
 **Where to start** — three ways through this repository:
 
-| You are | Your path |
+| Task | Where to look |
 | --- | --- |
 | **Starting**<br>a new app | [Getting started](#getting-started) — running in six commands<br>[Using this template](#using-this-template) — what `make init` rewrites<br>[local-dev.md](docs/local-dev.md) — the long version |
 | **Working**<br>in the app | [What is in here](#what-is-in-here) — every directory and what owns it<br>[architecture.md](docs/architecture.md) — data flow, providers, env<br>[quality.md](docs/quality.md) — which linter owns which rule |
@@ -55,8 +55,8 @@ make ios                     # or: make android
 `make check && make unit` runs every gate CI runs. `make help` lists the rest.
 
 > If a command is not in the Makefile, CI does not know how to run it either.
-> That is the rule the whole repo is built on, and `make ci` is the whole of CI
-> on your laptop.
+> That is the rule the whole repo is built on, and `make ci` runs the whole of
+> CI locally.
 
 <!-- init:usage-start -->
 ## Using this template
@@ -73,7 +73,7 @@ project, optionally drops the web target, and deletes itself. The full walkthrou
 
 Continuous Native Generation. Native config is a TypeScript plugin, not a diff
 someone applied to an Xcode project two years ago and cannot explain.
-`make prebuild` regenerates both. You commit neither.
+`make prebuild` regenerates both. Neither is committed.
 
 #### CI is a dependency, not a directory
 
@@ -91,8 +91,7 @@ gate is one Makefile line instead of a YAML negotiation.
 #### The release path runs without store credentials
 
 Builds go unsigned. Signing switches on with a repo variable, uploading with
-another. You can watch a release work end to end before Apple has answered your
-email.
+another. A release can be watched end to end before the store accounts exist.
 
 ## What is in here
 
@@ -120,7 +119,7 @@ Not in here, deliberately: `ios/` and `android/`. They are generated.
 
 Eleven workflow files. Each is a thin caller —
 [`react-native-workflows`](https://github.com/blinkbitcoin/react-native-workflows)
-holds what they actually do. Job names are what you read in the Actions graph.
+holds what they actually do. Job names are what the Actions graph shows.
 
 **CI** — on a pull request and on `main`
 
