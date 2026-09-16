@@ -59,7 +59,11 @@ else
 fi
 
 if ! git rev-parse --verify "$base" >/dev/null 2>&1; then
-  notice "docs freshness skipped: cannot resolve $base (no remote, or a shallow clone that does not reach it)"
+  # A repo with no remote can never resolve origin/main, and saying so on every
+  # local run trains people to ignore notices. Stay quiet until a remote exists.
+  if [ -n "$(git remote 2>/dev/null)" ]; then
+    notice "docs freshness skipped: cannot resolve $base (a shallow clone that does not reach it)"
+  fi
 else
   merge_base="$(git merge-base "$base" HEAD 2>/dev/null || true)"
   if [ -z "$merge_base" ]; then

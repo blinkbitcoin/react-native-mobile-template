@@ -34,7 +34,10 @@ pre-commit:
       # directory traversal, and naming files explicitly on the command line
       # bypasses it (the translated catalogs are full of Spanish words that look
       # like English typos).
-      run: typos --force-exclude {staged_files}
+      # mise exec: typos comes from .mise.toml, so a shell without mise
+      # activated (an editor's git integration, a plain terminal) would
+      # otherwise fail the commit with "command not found".
+      run: mise exec -- typos --force-exclude {staged_files}
 commit-msg:
   commands:
     commitlint:

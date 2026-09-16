@@ -9,7 +9,7 @@
 // 120, not the 72 the sibling repos use: theirs is tuned for narrow package
 // READMEs on npm, while these tables are read on GitHub at full page width and
 // document long command lines. Measured against this repo, 72 flags 117 lines
-// and 120 flags the 25 that actually squeeze a neighbouring column.
+// and 120 flags only the rows that actually squeeze a neighbouring column.
 import { globSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

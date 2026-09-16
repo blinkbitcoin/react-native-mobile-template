@@ -125,7 +125,7 @@ rather than passing quietly, because silence here is indistinguishable from
 
 Table width is 120, not the 72 the sibling repos use: theirs is tuned for the
 narrow README column npm renders, while these tables are read on GitHub at full
-page width. Measured on this repo, 72 flags 117 lines and 120 flags 25 — the
+page width. Measured on this repo, 72 flags 117 lines while 120 flags only the
 ones that actually squeeze a neighbouring column until its code spans wrap.
 
 **The mermaid check is the one gate that needs the network**, on a cold `npx`
