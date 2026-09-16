@@ -22,6 +22,12 @@ jobs:
       # fastlane lane parse and the lane unit tests. Needs Ruby, which is why
       # the toggle is off by default in the reusable workflow.
       release-checks: true
+      # Both off by default upstream, because a consumer without the scripts
+      # would fail; this one has them. Until these were switched on, `make
+      # check-gen` ran on developer machines and in no CI job - a green local
+      # gate implying a check CI never made.
+      i18n: true
+      graphql-codegen: true
   unit:
     needs: checks
     if: ${{ needs.checks.outputs.docs-only != 'true' }}

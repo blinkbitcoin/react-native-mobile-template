@@ -166,6 +166,11 @@
     ],
     "edits": [
       {
+        "$comment": "The build:web entry in the list of package scripts CI calls. Left behind, the test would demand a script the generated app no longer has.",
+        "path": "scripts/gates.test.mjs",
+        "lines": ["^  'build:web',$"]
+      },
+      {
         "$comment": "The web export directory, in the CodeQL scan exclusions. Left behind it is a path-ignore for a target the generated app does not build.",
         "path": ".github/codeql/codeql-config.yml",
         "lines": ["^  - dist # web export$"]

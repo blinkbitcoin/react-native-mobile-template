@@ -90,7 +90,17 @@ i18n: ## Extract + compile message catalogs
 codegen: ## Regenerate typed GraphQL documents
 	pnpm codegen
 
-# ---------- Quality gates (each is what CI runs) ----------
+# ---------- Quality gates ----------
+# `make check` is the `checks` workflow's gate set and `make ci` adds the `unit`
+# workflow's, so a green run here is the same set of gates CI makes - not a
+# similar one. That used to be a comment claiming as much while five gates
+# (i18n, codegen, SDK drift, lockfile provenance, licences) ran here and in no
+# CI job at all. It is now enforced from the other side: consumer-contract.bats
+# in react-native-workflows reads this Makefile and the workflow YAML and fails
+# when they disagree.
+#
+# E2E is the deliberate exception: it needs a simulator or an emulator, so it
+# stays in its own targets (`make e2e-ios`, `e2e-android`, `e2e-web`).
 typecheck: ## tsc --noEmit
 	pnpm typecheck
 
@@ -139,7 +149,14 @@ check-release: ## Ruby syntax + fastlane lane parse + lane unit tests
 	FASTLANE_SKIP_ENV_ASSERT=1 bundle exec fastlane lanes
 	bundle exec ruby -Ifastlane/test fastlane/test/lanes_test.rb
 
-check: check-code check-gen check-deps check-ci check-docs check-release ## Every static gate CI runs (no tests/builds)
+check: check-code check-gen check-deps check-ci check-docs check-release ## Every static gate the checks workflow runs (no tests/builds)
+
+# The two expensive gates are not in `check` and are off by default in CI for
+# the same reason: a prebuild of both platforms and a web export are minutes
+# each. Run them before a release, or when you have touched a config plugin.
+check-slow: check-prebuild bundle-secrets-check ## The minutes-long gates: prebuild output + bundle secrets
+
+ci: check coverage test-scripts ## Everything CI runs except E2E (which needs a simulator)
 
 # Deliberately NOT in `make check`: the first run downloads and compiles a query
 # pack (minutes) and every run needs a CodeQL CLI, which no other gate does.
@@ -184,4 +201,4 @@ reset: clean ## clean + reinstall
 help: ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: init doctor install ports start ios android web mock-api prebuild build-web version verify-ios verify-android release-notes i18n codegen typecheck lint format format-check knip spell check-gen check-prebuild check-code check-deps check-ci check-docs bundle-secrets-check check-release check codeql test-scripts unit coverage badges e2e-ios e2e-android e2e-web test clean reset help
+.PHONY: init doctor install ports start ios android web mock-api prebuild build-web version verify-ios verify-android release-notes i18n codegen typecheck lint format format-check knip spell check-gen check-prebuild check-code check-deps check-ci check-docs bundle-secrets-check check-release check check-slow ci codeql test-scripts unit coverage badges e2e-ios e2e-android e2e-web test clean reset help
