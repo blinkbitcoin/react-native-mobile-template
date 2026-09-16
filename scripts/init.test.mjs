@@ -702,13 +702,19 @@ describe('init --yes --no-web', () => {
   });
 
   // One paragraph disagreeing with three others is worse than all four being
-  // stale, because the reader cannot tell which one to trust.
+  // stale, because the reader cannot tell which one to trust. The template has
+  // eleven workflow files and `--no-web` deletes `web.yml`, so the generated app
+  // has ten: no "eleven" may survive the rewrite, and every count that describes
+  // the ten has to have moved with it. (The `nine` below is not a file count —
+  // it is how many `uses:` are left in `release-production.yml` once the web job
+  // goes with its marker block.)
   test('rewrites every workflow-file count in docs/ci.md, not just the first', () => {
     const ci = readFileSync(path.join(root, 'docs/ci.md'), 'utf8');
-    assert.doesNotMatch(ci, /\b[Tt]en\b/);
-    assert.match(ci, /the nine files in/);
-    assert.match(ci, /Two of the nine are the exception/);
-    assert.match(ci, /Seven of the nine files carry/);
+    assert.doesNotMatch(ci, /\b[Ee]leven\b/);
+    assert.match(ci, /Ten files, in two groups: four that run on every change/);
+    assert.match(ci, /the ten files in/);
+    assert.match(ci, /Two of the ten are the exception/);
+    assert.match(ci, /Eight of the ten files carry/);
     assert.match(ci, /`release-production\.yml` alone has nine\./);
   });
 
@@ -813,7 +819,7 @@ describe('init --yes --no-web', () => {
     assert.deepEqual(removedLines(REPO, root, 'AGENTS.md'), [
       // Two layout lines are rewritten, not deleted: they name the init script
       // and its doc page, both of which are gone afterwards.
-      'scripts/            check-*.sh, doctor, init, hooks/, release/ (verify, notes, version), e2e/',
+      'scripts/            check-*.sh, doctor, init, hooks/, release/ (verify, notes, version), e2e/, badges/',
       '.maestro/           Maestro flows (native e2e); e2e/web/ is Playwright',
       '                    release-runbook, ota, ota-and-crash-reporting, template-usage, decisions/',
       '| `make init` | Rename this template into your app, then delete itself (template only; `docs/template-usage.md`) |',

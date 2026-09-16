@@ -304,7 +304,7 @@
           ],
           ["the eleven files in", "the ten files in"],
           ["Two of the eleven are the exception", "Two of the ten are the exception"],
-          ["Eight of the ten files carry", "Seven of the nine files carry"],
+          ["Nine of the eleven files carry", "Eight of the ten files carry"],
           ["`release-production.yml` alone has ten.", "`release-production.yml` alone has nine."]
         ]
       },
