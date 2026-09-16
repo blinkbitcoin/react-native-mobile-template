@@ -88,8 +88,8 @@ The other two plugins are worth reading for their own patterns:
 
 | Plugin | Pattern |
 | --- | --- |
-| `with-android-release-signing.ts` | `withAppBuildGradle` plus `CodeGenerator.mergeContents` with a tag, which recognizes its own block and is idempotent. It rewrites the release build type to use the release `signingConfig`, and **throws** when the template it expects is not found. A silent no-op there would ship a release build signed with the debug keystore |
-| `with-android-release-abis.ts` | `withGradleProperties`, setting `reactNativeArchitectures` to `armeabi-v7a,arm64-v8a`. CI overrides it for x86 emulator builds with `-PreactNativeArchitectures=x86_64`, which wins over `gradle.properties` |
+| `with-android-release-signing.ts` | `withAppBuildGradle` plus `CodeGenerator.mergeContents` with a tag, which recognizes its own block and is idempotent.<br>It rewrites the release build type to use the release `signingConfig`,<br>and **throws** when the template it expects is not found.<br>A silent no-op there would ship a release build signed with the debug keystore |
+| `with-android-release-abis.ts` | `withGradleProperties`, setting `reactNativeArchitectures` to `armeabi-v7a,arm64-v8a`.<br>CI overrides it for x86 emulator builds with `-PreactNativeArchitectures=x86_64`, which wins over `gradle.properties` |
 
 Order matters: plugins run in the order listed in `app.config.ts`, and a later
 plugin sees what an earlier one wrote.
@@ -119,7 +119,7 @@ directory twice and prebuilds both platforms with
 
 | Pass | Environment | Asserts |
 | --- | --- | --- |
-| default | `APP_VARIANT=production APP_VERSION=1.2.3 APP_BUILD_NUMBER=42` | `AppBuildStamp` and `ITSAppUsesNonExemptEncryption` in the Info.plist, `AppBuildStamp` meta-data in the manifest, the release signing block and its debug-keystore warning, `signingConfig signingConfigs.release`, arm-only `reactNativeArchitectures`, the injected version and versionCode, `UIAppFonts`, the splash colorset, and that updates are **off** with no certificate anywhere |
+| default | `APP_VARIANT=production APP_VERSION=1.2.3 APP_BUILD_NUMBER=42` | `AppBuildStamp` and `ITSAppUsesNonExemptEncryption` in the Info.plist, `AppBuildStamp` meta-data in the manifest,<br>the release signing block and its debug-keystore warning, `signingConfig signingConfigs.release`,<br>arm-only `reactNativeArchitectures`, the injected version and versionCode, `UIAppFonts`, the splash colorset,<br>and that updates are **off** with no certificate anywhere |
 | OTA on | plus `OTA_ENABLED=true EXPO_UPDATES_URL=...` | `EXUpdatesEnabled` true, the update URL, and the embedded code-signing certificate and metadata on both platforms |
 
 Add an assertion to this script whenever you add a plugin. A plugin with no
@@ -132,8 +132,8 @@ prebuilds. Run it before pushing a native change.
 
 | What | How |
 | --- | --- |
-| The TypeScript wrapper | `jest.mock('../src/HelloNativeModule')` for the happy path, and `jest.doMock` with a throwing factory inside `jest.isolateModulesAsync` for the "native module absent" path |
-| A config plugin | Call the plugin, take the mod off `config.mods.ios.infoPlist` or `config.mods.android.manifest`, invoke it with a stub `modResults`, assert the output and that a second run changes nothing |
+| The TypeScript wrapper | `jest.mock('../src/HelloNativeModule')` for the happy path,<br>and `jest.doMock` with a throwing factory inside `jest.isolateModulesAsync` for the "native module absent" path |
+| A config plugin | Call the plugin, take the mod off `config.mods.ios.infoPlist` or `config.mods.android.manifest`,<br>invoke it with a stub `modResults`, assert the output and that a second run changes nothing |
 | The generated projects | `make check-prebuild` |
 | The user-visible result | A Maestro assertion on the ids the feature renders |
 
@@ -154,11 +154,11 @@ signatures.
 | --- | --- | --- |
 | Biometric unlock | `expo-local-authentication` | Needs an iOS Face ID usage description, set through the package's config plugin props |
 | Camera, QR and barcode scanning | `expo-camera` | Camera and microphone usage descriptions through the plugin. Ask for permission at the point of use, not on launch |
-| Push notifications | `expo-notifications` | Android delivery goes through Firebase. Adding the Firebase SDKs on iOS is what forces static frameworks, which is an `expo-build-properties` setting and affects every other pod |
+| Push notifications | `expo-notifications` | Android delivery goes through Firebase.<br>Adding the Firebase SDKs on iOS is what forces static frameworks,<br>which is an `expo-build-properties` setting and affects every other pod |
 | Share sheet | React Native's own `Share` API | No extra dependency |
 | Clipboard | `expo-clipboard` | |
 | Haptics | `expo-haptics` | |
-| Permissions | The owning module's own request API | There is no central permissions module. Usage strings belong in the module's plugin props in `app.config.ts`, so prebuild writes them |
+| Permissions | The owning module's own request API | There is no central permissions module.<br>Usage strings belong in the module's plugin props in `app.config.ts`, so prebuild writes them |
 | In-app browser | `expo-web-browser` | Prefer it over an external browser for OAuth flows |
 | Embedded web content | `react-native-webview` | Not an Expo package, but autolinked. Treat any page it loads as untrusted |
 | File system and picking | `expo-file-system`, `expo-document-picker`, `expo-sharing` | |

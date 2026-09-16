@@ -24,11 +24,11 @@ all).
 
 | Doc | Contents |
 | --- | --- |
-| [architecture.md](architecture.md) | Folder map, the routes-only rule, data flow, config and env flow, provider order, error handling, storage split, the updates channel model |
+| [architecture.md](architecture.md) | Folder map, the routes-only rule, data flow, config and env flow, provider order,<br>error handling, storage split, the updates channel model |
 | [local-dev.md](local-dev.md) | Toolchain via mise, `make doctor`, first run, the dev-client deep link, prebuild debugging, a troubleshooting table |
 | [quality.md](quality.md) | Biome and ESLint ownership, every gate in `make check`, how to suppress a rule correctly, commit conventions, git hooks |
 | [testing.md](testing.md) | The test layers, coverage rules, RNTL notes, adding a Maestro flow, Playwright, forensics artifacts |
-| [native-extensions.md](native-extensions.md) | Config plugin vs local Expo module vs build properties, the `hello-native` and `with-build-stamp` walkthroughs, capability recipes |
+| [native-extensions.md](native-extensions.md) | Config plugin vs local Expo module vs build properties,<br>the `hello-native` and `with-build-stamp` walkthroughs, capability recipes |
 | [ota-and-crash-reporting.md](ota-and-crash-reporting.md) | The `CrashReporter` adapter slot, Sentry and Crashlytics recipes, where dSYMs live, pointer to the OTA doc |
 | [ota.md](ota.md) | The `OTA_ENABLED` toggle, code signing, the update server, the channel model, the fingerprint gate, hotfix and rollback |
 | [release-runbook.md](release-runbook.md) | The six steps of a release, versions and build numbers, store notes, secrets, environments, verification gates, `DRY_RUN=1` |

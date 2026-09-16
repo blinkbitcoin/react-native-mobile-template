@@ -225,7 +225,7 @@ anyone who can see the run. Credentials go in `secrets:` instead.
 | `TESTFLIGHT_INTERNAL_GROUP` | `release-internal` iOS upload | Group name in App Store Connect → TestFlight |
 | `TESTFLIGHT_EXTERNAL_GROUP` | `release-beta` iOS promote | External group name; must already exist and be approved |
 | `PLAY_UPDATE_PRIORITY` | Android upload / production | `0`–`5`, Play in-app update priority |
-| `ANDROID_UPLOAD_CERT_SHA256` | `verify-android.sh`, read from the environment (via `build-env`); `--cert-sha256` is the manual override | `keytool -list -v -keystore upload.keystore`, the SHA-256 line. **Leave it unset and the signature check reports `skip`** — the gate that exists to catch a wrong signing identity stops checking |
+| `ANDROID_UPLOAD_CERT_SHA256` | `verify-android.sh`, read from the environment (via `build-env`); `--cert-sha256` is the manual override | `keytool -list -v -keystore upload.keystore`, the SHA-256 line.<br>**Leave it unset and the signature check reports `skip`** —<br>the gate that exists to catch a wrong signing identity stops checking |
 | `OTA_ENABLED` | `app.config.ts` at build time (via `build-env`) and the `if:` on every `ota-*` job | `true` to turn OTA on; see [ota.md](ota.md) |
 | `EXPO_UPDATES_URL` | `app.config.ts` at build time (via `build-env`) and the OTA manifest smoke check | Public origin of the update server |
 | `OTA_CLI_VERSION` | `expo-ota-publish` | Exact `eoas` version; the publish script refuses to run unpinned |
@@ -517,9 +517,9 @@ pretending to work:
 
 | Lane | Store | What implementing it needs |
 | --- | --- | --- |
-| `upload_huawei` | Huawei AppGallery | An AppGallery Connect client id/secret, the `fastlane-plugin-huawei_appgallery_connect` plugin, and an HMS-free build (no Google Play Services dependency at runtime) |
+| `upload_huawei` | Huawei AppGallery | An AppGallery Connect client id/secret, the `fastlane-plugin-huawei_appgallery_connect` plugin,<br>and an HMS-free build (no Google Play Services dependency at runtime) |
 | `upload_samsung` | Samsung Galaxy Store | Seller Portal API credentials and the Galaxy Store CLI; the same `.aab` works |
-| `fdroid_metadata` | F-Droid | Reproducible builds and metadata YAML in `fdroiddata`; F-Droid builds from source, so it needs the release to be buildable without any proprietary dependency |
+| `fdroid_metadata` | F-Droid | Reproducible builds and metadata YAML in `fdroiddata`;<br>F-Droid builds from source, so it needs the release to be buildable without any proprietary dependency |
 
 Each raises `UI.user_error!` pointing back at this section. Add a store by
 implementing its lane and adding a job to `release-production.yml` behind the

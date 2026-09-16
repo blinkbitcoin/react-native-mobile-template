@@ -136,7 +136,7 @@ quietly rendering the fallback.
 | --- | --- | --- |
 | Render errors | `ErrorBoundary` in `Providers` | `ErrorFallback` UI, plus `crashReporting.captureException` |
 | Errors outside React | `ErrorUtils.setGlobalHandler` in `src/app/_layout.tsx` | `crashReporting.captureException` with `isFatal`, then the previous handler |
-| GraphQL errors | `createErrorLink` in `src/graphql/links/error.ts` | A warning through `logger`. An `UNAUTHENTICATED` extension also notifies `onUnauthenticated` subscribers, which is how `src/services/auth.ts` signs the user out |
+| GraphQL errors | `createErrorLink` in `src/graphql/links/error.ts` | A warning through `logger`.<br>An `UNAUTHENTICATED` extension also notifies `onUnauthenticated` subscribers,<br>which is how `src/services/auth.ts` signs the user out |
 | Network errors on an operation | the same link | `logger.error` plus `crashReporting.captureException` with the operation name |
 | Anything user-facing | `toUserMessage` in `src/lib/errors.ts` | One of three copy strings, keyed by the `AppError` code `NETWORK`, `UNAUTHENTICATED` or `UNKNOWN` |
 
