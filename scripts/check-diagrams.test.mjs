@@ -2,11 +2,13 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   checkBlock,
-  classifyFailure,
+  cleanOutput,
   extractMermaidBlocks,
   filesWithMermaid,
   formatParseError,
   MERMAID_CLI,
+  PROBE_DIAGRAM,
+  probeToolchain,
 } from './check-diagrams.mjs';
 
 const doc = (...lines) => lines.join('\n');
@@ -76,22 +78,72 @@ test('filesWithMermaid keeps only documents carrying a block', () => {
   );
 });
 
-test('a missing CLI or browser is an unavailable environment, not a bad diagram', () => {
+test('the probe renders a diagram this module owns, never one from the docs', () => {
+  const seen = [];
+  probeToolchain((code) => {
+    seen.push(code);
+    return { status: 0, stderr: '' };
+  });
+  assert.deepEqual(seen, [PROBE_DIAGRAM]);
+  assert.match(PROBE_DIAGRAM, /^graph TD;/);
+});
+
+test('a toolchain that renders the known-good diagram is available', () => {
+  assert.deepEqual(
+    probeToolchain(() => ({ status: 0, stderr: '' })),
+    { available: true },
+  );
+});
+
+test('a toolchain that cannot render the known-good diagram is unavailable', () => {
   for (const stderr of [
     'Could not find Chrome (ver. 131). This can occur if either',
     'Error: Failed to launch the browser process!',
     'npm error code ENOTFOUND',
     'request to https://registry.npmjs.org/... failed, reason: getaddrinfo EAI_AGAIN',
-    'command not found: npx',
+    'could not run npx: spawnSync npx ENOENT',
   ]) {
-    assert.equal(classifyFailure(stderr), 'unavailable', stderr);
+    assert.deepEqual(
+      probeToolchain(() => ({ status: 1, stderr })),
+      { available: false, stderr },
+    );
   }
 });
 
-test('a parser complaint is a parse failure', () => {
-  assert.equal(classifyFailure('Parse error on line 2:\n  grph TD;\n  ^'), 'parse');
-  assert.equal(classifyFailure(''), 'parse');
-  assert.equal(classifyFailure(undefined), 'parse');
+// The regression that made this rewrite necessary: mmdc echoes the diagram
+// source back in its parse errors, so the old stderr sniff let a broken diagram
+// whose text mentioned "network" (or a timeout, or a missing command) classify
+// itself as an environment problem and switch the gate off. Availability is now
+// decided by the probe above, which the docs cannot reach.
+test('a broken diagram whose text mentions the network is a parse failure, not a skip', () => {
+  const stderr =
+    'UnknownDiagramError: No diagram type detected matching given configuration ' +
+    'for text: not a diagram but it mentions the network layer';
+  const result = checkBlock('docs/architecture.md', { line: 3, code: 'x' }, () => ({
+    status: 1,
+    stderr,
+  }));
+  assert.equal(result.ok, undefined);
+  assert.match(result.error, /^docs\/architecture\.md:3: mermaid block does not parse —/);
+});
+
+test('no word in a diagram can make checkBlock report anything but a parse failure', () => {
+  for (const word of [
+    'network',
+    'timeout',
+    'ETIMEDOUT',
+    'command not found',
+    'Could not find Chrome',
+    'npm error',
+    'registry.npmjs.org',
+    'ECONNREFUSED',
+  ]) {
+    const result = checkBlock('a.md', { line: 1, code: word }, () => ({
+      status: 1,
+      stderr: `Parse error ... for text: ${word}`,
+    }));
+    assert.ok(result.error, `"${word}" should still be a parse failure`);
+  }
 });
 
 test('a parse error names the file and the fence line', () => {
@@ -121,13 +173,19 @@ test('checkBlock reports a parse failure as an error line', () => {
   assert.equal(result.error, 'a.md:7: mermaid block does not parse — Parse error on line 1');
 });
 
-test('checkBlock reports an unrunnable CLI as unavailable rather than an error', () => {
-  const result = checkBlock('a.md', { line: 1, code: 'graph TD;' }, () => ({
-    status: 1,
-    stderr: 'npm error code ENOTFOUND',
-  }));
-  assert.equal(result.unavailable, true);
-  assert.equal(result.error, undefined);
+test('cleanOutput drops npx config chatter and keeps the diagnosis', () => {
+  assert.equal(
+    cleanOutput('npm warn Unknown project config "auto-install-peers".\nParse error on line 1'),
+    'Parse error on line 1',
+  );
+  assert.equal(cleanOutput('npm notice a new version\n\nFailed to launch'), 'Failed to launch');
+  assert.equal(cleanOutput(''), '');
+  assert.equal(cleanOutput(undefined), '');
+});
+
+test('cleanOutput keeps at most the requested number of lines', () => {
+  assert.equal(cleanOutput('a\nb\nc\nd\ne'), 'a b c d');
+  assert.equal(cleanOutput('a\nb\nc', 2), 'a b');
 });
 
 test('checkBlock hands the CLI the block source unchanged', () => {

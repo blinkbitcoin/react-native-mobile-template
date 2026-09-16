@@ -14,16 +14,18 @@
 // the usual `make check-docs` costs nothing; `--all` checks the whole doc set
 // and is what CI runs.
 //
-// This is the one gate that needs the network on a cold npx cache. When the CLI
-// cannot be fetched the check skips with a warning rather than blocking an
-// offline developer — loudly, as a `::warning::` annotation, when CI is set, so
-// a skip is never invisible in a run log.
+// This is the one gate that needs the network on a cold npx cache. Whether the
+// toolchain works is settled once, up front, by rendering a diagram this file
+// owns (PROBE_DIAGRAM) — never by reading the parser's complaints about the
+// docs' own diagrams. When that probe fails the check skips with a warning
+// rather than blocking an offline developer — loudly, as a `::warning::`
+// annotation, when CI is set, so a skip is never invisible in a run log.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DOC_EXCLUDES, DOC_GLOBS, docFiles } from './check-docs-tables.mjs';
+import { DOC_EXCLUDES, DOC_GLOBS, docFiles, fencedBlocks } from './check-docs-tables.mjs';
 
 // Pinned, not `@latest`: the parser is the thing under test, so a mermaid
 // release must be a reviewed commit here rather than a check that changes its
@@ -37,38 +39,12 @@ export const MERMAID_CLI = '@mermaid-js/mermaid-cli@11.16.0';
  * that outer block's content, not a diagram.
  */
 export function extractMermaidBlocks(markdown) {
-  const blocks = [];
-  const lines = markdown.split('\n');
-  let open = null;
-  for (let i = 0; i < lines.length; i++) {
-    const match = /^(\s*)(`{3,}|~{3,})(.*)$/.exec(lines[i]);
-    if (open) {
-      const closes =
-        match &&
-        match[2][0] === open.char &&
-        match[2].length >= open.length &&
-        match[3].trim() === '';
-      if (closes) {
-        if (open.info === 'mermaid') blocks.push({ line: open.line, code: open.body.join('\n') });
-        open = null;
-      } else {
-        open.body.push(lines[i].slice(open.indent));
-      }
-      continue;
-    }
-    if (match) {
-      open = {
-        char: match[2][0],
-        length: match[2].length,
-        indent: match[1].length,
-        info: match[3].trim().split(/\s+/)[0].toLowerCase(),
-        line: i + 1,
-        body: [],
-      };
-    }
-  }
-  // An unclosed fence is a markdown bug, not a diagram; leave it to the reader.
-  return blocks;
+  return (
+    fencedBlocks(markdown.split('\n'))
+      // An unclosed fence is a markdown bug, not a diagram; leave it to the reader.
+      .filter((block) => block.info === 'mermaid' && block.closed)
+      .map((block) => ({ line: block.start + 1, code: block.body.join('\n') }))
+  );
 }
 
 /** The subset of `files` that contains at least one mermaid block. */
@@ -76,41 +52,53 @@ export function filesWithMermaid(files, read) {
   return files.filter((file) => extractMermaidBlocks(read(file)).length > 0);
 }
 
-// A failing `mmdc` call means one of two very different things. Anything that
-// says the tool or its browser is not there is an environment problem — an
-// offline `npx`, a puppeteer install without Chrome — and must not read as "the
-// diagram is broken"; everything else is the parser talking.
-const UNAVAILABLE =
-  /could not find (chrome|chromium)|failed to launch|npm error|ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ETIMEDOUT|command not found|ERR_MODULE_NOT_FOUND|ERR_SOCKET|network|registry\.npmjs\.org/i;
+// A diagram this file owns, used to decide whether the toolchain works at all.
+// It must never come from the docs: the whole point is that the thing being
+// checked cannot influence the decision to check it.
+export const PROBE_DIAGRAM = 'graph TD;\n  A-->B;';
 
-/** `'unavailable'` when the CLI or its browser could not run, else `'parse'`. */
-export function classifyFailure(stderr) {
-  return UNAVAILABLE.test(stderr ?? '') ? 'unavailable' : 'parse';
+/**
+ * Whether `run` can render at all, decided by rendering PROBE_DIAGRAM — a
+ * known-good diagram — rather than by reading the parser's complaints.
+ *
+ * The earlier version sniffed `mmdc`'s stderr for words like "network" or
+ * "command not found" to tell an offline npx from a broken diagram. That was
+ * unsound: `mmdc` echoes the diagram source back in its parse errors
+ * ("...for text: <the block>"), so a malformed diagram containing any of those
+ * words classified itself as an environment problem and turned the gate off.
+ * The one failure mode a gate must not have. Availability is now settled once,
+ * before a single doc block is read, and every later non-zero exit is the
+ * diagram's fault by construction.
+ */
+export function probeToolchain(run) {
+  const { status, stderr } = run(PROBE_DIAGRAM);
+  return status === 0 ? { available: true } : { available: false, stderr };
+}
+
+/** `message` without npx's own config chatter, which is never the diagnosis. */
+export function cleanOutput(message, lines = 4) {
+  return (message ?? '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l && !/^npm (warn|notice)\b/.test(l))
+    .slice(0, lines)
+    .join(' ');
 }
 
 /** One report line per broken block, pointing at the fence that opened it. */
 export function formatParseError(file, block, message) {
-  const first = (message ?? '')
-    .split('\n')
-    .map((l) => l.trim())
-    // npx prints its own config warnings on the same stream; they are never
-    // what is wrong with the diagram.
-    .filter((l) => l && !/^npm (warn|notice)\b/.test(l))
-    .slice(0, 4)
-    .join(' ');
+  const first = cleanOutput(message);
   return `${file}:${block.line}: mermaid block does not parse — ${first || 'no parser output'}`;
 }
 
 /**
- * Check one block with `run(code)`, which must return
- * `{ status, stderr }`. Returns `{ ok }`, `{ unavailable, stderr }` or
- * `{ error }` so the CLI below stays a thin loop and this stays testable.
+ * Check one block with `run(code)`, which must return `{ status, stderr }`.
+ * Called only after `probeToolchain` said the toolchain works, so a non-zero
+ * exit here is a parse failure and nothing else.
  */
 export function checkBlock(file, block, run) {
   const { status, stderr } = run(block.code);
-  if (status === 0) return { ok: true };
-  if (classifyFailure(stderr) === 'unavailable') return { unavailable: true, stderr };
-  return { error: formatParseError(file, block, stderr) };
+  return status === 0 ? { ok: true } : { error: formatParseError(file, block, stderr) };
 }
 
 function changedDocs() {
@@ -128,6 +116,10 @@ function changedDocs() {
   }
 }
 
+// One `npx` process per diagram, plus one for the probe. The doc set has a
+// single block today, so this is two spawns; past roughly three blocks it is
+// worth writing them all into `dir` and handing `mmdc` the directory once
+// (`-i dir`), or resolving the CLI once with a warm `npx --no-install`.
 function mmdcRunner(dir) {
   let n = 0;
   return (code) => {
@@ -138,8 +130,8 @@ function mmdcRunner(dir) {
       ['--yes', MERMAID_CLI, '--quiet', '-i', input, '-o', `${input}.svg`],
       { encoding: 'utf8' },
     );
-    if (result.error)
-      return { status: 1, stderr: `command not found: npx (${result.error.message})` };
+    // A spawn that never started (no npx on PATH) has no exit code of its own.
+    if (result.error) return { status: 1, stderr: `could not run npx: ${result.error.message}` };
     return { status: result.status, stderr: `${result.stderr ?? ''}${result.stdout ?? ''}` };
   };
 }
@@ -180,27 +172,28 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   const run = mmdcRunner(dir);
   const errors = [];
   let blocks = 0;
-  let skipped = null;
+  let probe;
   try {
-    for (const file of files) {
-      if (skipped) break;
-      for (const block of extractMermaidBlocks(read(file))) {
-        blocks++;
-        const result = checkBlock(file, block, run);
-        if (result.unavailable) {
-          skipped = result.stderr;
-          break;
+    // Availability first, on our own diagram. Nothing from the docs has been
+    // handed to the CLI at this point, so nothing in the docs can turn the
+    // gate off.
+    probe = probeToolchain(run);
+    if (probe.available) {
+      for (const file of files) {
+        for (const block of extractMermaidBlocks(read(file))) {
+          blocks++;
+          const { error } = checkBlock(file, block, run);
+          if (error) errors.push(error); // collect them all; never stop early
         }
-        if (result.error) errors.push(result.error);
       }
     }
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 
-  if (skipped) {
-    const why = skipped.split('\n').find((l) => l.trim()) ?? 'unknown reason';
-    const message = `mermaid check skipped: ${MERMAID_CLI} could not run (${why.trim()}) — this gate needs the network on a cold npx cache`;
+  if (!probe.available) {
+    const why = cleanOutput(probe.stderr, 2) || 'no output';
+    const message = `mermaid check skipped: ${MERMAID_CLI} could not render a known-good diagram (${why}) — this gate needs the network on a cold npx cache`;
     console.error(process.env.CI ? `::warning::${message}` : `warning: ${message}`);
     process.exit(0);
   }
