@@ -250,7 +250,7 @@ so the default `GITHUB_TOKEN` can push to it.
 ## Pinning and bumping the workflows version
 
 Every `uses:` that points at the workflows repo is pinned to the moving major
-tag. Eight of the ten files carry at least one, and several carry many:
+tag. Nine of the eleven files carry at least one, and several carry many:
 `release-production.yml` alone has ten. `release-please.yml` and
 `release-retry.yml` call no reusable workflow at all.
 
