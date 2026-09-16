@@ -252,6 +252,10 @@ credentials exist.
 
 ## Variables and secrets
 
+Where each value comes from — which console, which page, and what it can
+reach if it leaks — is in [store-accounts.md](store-accounts.md). This table
+is the wiring; that page is the sourcing.
+
 Repository **variables** (Settings → Secrets and variables → Actions →
 Variables). None are sensitive; all are visible in logs.
 
@@ -570,6 +574,11 @@ pretending to work:
 | `upload_huawei` | Huawei AppGallery | An AppGallery Connect client id/secret, the `fastlane-plugin-huawei_appgallery_connect` plugin,<br>and an HMS-free build (no Google Play Services dependency at runtime) |
 | `upload_samsung` | Samsung Galaxy Store | Seller Portal API credentials and the Galaxy Store CLI; the same `.aab` works |
 | `fdroid_metadata` | F-Droid | Reproducible builds and metadata YAML in `fdroiddata`;<br>F-Droid builds from source, so it needs the release to be buildable without any proprietary dependency |
+
+Signup, consoles and credentials for both are in
+[store-accounts.md](store-accounts.md); the Huawei entry also covers the part
+that is not the lane, which is that Huawei devices ship without Google Play
+Services.
 
 Each raises `UI.user_error!` pointing back at this section. Add a store by
 implementing its lane and adding a job to `release-production.yml` behind the
