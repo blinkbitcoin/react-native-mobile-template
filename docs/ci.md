@@ -22,7 +22,7 @@ is the inventory.
 | `web.yml` | `pull_request`, `release: published` | `web.yml` | PR = dev export + Playwright smoke; release = production export + Pages deploy |
 | `pr-closed.yml` | `pull_request: closed` | `pr-closed.yml` | cancels the closed PR's in-flight runs; needs `actions: write` |
 | `pr-title.yml` | `pull_request: edited` (only when the title changed) | `pr-title.yml` | `opened`/`synchronize` are already covered by `checks.yml`'s `commitlint` |
-| `codeql.yml` | `push` to `main`, `pull_request` to `main`, `schedule` (Mon 06:17 UTC) | `codeql.yml` | CodeQL advanced setup. Informational — **never** a required check. Config in `.github/codeql/codeql-config.yml`; `make codeql` runs the same queries locally |
+| `codeql.yml` | `push` to `main`, `pull_request` to `main`, `schedule` (Mon 06:17 UTC) | `codeql.yml` | CodeQL advanced setup. Informational — **never** a required check.<br>Config in `.github/codeql/codeql-config.yml`; `make codeql` runs the same queries locally |
 
 `push` is deliberately scoped to `main` only: a PR branch in this repo would
 otherwise fire both `push` and `pull_request` and run the whole suite twice for
@@ -52,7 +52,7 @@ break. The expensive half, the native matrix, still skips.
 | File | Trigger | Calls | Notes |
 | --- | --- | --- | --- |
 | `release-please.yml` | `push` to `main` (all paths), `workflow_dispatch` | `googleapis/release-please-action@v5`, `actions/create-github-app-token@v2` | Keeps one release PR open. Calls no reusable workflow from the workflows repo |
-| `release-internal.yml` | `push` to `main` (skipping `docs/**`, `**.md`), `workflow_dispatch` | `expo-prepare.yml`, `expo-build-ios.yml`, `expo-build-android.yml`, `fastlane-lane.yml`, `github-release.yml`, `expo-ota-publish.yml` | The only workflow that builds binaries |
+| `release-internal.yml` | `push` to `main` (skipping `docs/**`, `**.md`), `workflow_dispatch` | `expo-prepare.yml`, `expo-build-ios.yml`, `expo-build-android.yml`,<br>`fastlane-lane.yml`, `github-release.yml`, `expo-ota-publish.yml` | The only workflow that builds binaries |
 | `release-beta.yml` | `release: published`, `workflow_dispatch` (`tag`) | `expo-prepare.yml`, `fastlane-lane.yml`, `github-release.yml`, `expo-ota-publish.yml` | Promotes the binary internal already built and tested. Never builds |
 | `release-production.yml` | `workflow_dispatch` (`tag`, `action`) | `expo-prepare.yml`, `fastlane-lane.yml`, `github-release.yml`, `expo-ota-publish.yml`, `web.yml` | `action` selects release, rollout, halt, resume or complete |
 | `release-retry.yml` | `workflow_run` on a completed `release-internal` for `main` | nothing: it re-runs a failed beta run with `gh` | Closes the hole where `release: published` fires once, before internal is green |
@@ -71,7 +71,7 @@ locally means the same commands passed the same way in CI.
 
 | CI job | Scripts it runs | Local equivalent |
 | --- | --- | --- |
-| `checks.yml` | `typecheck`, `lint`, `format:check`, `knip`, `spell`, `expo-doctor`, `pnpm audit --prod`, commitlint, actionlint, shellcheck | `make check-code`, `make check-deps`, `make check-ci` (`make check` runs all of it) |
+| `checks.yml` | `typecheck`, `lint`, `format:check`, `knip`, `spell`, `expo-doctor`, `pnpm audit --prod`,<br>commitlint, actionlint, shellcheck, `check:docs` | `make check-code`, `make check-deps`, `make check-ci`, `make check-docs`<br>(`make check` runs all of it) |
 | `unit.yml` | `test:coverage`, `test:scripts` | `make coverage`, `make test-scripts` (`make unit` runs `test` + `test:scripts`) |
 | `e2e.yml` | Maestro flows in `.maestro/` against a debug build | `make e2e-ios` / `make e2e-android` (after `make mock-api`, `make start`, `make ios`/`make android`) |
 | `web.yml` | `build:web`, `test:e2e:web` | `make build-web`, `make e2e-web` |
@@ -185,7 +185,7 @@ run's summary page first:
 
 | Artifact | From | Contents |
 | --- | --- | --- |
-| `forensics-ios` | `e2e.yml`'s `ios` job | Maestro's `--debug-output` tree (per-flow `commands-*.json`, failure screenshots, `maestro.log`), the simulator screen recording, Metro's log, the device system log, and any crash report from `DiagnosticReports` newer than the run's start stamp (older ones are filtered out so a previous job's crash on the same runner cannot be misread as this one's) |
+| `forensics-ios` | `e2e.yml`'s `ios` job | Maestro's `--debug-output` tree (per-flow `commands-*.json`, failure screenshots, `maestro.log`),<br>the simulator screen recording, Metro's log, the device system log,<br>and any crash report from `DiagnosticReports` newer than the run's start stamp<br>(older ones are filtered out so a previous job's crash on the same runner cannot be misread as this one's) |
 | `forensics-android` | `e2e.yml`'s `android` job | The same Maestro debug tree, the emulator screen recording, Metro's log and `logcat` |
 | `playwright-report` | `web.yml`'s `playwright` job | The Playwright HTML report (traces, screenshots) |
 | `coverage` | `unit.yml` | `coverage/`, uploaded on every run (30-day retention) |

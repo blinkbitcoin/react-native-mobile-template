@@ -127,7 +127,7 @@ check-ci: ## Lint the CI itself: actionlint (workflows) + shellcheck (scripts)
 	bash scripts/shellcheck.sh
 	@if [ -d .github/workflows ]; then actionlint; else echo "no workflows yet"; fi
 
-check-docs: ## Docs freshness + AGENTS.md command table
+check-docs: ## Docs freshness, AGENTS.md command table, table widths, mermaid blocks
 	bash scripts/check-docs.sh
 
 bundle-secrets-check: ## Export the bundle and assert no non-public keys leaked

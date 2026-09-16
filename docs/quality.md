@@ -69,17 +69,17 @@ Add a rule to one side only, and record which side in the config comment.
 
 | Target | Runs | Owns |
 | --- | --- | --- |
-| `make typecheck` | `tsc --noEmit` | Types. `strict`, plus `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `verbatimModuleSyntax`, `noImplicitOverride`, `noFallthroughCasesInSwitch` |
+| `make typecheck` | `tsc --noEmit` | Types. `strict`, plus `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`,<br>`verbatimModuleSyntax`, `noImplicitOverride`, `noFallthroughCasesInSwitch` |
 | `make lint` | `biome lint .` then `eslint . --max-warnings=0` | Lint, both halves. Warnings are failures |
 | `make format-check` | `biome format .` | Formatting. `make format` writes |
 | `make knip` | `knip` | Unused files, exports, dependencies |
 | `make spell` | `typos` | Spelling, Markdown included |
 | `make check-code` | the five above | The fast local gate |
 | `make check-gen` | `pnpm i18n:check`, `pnpm codegen:check` | Drift in generated catalogs and generated GraphQL documents |
-| `make check-deps` | `pnpm deps:check`, `pnpm deps:audit`, `pnpm deps:licenses` | Expo SDK drift (`expo install --check` and `expo-doctor`), high-severity vulnerabilities in production dependencies, lockfile provenance (`scripts/check-lockfile.sh`), and the license allowlist (`scripts/check-licenses.mjs`) |
+| `make check-deps` | `pnpm deps:check`, `pnpm deps:audit`, `pnpm deps:licenses` | Expo SDK drift (`expo install --check` and `expo-doctor`), high-severity vulnerabilities in production dependencies,<br>lockfile provenance (`scripts/check-lockfile.sh`), and the license allowlist (`scripts/check-licenses.mjs`) |
 | `make check-ci` | `scripts/shellcheck.sh`, `actionlint` | The CI itself: every `scripts/**/*.sh`, and the workflow files |
-| `make check-docs` | `scripts/check-docs.sh` | Warns when architecture-relevant paths changed with no `docs/` change. Fails when `AGENTS.md`'s command table and the Makefile's `##`-documented targets disagree in either direction |
-| `make check-release` | `ruby -c` over the Fastfile and lanes, `fastlane lanes`, and the minitest suite in `fastlane/test/lanes_test.rb` | That the lanes parse and that their pure logic still behaves. Needs the Ruby gems `make install` installs, and talks to no store |
+| `make check-docs` | `scripts/check-docs.sh`, `scripts/check-docs-tables.mjs`, `scripts/check-diagrams.mjs` | Warns when architecture-relevant paths changed with no `docs/` change.<br>Fails when `AGENTS.md`'s command table and the Makefile's `##`-documented targets disagree in either direction,<br>when a markdown table cell has a line wider than 120 visible characters,<br>or when a fenced `mermaid` block does not parse |
+| `make check-release` | `ruby -c` over the Fastfile and lanes, `fastlane lanes`, and the minitest suite in `fastlane/test/lanes_test.rb` | That the lanes parse and that their pure logic still behaves.<br>Needs the Ruby gems `make install` installs, and talks to no store |
 
 Not in `make check`, because each is slow or needs a build:
 
@@ -92,6 +92,39 @@ Not in `make check`, because each is slow or needs a build:
 
 `make lint` and `make check-code` are what the pre-push hook and the CI
 `checks` job cover between them. The CI mapping table is in [ci.md](ci.md).
+
+## What `make check-docs` checks
+
+CI runs the same thing through the `check:docs` package script, which the
+workflows repo's `checks.yml` calls when its `docs-check` input is on. Before
+that input existed this gate ran on no CI job at all — it was a local-only
+courtesy, which is how a stale command table could reach `main`.
+
+| Check | Fails on | Escape hatch |
+| --- | --- | --- |
+| Freshness | nothing — it warns | Touch `docs/`, or ignore the warning deliberately |
+| Command table | `AGENTS.md` and the Makefile's `##`-documented targets disagreeing in either direction | None. Fix whichever side is wrong |
+| Table width | a markdown table cell line wider than 120 visible characters | Break the cell with `<br>`; the limit is `MAX_LINE` in `scripts/check-docs-tables.mjs` |
+| Mermaid | a fenced `mermaid` block the parser rejects | Fix the diagram. There is no ignore |
+
+The freshness warning reads a `package.json` change as architectural only when
+a non-dependency key moved — `scripts`, `engines`, `packageManager`,
+`expo.install.exclude`, the package identity — so a version or dependency bump
+never asks for a docs update (`scripts/manifest-structural.mjs`), and a
+Dependabot PR (`PR_AUTHOR`) is exempt outright.
+
+Table width is 120, not the 72 the sibling repos use: theirs is tuned for the
+narrow README column npm renders, while these tables are read on GitHub at full
+page width. Measured on this repo, 72 flags 117 lines and 120 flags 25 — the
+ones that actually squeeze a neighbouring column until its code spans wrap.
+
+**The mermaid check is the one gate that needs the network**, on a cold `npx`
+cache: it runs a pinned `@mermaid-js/mermaid-cli` rather than vendoring a
+parser. When the CLI cannot be fetched or its browser cannot launch, the check
+skips with a warning instead of blocking an offline developer — as a
+`::warning::` annotation when `CI` is set, so a skipped run is visible in the
+log rather than silently green. Locally it only looks at docs that changed
+against `origin/main`; CI passes `--all`.
 
 ## Suppressing something, correctly
 
@@ -109,7 +142,7 @@ Each gate has one supported escape hatch. Use it, with a comment saying why.
 | `minimumReleaseAge` | `minimumReleaseAgeExclude`, pinned as `name@exact-version` so the guard still applies to later releases | `pnpm-workspace.yaml` |
 | Package build scripts | `onlyBuiltDependencies` or `allowBuilds`. `strictDepBuilds` forces an explicit decision | `pnpm-workspace.yaml` |
 | Coverage | Change the threshold in `jest.config.ts`, deliberately, not silently | `jest.config.ts` |
-| CodeQL | `// codeql[<rule-id>]` alone on the line directly above the code, with the reason in a comment *above the marker* — never between it and the code. **Never** dismiss the alert in the GitHub UI or API | The code |
+| CodeQL | `// codeql[<rule-id>]` alone on the line directly above the code,<br>with the reason in a comment *above the marker* — never between it and the code.<br>**Never** dismiss the alert in the GitHub UI or API | The code |
 
 Rules of thumb: suppress the narrowest scope that works, put the reason in the
 suppression itself, and never widen an ignore pattern to hide one file.
