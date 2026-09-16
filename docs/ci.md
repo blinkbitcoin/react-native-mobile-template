@@ -229,6 +229,13 @@ Three details are deliberate:
   published coverage badge exactly as it was instead of blanking it.
 - **Closing a PR removes `badges/<branch>/`** (`pr-closed.yml`), which is why
   that caller grants `contents: write`.
+- **A `checks` failure greys out two of the three badges.** On a non-docs-only
+  change, `unit` and `e2e` both `needs: checks`, so a red lint run makes them
+  *skip*; the badges job still runs (nothing was cancelled, nothing was
+  docs-only) and publishes both as grey `skipped`, while the coverage badge is
+  left as it was. That is deliberate — "we could not tell" is not "passing" —
+  but it does mean a lint-only failure on `main` shows two grey badges in the
+  README until the next green run.
 
 **Coexistence with the web target.** `web.yml` deploys the web export to GitHub
 Pages through `actions/deploy-pages`, which is an *artifact* deploy and does not

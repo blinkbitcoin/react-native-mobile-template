@@ -162,6 +162,30 @@ describe('renderBadgeSvg', () => {
     assert.equal(Number(svg.match(/<rect x="(\d+)" width="\d+"/)[1]), label);
   });
 
+  // The centring arithmetic is written asymmetrically (`labelBox * 5` against
+  // `(labelBox + messageBox / 2) * 10`), which makes it the likeliest place for
+  // a future typo - and a typo there is invisible to the tiling assertion
+  // above. This pins both halves to their own box.
+  test('each half is centred in its own box and pinned to that width', () => {
+    const texts = [
+      ...svg.matchAll(/<text x="(\d+)" y="140" transform="scale\(\.1\)" textLength="(\d+)"/g),
+    ];
+    assert.equal(texts.length, 2);
+    // The two coloured halves, not the clipPath rect that spans the whole badge.
+    const label = Number(svg.match(/<rect width="(\d+)" height="20" fill="#555"\/>/)[1]);
+    const message = Number(svg.match(/<rect x="\d+" width="(\d+)" height="20" fill="#/)[1]);
+    assert.equal(Number(texts[0][1]), (label * 10) / 2);
+    assert.equal(Number(texts[0][2]), (label - 10) * 10);
+    assert.equal(Number(texts[1][1]), (label + message / 2) * 10);
+    assert.equal(Number(texts[1][2]), (message - 10) * 10);
+  });
+
+  // A badge with a CSS width should scale, not stretch its viewport.
+  test('carries a viewBox matching its declared size', () => {
+    const width = svg.match(/<svg[^>]*width="(\d+)"/)[1];
+    assert.ok(svg.includes(`viewBox="0 0 ${width} 20"`));
+  });
+
   test('a longer message makes a wider badge', () => {
     const short = renderBadgeSvg({ label: 'E2E', message: 'passing', color: 'brightgreen' });
     const long = renderBadgeSvg({ label: 'E2E', message: 'cancelled', color: 'lightgrey' });

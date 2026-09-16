@@ -91,10 +91,19 @@ export function coverageFrom(summary) {
 }
 
 // Advance widths of 11px Verdana, the face shields.io measures against, in
-// pixels. Only the printable ASCII a badge can carry is listed; anything else
-// falls back to DEFAULT_WIDTH, which is wide enough that an unlisted glyph
-// cannot make the text overflow its box.
-const DEFAULT_WIDTH = 7;
+// pixels. Only printable ASCII is listed; anything else falls back to
+// DEFAULT_WIDTH.
+//
+// What keeps an unlisted glyph inside its box is `textLength`, not this table:
+// renderBadgeSvg pins each glyph run to exactly the width it computed, so a
+// wrong estimate changes letter spacing and never the geometry. The table only
+// decides how much room the text is *given*. DEFAULT_WIDTH is therefore set
+// near the wide end of the table (`W` is 11.3, `@` 12.4) rather than at the
+// average: a non-ASCII label - and `unit-label`/`e2e-label` are consumer
+// inputs - then errs toward padding instead of squashed glyphs. CJK is wider
+// still and will squash a little; that is the honest limit of measuring text
+// without the font.
+const DEFAULT_WIDTH = 11;
 // biome-ignore format: one row per character class reads as the table it is.
 const CHAR_WIDTHS = {
   ' ': 3.93, '!': 4.58, '"': 5.6, '#': 9.2, $: 6.9, '%': 11.4, '&': 8, "'": 3.2,
@@ -150,7 +159,10 @@ export function renderBadgeSvg({ label, message, color }) {
   const text = (x, len, body) =>
     `<text aria-hidden="true" x="${x}" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="${len}">${body}</text>` +
     `<text x="${x}" y="140" transform="scale(.1)" textLength="${len}">${body}</text>`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="20" role="img" aria-label="${alt}">
+  // viewBox as well as width/height: shields.io omits it, but without one a
+  // consumer who gives the <img> a CSS width gets a stretched viewport around
+  // fixed-size content instead of a scaled badge.
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="20" viewBox="0 0 ${width} 20" role="img" aria-label="${alt}">
 <title>${alt}</title>
 <linearGradient id="s" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient>
 <clipPath id="r"><rect width="${width}" height="20" rx="3" fill="#fff"/></clipPath>
