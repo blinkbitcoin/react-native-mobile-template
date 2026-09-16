@@ -1,16 +1,34 @@
-# react-native-mobile-template
+<div align="center">
 
-A React Native app is a week's work. Everything around it is the other three
-months: the signing that only fails on a Tuesday, the emulator that hangs in
-CI, the eleventh linter, the release that needs someone to remember the order.
+# React Native Mobile Template
 
-This repo is those three months, already done. Press **Use this template**, run
-`make init`, and you start on day ninety with an Expo app that builds, tests
-itself on real devices, and ships to both stores from a merged pull request.
+**Start on day ninety.**<br>
+An Expo app with the signing, the pipelines, the emulators and the store
+submissions already working.
 
 [![Unit](https://raw.githubusercontent.com/blinkbitcoin/react-native-mobile-template/gh-pages/badges/main/unit.svg)](https://github.com/blinkbitcoin/react-native-mobile-template/actions/workflows/ci.yml)
 [![E2E](https://raw.githubusercontent.com/blinkbitcoin/react-native-mobile-template/gh-pages/badges/main/e2e.svg)](https://github.com/blinkbitcoin/react-native-mobile-template/actions/workflows/ci.yml)
 [![Coverage](https://raw.githubusercontent.com/blinkbitcoin/react-native-mobile-template/gh-pages/badges/main/coverage.svg)](https://github.com/blinkbitcoin/react-native-mobile-template/actions/workflows/ci.yml)
+
+</div>
+
+---
+
+Every React Native project pays the same tax before it ships anything. Signing
+that only fails on a Tuesday. An emulator that hangs in CI and nowhere else.
+The eleventh linter. A release nobody remembers the order of. Months of it,
+and none of it is your app.
+
+This repo is that tax, already paid. Press **Use this template**, run `make
+init`, and you get an app that builds, tests itself on real devices, and ships
+to both stores from a merged pull request.
+
+```mermaid
+flowchart LR
+  push[push] --> checks[Checks] --> unit[Unit] --> e2e[E2E on device]
+  e2e --> merge[merge to main]
+  merge --> relpr[Release PR] --> build[Signed builds] --> stores[TestFlight and Play]
+```
 
 ## Getting started
 
@@ -23,9 +41,11 @@ make start                   # terminal 2: Metro for the dev client
 make ios                     # or: make android
 ```
 
-Then `make check && make unit` to run every gate CI runs, and `make help` for
-the rest. If a command is not in the Makefile, CI does not know how to run it
-either — that is the rule, and `make ci` runs the whole thing locally.
+`make check && make unit` runs every gate CI runs. `make help` lists the rest.
+
+> If a command is not in the Makefile, CI does not know how to run it either.
+> That is the rule the whole repo is built on, and `make ci` is the whole of CI
+> on your laptop.
 
 <!-- init:usage-start -->
 ## Using this template
@@ -38,24 +58,30 @@ project, optionally drops the web target, and deletes itself. The full walkthrou
 
 ## The opinions
 
-**`ios/` and `android/` are build output.** Continuous Native Generation, so
-native config is a plugin in TypeScript, not a diff someone applied to an Xcode
-project two years ago and cannot explain. `make prebuild` regenerates both; you
-never commit either.
+#### `ios/` and `android/` are build output
 
-**CI is a dependency, not a directory.** The workflows live in
-[`blinkbitcoin/react-native-workflows`](https://github.com/blinkbitcoin/react-native-workflows)
-and this repo pins them at `@v0`. What is left here is eleven short workflow
-files saying which ones to run. A fix to the Android emulator boot lands once, for
-every app in the family.
+Continuous Native Generation. Native config is a TypeScript plugin, not a diff
+someone applied to an Xcode project two years ago and cannot explain.
+`make prebuild` regenerates both. You commit neither.
 
-**Every gate is a `make` target.** CI runs `make`, so a red build is
-reproducible on your laptop by reading the job name, and a new gate is one
-Makefile line rather than a YAML negotiation.
+#### CI is a dependency, not a directory
 
-**The release path runs without store credentials.** Builds go unsigned,
-signing switches on with a repo variable, uploads with another. You can watch a
-release work end to end before Apple has answered your email.
+The workflows live in
+[`blinkbitcoin/react-native-workflows`](https://github.com/blinkbitcoin/react-native-workflows),
+pinned here at `@v0`. What is left in this repo is eleven short files naming
+which ones to run. A fix to the Android emulator boot lands once, for every app
+in the family.
+
+#### Every gate is a `make` target
+
+CI runs `make`. So a red build is reproducible from the job name, and a new
+gate is one Makefile line instead of a YAML negotiation.
+
+#### The release path runs without store credentials
+
+Builds go unsigned. Signing switches on with a repo variable, uploading with
+another. You can watch a release work end to end before Apple has answered your
+email.
 
 ## What's inside
 
@@ -73,22 +99,21 @@ release work end to end before Apple has answered your email.
 
 ## Shipping
 
-Merge a pull request and release-please opens the version PR. Merge that and
+Merge a pull request and release-please opens the version PR. Merge that, and
 the tag, the signed builds, the artifact verification, the GitHub release and
-the TestFlight and Play submissions happen without anyone typing a command.
-Beta promotion and the staged production rollout are each one dispatch, and a
+the TestFlight and Play submissions all happen without anyone typing a command.
+Beta promotion and the staged production rollout are one dispatch each, and a
 bad rollout is halted the same way.
 
-[docs/release-runbook.md](docs/release-runbook.md) is the whole path, including
-how to rehearse it. [docs/store-accounts.md](docs/store-accounts.md) covers
-getting the accounts and credentials in the first place — Apple, Google, Huawei
-and Samsung.
+[**Release runbook**](docs/release-runbook.md) is the whole path, including how
+to rehearse it. [**Store accounts**](docs/store-accounts.md) covers getting the
+accounts and credentials in the first place — Apple, Google, Huawei, Samsung.
 
 ## Documentation
 
 [docs/README.md](docs/README.md) says which page answers which question. Two to
-start with: [local-dev.md](docs/local-dev.md) to get the app running,
-[architecture.md](docs/architecture.md) for how it is laid out. `AGENTS.md` is
+start with: [**local-dev**](docs/local-dev.md) to get the app running,
+[**architecture**](docs/architecture.md) for how it is laid out. `AGENTS.md` is
 the rules-of-the-road file, for humans and coding agents alike.
 
 ## Licence
