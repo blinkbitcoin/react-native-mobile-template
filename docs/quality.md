@@ -85,10 +85,68 @@ Not in `make check`, because each is slow or needs a build:
 
 | Target | Runs |
 | --- | --- |
+| `make check-slow` | The two below, grouped. Off by default in CI too (`prebuild-check`, `bundle-secrets`) |
 | `make check-prebuild` | Two prebuilds into temp directories, asserting the config plugin output |
 | `make bundle-secrets-check` | Exports the bundle and asserts no non-public key leaked into it |
 | `make codeql` | CodeQL's `security-and-quality` suite over the whole tree — see below |
 | `make test`, `make unit`, `make coverage` | See [testing.md](testing.md) |
+
+## `make check` is the CI gate set, and that is enforced
+
+`make check` runs the gates the `checks` workflow runs. `make ci` adds the
+`unit` workflow's — coverage and the script tests — and is the one-command
+local CI run:
+
+```sh
+make ci     # everything CI runs except E2E
+```
+
+E2E is the deliberate exception: it needs a simulator or an emulator, so it
+stays in `make e2e-ios`, `make e2e-android` and `make e2e-web`.
+
+**This is checked, not asserted.** It used to be asserted — the Makefile headed
+this section "each is what CI runs" — while four gates ran here and in no CI job
+at all: i18n drift, codegen drift, lockfile provenance and the licence check. A
+green `make check` was making a claim about coverage CI was not providing, and
+nothing detected it.
+
+Two cases at the end of `test/consumer-contract.bats` in
+`react-native-workflows` now read the workflow YAML and this repo's `Makefile`
+and fail in both directions:
+
+- a script CI calls that `make ci` cannot reach;
+- a gate `make check` runs that has no CI step.
+
+They run in that repo's `parity` job, where a skipped parity case is itself a
+failure. So adding a gate here means adding its CI step, and vice versa.
+
+### How a gate gets into CI
+
+The reusable workflows call the consumer's **package scripts**, never `make`
+directly — requiring a Makefile with exact target names would make the workflows
+unusable for consumers that have none. A package script may wrap a make target,
+and several here do: `check:docs`, `check:release`, `check:ci` and
+`check:bundle-secrets` are each `make <target>`. That is how make ends up
+running in CI: the package script is the interface, make is the implementation.
+
+For five gates — i18n, codegen, Expo doctor, the audit and the CI linters —
+`react-native-workflows` prefers this repo's script and falls back to its own
+only if we ship none. That makes `scripts/check-i18n.sh`, `check-codegen.sh` and
+`shellcheck.sh` load-bearing in CI, which is why they must be at least as strict
+as the fallbacks they displace; `scripts/gates.test.mjs` holds them to it.
+
+### Why CI is not one `make check` step
+
+It would guarantee parity trivially, and it was rejected. The `checks` workflow
+runs each gate as its own step, which buys three things a single step loses: the
+per-gate workflow inputs, which are a documented consumer interface; the audit
+step's own `timeout-minutes` and its advisory-on-PR behaviour; and per-step
+timing in the run UI. Parity is worth having, but not at the price of the
+controls that make a red run diagnosable.
+
+The thirteen gates already share one job, one checkout and one `pnpm install`.
+Splitting them across parallel jobs would pay that setup again per job to
+parallelise gates that mostly take seconds.
 
 `make lint` and `make check-code` are what the pre-push hook and the CI
 `checks` job cover between them. The CI mapping table is in [ci.md](ci.md).

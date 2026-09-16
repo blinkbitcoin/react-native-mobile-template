@@ -45,6 +45,21 @@ says so with a `::notice::`. `release-internal.yml`
 keeps its `paths-ignore`: that one is not a docs classification but a "do not
 cut a build for this" rule, and it calls no classifier.
 
+### Running CI locally
+
+`make ci` runs everything CI runs except E2E, which needs a simulator or an
+emulator. `make check` is the `checks` workflow's half of that on its own.
+
+Two gates are opt-in in CI and grouped locally as `make check-slow`:
+`check-prebuild` and the bundle-secrets check, both minutes rather than
+seconds. Enable the `prebuild-check` and `bundle-secrets` inputs on the
+`checks` call where the coverage earns the wall clock.
+
+That `make ci` and CI agree is enforced from `react-native-workflows`, whose
+`consumer-contract.bats` reads this repo's `Makefile` against the workflow
+YAML and fails in either direction. See
+[quality.md](quality.md#make-check-is-the-ci-gate-set-and-that-is-enforced).
+
 What that costs: only `unit` and `e2e` skip on a docs-only change.
 `checks.yml`'s `code` job has no `docs-only` gate, so a documentation push to
 `main` now runs typecheck, lint, format, knip, spell and audit — a couple of
