@@ -841,39 +841,80 @@ export async function main(argv, root = REPO_ROOT) {
 
   applyRename(root, manifest, filled);
   if (!web) applyWebRemoval(root, manifest);
-  applySelfDelete(root, manifest, { web });
 
-  if (process.env.INIT_SKIP_INSTALL !== '1') {
-    run('pnpm', ['install'], { cwd: root });
-    run('pnpm', ['codegen'], { cwd: root });
-    // Renaming touches no message id, so the catalogs must come back unchanged.
-    run('pnpm', ['i18n:check'], { cwd: root });
-  } else {
-    console.log('INIT_SKIP_INSTALL=1: skipping install, codegen, i18n and check-code');
-  }
+  // Everything from here on is wrapped, because everything from here on can fail
+  // on a first adopter's machine for reasons that have nothing to do with them:
+  // a registry hiccup during `pnpm install`, a codegen step that needs the
+  // network. What must not happen is that such a failure leaves a tree with no
+  // way forward — which is exactly what the old order did, by deleting this
+  // script *before* running any of this. The adopter was left renamed, with
+  // nothing installed, nothing committed, and the one command that would redo
+  // the work gone. `git checkout .` would have thrown away the rename they came
+  // for.
+  //
+  // So the destructive step moved to the end, and a failure before it now leaves
+  // the tree exactly as re-runnable as it was.
+  try {
+    if (process.env.INIT_SKIP_INSTALL !== '1') {
+      run('pnpm', ['install'], { cwd: root });
+      run('pnpm', ['codegen'], { cwd: root });
+      // Renaming touches no message id, so the catalogs must come back unchanged.
+      run('pnpm', ['i18n:check'], { cwd: root });
+    } else {
+      console.log('INIT_SKIP_INSTALL=1: skipping install, codegen, i18n and check-code');
+    }
 
-  // The JSON rewrites above are parse/stringify: valid JSON, but not always
-  // Biome's line-width choice. Formatting only needs node_modules, not a fresh
-  // install, so it runs whenever Biome is there — otherwise a skipped-install
-  // run ends with an unformatted tree and a red `make check-code`.
-  // Biome directly, not `pnpm format`: pnpm would re-run the `prepare` lifecycle
-  // (`lefthook install`), which needs a git repo the scratch copies do not have.
-  if (exists(root, 'node_modules/.bin/biome')) {
-    run(abs(root, 'node_modules/.bin/biome'), ['format', '--write', '.'], { cwd: root });
-  }
-  if (process.env.INIT_SKIP_INSTALL !== '1') {
-    run('make', ['check-code'], { cwd: root });
-  }
+    // The JSON rewrites above are parse/stringify: valid JSON, but not always
+    // Biome's line-width choice. Formatting only needs node_modules, not a fresh
+    // install, so it runs whenever Biome is there — otherwise a skipped-install
+    // run ends with an unformatted tree and a red `make check-code`.
+    // Biome directly, not `pnpm format`: pnpm would re-run the `prepare` lifecycle
+    // (`lefthook install`), which needs a git repo the scratch copies do not have.
+    if (exists(root, 'node_modules/.bin/biome')) {
+      run(abs(root, 'node_modules/.bin/biome'), ['format', '--write', '.'], { cwd: root });
+    }
+    if (process.env.INIT_SKIP_INSTALL !== '1') {
+      run('make', ['check-code'], { cwd: root });
+    }
 
-  if (process.env.INIT_SKIP_COMMIT !== '1') {
-    run('git', ['add', '-A'], { cwd: root });
-    run(
-      'git',
-      ['commit', '-m', `chore(app): initialize ${filled.slug} from react-native-mobile-template`],
-      { cwd: root },
-    );
-  } else {
-    console.log('INIT_SKIP_COMMIT=1: leaving the changes uncommitted');
+    // Last, and only once the gates have passed: this removes the initialiser
+    // and its manifest, so it is the one step that cannot be undone by re-running.
+    applySelfDelete(root, manifest, { web });
+
+    if (process.env.INIT_SKIP_COMMIT !== '1') {
+      run('git', ['add', '-A'], { cwd: root });
+      run(
+        'git',
+        ['commit', '-m', `chore(app): initialize ${filled.slug} from react-native-mobile-template`],
+        { cwd: root },
+      );
+    } else {
+      console.log('INIT_SKIP_COMMIT=1: leaving the changes uncommitted');
+    }
+  } catch (error) {
+    // A bare non-zero exit here would look like the adopter did something wrong.
+    // Say what state the tree is in and what to type next, then re-throw so the
+    // exit code still reports failure.
+    const initialiserGone = !exists(root, 'scripts/init.mjs');
+    console.error('\ninit did not finish.\n');
+    console.error('The rename and the web-target choice have been applied to the working tree.');
+    if (initialiserGone) {
+      console.error(
+        'scripts/init.mjs has already been removed, so the remaining steps are ordinary ones:\n' +
+          '  pnpm install && pnpm codegen && make check-code\n' +
+          '  git add -A && git commit -m "chore(app): initialize ' +
+          `${filled.slug} from react-native-mobile-template"`,
+      );
+    } else {
+      console.error(
+        'scripts/init.mjs is still here and nothing has been committed, so you can fix the\n' +
+          'cause and re-run it:\n' +
+          '  git checkout . && node scripts/init.mjs\n' +
+          'or finish by hand:\n' +
+          '  pnpm install && pnpm codegen && make check-code',
+      );
+    }
+    throw error;
   }
 
   console.log(

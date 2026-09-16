@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
+  chmodSync,
   cpSync,
   existsSync,
   mkdirSync,
@@ -544,6 +545,24 @@ function removedLines(beforeRoot, afterRoot, rel) {
   return gone;
 }
 
+/**
+ * Runs init with a stubbed `pnpm` that fails, so the gates run for real and the
+ * first of them blows up the way a registry hiccup would.
+ */
+function runInitWithFailingPnpm(root, args) {
+  const stub = path.join(root, 'stub-bin');
+  mkdirSync(stub, { recursive: true });
+  const pnpm = path.join(stub, 'pnpm');
+  writeFileSync(pnpm, '#!/bin/sh\necho "registry unreachable" >&2\nexit 1\n');
+  chmodSync(pnpm, 0o755);
+  return spawnSync(process.execPath, [path.join(root, 'scripts/init.mjs'), ...args], {
+    cwd: root,
+    encoding: 'utf8',
+    // INIT_SKIP_INSTALL deliberately NOT set: the point is to reach the gates.
+    env: { ...process.env, PATH: `${stub}:${process.env.PATH}`, INIT_SKIP_INSTALL: '' },
+  });
+}
+
 function runInit(root, args) {
   return spawnSync(process.execPath, [path.join(root, 'scripts/init.mjs'), ...args], {
     cwd: root,
@@ -953,5 +972,51 @@ describe('init preflight', () => {
     assert.match(bare.stdout, /web target: removed/);
     assert.match(web.stdout, /web target: kept/);
     assert.equal(gitStatus(root), '');
+  });
+});
+
+// A failing gate must leave the adopter somewhere they can get out of.
+//
+// The old order deleted scripts/init.mjs and its manifest *before* running
+// `pnpm install`, `pnpm codegen` and `make check-code`. A first adopter on a
+// flaky network therefore ended up renamed, with nothing installed, nothing
+// committed, and the one command that would redo the work gone — and
+// `git checkout .` would have thrown away the rename they came for. The
+// destructive step now runs last, after the gates have passed.
+describe('init when a gate fails', () => {
+  test('leaves the initialiser in place so the run can be repeated', () => {
+    const root = copyRepo({ git: true });
+    const result = runInitWithFailingPnpm(root, ['--yes', '--no-web', ...ANSWERS]);
+
+    assert.notEqual(result.status, 0, 'a failing pnpm should fail the run');
+    assert.ok(
+      existsSync(path.join(root, 'scripts/init.mjs')),
+      'scripts/init.mjs was deleted even though the run did not finish',
+    );
+    assert.ok(
+      existsSync(path.join(root, 'scripts/init.manifest.json')),
+      'the manifest was deleted even though the run did not finish',
+    );
+  });
+
+  test('commits nothing, so the working tree is still recoverable', () => {
+    const root = copyRepo({ git: true });
+    const before = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).stdout;
+    const result = runInitWithFailingPnpm(root, ['--yes', '--no-web', ...ANSWERS]);
+    const after = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).stdout;
+
+    assert.notEqual(result.status, 0);
+    assert.equal(after, before, 'a failed init created a commit');
+  });
+
+  test('says what state the tree is in and what to type next', () => {
+    const root = copyRepo({ git: true });
+    const result = runInitWithFailingPnpm(root, ['--yes', '--no-web', ...ANSWERS]);
+
+    assert.match(result.stderr, /init did not finish/);
+    // The two facts an adopter needs: the rename happened, and the script that
+    // redoes it is still there.
+    assert.match(result.stderr, /still here/);
+    assert.match(result.stderr, /node scripts\/init\.mjs/);
   });
 });
