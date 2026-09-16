@@ -113,6 +113,16 @@ a non-dependency key moved — `scripts`, `engines`, `packageManager`,
 never asks for a docs update (`scripts/manifest-structural.mjs`), and a
 Dependabot PR (`PR_AUTHOR`) is exempt outright.
 
+Its diff base comes from the event: a `pull_request` compares against
+`origin/$BASE_REF`, any other CI event against `HEAD~1`, and a local run
+against `origin/main`. CI checks out at depth 1 and two depth-1 tips share no
+common ancestor, so the script deepens the fetch (`--deepen=50`, then one
+`--unshallow` if that was not enough) before diffing — without it this warning
+could never fire in CI at all, which is what it did for its first round. When
+the base still cannot be resolved the check **says so** with a `::notice::`
+rather than passing quietly, because silence here is indistinguishable from
+"nothing to warn about".
+
 Table width is 120, not the 72 the sibling repos use: theirs is tuned for the
 narrow README column npm renders, while these tables are read on GitHub at full
 page width. Measured on this repo, 72 flags 117 lines and 120 flags 25 — the
@@ -126,6 +136,16 @@ skips with a warning instead of blocking an offline developer — as a
 log rather than silently green. Locally it only looks at docs that changed
 against `origin/main`; CI passes `--all`.
 
+Whether the toolchain works is decided **once, up front**, by rendering a
+known-good diagram the script owns (`PROBE_DIAGRAM`) — never by reading the
+parser's complaints. The first cut sniffed `mmdc`'s stderr for words like
+"network" and "command not found" to tell an offline `npx` from a broken
+diagram, but `mmdc` echoes the diagram source back in its errors, so any
+malformed diagram mentioning one of those words classified itself as an
+environment problem and switched the gate off. A gate whose subject can turn it
+off is not a gate; deciding availability before any doc is read is what makes
+that impossible.
+
 ## Suppressing something, correctly
 
 Each gate has one supported escape hatch. Use it, with a comment saying why.
@@ -137,7 +157,7 @@ Each gate has one supported escape hatch. Use it, with a comment saying why.
 | ESLint | `// eslint-disable-next-line <rule> -- <reason>` | The code |
 | knip | An `ignore`, `ignoreDependencies`, `ignoreBinaries` or `ignoreUnresolved` entry, or the `knipignore` JSDoc tag on an export | `knip.json` |
 | typos | An entry under `[default.extend-words]`, or a path in `extend-exclude` | `typos.toml` |
-| Vulnerability audit | `auditConfig.ignoreGhsas`, one comment **per id** — the advisory, the dependency path that pulls it in, why it is unreachable from app code, and what should make us look again | `pnpm-workspace.yaml` |
+| Vulnerability audit | `auditConfig.ignoreGhsas`, one comment **per id** — the advisory, the dependency path that pulls it in,<br>why it is unreachable from app code, and what should make us look again | `pnpm-workspace.yaml` |
 | Expo SDK version check | `expo.install.exclude` | `package.json` |
 | `minimumReleaseAge` | `minimumReleaseAgeExclude`, pinned as `name@exact-version` so the guard still applies to later releases | `pnpm-workspace.yaml` |
 | Package build scripts | `onlyBuiltDependencies` or `allowBuilds`. `strictDepBuilds` forces an explicit decision | `pnpm-workspace.yaml` |

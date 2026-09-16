@@ -19,38 +19,73 @@
 # Env (CI): EVENT_NAME, BASE_REF, PR_AUTHOR. Everywhere else the base is
 # origin/main. Check 1 fails open at every step - an unfetchable base, an
 # unreadable range, no remote at all - because a warning that cannot compute
-# its diff must not turn into a failing build.
+# its diff must not turn into a failing build. It says so out loud (a
+# ::notice:: under CI) rather than passing silently, so "no warning" is never
+# confused with "nothing to warn about".
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# A skipped advisory says so. Silence reads as "nothing to warn about", which
+# is exactly how this heuristic sat dead in CI for a whole release.
+notice() {
+  if [ -n "${CI:-}" ]; then echo "::notice::$1" >&2; else echo "notice: $1" >&2; fi
+}
+
+# CI checks out at depth 1, and two depth-1 tips share no ancestor: without a
+# deepen the range below is unreadable and the freshness heuristic could never
+# fire in the place it was written for. `--deepen` is an error on a complete
+# clone, so fall back to a plain fetch; a repo with no remote at all falls
+# through to the rev-parse guard.
+deepen_origin() {
+  git fetch -q --no-tags --deepen=50 origin "$@" >/dev/null 2>&1 ||
+    git fetch -q --no-tags origin "$@" >/dev/null 2>&1 ||
+    true
+}
+
 if [ "${EVENT_NAME:-}" = pull_request ] && [ -n "${BASE_REF:-}" ]; then
-  # Quietly: a repo with no remote (or a shallow clone that cannot reach the
-  # base) is handled by the rev-parse guard below, not by this fetch.
-  git fetch -q --no-tags --depth=1 origin "$BASE_REF" >/dev/null 2>&1 || true
+  # Explicit refspec: a CI checkout is single-branch, so its configured refspec
+  # covers only the PR ref. `git fetch origin main` there lands in FETCH_HEAD
+  # and never creates refs/remotes/origin/main, which is why naming the
+  # destination is not optional.
+  deepen_origin "+refs/heads/$BASE_REF:refs/remotes/origin/$BASE_REF"
   base="origin/$BASE_REF"
+elif [ -n "${EVENT_NAME:-}" ]; then
+  # A push: the previous tip is the base. origin/main is useless here - on a
+  # push to main it *is* HEAD, so the range would always come back empty.
+  deepen_origin
+  base=HEAD~1
 else
   base=origin/main
 fi
 
-if git rev-parse --verify "$base" >/dev/null 2>&1; then
-  # A fresh clone of a branch with no merge base against the base ref would
-  # otherwise print git's "no merge base" error; the check is advisory anyway.
-  changed="$(git diff --name-only "$base...HEAD" 2>/dev/null || true)"
-  merge_base="$(git merge-base "$base" HEAD 2>/dev/null || echo "$base")"
-  arch="$(echo "$changed" | grep -E '^(app\.config\.ts|plugins/|modules/|src/graphql/|scripts/|Makefile)' || true)"
-  # A version or dependency bump moves no architecture, so the manifest only
-  # joins the list when a non-dependency key actually changed.
-  manifests="$(echo "$changed" | grep -E '(^|/)package\.json$' || true)"
-  if [ -n "$manifests" ]; then
-    # shellcheck disable=SC2086 # manifest paths are one per line and whitespace-free
-    arch="$(printf '%s\n%s' "$arch" \
-      "$(node scripts/manifest-structural.mjs "$merge_base" $manifests)" | sed '/^$/d')"
+if ! git rev-parse --verify "$base" >/dev/null 2>&1; then
+  notice "docs freshness skipped: cannot resolve $base (no remote, or a shallow clone that does not reach it)"
+else
+  merge_base="$(git merge-base "$base" HEAD 2>/dev/null || true)"
+  if [ -z "$merge_base" ]; then
+    # 50 commits were not enough. One unshallow, then give up out loud.
+    git fetch -q --no-tags --unshallow origin >/dev/null 2>&1 || true
+    merge_base="$(git merge-base "$base" HEAD 2>/dev/null || true)"
   fi
-  if [ "${PR_AUTHOR:-}" = 'dependabot[bot]' ]; then
-    : # a dependency update is never expected to touch docs/
-  elif [ -n "$arch" ] && ! echo "$changed" | grep -q '^docs/'; then
-    echo "warning: architecture-relevant changes without a docs/ update:" >&2
-    while read -r path; do echo "  $path" >&2; done <<<"$arch"
+  if [ -z "$merge_base" ]; then
+    notice "docs freshness skipped: no merge base between $base and HEAD"
+  else
+    changed="$(git diff --name-only "$merge_base" HEAD 2>/dev/null || true)"
+    arch="$(echo "$changed" | grep -E '^(app\.config\.ts|plugins/|modules/|src/graphql/|scripts/|Makefile)' || true)"
+    # A version or dependency bump moves no architecture, so the manifest only
+    # joins the list when a non-dependency key actually changed.
+    manifests="$(echo "$changed" | grep -E '(^|/)package\.json$' || true)"
+    if [ -n "$manifests" ]; then
+      # shellcheck disable=SC2086 # manifest paths are one per line and whitespace-free
+      arch="$(printf '%s\n%s' "$arch" \
+        "$(node scripts/manifest-structural.mjs "$merge_base" $manifests)" | sed '/^$/d')"
+    fi
+    if [ "${PR_AUTHOR:-}" = 'dependabot[bot]' ]; then
+      : # a dependency update is never expected to touch docs/
+    elif [ -n "$arch" ] && ! echo "$changed" | grep -q '^docs/'; then
+      echo "warning: architecture-relevant changes without a docs/ update:" >&2
+      while read -r path; do echo "  $path" >&2; done <<<"$arch"
+    fi
   fi
 fi
 

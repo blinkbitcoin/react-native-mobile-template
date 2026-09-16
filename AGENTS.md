@@ -74,7 +74,7 @@ Every row is a make target; nothing here is run through pnpm directly.
 | `make check-gen` | Generated-file drift (i18n, codegen) |
 | `make check-deps` | SDK drift, audit, lockfile provenance, licenses |
 | `make check-ci` | actionlint (workflows) + shellcheck (scripts) |
-| `make check-docs` | This file's command table vs the Makefile |
+| `make check-docs` | Docs freshness, this file's command table vs the Makefile, table widths, mermaid blocks |
 | `make check-prebuild` | Prebuild both platforms in a temp dir, assert plugin output |
 | `make check-release` | Ruby syntax + fastlane lane parse + lane unit tests |
 | `make bundle-secrets-check` | Export the bundle, assert no non-public keys leaked |
@@ -149,8 +149,11 @@ Every row is a make target; nothing here is run through pnpm directly.
   notes prose is edited in the release body, then previewed with
   `make release-notes` — see `docs/release-runbook.md`.
 - **Docs ship with the code.** Architecture-relevant changes without a `docs/`
-  change get a warning from `make check-docs`; adding a make target without a
-  row in the table above is a hard failure.
+  change get a warning from `make check-docs` (a dependency bump does not count,
+  and Dependabot is exempt); adding a make target without a row in the table
+  above is a hard failure, and so is a markdown table cell wider than 120
+  visible characters (break it with `<br>`) or a fenced `mermaid` block that
+  does not parse.
 
 ## Testing map
 
