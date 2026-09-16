@@ -2,7 +2,7 @@
 
 # React Native Mobile Template
 
-The starting point for Blink's React Native apps: an Expo app with the
+The starting point for a new React Native app: an Expo project with the
 signing, the pipelines, the emulators and the store submissions already
 working.
 
