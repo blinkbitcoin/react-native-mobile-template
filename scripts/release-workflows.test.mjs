@@ -115,6 +115,32 @@ describe('the release path without a store account', () => {
         }
       });
 
+      test('signing is derived so that uploading implies something to upload', () => {
+        // Only release-internal builds; beta and production promote what it
+        // produced, so they have no signing inputs to derive.
+        if (file !== 'release-internal.yml') return;
+        for (const [job, input, variable] of [
+          ['build-ios', 'ios-signing', 'IOS_SIGNING_ENABLED'],
+          ['build-android', 'android-signing', 'ANDROID_SIGNING_ENABLED'],
+        ]) {
+          const body = jobs[job].body.filter((l) => !l.trimStart().startsWith('#')).join('\n');
+          assert.match(body, new RegExp(`${input}:`), `${job} does not pass ${input}`);
+          // Both halves of the OR. Without the uploads term, someone could turn
+          // uploads on and leave signing off, and the upload job would look for
+          // an artifact the build never produced.
+          assert.match(
+            body,
+            new RegExp(`${GATE}\\s*==\\s*'true'\\s*\\|\\|`),
+            `${job}'s ${input} does not treat uploads as implying signing`,
+          );
+          assert.match(
+            body,
+            new RegExp(`${variable}\\s*==\\s*'true'`),
+            `${job}'s ${input} ignores ${variable}, so signing cannot be turned on without uploading`,
+          );
+        }
+      });
+
       test('a release created without uploads says so in its body', () => {
         for (const name of spec.releaseJobs) {
           // Comments stripped first: the workflows explain this very pitfall in

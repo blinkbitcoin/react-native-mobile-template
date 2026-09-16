@@ -68,6 +68,11 @@ jobs:
       contents: read
     with:
       environment: internal
+      # Uploads imply signing, so the invalid combination - uploading with
+      # nothing signed to upload - cannot be expressed. Both unset means an
+      # unsigned build: it still compiles, still runs verify, and needs no
+      # Apple account. See docs/store-accounts.md.
+      ios-signing: ${{ vars.STORE_UPLOADS_ENABLED == 'true' || vars.IOS_SIGNING_ENABLED == 'true' }}
       version: ${{ needs.prepare.outputs.version }}
       build-number: ${{ needs.prepare.outputs.build-number }}
       stage: internal
@@ -105,6 +110,11 @@ jobs:
       contents: read
     with:
       environment: internal
+      # Uploads imply signing, so the invalid combination - uploading with
+      # nothing signed to upload - cannot be expressed. Both unset means an
+      # unsigned build: it still compiles, still runs verify, and needs no
+      # Play account. See docs/store-accounts.md.
+      android-signing: ${{ vars.STORE_UPLOADS_ENABLED == 'true' || vars.ANDROID_SIGNING_ENABLED == 'true' }}
       version: ${{ needs.prepare.outputs.version }}
       build-number: ${{ needs.prepare.outputs.build-number }}
       stage: internal

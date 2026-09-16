@@ -10,16 +10,23 @@ stable for years and the navigation is easier to re-find than a dead anchor.
 
 ## First: does this repo need store accounts at all?
 
-Probably not yet. Store uploads are off unless the repository variable
-`STORE_UPLOADS_ENABLED` is `true`, and with it off a push to `main` still
-builds both platforms, verifies the artifacts and publishes a GitHub
-pre-release carrying all of them — green, with no store account anywhere. See
-[Before you have store accounts](release-runbook.md#before-you-have-store-accounts).
+Not to start with. There are three tiers, and only the last needs an account.
 
-A template exists to be copied, not shipped. The usual answer is to leave
-uploads off here and set the store credentials up on the first real app
-generated from it. The cost of doing that is real but small: the last mile of
-the release path stays unexercised until that first app.
+| Repository variables set | What a push to `main` does | What it needs |
+| --- | --- | --- |
+| None | Builds both platforms unsigned, runs both verify gates, publishes a GitHub pre-release | Nothing |
+| `IOS_SIGNING_ENABLED` / `ANDROID_SIGNING_ENABLED` | Signs and exports a real `.ipa` and `.aab` | Certificates and a keystore |
+| `STORE_UPLOADS_ENABLED` | Uploads to TestFlight and Play | Full store accounts |
+
+Uploading implies signing, so the middle tier cannot be skipped by accident.
+
+The unsigned tier is not a stub. It runs prebuild, CocoaPods, Gradle, every
+config plugin, the compile and the version stamping, then verifies the output:
+a real Android build with no keystore produces a 46 MB `.aab` and a 60 MB
+universal `.apk`, and `fastlane android verify` passes sixteen checks against
+them. What it cannot prove is signing identity and store delivery.
+
+So: adopt at tier one, move up as credentials arrive.
 
 ## Second: a new account, or the one you have?
 

@@ -382,6 +382,53 @@ class LanesTest < Minitest::Test
     assert_includes error.message, 'PLAY_SERVICE_ACCOUNT_JSON'
   end
 
+  # ---------- bundletool signing arguments ----------
+  #
+  # A build with no keystore is the tier a repository sits in before its Play
+  # credentials exist: gradle falls back to the debug keystore (the signing
+  # config plugin does that and warns), and bundletool has to match it by
+  # signing with its own debug key rather than being handed a keystore that is
+  # not there. The difference between the two forms is four arguments, two of
+  # them password file paths, so it is worth pinning rather than reading.
+
+  def test_bundletool_args_carry_the_bundle_the_output_and_universal_mode
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, 'bundletool'), '#!/bin/sh')
+      FileUtils.chmod(0o755, File.join(dir, 'bundletool'))
+      ENV['PATH'] = dir
+      args = bundletool_build_apks_args('/tmp/app.aab', '/tmp/app.apks')
+      assert_includes args, 'build-apks'
+      assert_includes args, '--bundle=/tmp/app.aab'
+      assert_includes args, '--output=/tmp/app.apks'
+      assert_includes args, '--mode=universal'
+    end
+  end
+
+  def test_bundletool_args_alone_name_no_keystore
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, 'bundletool'), '#!/bin/sh')
+      FileUtils.chmod(0o755, File.join(dir, 'bundletool'))
+      ENV['PATH'] = dir
+      args = bundletool_build_apks_args('/tmp/app.aab', '/tmp/app.apks')
+      refute(args.any? { |a| a.start_with?('--ks') || a.start_with?('--key-pass') },
+             "an unsigned build must hand bundletool no keystore: #{args.inspect}")
+    end
+  end
+
+  def test_bundletool_signing_args_pass_passwords_as_files_never_inline
+    ENV['ANDROID_UPLOAD_KEYSTORE_PATH'] = '/tmp/upload.keystore'
+    ENV['ANDROID_UPLOAD_KEY_ALIAS'] = 'upload'
+    args = bundletool_signing_args('/tmp/store.pass', '/tmp/key.pass')
+
+    assert_includes args, '--ks-pass=file:/tmp/store.pass'
+    assert_includes args, '--key-pass=file:/tmp/key.pass'
+    assert_includes args, '--ks-key-alias=upload'
+    # `pass:` would put the password in the process table, where the lane's
+    # `log: false` cannot reach it.
+    refute(args.any? { |a| a.include?('pass:') && !a.include?('file:') },
+           "a password reached the argument list inline: #{args.inspect}")
+  end
+
   # ---------- bundletool discovery ----------
 
   def test_bundletool_prefers_the_executable_on_path

@@ -34,6 +34,34 @@ def android_signing_properties
   }
 end
 
+# The bundletool `build-apks` arguments, minus the signing flags.
+#
+# Split out from the lane so the signed and unsigned forms can be unit-tested:
+# the difference between them is four arguments, two of which are password file
+# paths, and getting that branch wrong either leaks a credential into the
+# process table or silently produces an APK signed with the wrong key.
+def bundletool_build_apks_args(bundle, output)
+  [
+    *bundletool_command,
+    'build-apks',
+    "--bundle=#{bundle}",
+    "--output=#{output}",
+    '--mode=universal'
+  ]
+end
+
+# The four signing arguments, given the two password files. Empty when the build
+# is unsigned, which leaves bundletool to sign with its own debug key - matching
+# the debug-signed bundle gradle produced.
+def bundletool_signing_args(store_pass_file, key_pass_file)
+  [
+    "--ks=#{android_keystore_path}",
+    "--ks-pass=file:#{store_pass_file}",
+    "--ks-key-alias=#{ENV.fetch('ANDROID_UPLOAD_KEY_ALIAS')}",
+    "--key-pass=file:#{key_pass_file}"
+  ]
+end
+
 # Writes each secret to its own 0600 file for the duration of the block, so a
 # password reaches bundletool without ever appearing in an argument list.
 def with_password_files(*secrets)
@@ -74,8 +102,15 @@ end
 
 platform :android do
   desc 'Build the release AAB and a universal APK from that same bundle'
-  lane :build do
-    require_env!(ANDROID_UPLOAD_KEYSTORE_ENV)
+  lane :build do |options|
+    # Without a keystore this still builds: plugins/with-android-release-signing.ts
+    # falls back to the debug keystore when the ANDROID_UPLOAD_* gradle
+    # properties are absent, and warns that it did. So a repository with no Play
+    # credentials still compiles, still produces an .aab, a universal .apk and a
+    # mapping file, and still runs `verify` - it simply cannot upload any of it.
+    # Mirrors `skip_signing` on the iOS lane so the two read the same way.
+    skip_signing = truthy?(options[:skip_signing])
+    require_env!(ANDROID_UPLOAD_KEYSTORE_ENV) unless skip_signing
     out = prepare_output_dir!(output_dir('android'))
 
     gradle(
@@ -83,7 +118,9 @@ platform :android do
       task: 'bundle',
       build_type: 'Release',
       flags: "-PreactNativeArchitectures=#{ANDROID_ABIS}",
-      properties: android_signing_properties,
+      # No properties at all when skipping: the plugin's fallback only applies
+      # when the properties are absent, so passing empty ones would defeat it.
+      properties: skip_signing ? {} : android_signing_properties,
       # The signing properties are on the command line: printing it would put
       # the keystore password in the build log.
       print_command: false
@@ -104,22 +141,19 @@ platform :android do
     # `--ks-pass=pass:` would put the keystore password in the process table,
     # where `log: false` cannot reach it; bundletool's `file:` form reads it
     # from a 0600 file that exists only for the length of the call.
-    with_password_files(
-      ENV.fetch('ANDROID_UPLOAD_KEYSTORE_PASSWORD'),
-      ENV.fetch('ANDROID_UPLOAD_KEY_PASSWORD')
-    ) do |store_pass_file, key_pass_file|
-      sh(
-        *bundletool_command,
-        'build-apks',
-        "--bundle=#{File.join(out, 'app-release.aab')}",
-        "--output=#{apks}",
-        '--mode=universal',
-        "--ks=#{android_keystore_path}",
-        "--ks-pass=file:#{store_pass_file}",
-        "--ks-key-alias=#{ENV.fetch('ANDROID_UPLOAD_KEY_ALIAS')}",
-        "--key-pass=file:#{key_pass_file}",
-        log: false
-      )
+    build_apks = bundletool_build_apks_args(File.join(out, 'app-release.aab'), apks)
+    if skip_signing
+      # No signing arguments: bundletool signs with its own debug key, matching
+      # the debug-signed bundle gradle just produced. Nothing built this way is
+      # installable anywhere that checks a signature, which is the point.
+      sh(*build_apks, log: false)
+    else
+      with_password_files(
+        ENV.fetch('ANDROID_UPLOAD_KEYSTORE_PASSWORD'),
+        ENV.fetch('ANDROID_UPLOAD_KEY_PASSWORD')
+      ) do |store_pass_file, key_pass_file|
+        sh(*build_apks, *bundletool_signing_args(store_pass_file, key_pass_file), log: false)
+      end
     end
     # build-apks writes a zip; the universal APK is the single entry inside it.
     # rubyzip comes with fastlane, so this needs no `unzip` on the runner.

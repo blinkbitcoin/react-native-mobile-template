@@ -219,10 +219,28 @@ workflow input and would publish them in the run's parameters.
 The release path runs in two phases, and the first needs no Apple or Google
 account at all.
 
-`STORE_UPLOADS_ENABLED` is a repository variable, and until it is `true` every
-job that talks to a store is skipped: TestFlight and Play uploads in
-`release-internal`, the promotions in `release-beta`, and the release, phased
-and rollout lanes in `release-production`. Everything else still runs.
+Three variables, each turning on one more tier. All unset means an unsigned
+build that needs no account anywhere.
+
+| Variable | Turns on | Needs |
+| --- | --- | --- |
+| *(none set)* | Unsigned build, both verify gates, GitHub pre-release | Nothing |
+| `IOS_SIGNING_ENABLED` | A signed `.ipa` | Certificates via `fastlane match` |
+| `ANDROID_SIGNING_ENABLED` | An upload-key-signed `.aab` | The upload keystore |
+| `STORE_UPLOADS_ENABLED` | TestFlight and Play uploads | Full store accounts |
+
+`STORE_UPLOADS_ENABLED` implies signing on both platforms, so uploading with
+nothing signed to upload cannot be expressed. Until it is `true` every job that
+talks to a store is skipped: TestFlight and Play uploads in `release-internal`,
+the promotions in `release-beta`, and the release, phased and rollout lanes in
+`release-production`.
+
+**The unsigned tier still builds and still verifies.** Gradle falls back to the
+debug keystore (`plugins/with-android-release-signing.ts` does that and warns),
+and the iOS lane archives without a signing identity. `verify-android.sh`
+reports `signing-cert` as `skip` and checks everything else; `verify-ios.sh`
+takes `--no-signing` and verifies the `.app` inside the archive. What is not
+produced is an `.ipa`, so the `ios-ipa` artifact upload is skipped too.
 
 | Runs from the first push | Waits for `STORE_UPLOADS_ENABLED=true` |
 | --- | --- |
@@ -273,6 +291,8 @@ anyone who can see the run. Credentials go in `secrets:` instead.
 | `IOS_SCHEME` | every build and lane job | Xcode scheme name (the Expo prebuild generates it from the app name) |
 | `ANDROID_PACKAGE` | every build and lane job | Play application id |
 | `XCODE_VERSION` | `release-internal` iOS build | A version installed on the runner image, e.g. `26.0`; sets `DEVELOPER_DIR` |
+| `IOS_SIGNING_ENABLED` | repo variable; `build-ios` in `release-internal` | `true` signs and exports an `.ipa`.<br>Unset archives unsigned, which needs no Apple account |
+| `ANDROID_SIGNING_ENABLED` | repo variable; `build-android` in `release-internal` | `true` signs with the upload keystore.<br>Unset falls back to the debug keystore, which needs no Play account |
 | `STORE_UPLOADS_ENABLED` | repo variable; every store job in all three release workflows | `true` turns on TestFlight and Play uploads.<br>Unset means off, and the store credentials below<br>are only needed once it is on — see<br>[Before you have store accounts](#before-you-have-store-accounts) |
 | `BUILD_NUMBER_OFFSET` | every `expo-prepare` call | Integer, default `1000`. Raise only |
 | `WORKFLOWS_MACOS_RUNNER` | iOS build + iOS internal upload | Runner label, default `macos-26` |
