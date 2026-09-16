@@ -1,38 +1,31 @@
 # react-native-mobile-template
 
-A store-ready Expo (SDK 57) React Native app you can ship from: navigation,
-GraphQL, i18n, theming, native-module and config-plugin examples, tests at every
-layer, and a release pipeline that already knows how to sign, verify and
-publish to both stores.
+A React Native app is a week's work. Everything around it is the other three
+months: the signing that only fails on a Tuesday, the emulator that hangs in
+CI, the eleventh linter, the release that needs someone to remember the order.
 
-Continuous Native Generation: `ios/` and `android/` are build output, never
-source. CI lives in a reusable-workflow repo
-(`blinkbitcoin/react-native-workflows`); this repo pins and calls it.
+This repo is those three months, already done. Press **Use this template**, run
+`make init`, and you start on day ninety with an Expo app that builds, tests
+itself on real devices, and ships to both stores from a merged pull request.
 
 [![Unit](https://raw.githubusercontent.com/blinkbitcoin/react-native-mobile-template/gh-pages/badges/main/unit.svg)](https://github.com/blinkbitcoin/react-native-mobile-template/actions/workflows/ci.yml)
 [![E2E](https://raw.githubusercontent.com/blinkbitcoin/react-native-mobile-template/gh-pages/badges/main/e2e.svg)](https://github.com/blinkbitcoin/react-native-mobile-template/actions/workflows/ci.yml)
 [![Coverage](https://raw.githubusercontent.com/blinkbitcoin/react-native-mobile-template/gh-pages/badges/main/coverage.svg)](https://github.com/blinkbitcoin/react-native-mobile-template/actions/workflows/ci.yml)
 
-`ci.yml`'s `badges` job renders these per branch and publishes them to the
-`gh-pages` branch as `badges/<branch>/`, so the ones above are `main`'s and
-every other branch has its own set. They appear after the first CI run on
-`main`; until then GitHub serves a broken image. See
-[docs/ci.md](docs/ci.md#badges).
-
-## 60-second start
+## Getting started
 
 ```sh
 mise trust && mise install   # toolchain: Node, pnpm, Ruby, Java
-make doctor                  # verify it (prints one line per tool)
-make install                 # pnpm dependencies, Ruby gems, git hooks
-make mock-api                # terminal 1: GraphQL mock API (make ports says where)
+make doctor                  # verify it (one line per tool)
+make install                 # dependencies, gems, git hooks
+make mock-api                # terminal 1: GraphQL mock API
 make start                   # terminal 2: Metro for the dev client
-make ios                     # or: make android — builds and launches
-make check && make unit      # every static gate, then the tests
+make ios                     # or: make android
 ```
 
-`make help` lists every target; `AGENTS.md` is the rules-of-the-road file for
-humans and coding agents alike.
+Then `make check && make unit` to run every gate CI runs, and `make help` for
+the rest. If a command is not in the Makefile, CI does not know how to run it
+either — that is the rule, and `make ci` runs the whole thing locally.
 
 <!-- init:usage-start -->
 ## Using this template
@@ -42,6 +35,27 @@ project, optionally drops the web target, and deletes itself. The full walkthrou
 — what it asks, what it rewrites and what to do afterwards — is in
 [docs/template-usage.md](docs/template-usage.md).
 <!-- init:usage-end -->
+
+## The opinions
+
+**`ios/` and `android/` are build output.** Continuous Native Generation, so
+native config is a plugin in TypeScript, not a diff someone applied to an Xcode
+project two years ago and cannot explain. `make prebuild` regenerates both; you
+never commit either.
+
+**CI is a dependency, not a directory.** The workflows live in
+[`blinkbitcoin/react-native-workflows`](https://github.com/blinkbitcoin/react-native-workflows)
+and this repo pins them at `@v0`. What is left here is eleven short workflow
+files saying which ones to run. A fix to the Android emulator boot lands once, for
+every app in the family.
+
+**Every gate is a `make` target.** CI runs `make`, so a red build is
+reproducible on your laptop by reading the job name, and a new gate is one
+Makefile line rather than a YAML negotiation.
+
+**The release path runs without store credentials.** Builds go unsigned,
+signing switches on with a repo variable, uploads with another. You can watch a
+release work end to end before Apple has answered your email.
 
 ## What's inside
 
@@ -57,19 +71,25 @@ project, optionally drops the web target, and deletes itself. The full walkthrou
 | Release | fastlane lanes for both stores, match signing, artifact verification, store notes, `DRY_RUN=1` rehearsal |
 | OTA | expo-updates behind an `OTA_ENABLED` toggle, code signing, a self-hosted update server |
 
+## Shipping
+
+Merge a pull request and release-please opens the version PR. Merge that and
+the tag, the signed builds, the artifact verification, the GitHub release and
+the TestFlight and Play submissions happen without anyone typing a command.
+Beta promotion and the staged production rollout are each one dispatch, and a
+bad rollout is halted the same way.
+
+[docs/release-runbook.md](docs/release-runbook.md) is the whole path, including
+how to rehearse it. [docs/store-accounts.md](docs/store-accounts.md) covers
+getting the accounts and credentials in the first place — Apple, Google, Huawei
+and Samsung.
+
 ## Documentation
 
-[docs/README.md](docs/README.md) is the index — it says which page answers
-which question. Start with [docs/local-dev.md](docs/local-dev.md) to get the app
-running and [docs/architecture.md](docs/architecture.md) for the layout.
-
-## CI and releases
-
-- **CI**: every push runs the same gates as `make check`, `make unit` and the
-  e2e suites, through the pinned reusable workflows — see [docs/ci.md](docs/ci.md).
-- **Releases**: release-please opens the version PR; merging it tags, builds,
-  verifies and submits to TestFlight and Play — see
-  [docs/release-runbook.md](docs/release-runbook.md).
+[docs/README.md](docs/README.md) says which page answers which question. Two to
+start with: [local-dev.md](docs/local-dev.md) to get the app running,
+[architecture.md](docs/architecture.md) for how it is laid out. `AGENTS.md` is
+the rules-of-the-road file, for humans and coding agents alike.
 
 ## Licence
 

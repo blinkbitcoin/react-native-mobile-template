@@ -61,7 +61,7 @@
       },
       {
         "path": "README.md",
-        "$comment": "The three gh-pages badge URLs and the links under them. Anchored on the host so the `blinkbitcoin/react-native-workflows` mention two lines above keeps its owner; the repo half of each is renamed by the token pass, which runs after this one.",
+        "$comment": "The three gh-pages badge URLs and the links under them. Anchored on the host and repo together so the `blinkbitcoin/react-native-workflows` link further down keeps its owner; the repo half of each is renamed by the token pass, which runs after this one.",
         "replace": [
           ["raw.githubusercontent.com/blinkbitcoin/", "raw.githubusercontent.com/{{owner}}/", 3],
           [
