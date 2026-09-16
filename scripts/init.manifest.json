@@ -367,7 +367,8 @@
       "scripts/init.mjs",
       "scripts/init.test.mjs",
       "scripts/init.manifest.json",
-      "docs/template-usage.md"
+      "docs/template-usage.md",
+      "CHANGELOG.md"
     ],
     "makeTargets": ["init"],
     "markedBlocks": [
