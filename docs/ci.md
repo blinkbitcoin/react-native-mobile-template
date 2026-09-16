@@ -18,7 +18,7 @@ is the inventory.
 
 | File | Trigger | Calls | Notes |
 | --- | --- | --- | --- |
-| `ci.yml` | `push` to `main` (all paths), `pull_request` (`opened`, `synchronize`, `reopened`, `labeled`), `workflow_dispatch` | `checks.yml`, `unit.yml`, `e2e.yml`, `badges.yml` | `unit` and `e2e` both `needs: checks` and skip when `checks` reports `docs-only` — on a push as well as a PR; `badges` runs under `always()` and publishes this branch's badges (see [Badges](#badges)) |
+| `ci.yml` | `push` to `main` (all paths), `pull_request` (`opened`, `synchronize`, `reopened`, `labeled`), `workflow_dispatch` | `checks.yml`, `unit.yml`, `e2e.yml`, `badges.yml` | `unit` and `e2e` both `needs: checks` and skip when `checks` reports<br>`docs-only` — on a push as well as a PR; `badges` runs under `always()`<br>and publishes this branch's badges (see [Badges](#badges)) |
 | `web.yml` | `pull_request`, `release: published` | `web.yml` | PR = dev export + Playwright smoke; release = production export + Pages deploy |
 | `pr-closed.yml` | `pull_request: closed` | `pr-closed.yml` | cancels the closed PR's in-flight runs and drops its `gh-pages` badge directory; needs `actions: write` and `contents: write` |
 | `pr-title.yml` | `pull_request: edited` (only when the title changed) | `pr-title.yml` | `opened`/`synchronize` are already covered by `checks.yml`'s `commitlint` |
