@@ -94,6 +94,7 @@
       ".env.development",
       ".env.example",
       ".env.production",
+      ".github/codeql/codeql-config.yml",
       ".maestro/flows/deep-link.yaml",
       "app.config.ts",
       "certs/README.md",
@@ -293,16 +294,16 @@
         "optional": true,
         "replace": [
           [
-            "Ten files, in two groups: four that run on every change, and six that make\nreleases.",
-            "Nine files, in two groups: three that run on every change, and six that make\nreleases."
+            "Eleven files, in two groups: five that run on every change, and six that make\nreleases.",
+            "Ten files, in two groups: four that run on every change, and six that make\nreleases."
           ],
           ["`expo-ota-publish.yml`, `web.yml`", "`expo-ota-publish.yml`"],
           [
             "Two script-contract details are load-bearing:",
             "One script-contract detail is load-bearing:"
           ],
-          ["the ten files in", "the nine files in"],
-          ["Two of the ten are the exception", "Two of the nine are the exception"],
+          ["the eleven files in", "the ten files in"],
+          ["Two of the eleven are the exception", "Two of the ten are the exception"],
           ["Eight of the ten files carry", "Seven of the nine files carry"],
           ["`release-production.yml` alone has ten.", "`release-production.yml` alone has nine."]
         ]
