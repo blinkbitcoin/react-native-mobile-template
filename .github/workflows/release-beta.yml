@@ -64,6 +64,9 @@ jobs:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
   promote-ios:
+    # Off unless the repository says otherwise, so a checkout with no store
+    # credentials still runs everything that does not need one.
+    if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' }}
     needs: prepare
     uses: blinkbitcoin/react-native-workflows/.github/workflows/fastlane-lane.yml@v0
     permissions:
@@ -100,6 +103,9 @@ jobs:
       APP_REVIEW_NOTES: ${{ secrets.APP_REVIEW_NOTES }}
 
   promote-android:
+    # Off unless the repository says otherwise, so a checkout with no store
+    # credentials still runs everything that does not need one.
+    if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' }}
     needs: prepare
     uses: blinkbitcoin/react-native-workflows/.github/workflows/fastlane-lane.yml@v0
     permissions:
@@ -120,7 +126,11 @@ jobs:
       PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
 
   github-release:
+    # `!cancelled() && !failure()` is what lets this run when the promotions are
+    # skipped: a skipped dependency skips its dependents unless the condition
+    # uses a status function.
     needs: [prepare, promote-ios, promote-android]
+    if: ${{ !cancelled() && !failure() }}
     uses: blinkbitcoin/react-native-workflows/.github/workflows/github-release.yml@v0
     permissions:
       contents: write
@@ -135,6 +145,12 @@ jobs:
       # The build number is derived from the tag's commit, so it resolves to the
       # same `-build.N` tag release-internal created for that sha.
       from-tag: v${{ needs.prepare.outputs.version }}-build.${{ needs.prepare.outputs.build-number }}
+      # Empty when uploads ran, so a real store build carries no marker.
+      # Inverted on purpose: GitHub's `&&` yields its first falsy operand, so
+      # `cond && '' || X` is X on both branches - the non-empty value has to sit
+      # in the `&&` slot.
+      body-note: >-
+        ${{ vars.STORE_UPLOADS_ENABLED != 'true' && 'Store uploads were off for this build: it was never sent to TestFlight or Play. Set the repository variable STORE_UPLOADS_ENABLED to true to turn them on.' || '' }}
       # Removed only after the upload succeeded; a re-run whose source is
       # already gone continues instead of failing.
       delete-source: true

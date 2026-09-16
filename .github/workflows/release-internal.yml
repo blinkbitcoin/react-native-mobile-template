@@ -132,6 +132,9 @@ jobs:
       PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
 
   publish-ios:
+    # Off unless the repository says otherwise, so a checkout with no store
+    # credentials still builds, verifies and publishes its artifacts.
+    if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' }}
     needs: [prepare, build-ios]
     uses: blinkbitcoin/react-native-workflows/.github/workflows/fastlane-lane.yml@v0
     permissions:
@@ -164,6 +167,9 @@ jobs:
       ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
 
   publish-android:
+    # Off unless the repository says otherwise, so a checkout with no store
+    # credentials still builds, verifies and publishes its artifacts.
+    if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' }}
     needs: [prepare, build-android]
     uses: blinkbitcoin/react-native-workflows/.github/workflows/fastlane-lane.yml@v0
     permissions:
@@ -185,7 +191,13 @@ jobs:
       PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
 
   github-prerelease:
-    needs: [prepare, publish-ios, publish-android]
+    # The build jobs are named directly rather than reached through the upload
+    # jobs: this release carries their artifacts and has never needed a store.
+    # `!cancelled() && !failure()` is what lets it run when the uploads are
+    # skipped - a skipped dependency skips its dependents unless the condition
+    # uses a status function.
+    needs: [prepare, build-ios, build-android, publish-ios, publish-android]
+    if: ${{ !cancelled() && !failure() }}
     uses: blinkbitcoin/react-native-workflows/.github/workflows/github-release.yml@v0
     permissions:
       # The called job creates a release; a called workflow can only narrow the
@@ -197,6 +209,12 @@ jobs:
       sha: ${{ github.sha }}
       title: v${{ needs.prepare.outputs.version }} build ${{ needs.prepare.outputs.build-number }}
       assets-artifacts: "*"
+      # Empty when uploads ran, so a real store build carries no marker.
+      # The condition is inverted on purpose: GitHub's `&&` yields its first
+      # falsy operand, so `cond && '' || X` is X on *both* branches. The
+      # non-empty value has to sit in the `&&` slot.
+      body-note: >-
+        ${{ vars.STORE_UPLOADS_ENABLED != 'true' && 'Store uploads were off for this build: it was never sent to TestFlight or Play. Set the repository variable STORE_UPLOADS_ENABLED to true to turn them on.' || '' }}
     secrets:
       RELEASE_TAGGER_APP_ID: ${{ secrets.RELEASE_TAGGER_APP_ID }}
       RELEASE_TAGGER_APP_PRIVATE_KEY: ${{ secrets.RELEASE_TAGGER_APP_PRIVATE_KEY }}

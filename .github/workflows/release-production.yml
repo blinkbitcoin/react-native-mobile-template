@@ -86,7 +86,7 @@ jobs:
 
   ios-release:
     needs: prepare
-    if: ${{ inputs.action == 'release' && inputs.platforms != 'android' }}
+    if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && (inputs.action == 'release' && inputs.platforms != 'android') }}
     uses: blinkbitcoin/react-native-workflows/.github/workflows/fastlane-lane.yml@v0
     permissions:
       contents: read
@@ -123,7 +123,7 @@ jobs:
 
   android-release:
     needs: prepare
-    if: ${{ inputs.action == 'release' && inputs.platforms != 'ios' }}
+    if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && (inputs.action == 'release' && inputs.platforms != 'ios') }}
     uses: blinkbitcoin/react-native-workflows/.github/workflows/fastlane-lane.yml@v0
     permissions:
       contents: read
@@ -147,7 +147,7 @@ jobs:
 
   ios-phased:
     needs: prepare
-    if: ${{ contains(fromJSON('["halt", "resume", "complete"]'), inputs.action) && inputs.platforms != 'android' }}
+    if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && (contains(fromJSON('["halt", "resume", "complete"]'), inputs.action) && inputs.platforms != 'android') }}
     uses: blinkbitcoin/react-native-workflows/.github/workflows/fastlane-lane.yml@v0
     permissions:
       contents: read
@@ -175,7 +175,7 @@ jobs:
 
   android-rollout:
     needs: prepare
-    if: ${{ contains(fromJSON('["rollout", "resume", "complete"]'), inputs.action) && inputs.platforms != 'ios' }}
+    if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && (contains(fromJSON('["rollout", "resume", "complete"]'), inputs.action) && inputs.platforms != 'ios') }}
     uses: blinkbitcoin/react-native-workflows/.github/workflows/fastlane-lane.yml@v0
     permissions:
       contents: read
@@ -199,7 +199,7 @@ jobs:
 
   android-halt:
     needs: prepare
-    if: ${{ inputs.action == 'halt' && inputs.platforms != 'ios' }}
+    if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && (inputs.action == 'halt' && inputs.platforms != 'ios') }}
     uses: blinkbitcoin/react-native-workflows/.github/workflows/fastlane-lane.yml@v0
     permissions:
       contents: read
@@ -235,6 +235,12 @@ jobs:
       mode: latest
       tag: ${{ inputs.tag }}
       assets-artifacts: release-meta
+      # Empty when uploads ran, so a real store build carries no marker.
+      # Inverted on purpose: GitHub's `&&` yields its first falsy operand, so
+      # `cond && '' || X` is X on both branches - the non-empty value has to sit
+      # in the `&&` slot.
+      body-note: >-
+        ${{ vars.STORE_UPLOADS_ENABLED != 'true' && 'Store uploads were off for this build: it was never sent to TestFlight or Play. Set the repository variable STORE_UPLOADS_ENABLED to true to turn them on.' || '' }}
     secrets:
       RELEASE_TAGGER_APP_ID: ${{ secrets.RELEASE_TAGGER_APP_ID }}
       RELEASE_TAGGER_APP_PRIVATE_KEY: ${{ secrets.RELEASE_TAGGER_APP_PRIVATE_KEY }}

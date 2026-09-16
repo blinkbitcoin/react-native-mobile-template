@@ -214,6 +214,42 @@ The three variables reach `notes.mjs` through `expo-prepare`'s `build-env`; the
 two keys are declared secrets on `expo-prepare.yml`, because `build-env` is a
 workflow input and would publish them in the run's parameters.
 
+## Before you have store accounts
+
+The release path runs in two phases, and the first needs no Apple or Google
+account at all.
+
+`STORE_UPLOADS_ENABLED` is a repository variable, and until it is `true` every
+job that talks to a store is skipped: TestFlight and Play uploads in
+`release-internal`, the promotions in `release-beta`, and the release, phased
+and rollout lanes in `release-production`. Everything else still runs.
+
+| Runs from the first push | Waits for `STORE_UPLOADS_ENABLED=true` |
+| --- | --- |
+| Version and build number, fingerprints, `build-info.json`, release notes | `fastlane match` certificates |
+| Both native builds, and `verify-ios` / `verify-android` | TestFlight upload and external groups |
+| The GitHub release: tag, assets, `SHA256SUMS`, promote | Play track uploads |
+| Store-notes generation and the changelog section | Phased release and staged rollout |
+
+So a merge to `main` builds both platforms, verifies the artifacts and
+publishes a `vX.Y.Z-build.N` pre-release carrying all of them — green, with no
+credentials configured.
+
+**A build made this way never reached a store, and says so.** Its release body
+opens with a note naming the variable that switched uploads off. That marker is
+the whole point: a release with artifacts attached is otherwise indistinguishable
+from one that shipped, and someone finding it months later has no way to tell.
+
+The order to configure things in: get the store-free phase green first, then
+register the App Store Connect and Play apps, then add the secrets and
+variables below, then set `STORE_UPLOADS_ENABLED` to `true`. Turning uploads on
+before the rest is green means debugging store credentials on top of an
+untested pipeline.
+
+Why a variable rather than detecting the secrets: GitHub's `secrets` context is
+not available in a job-level `if:`, so a job cannot ask whether its own
+credentials exist.
+
 ## Variables and secrets
 
 Repository **variables** (Settings → Secrets and variables → Actions →
@@ -233,6 +269,7 @@ anyone who can see the run. Credentials go in `secrets:` instead.
 | `IOS_SCHEME` | every build and lane job | Xcode scheme name (the Expo prebuild generates it from the app name) |
 | `ANDROID_PACKAGE` | every build and lane job | Play application id |
 | `XCODE_VERSION` | `release-internal` iOS build | A version installed on the runner image, e.g. `26.0`; sets `DEVELOPER_DIR` |
+| `STORE_UPLOADS_ENABLED` | repo variable; every store job in all three release workflows | `true` turns on TestFlight and Play uploads.<br>Unset means off, and the store credentials below<br>are only needed once it is on — see<br>[Before you have store accounts](#before-you-have-store-accounts) |
 | `BUILD_NUMBER_OFFSET` | every `expo-prepare` call | Integer, default `1000`. Raise only |
 | `WORKFLOWS_MACOS_RUNNER` | iOS build + iOS internal upload | Runner label, default `macos-26` |
 | `TESTFLIGHT_INTERNAL_GROUP` | `release-internal` iOS upload | Group name in App Store Connect → TestFlight |
