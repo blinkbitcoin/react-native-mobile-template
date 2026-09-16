@@ -9,6 +9,9 @@ submissions already working.
 [![Unit](https://raw.githubusercontent.com/blinkbitcoin/react-native-mobile-template/gh-pages/badges/main/unit.svg)](https://github.com/blinkbitcoin/react-native-mobile-template/actions/workflows/ci.yml)
 [![E2E](https://raw.githubusercontent.com/blinkbitcoin/react-native-mobile-template/gh-pages/badges/main/e2e.svg)](https://github.com/blinkbitcoin/react-native-mobile-template/actions/workflows/ci.yml)
 [![Coverage](https://raw.githubusercontent.com/blinkbitcoin/react-native-mobile-template/gh-pages/badges/main/coverage.svg)](https://github.com/blinkbitcoin/react-native-mobile-template/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
+
+<sub>Badges are per branch — these are `main`'s. See <a href="docs/ci.md#badges">CI</a>.</sub>
 
 </div>
 
@@ -29,6 +32,14 @@ flowchart LR
   e2e --> merge[merge to main]
   merge --> relpr[Release PR] --> build[Signed builds] --> stores[TestFlight and Play]
 ```
+
+**Where to start** — three ways through this repository:
+
+| You are | Your path |
+| --- | --- |
+| **Starting**<br>a new app | [Getting started](#getting-started) — running in six commands<br>[Using this template](#using-this-template) — what `make init` rewrites<br>[local-dev.md](docs/local-dev.md) — the long version |
+| **Working**<br>in the app | [What is in here](#what-is-in-here) — every directory and what owns it<br>[architecture.md](docs/architecture.md) — data flow, providers, env<br>[quality.md](docs/quality.md) — which linter owns which rule |
+| **Shipping**<br>it | [The pipelines](#the-pipelines) — every workflow and its jobs<br>[release-runbook.md](docs/release-runbook.md) — cut, promote, roll out, halt<br>[store-accounts.md](docs/store-accounts.md) — the accounts and credentials |
 
 ## Getting started
 
@@ -83,19 +94,54 @@ Builds go unsigned. Signing switches on with a repo variable, uploading with
 another. You can watch a release work end to end before Apple has answered your
 email.
 
-## What's inside
+## What is in here
 
-| Area | What you get |
+| Path | Responsibility |
 | --- | --- |
-| App | Expo SDK 57, React Native 0.86, expo-router routes, a themed component kit |
-| Data | Apollo Client 4 with retry/auth/error links, a persisted cache, generated typed documents |
-| i18n | Lingui 6, `en` + `es` catalogs, extraction and drift checks |
-| Native | A local Expo module (`modules/hello-native`) and a config plugin (`plugins/with-build-stamp.ts`) |
-| Config | `zod`-parsed `EXPO_PUBLIC_*` env, per-environment `.env` files, a secret-leak gate |
-| Tests | Jest + RNTL unit/component, `node:test` for scripts, Maestro on device, Playwright on web |
-| Quality | Biome, ESLint, TypeScript, knip, typos, shellcheck, actionlint — all behind `make check` |
-| Release | fastlane lanes for both stores, match signing, artifact verification, store notes, `DRY_RUN=1` rehearsal |
-| OTA | expo-updates behind an `OTA_ENABLED` toggle, code signing, a self-hosted update server |
+| `src/app/` | expo-router routes. A file here is a screen; nothing else is |
+| `src/components/` | The themed component kit, each with its own test |
+| `src/features/` | Feature modules — the screens' actual logic, kept out of the route files |
+| `src/graphql/` | Queries and mutations, plus the typed documents codegen writes from them |
+| `src/config/` | `zod`-parsed `EXPO_PUBLIC_*` env. Nothing reads `process.env` directly |
+| `src/i18n/` | Lingui setup and the `en` and `es` catalogs |
+| `src/theme/`, `src/lib/`,<br>`src/services/` | Tokens and colours, shared helpers, the Apollo client and its links |
+| `modules/` | A local Expo native module (`hello-native`) — the worked example of native code |
+| `plugins/` | Config plugins. `with-build-stamp.ts` shows the pattern: native config as TypeScript |
+| `fastlane/` | `Fastfile` plus one lane file per platform, store metadata, `Matchfile` for signing |
+| `scripts/` | Every gate and helper `make` calls, with `node:test` files next to them |
+| `mocks/` | The GraphQL mock API — one schema, served to Jest via MSW and to E2E as a server |
+| `.maestro/`, `e2e/` | Maestro flows for device E2E, Playwright specs for web |
+| `assets/`, `certs/`,<br>`deploy/` | Icons and fonts, the public OTA certificate, the update-server deployment |
+| `docs/` | Twelve pages, indexed by question in [docs/README.md](docs/README.md) |
+
+Not in here, deliberately: `ios/` and `android/`. They are generated.
+
+## The pipelines
+
+Eleven workflow files. Each is a thin caller —
+[`react-native-workflows`](https://github.com/blinkbitcoin/react-native-workflows)
+holds what they actually do. Job names are what you read in the Actions graph.
+
+**CI** — on a pull request and on `main`
+
+| Workflow | Jobs | Fires on |
+| --- | --- | --- |
+| `ci.yml` | `Checks` · `Unit` · `E2E` · `Badges` | Push, PR, dispatch. Each job gates the next, so a failed unit run never reaches E2E |
+| `codeql.yml` | `Analyze` | Push, PR, weekly. Informational, never a required check |
+| `web.yml` | `Export` | PR and release — the web export and Playwright suite |
+| `pr-title.yml` | `Title` | Conventional Commits on the PR title |
+| `pr-closed.yml` | `Cleanup` | Cancels the closed PR's runs, drops its badges |
+
+**CD** — on a merge, a release, or a deliberate dispatch
+
+| Workflow | Jobs | Fires on |
+| --- | --- | --- |
+| `release-please.yml` | `Release PR` | Push to `main`. Maintains the version PR |
+| `release-internal.yml` | `Prepare` · `Build iOS` · `Build Android`<br>· `Upload iOS` · `Upload Android`<br>· `GitHub Pre-release` · `OTA` | Push to `main`, once CI is green for that sha. TestFlight and the Play internal track |
+| `release-beta.yml` | `Prepare` · `Promote iOS` · `Promote Android`<br>· `GitHub Release` · `Store Notes` · `OTA` | `release: published`. Promotes the internal build rather than rebuilding |
+| `release-production.yml` | `Prepare` · `Release iOS` · `Release Android`<br>· `Phased iOS` · `Rollout Android` · `Halt Android`<br>· `GitHub Release` · `OTA` · `Web` | Dispatch only, carrying the action. Phased release and staged rollout, with a halt |
+| `release-retry.yml` | `Retry Beta` | A failed beta run. Retries it without a human |
+| `ota-hotfix.yml` | `Baseline` · `Publish` | Dispatch. Ships JS without a store round trip, gated on the native fingerprint |
 
 ## Shipping
 

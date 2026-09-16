@@ -262,7 +262,7 @@
       {
         "path": "README.md",
         "optional": true,
-        "replace": [[", Maestro on device, Playwright on web |", ", Maestro on device |"]]
+        "replace": [["| `.maestro/`, `e2e/` | Maestro flows for device E2E, Playwright specs for web |", "| `.maestro/` | Maestro flows for device E2E |"]]
       },
       {
         "path": "docs/README.md",
