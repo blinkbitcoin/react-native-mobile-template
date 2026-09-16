@@ -2,7 +2,7 @@
 
 This file — and `make init` itself — only exist in the template. The first
 thing you do in a new repo is run `make init`; it renames the project, can drop
-the web target, and then deletes itself.
+the web target, and deletes itself last of all.
 
 ## 1. Take a copy
 
@@ -83,7 +83,16 @@ and, with `--no-web`, the removed dependencies), `pnpm codegen` and
 and no message id), Biome's formatter (invoked directly, not through `pnpm
 format` — see the comment in `scripts/init.mjs`), and `make check-code`.
 
-**Deleted** — `scripts/init.mjs`, `scripts/init.test.mjs`,
+**If any of that fails** — a registry hiccup during `pnpm install` is the
+likely one — the run stops and prints what state the tree is in and what to
+type next. `scripts/init.mjs` is still there at that point and nothing has been
+committed, so `git checkout . && node scripts/init.mjs` starts over cleanly.
+That ordering is deliberate: the initialiser used to delete itself *before*
+these steps, which left a first adopter renamed, with nothing installed,
+nothing committed, and the one command that would redo the work already gone.
+
+**Deleted last, once those steps have passed** — `scripts/init.mjs`,
+`scripts/init.test.mjs`,
 `scripts/init.manifest.json`, this file, the Makefile's `init` target, the
 README's "Using this template" section, and the doc rows that pointed at any of
 them. The `// init:web-start` / `// init:web-end` comments go too: with

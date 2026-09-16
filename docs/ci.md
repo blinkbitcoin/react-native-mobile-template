@@ -36,7 +36,12 @@ was a second docs rule sitting next to the classifier's: narrower (it missed
 `LICENSE` and the issue/PR templates) and free to drift further. `checks.yml`
 now falls back to `github.event.before` on a push, so one rule answers both
 events and the `changes` job is the single source. Widen what counts as docs
-with the `docs-globs` input, never with a second list here. `release-internal.yml`
+with the `docs-globs` input, never with a second list here. Those alternatives
+are joined into one ERE, so a stray leading, trailing or doubled `|` is
+**refused outright** rather than appended: an empty alternative matches every
+path, which would classify every change as docs-only and skip the whole matrix
+green. A pattern that fails to compile for any other reason runs everything and
+says so with a `::notice::`. `release-internal.yml`
 keeps its `paths-ignore`: that one is not a docs classification but a "do not
 cut a build for this" rule, and it calls no classifier.
 

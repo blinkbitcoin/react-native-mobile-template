@@ -114,10 +114,18 @@ and takes Play to 100%. `action: halt` stops both. See
 ## Versions and build numbers
 
 - **Version** comes from `scripts/release/resolve-version.sh`: a stable `vX.Y.Z`
-  tag on HEAD → a HEAD subject of `chore(main): release X.Y.Z` → the open
+  tag on HEAD → a HEAD subject of `chore(<scope>): release X.Y.Z` → the open
   release PR's title → the newest stable tag with its patch bumped → `0.0.1`.
   Prerelease tags are ignored at every step. Internal builds therefore already
   carry the version that will be released.
+  - `<scope>` is the **release branch's name**, because that is what
+    release-please scopes its commit with: `chore(main)` on `main`,
+    `chore(master)` on `master`. It comes from `$GITHUB_REF_NAME`, falling back
+    to `main` outside Actions, and `RNW_RELEASE_SCOPE` overrides it if your
+    `release-please-config.json` uses a scope that is not the branch name. It
+    used to be hardcoded to `main`, so releasing from any other branch matched
+    nothing and fell through to the patch bump below — a wrong version on a real
+    release, with no error anywhere.
   - The subject source is read from HEAD, and from HEAD's *second parent* when
     HEAD is a merge commit — so a release PR merged with GitHub's "Create a
     merge commit" button (whose own subject is `Merge pull request #N from …`)
@@ -137,6 +145,11 @@ and takes Play to 100%. `action: halt` stops both. See
   workflows set.
 - **Raise `BUILD_NUMBER_OFFSET`, never lower it.** App Store Connect and Play
   both reject a build number that goes backwards, permanently.
+- **A non-numeric `BUILD_NUMBER_OFFSET` is refused** by both copies of the
+  script rather than silently counted as `0` — which is what bash does with
+  `abc`, and which lowers the build number exactly the way the previous point
+  warns about, with the store's rejection naming neither the variable nor the
+  script.
 - **App Store rejects a new build for an already-released version.** Once
   `1.2.3` is live, every further build must be `1.2.4` or later. This is why the
   version is resolved from the pending release PR rather than from the last tag:
