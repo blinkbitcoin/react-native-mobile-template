@@ -35,11 +35,11 @@ flowchart LR
 
 **Where to start** — three ways through this repository:
 
-| Task | Where to look |
-| --- | --- |
-| **Starting**<br>a new app | [Getting started](#getting-started) — running in six commands<br>[Using this template](#using-this-template) — what `make init` rewrites<br>[local-dev.md](docs/local-dev.md) — the long version |
-| **Working**<br>in the app | [What is in here](#what-is-in-here) — every directory and what owns it<br>[architecture.md](docs/architecture.md) — data flow, providers, env<br>[quality.md](docs/quality.md) — which linter owns which rule |
-| **Shipping**<br>it | [The pipelines](#the-pipelines) — every workflow and its jobs<br>[release-runbook.md](docs/release-runbook.md) — cut, promote, roll out, halt<br>[store-accounts.md](docs/store-accounts.md) — the accounts and credentials |
+| Task                      | Where to look                                                                                                                                                                                                               |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Starting**<br>a new app | [Getting started](#getting-started) — running in six commands<br>[Using this template](#using-this-template) — what `make init` rewrites<br>[local-dev.md](docs/local-dev.md) — the long version                            |
+| **Working**<br>in the app | [What is in here](#what-is-in-here) — every directory and what owns it<br>[architecture.md](docs/architecture.md) — data flow, providers, env<br>[quality.md](docs/quality.md) — which linter owns which rule               |
+| **Shipping**<br>it        | [The pipelines](#the-pipelines) — every workflow and its jobs<br>[release-runbook.md](docs/release-runbook.md) — cut, promote, roll out, halt<br>[store-accounts.md](docs/store-accounts.md) — the accounts and credentials |
 
 ## Getting started
 
@@ -95,23 +95,23 @@ another. A release can be watched end to end before the store accounts exist.
 
 ## What is in here
 
-| Path | Responsibility |
-| --- | --- |
-| `src/app/` | expo-router routes. A file here is a screen; nothing else is |
-| `src/components/` | The themed component kit, each with its own test |
-| `src/features/` | Feature modules — the screens' actual logic, kept out of the route files |
-| `src/graphql/` | Queries and mutations, plus the typed documents codegen writes from them |
-| `src/config/` | `zod`-parsed `EXPO_PUBLIC_*` env. Nothing reads `process.env` directly |
-| `src/i18n/` | Lingui setup and the `en` and `es` catalogs |
-| `src/theme/`, `src/lib/`,<br>`src/services/` | Tokens and colours, shared helpers, the Apollo client and its links |
-| `modules/` | A local Expo native module (`hello-native`) — the worked example of native code |
-| `plugins/` | Config plugins. `with-build-stamp.ts` shows the pattern: native config as TypeScript |
-| `fastlane/` | `Fastfile` plus one lane file per platform, store metadata, `Matchfile` for signing |
-| `scripts/` | Every gate and helper `make` calls, with `node:test` files next to them |
-| `mocks/` | The GraphQL mock API — one schema, served to Jest via MSW and to E2E as a server |
-| `.maestro/`, `e2e/` | Maestro flows for device E2E, Playwright specs for web |
-| `assets/`, `certs/`,<br>`deploy/` | Icons and fonts, the public OTA certificate, the update-server deployment |
-| `docs/` | Twelve pages, indexed by question in [docs/README.md](docs/README.md) |
+| Path                                         | Responsibility                                                                       |
+| -------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `src/app/`                                   | expo-router routes. A file here is a screen; nothing else is                         |
+| `src/components/`                            | The themed component kit, each with its own test                                     |
+| `src/features/`                              | Feature modules — the screens' actual logic, kept out of the route files             |
+| `src/graphql/`                               | Queries and mutations, plus the typed documents codegen writes from them             |
+| `src/config/`                                | `zod`-parsed `EXPO_PUBLIC_*` env. Nothing reads `process.env` directly               |
+| `src/i18n/`                                  | Lingui setup and the `en` and `es` catalogs                                          |
+| `src/theme/`, `src/lib/`,<br>`src/services/` | Tokens and colours, shared helpers, the Apollo client and its links                  |
+| `modules/`                                   | A local Expo native module (`hello-native`) — the worked example of native code      |
+| `plugins/`                                   | Config plugins. `with-build-stamp.ts` shows the pattern: native config as TypeScript |
+| `fastlane/`                                  | `Fastfile` plus one lane file per platform, store metadata, `Matchfile` for signing  |
+| `scripts/`                                   | Every gate and helper `make` calls, with `node:test` files next to them              |
+| `mocks/`                                     | The GraphQL mock API — one schema, served to Jest via MSW and to E2E as a server     |
+| `.maestro/`, `e2e/`                          | Maestro flows for device E2E, Playwright specs for web                               |
+| `assets/`, `certs/`,<br>`deploy/`            | Icons and fonts, the public OTA certificate, the update-server deployment            |
+| `docs/`                                      | Twelve pages, indexed by question in [docs/README.md](docs/README.md)                |
 
 Not in here, deliberately: `ios/` and `android/`. They are generated.
 
@@ -123,24 +123,24 @@ holds what they actually do. Job names are what the Actions graph shows.
 
 **CI** — on a pull request and on `main`
 
-| Workflow | Jobs | Fires on |
-| --- | --- | --- |
-| `ci.yml` | `Checks` · `Unit` · `E2E` · `Badges` | Push, PR, dispatch. Each job gates the next, so a failed unit run never reaches E2E |
-| `codeql.yml` | `Analyze` | Push, PR, weekly. Informational, never a required check |
-| `web.yml` | `Export` | PR and release — the web export and Playwright suite |
-| `pr-title.yml` | `Title` | Conventional Commits on the PR title |
-| `pr-closed.yml` | `Cleanup` | Cancels the closed PR's runs, drops its badges |
+| Workflow        | Jobs                                 | Fires on                                                                            |
+| --------------- | ------------------------------------ | ----------------------------------------------------------------------------------- |
+| `ci.yml`        | `Checks` · `Unit` · `E2E` · `Badges` | Push, PR, dispatch. Each job gates the next, so a failed unit run never reaches E2E |
+| `codeql.yml`    | `Analyze`                            | Push, PR, weekly. Informational, never a required check                             |
+| `web.yml`       | `Export`                             | PR and release — the web export and Playwright suite                                |
+| `pr-title.yml`  | `Title`                              | Conventional Commits on the PR title                                                |
+| `pr-closed.yml` | `Cleanup`                            | Cancels the closed PR's runs, drops its badges                                      |
 
 **CD** — on a merge, a release, or a deliberate dispatch
 
-| Workflow | Jobs | Fires on |
-| --- | --- | --- |
-| `release-please.yml` | `Release PR` | Push to `main`. Maintains the version PR |
-| `release-internal.yml` | `Prepare` · `Build iOS` · `Build Android`<br>· `Upload iOS` · `Upload Android`<br>· `GitHub Pre-release` · `OTA` | Push to `main`, once CI is green for that sha. TestFlight and the Play internal track |
-| `release-beta.yml` | `Prepare` · `Promote iOS` · `Promote Android`<br>· `GitHub Release` · `Store Notes` · `OTA` | `release: published`. Promotes the internal build rather than rebuilding |
-| `release-production.yml` | `Prepare` · `Release iOS` · `Release Android`<br>· `Phased iOS` · `Rollout Android` · `Halt Android`<br>· `GitHub Release` · `OTA` · `Web` | Dispatch only, carrying the action. Phased release and staged rollout, with a halt |
-| `release-retry.yml` | `Retry Beta` | A failed beta run. Retries it without a human |
-| `ota-hotfix.yml` | `Baseline` · `Publish` | Dispatch. Ships JS without a store round trip, gated on the native fingerprint |
+| Workflow                 | Jobs                                                                                                                                       | Fires on                                                                              |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| `release-please.yml`     | `Release PR`                                                                                                                               | Push to `main`. Maintains the version PR                                              |
+| `release-internal.yml`   | `Prepare` · `Build iOS` · `Build Android`<br>· `Upload iOS` · `Upload Android`<br>· `GitHub Pre-release` · `OTA`                           | Push to `main`, once CI is green for that sha. TestFlight and the Play internal track |
+| `release-beta.yml`       | `Prepare` · `Promote iOS` · `Promote Android`<br>· `GitHub Release` · `Store Notes` · `OTA`                                                | `release: published`. Promotes the internal build rather than rebuilding              |
+| `release-production.yml` | `Prepare` · `Release iOS` · `Release Android`<br>· `Phased iOS` · `Rollout Android` · `Halt Android`<br>· `GitHub Release` · `OTA` · `Web` | Dispatch only, carrying the action. Phased release and staged rollout, with a halt    |
+| `release-retry.yml`      | `Retry Beta`                                                                                                                               | A failed beta run. Retries it without a human                                         |
+| `ota-hotfix.yml`         | `Baseline` · `Publish`                                                                                                                     | Dispatch. Ships JS without a store round trip, gated on the native fingerprint        |
 
 ## Shipping
 
