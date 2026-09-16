@@ -8,8 +8,8 @@
 //
 // 120, not the 72 the sibling repos use: theirs is tuned for narrow package
 // READMEs on npm, while these tables are read on GitHub at full page width and
-// document long command lines. Measured against this repo, 72 flags 112 lines
-// and 120 flags the ones that actually squeeze a neighbouring column.
+// document long command lines. Measured against this repo, 72 flags 117 lines
+// and 120 flags the 25 that actually squeeze a neighbouring column.
 import { globSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,6 +27,65 @@ export const DOC_GLOBS = [
   'docs/**/*.md',
 ];
 export const DOC_EXCLUDES = ['docs/superpowers/'];
+
+/**
+ * Every fenced block in `lines`, as
+ * `{ info, indent, start, end, closed, body }`. `start`/`end` are 0-based
+ * indices of the opening and closing delimiters (`end` is `lines.length` and
+ * `closed` is false when the fence is never closed); `body` is the content with
+ * the opening fence's indentation removed; `info` is the lowercased first word
+ * of the info string.
+ *
+ * Shared by both docs checks — the table check must not measure a code block,
+ * the diagram check wants the mermaid ones — so there is one answer to "am I
+ * inside a fence". A fence closes only on a delimiter of the same character,
+ * at least as long, with nothing after it. That is what makes a ```mermaid
+ * inside a ````-fence its content rather than a diagram, and what stops a
+ * four-backtick block containing a three-backtick line from desyncing the
+ * scanner for the rest of the file.
+ */
+export function fencedBlocks(lines) {
+  const blocks = [];
+  let open = null;
+  for (let i = 0; i < lines.length; i++) {
+    const match = /^(\s*)(`{3,}|~{3,})(.*)$/.exec(lines[i]);
+    if (open) {
+      const closes =
+        match &&
+        match[2][0] === open.char &&
+        match[2].length >= open.length &&
+        match[3].trim() === '';
+      if (closes) {
+        blocks.push({ ...open, end: i, closed: true });
+        open = null;
+      } else {
+        open.body.push(lines[i].slice(open.indent));
+      }
+      continue;
+    }
+    if (match) {
+      open = {
+        char: match[2][0],
+        length: match[2].length,
+        indent: match[1].length,
+        info: match[3].trim().split(/\s+/)[0].toLowerCase(),
+        start: i,
+        body: [],
+      };
+    }
+  }
+  if (open) blocks.push({ ...open, end: lines.length, closed: false });
+  return blocks;
+}
+
+/** 0-based indices of every line inside a fenced block, delimiters included. */
+function fencedLines(lines) {
+  const inside = new Set();
+  for (const block of fencedBlocks(lines)) {
+    for (let i = block.start; i <= Math.min(block.end, lines.length - 1); i++) inside.add(i);
+  }
+  return inside;
+}
 
 // Visible width of a cell line: markdown and HTML decoration takes no space on
 // the rendered page.
@@ -69,15 +128,11 @@ function cells(line) {
  */
 export function overlongTableLines(markdown, max = MAX_LINE) {
   const findings = [];
-  let inFence = false;
   const lines = markdown.split('\n');
+  const inFence = fencedLines(lines);
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (/^\s*```/.test(line)) {
-      inFence = !inFence;
-      continue;
-    }
-    if (inFence || !isTableRow(line) || isSeparator(line)) continue;
+    if (inFence.has(i) || !isTableRow(line) || isSeparator(line)) continue;
     cells(line).forEach((cell, column) => {
       for (const segment of cell.split(/<br\s*\/?>/i)) {
         const width = visible(segment).length;

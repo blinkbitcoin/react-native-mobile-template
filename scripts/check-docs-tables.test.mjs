@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import {
   DOC_EXCLUDES,
   DOC_GLOBS,
+  fencedBlocks,
   formatFindings,
   MAX_LINE,
   overlongTableLines,
@@ -86,4 +87,46 @@ test('the doc set covers the published docs and excludes the agent plans', () =>
   assert.ok(DOC_GLOBS.includes('README.md'));
   assert.ok(DOC_GLOBS.includes('docs/**/*.md'));
   assert.deepEqual(DOC_EXCLUDES, ['docs/superpowers/']);
+});
+
+// M3: the table check used to toggle a boolean on any ```-prefixed line, so a
+// tilde fence was invisible and a four-backtick block containing a three-
+// backtick line desynced the scanner - measuring code as a table, then skipping
+// the rest of the file. Both checks now share fencedBlocks().
+test('a tilde-fenced block is skipped like a backtick-fenced one', () => {
+  const markdown = ['~~~', table('x'.repeat(MAX_LINE + 50)), '~~~'].join('\n');
+  assert.deepEqual(overlongTableLines(markdown), []);
+});
+
+test('a three-backtick line inside a four-backtick fence does not desync the scan', () => {
+  const markdown = [
+    '````markdown',
+    table('x'.repeat(MAX_LINE + 50)), // inside the outer fence: not measured
+    '```',
+    table('y'.repeat(MAX_LINE + 50)), // still inside it
+    '````',
+    table('z'.repeat(MAX_LINE + 1)), // after it: measured
+  ].join('\n');
+  const findings = overlongTableLines(markdown);
+  assert.equal(findings.length, 1);
+  assert.match(findings[0].text, /^z+$/);
+});
+
+test('an unclosed fence swallows the rest of the file rather than half of it', () => {
+  const markdown = ['```', table('x'.repeat(MAX_LINE + 50))].join('\n');
+  assert.deepEqual(overlongTableLines(markdown), []);
+});
+
+test('fencedBlocks reports the info string, the delimiters and whether it closed', () => {
+  const [block] = fencedBlocks(['```ts title=x', 'const a = 1;', '```']);
+  assert.deepEqual(
+    { info: block.info, start: block.start, end: block.end, closed: block.closed },
+    { info: 'ts', start: 0, end: 2, closed: true },
+  );
+  assert.deepEqual(block.body, ['const a = 1;']);
+});
+
+test('fencedBlocks reports an unclosed fence as running to the end of the file', () => {
+  const [block] = fencedBlocks(['```ts', 'const a = 1;']);
+  assert.deepEqual({ end: block.end, closed: block.closed }, { end: 2, closed: false });
 });
