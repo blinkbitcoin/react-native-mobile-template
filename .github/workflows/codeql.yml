@@ -21,10 +21,18 @@ concurrency:
   group: codeql-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  # The called workflow declares the `security-events: write` / `actions: read`
-  # escalation on its own analyze job, so nothing is granted here.
+  # Granted here, not just on the called workflow's own job. A called workflow
+  # can only ever NARROW the caller's token, never widen it: with only
+  # `contents: read` above, the analyze job's request for `security-events:
+  # write` exceeded the cap and every run died as a startup_failure before a
+  # single job began. The comment that used to sit here claimed the opposite.
+  #
   # Keep this OUT of the required-checks ruleset: CodeQL is informational and a
   # runner hiccup must not be able to block a merge.
   codeql:
     name: Analyze
+    permissions:
+      contents: read
+      actions: read # workflow metadata for the SARIF upload
+      security-events: write # upload the SARIF results
     uses: blinkbitcoin/react-native-workflows/.github/workflows/codeql.yml@v0
