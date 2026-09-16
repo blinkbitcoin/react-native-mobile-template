@@ -108,6 +108,8 @@
     "check-prebuild": "bash scripts/check-prebuild.sh",
     "check:docs": "make check-docs",
     "check:release": "make check-release",
+    "check:ci": "make check-ci",
+    "check:bundle-secrets": "make bundle-secrets-check",
     "mock-api": "tsx mocks/server.ts",
     "deps:check": "expo install --check && expo-doctor",
     "deps:audit": "pnpm audit --audit-level=high --prod && bash scripts/check-lockfile.sh",
