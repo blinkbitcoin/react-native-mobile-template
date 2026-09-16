@@ -5,6 +5,18 @@ by [release-please](https://github.com/googleapis/release-please) from
 [Conventional Commits](https://www.conventionalcommits.org/) — edit the commit
 messages, not this file. See [docs/release-runbook.md](docs/release-runbook.md).
 
+## [0.2.0](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.1.0...v0.2.0) (2026-09-16)
+
+
+### Features
+
+* **ci:** separate CI from CD in the UI, and fail fast ([c2bcc97](https://github.com/blinkbitcoin/react-native-mobile-template/commit/c2bcc97dd087d9f1b18635e3dd65d0178e2f0d99))
+
+
+### Bug Fixes
+
+* **tooling:** make init drop the template's own changelog ([92d0a09](https://github.com/blinkbitcoin/react-native-mobile-template/commit/92d0a0920d2dc09802aa26f0bc2bd15633619596))
+
 ## 0.1.0 (2026-09-16)
 
 
