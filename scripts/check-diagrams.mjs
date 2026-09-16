@@ -17,11 +17,11 @@
 // This is the one gate that needs the network on a cold npx cache. Whether the
 // toolchain works is settled once, up front, by rendering a diagram this file
 // owns (PROBE_DIAGRAM) — never by reading the parser's complaints about the
-// docs' own diagrams. When that probe fails the check skips with a warning
-// rather than blocking an offline developer — loudly, as a `::warning::`
-// annotation, when CI is set, so a skip is never invisible in a run log.
+// docs' own diagrams. When that probe fails locally the check skips rather than
+// blocking an offline developer; under CI it fails, because a runner that
+// cannot render is a broken gate and a warning nobody reads is how a gate dies.
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -55,6 +55,42 @@ export function filesWithMermaid(files, read) {
 // A diagram this file owns, used to decide whether the toolchain works at all.
 // It must never come from the docs: the whole point is that the thing being
 // checked cannot influence the decision to check it.
+// mermaid-cli renders through puppeteer, which needs a Chromium to drive. `npx`
+// fetches the CLI on demand but not reliably a browser with it, so prefer one
+// the machine already has: GitHub runner images ship Chrome and export
+// CHROME_BIN, and a Mac keeps it under /Applications. Finding none, the config
+// names no executable and puppeteer falls back to whatever it downloaded.
+export const BROWSER_PATHS = [
+  process.env.PUPPETEER_EXECUTABLE_PATH,
+  process.env.CHROME_BIN,
+  '/usr/bin/google-chrome',
+  '/usr/bin/google-chrome-stable',
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  '/Applications/Chromium.app/Contents/MacOS/Chromium',
+];
+
+/** The first entry of `paths` that exists, or undefined. */
+export function findBrowser(paths = BROWSER_PATHS, exists = existsSync) {
+  return paths.find((candidate) => candidate && exists(candidate));
+}
+
+/**
+ * Writes the puppeteer config `mmdc -p` takes, and returns its path.
+ *
+ * `--no-sandbox` because a CI container has no user namespace to sandbox with,
+ * and `--disable-dev-shm-usage` because its /dev/shm is smaller than Chromium
+ * assumes. Both are inert on a developer machine, so there is one code path.
+ */
+export function writePuppeteerConfig(dir, executablePath) {
+  const config = { args: ['--no-sandbox', '--disable-dev-shm-usage'] };
+  if (executablePath) config.executablePath = executablePath;
+  const file = path.join(dir, 'puppeteer.json');
+  writeFileSync(file, `${JSON.stringify(config)}\n`);
+  return file;
+}
+
 export const PROBE_DIAGRAM = 'graph TD;\n  A-->B;';
 
 /**
@@ -121,13 +157,14 @@ function changedDocs() {
 // worth writing them all into `dir` and handing `mmdc` the directory once
 // (`-i dir`), or resolving the CLI once with a warm `npx --no-install`.
 function mmdcRunner(dir) {
+  const puppeteerConfig = writePuppeteerConfig(dir, findBrowser());
   let n = 0;
   return (code) => {
     const input = path.join(dir, `block-${n++}.mmd`);
     writeFileSync(input, `${code}\n`);
     const result = spawnSync(
       'npx',
-      ['--yes', MERMAID_CLI, '--quiet', '-i', input, '-o', `${input}.svg`],
+      ['--yes', MERMAID_CLI, '--quiet', '-p', puppeteerConfig, '-i', input, '-o', `${input}.svg`],
       { encoding: 'utf8' },
     );
     // A spawn that never started (no npx on PATH) has no exit code of its own.
@@ -193,8 +230,16 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
 
   if (!probe.available) {
     const why = cleanOutput(probe.stderr, 2) || 'no output';
-    const message = `mermaid check skipped: ${MERMAID_CLI} could not render a known-good diagram (${why}) — this gate needs the network on a cold npx cache`;
-    console.error(process.env.CI ? `::warning::${message}` : `warning: ${message}`);
+    const message = `${MERMAID_CLI} could not render a known-good diagram (${why})`;
+    // A runner is expected to have both the network and a browser, so a probe
+    // failure there is the gate breaking, not an environment to work around.
+    if (process.env.CI) {
+      console.error(`::error::diagrams: ${message}`);
+      process.exit(1);
+    }
+    console.error(
+      `warning: mermaid check skipped: ${message} — this gate needs the network on a cold npx cache`,
+    );
     process.exit(0);
   }
 

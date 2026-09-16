@@ -1,14 +1,20 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import {
+  BROWSER_PATHS,
   checkBlock,
   cleanOutput,
   extractMermaidBlocks,
   filesWithMermaid,
+  findBrowser,
   formatParseError,
   MERMAID_CLI,
   PROBE_DIAGRAM,
   probeToolchain,
+  writePuppeteerConfig,
 } from './check-diagrams.mjs';
 
 const doc = (...lines) => lines.join('\n');
@@ -208,4 +214,45 @@ test('npx config noise is dropped from a parse error', () => {
     'npm warn Unknown project config\nParse error',
   );
   assert.equal(line, 'a.md:1: mermaid block does not parse — Parse error');
+});
+
+test('the browser search prefers the first path that exists', () => {
+  assert.equal(
+    findBrowser(['/nowhere/chrome', '/usr/bin/chromium', '/usr/bin/google-chrome'], (p) =>
+      p.startsWith('/usr/bin'),
+    ),
+    '/usr/bin/chromium',
+  );
+});
+
+test('the browser search skips unset environment entries rather than crashing', () => {
+  assert.equal(
+    findBrowser([undefined, '', '/usr/bin/google-chrome'], () => true),
+    '/usr/bin/google-chrome',
+  );
+});
+
+test('no browser anywhere yields undefined, not a bogus path', () => {
+  assert.equal(
+    findBrowser(BROWSER_PATHS, () => false),
+    undefined,
+  );
+});
+
+test('the puppeteer config names the browser found and always disarms the sandbox', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'check-diagrams-test-'));
+  try {
+    const withBrowser = JSON.parse(
+      readFileSync(writePuppeteerConfig(dir, '/usr/bin/chromium'), 'utf8'),
+    );
+    assert.equal(withBrowser.executablePath, '/usr/bin/chromium');
+    assert.deepEqual(withBrowser.args, ['--no-sandbox', '--disable-dev-shm-usage']);
+
+    // Without one, puppeteer must be left to its own download rather than
+    // pointed at a path that does not exist.
+    const without = JSON.parse(readFileSync(writePuppeteerConfig(dir, undefined), 'utf8'));
+    assert.equal('executablePath' in without, false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

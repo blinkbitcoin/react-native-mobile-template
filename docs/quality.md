@@ -189,10 +189,20 @@ ones that actually squeeze a neighbouring column until its code spans wrap.
 **The mermaid check is the one gate that needs the network**, on a cold `npx`
 cache: it runs a pinned `@mermaid-js/mermaid-cli` rather than vendoring a
 parser. When the CLI cannot be fetched or its browser cannot launch, the check
-skips with a warning instead of blocking an offline developer — as a
-`::warning::` annotation when `CI` is set, so a skipped run is visible in the
-log rather than silently green. Locally it only looks at docs that changed
-against `origin/main`; CI passes `--all`.
+skips with a warning instead of blocking an offline developer — but **only off
+CI**. A runner has both the network and a browser, so a probe failure there is
+the gate itself breaking, and it exits non-zero with an `::error::` annotation.
+The earlier version warned on the runner too, which meant every diagram merged
+unchecked for as long as nobody read the log. Locally the check only looks at
+docs that changed against `origin/main`; CI passes `--all`.
+
+Rendering goes through puppeteer, which needs a Chromium to drive, and `npx`
+fetches the CLI without reliably fetching a browser with it. So the script
+looks for one the machine already has — `PUPPETEER_EXECUTABLE_PATH`,
+`CHROME_BIN` (GitHub runner images export it), then the usual Linux and macOS
+install paths — and hands `mmdc -p` a puppeteer config naming it, with
+`--no-sandbox --disable-dev-shm-usage` for the container case. Finding none, it
+names no executable and puppeteer falls back to its own download.
 
 Whether the toolchain works is decided **once, up front**, by rendering a
 known-good diagram the script owns (`PROBE_DIAGRAM`) — never by reading the
