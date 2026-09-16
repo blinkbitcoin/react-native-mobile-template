@@ -157,7 +157,7 @@ platform :android do
     package = ENV.fetch('ANDROID_PACKAGE')
     version_code = ENV.fetch('APP_BUILD_NUMBER')
     # artifact_dir, not output_dir: this job downloaded the build job's
-    # artifacts into $RNW_ASSETS_DIR and has nothing of its own to upload.
+    # artifacts into $WORKFLOWS_ASSETS_DIR and has nothing of its own to upload.
     out = artifact_dir('android')
 
     # Play rejects a duplicate version code outright, which turns any retry of

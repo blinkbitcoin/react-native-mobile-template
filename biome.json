@@ -9,7 +9,7 @@
       "!**/.expo",
       "!**/dist",
       "!**/coverage",
-      "!**/.rnw",
+      "!**/.workflows",
       "!src/graphql/generated",
       "!src/i18n/locales/**/messages.ts",
       "!**/*.po"

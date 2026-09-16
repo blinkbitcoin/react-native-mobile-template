@@ -132,9 +132,9 @@ Two independent ways in:
 
 Android runs on every non-docs-only run (`android` defaults to `true`).
 
-`macos-runner` is passed as `${{ vars.RNW_MACOS_RUNNER || 'macos-26' }}`:
-set the repo variable `RNW_MACOS_RUNNER` to move iOS onto a different (e.g.
-self-hosted) macOS label without editing the workflow. `RNW_MACOS_RUNNER` is a
+`macos-runner` is passed as `${{ vars.WORKFLOWS_MACOS_RUNNER || 'macos-26' }}`:
+set the repo variable `WORKFLOWS_MACOS_RUNNER` to move iOS onto a different (e.g.
+self-hosted) macOS label without editing the workflow. `WORKFLOWS_MACOS_RUNNER` is a
 convention documented by the workflows repo, not a default any workflow applies
 on its own — hence the explicit `||` fallback.
 
@@ -150,7 +150,7 @@ rnmt://expo-development-client/?url=http%3A%2F%2F10.0.2.2%3A$METRO_PORT   # Andr
 ```
 
 `METRO_PORT` is `APP_PORT_BASE` + 1 (`scripts/ports.mjs`). Its default is also
-the workflows repo's `RNW_METRO_PORT` default, so CI and a default local run
+the workflows repo's `WORKFLOWS_METRO_PORT` default, so CI and a default local run
 reach the app on the same port.
 
 This matters because `expo-dev-client`'s launcher screen finds Metro over
@@ -182,7 +182,7 @@ e2e-teardown-script: scripts/e2e/ci-mock-api-down.sh
 ```
 
 - **Setup** starts `pnpm mock-api` with `nohup`, writes its pid to
-  `$RNW_OUT/mock-api.pid` (falling back to `/tmp` outside CI), and blocks on
+  `$WORKFLOWS_OUT/mock-api.pid` (falling back to `/tmp` outside CI), and blocks on
   `scripts/e2e/wait-for-mock-api.sh` until the server answers a real GraphQL
   query. A missing setup script is fatal — the job fails before the suite runs.
 - **Teardown** kills that pid if it is still alive and always exits `0`. It runs
@@ -190,7 +190,7 @@ e2e-teardown-script: scripts/e2e/ci-mock-api-down.sh
   confusing one.
 
 Setup also runs `adb reverse` for the derived mock-API port when a device is
-attached. The workflows repo reverses `RNW_MOCK_API_PORT`, whose default still
+attached. The workflows repo reverses `WORKFLOWS_MOCK_API_PORT`, whose default still
 predates `APP_PORT_BASE`; until it derives its ports from the same base, the
 hook covers the gap.
 
@@ -293,14 +293,14 @@ To bump:
 Change every `uses:` in one pass, release workflows included. A bump that only
 touches the everyday-CI files leaves the release path on the old line, which is
 exactly where a version mismatch is hardest to notice. `grep -rn '@v0'
-.github/workflows` is the check. All callers share the `.rnw/` self-checkout
+.github/workflows` is the check. All callers share the `.workflows/` self-checkout
 and the script contract; mixing versions across them is untested.
 
-## `.rnw/`
+## `.workflows/`
 
-Every job checks the workflows repo out into `$GITHUB_WORKSPACE/.rnw` and
-reaches its scripts through `$RNW`. Nothing in this repo references
+Every job checks the workflows repo out into `$GITHUB_WORKSPACE/.workflows` and
+reaches its scripts through `$WORKFLOWS_DIR`. Nothing in this repo references
 `react-native-workflows` paths directly. Local tooling that walks the whole
-tree ignores it: `biome.json` (`!**/.rnw`), `eslint.config.mjs`
-(`.rnw/**`), `tsconfig.json` (`exclude`), `typos.toml` (`extend-exclude`) and
-`.gitignore` (`/.rnw`).
+tree ignores it: `biome.json` (`!**/.workflows`), `eslint.config.mjs`
+(`.workflows/**`), `tsconfig.json` (`exclude`), `typos.toml` (`extend-exclude`) and
+`.gitignore` (`/.workflows`).

@@ -50,4 +50,4 @@ paths-ignore:
   - dist # web export
   - coverage # jest reports
   - vendor/bundle # fastlane's gems
-  - .rnw # the workflows repo, checked out beside us on a runner
+  - .workflows # the workflows repo, checked out beside us on a runner

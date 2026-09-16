@@ -4,7 +4,7 @@
 # after — teardown runs with `if: always()`, including after a failed suite.
 set -euo pipefail
 
-out="${RNW_OUT:-/tmp}"
+out="${WORKFLOWS_OUT:-/tmp}"
 pidfile="$out/mock-api.pid"
 
 if [ -f "$pidfile" ]; then

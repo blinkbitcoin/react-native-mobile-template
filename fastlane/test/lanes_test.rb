@@ -438,8 +438,8 @@ class LanesTest < Minitest::Test
   end
 
   def test_an_explicit_output_dir_is_taken_as_given_when_absolute
-    ENV['RNW_OUTPUT_DIR'] = '/tmp/rnw-out'
-    assert_equal '/tmp/rnw-out', output_dir('ios')
+    ENV['WORKFLOWS_OUTPUT_DIR'] = '/tmp/workflows-out'
+    assert_equal '/tmp/workflows-out', output_dir('ios')
   end
 
   # ---------- artifact_dir (where a publish lane reads the binary from) ----------
@@ -448,10 +448,10 @@ class LanesTest < Minitest::Test
     Dir.mktmpdir do |dir|
       assets = File.join(dir, 'assets')
       FileUtils.mkdir_p(assets)
-      ENV['RNW_ASSETS_DIR'] = assets
-      ENV['RNW_OUTPUT_DIR'] = dir
-      # The publish job downloads into $RNW_ASSETS_DIR and builds nothing, so
-      # $RNW_OUTPUT_DIR is one level above the binaries there.
+      ENV['WORKFLOWS_ASSETS_DIR'] = assets
+      ENV['WORKFLOWS_OUTPUT_DIR'] = dir
+      # The publish job downloads into $WORKFLOWS_ASSETS_DIR and builds nothing, so
+      # $WORKFLOWS_OUTPUT_DIR is one level above the binaries there.
       assert_equal assets, artifact_dir('ios')
       assert_equal dir, output_dir('ios')
     end
@@ -459,18 +459,18 @@ class LanesTest < Minitest::Test
 
   def test_artifact_dir_falls_back_to_the_output_dir_when_nothing_was_downloaded
     Dir.mktmpdir do |dir|
-      ENV['RNW_ASSETS_DIR'] = File.join(dir, 'never-created')
-      ENV['RNW_OUTPUT_DIR'] = dir
+      ENV['WORKFLOWS_ASSETS_DIR'] = File.join(dir, 'never-created')
+      ENV['WORKFLOWS_OUTPUT_DIR'] = dir
       assert_equal dir, artifact_dir('android')
 
-      ENV.delete('RNW_ASSETS_DIR')
+      ENV.delete('WORKFLOWS_ASSETS_DIR')
       assert_equal dir, artifact_dir('android')
     end
   end
 
   def test_artifact_dir_falls_all_the_way_back_to_the_default_output_dir
-    ENV.delete('RNW_ASSETS_DIR')
-    ENV.delete('RNW_OUTPUT_DIR')
+    ENV.delete('WORKFLOWS_ASSETS_DIR')
+    ENV.delete('WORKFLOWS_OUTPUT_DIR')
     assert_equal root_path('artifacts', 'ios'), artifact_dir('ios')
   end
 
@@ -642,7 +642,7 @@ class LaneBehaviourTest < Minitest::Test
 
   # Env keys a test must not inherit from the shell that ran the suite.
   CLEARED_ENV = %w[
-    DRY_RUN RNW_OUTPUT_DIR RNW_ASSETS_DIR STORE_NOTES_JSON PLAY_ROLLOUT PLAY_UPDATE_PRIORITY
+    DRY_RUN WORKFLOWS_OUTPUT_DIR WORKFLOWS_ASSETS_DIR STORE_NOTES_JSON PLAY_ROLLOUT PLAY_UPDATE_PRIORITY
     IOS_PHASED_RELEASE PLAY_SERVICE_ACCOUNT_JSON_PATH BUNDLETOOL_JAR CI
     APP_REVIEW_FIRST_NAME APP_REVIEW_LAST_NAME APP_REVIEW_PHONE APP_REVIEW_EMAIL
     APP_REVIEW_DEMO_USER APP_REVIEW_DEMO_PASSWORD APP_REVIEW_NOTES
@@ -805,16 +805,16 @@ class LaneBehaviourTest < Minitest::Test
   end
 
   # The publish job never builds: `fastlane-lane.yml` downloads the build job's
-  # artifacts into $RNW_ASSETS_DIR, one level *below* $RNW_OUTPUT_DIR. Reading
+  # artifacts into $WORKFLOWS_ASSETS_DIR, one level *below* $WORKFLOWS_OUTPUT_DIR. Reading
   # the output directory here handed pilot a path with no ipa at it, on every
   # single run.
   def test_ios_upload_internal_reads_the_ipa_from_the_download_directory
     in_project do |dir|
-      assets = File.join(dir, 'rnw-out', 'assets')
+      assets = File.join(dir, 'workflows-out', 'assets')
       FileUtils.mkdir_p(assets)
       File.write(File.join(assets, 'App.ipa'), 'ipa')
-      ENV['RNW_OUTPUT_DIR'] = File.join(dir, 'rnw-out')
-      ENV['RNW_ASSETS_DIR'] = assets
+      ENV['WORKFLOWS_OUTPUT_DIR'] = File.join(dir, 'workflows-out')
+      ENV['WORKFLOWS_ASSETS_DIR'] = assets
       stub_result(:latest_testflight_build_number, 41)
       run_lane(:ios, :upload_internal)
 
@@ -824,7 +824,7 @@ class LaneBehaviourTest < Minitest::Test
 
   def test_ios_upload_internal_lets_an_explicit_ipa_win_over_both_directories
     in_project do |dir|
-      ENV['RNW_ASSETS_DIR'] = dir
+      ENV['WORKFLOWS_ASSETS_DIR'] = dir
       stub_result(:latest_testflight_build_number, 41)
       run_lane(:ios, :upload_internal, ipa: '/somewhere/else/App.ipa')
 
@@ -978,12 +978,12 @@ class LaneBehaviourTest < Minitest::Test
 
   def test_android_upload_internal_reads_the_aab_and_mapping_from_the_download_directory
     in_project do |dir|
-      assets = File.join(dir, 'rnw-out', 'assets')
+      assets = File.join(dir, 'workflows-out', 'assets')
       FileUtils.mkdir_p(assets)
       File.write(File.join(assets, 'app-release.aab'), 'aab')
       File.write(File.join(assets, 'mapping.txt'), 'mapping')
-      ENV['RNW_OUTPUT_DIR'] = File.join(dir, 'rnw-out')
-      ENV['RNW_ASSETS_DIR'] = assets
+      ENV['WORKFLOWS_OUTPUT_DIR'] = File.join(dir, 'workflows-out')
+      ENV['WORKFLOWS_ASSETS_DIR'] = assets
       stub_result(:google_play_track_version_codes, [41])
       run_lane(:android, :upload_internal)
 
@@ -995,7 +995,7 @@ class LaneBehaviourTest < Minitest::Test
 
   def test_android_upload_internal_lets_an_explicit_aab_win_over_both_directories
     in_project do |dir|
-      ENV['RNW_ASSETS_DIR'] = dir
+      ENV['WORKFLOWS_ASSETS_DIR'] = dir
       stub_result(:google_play_track_version_codes, [41])
       run_lane(:android, :upload_internal, aab: '/somewhere/else/app-release.aab')
 

@@ -97,7 +97,7 @@ modules/*/android/.cxx/
 !/fastlane/metadata/android/*/images/.gitkeep
 
 # Release artifacts. `artifacts/` is where the lanes write by default, but
-# RNW_OUTPUT_DIR can point anywhere, so the shapes are ignored by extension too.
+# WORKFLOWS_OUTPUT_DIR can point anywhere, so the shapes are ignored by extension too.
 /artifacts
 *.aab
 *.apk
@@ -107,7 +107,7 @@ modules/*/android/.cxx/
 mapping.txt
 
 # react-native-workflows self-checkout (also added to .git/info/exclude by its setup action)
-/.rnw
+/.workflows
 
 # Per-machine lefthook overrides (see CONTRIBUTING.md)
 /lefthook-local.yml

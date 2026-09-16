@@ -11,6 +11,7 @@
 // CI asks for exist, and that each is at least as strict as the implementation
 // it displaced.
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test, { describe } from 'node:test';
@@ -88,6 +89,44 @@ describe('the drift-detecting gates catch an untracked file', () => {
       );
     });
   }
+});
+
+// The family's variables were prefixed with the initials of the workflows
+// repo's name, and its self-checkout landed in a directory named the same way.
+// A reader meeting those in their own app repo had no way to recover the
+// expansion. They are spelled out now, and the absence of the old form is
+// asserted rather than assumed: the rename touched ~1300 occurrences across two
+// repos, which is more than review catches, and a half-finished rename reads
+// worse than either name would alone.
+//
+// The old spelling is built from fragments here so this file does not trip its
+// own check - a test that reads its own explanation as a violation is a false
+// positive waiting to happen.
+test('no trace of the old abbreviated namespace survives', () => {
+  const legacy = ['R', 'N', 'W'].join('');
+  const tracked = execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8' })
+    .split('\n')
+    .filter(Boolean)
+    // Archives are dated records of what was planned at the time; rewriting
+    // them to match today's names would make them lie about their own past.
+    .filter((f) => !f.startsWith('docs/superpowers/'))
+    // Lock file integrity hashes contain the letters by coincidence.
+    .filter((f) => f !== 'pnpm-lock.yaml')
+    .filter((f) => f !== 'scripts/gates.test.mjs');
+
+  const offenders = [];
+  for (const file of tracked) {
+    let src;
+    try {
+      src = readFileSync(path.join(root, file), 'utf8');
+    } catch {
+      continue; // a path that is not a readable text file
+    }
+    if (src.includes(`${legacy}_`) || src.includes(`.${legacy.toLowerCase()}`)) {
+      offenders.push(file);
+    }
+  }
+  assert.deepEqual(offenders, [], `these still carry the old prefix: ${offenders.join(', ')}`);
 });
 
 test('shellcheck.sh walks the tree instead of globbing to a fixed depth', () => {

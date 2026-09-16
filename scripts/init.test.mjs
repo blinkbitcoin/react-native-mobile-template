@@ -461,7 +461,7 @@ describe('the manifest', () => {
 // are full of the very tokens the scan asserts on.
 const SKIP_PREFIXES = ['docs/superpowers/', '.superpowers/'];
 // Skipped wherever they appear when walking the result.
-const SKIP_ANYWHERE = new Set(['node_modules', '.git', '.expo', '.rnw']);
+const SKIP_ANYWHERE = new Set(['node_modules', '.git', '.expo', '.workflows']);
 // Skipped only at the repo root: `ios`/`android` there would be prebuild output,
 // but `modules/hello-native/ios` is source the manifest renames.
 const SKIP_SCAN_AT_ROOT = new Set([

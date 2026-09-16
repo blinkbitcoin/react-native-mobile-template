@@ -47,7 +47,7 @@ function resolve(cwd, env = {}) {
       GITHUB_OUTPUT: '',
       RELEASE_PR_TITLE: '',
       GITHUB_REF_NAME: '',
-      RNW_RELEASE_SCOPE: '',
+      WORKFLOWS_RELEASE_SCOPE: '',
       BUILD_NUMBER_OFFSET: '',
       ...env,
     },
@@ -179,10 +179,10 @@ test('the release scope follows the branch, so releasing from master works', () 
   assert.equal(resolve(repo, { GITHUB_REF_NAME: 'master' }).APP_VERSION, '1.5.0');
 });
 
-test('RNW_RELEASE_SCOPE overrides the branch name', () => {
+test('WORKFLOWS_RELEASE_SCOPE overrides the branch name', () => {
   const repo = fixtureRepo(3, { 1: 'v1.4.2' }, { 3: 'chore(app): release 1.5.0' });
   assert.equal(
-    resolve(repo, { GITHUB_REF_NAME: 'main', RNW_RELEASE_SCOPE: 'app' }).APP_VERSION,
+    resolve(repo, { GITHUB_REF_NAME: 'main', WORKFLOWS_RELEASE_SCOPE: 'app' }).APP_VERSION,
     '1.5.0',
   );
 });

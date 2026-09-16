@@ -180,7 +180,7 @@ barrel cannot lift the number while testing nothing. See `docs/testing.md`.
 ## CI, release and troubleshooting
 
 - CI is four callers into `blinkbitcoin/react-native-workflows`, pinned by SHA —
-  `docs/ci.md` maps each `make` target to its CI job and explains `.rnw/`.
+  `docs/ci.md` maps each `make` target to its CI job and explains `.workflows/`.
 - Releases (versions, build numbers, store notes, environments, rollback,
   hotfix): `docs/release-runbook.md`. Over-the-air updates and the channel
   model: `docs/ota.md`.

@@ -125,7 +125,7 @@ while IFS= read -r p; do
   filters+=("exclude:$p")
   # A directory also needs the subtree; a file-shaped pattern does not, and
   # `exclude:.../messages.ts/**` can never match anything. The leading-dot test
-  # keeps `.rnw` and `.codeql` on the directory side.
+  # keeps `.workflows` and `.codeql` on the directory side.
   case "${p##*/}" in
     ?*.?*) ;;
     *) filters+=("exclude:$p/**") ;;

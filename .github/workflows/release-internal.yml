@@ -72,7 +72,7 @@ jobs:
       build-number: ${{ needs.prepare.outputs.build-number }}
       stage: internal
       xcode: ${{ vars.XCODE_VERSION }}
-      macos-runner: ${{ vars.RNW_MACOS_RUNNER || 'macos-26' }}
+      macos-runner: ${{ vars.WORKFLOWS_MACOS_RUNNER || 'macos-26' }}
       # All five Fastfile contract variables are asserted in `before_all` for
       # every lane on both platforms, so the Android id is required here too.
       ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
@@ -141,9 +141,9 @@ jobs:
       lane: upload_internal
       # Transporter (the upload path pilot/upload_to_testflight uses) only
       # ships on macOS, so this lane cannot run on ubuntu.
-      runner: ${{ vars.RNW_MACOS_RUNNER || 'macos-26' }}
+      runner: ${{ vars.WORKFLOWS_MACOS_RUNNER || 'macos-26' }}
       environment: internal
-      # `*` merges every artifact this run produced into $RNW_ASSETS_DIR, which
+      # `*` merges every artifact this run produced into $WORKFLOWS_ASSETS_DIR, which
       # is where the lane looks for <IOS_SCHEME>.ipa (gym's `output_name`),
       # build-info.json and the notes — `artifact_dir` in shared.rb prefers that
       # directory over the build output directory for exactly this reason.

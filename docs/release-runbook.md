@@ -121,7 +121,7 @@ and takes Play to 100%. `action: halt` stops both. See
   - `<scope>` is the **release branch's name**, because that is what
     release-please scopes its commit with: `chore(main)` on `main`,
     `chore(master)` on `master`. It comes from `$GITHUB_REF_NAME`, falling back
-    to `main` outside Actions, and `RNW_RELEASE_SCOPE` overrides it if your
+    to `main` outside Actions, and `WORKFLOWS_RELEASE_SCOPE` overrides it if your
     `release-please-config.json` uses a scope that is not the branch name. It
     used to be hardcoded to `main`, so releasing from any other branch matched
     nothing and fell through to the patch bump below — a wrong version on a real
@@ -234,7 +234,7 @@ anyone who can see the run. Credentials go in `secrets:` instead.
 | `ANDROID_PACKAGE` | every build and lane job | Play application id |
 | `XCODE_VERSION` | `release-internal` iOS build | A version installed on the runner image, e.g. `26.0`; sets `DEVELOPER_DIR` |
 | `BUILD_NUMBER_OFFSET` | every `expo-prepare` call | Integer, default `1000`. Raise only |
-| `RNW_MACOS_RUNNER` | iOS build + iOS internal upload | Runner label, default `macos-26` |
+| `WORKFLOWS_MACOS_RUNNER` | iOS build + iOS internal upload | Runner label, default `macos-26` |
 | `TESTFLIGHT_INTERNAL_GROUP` | `release-internal` iOS upload | Group name in App Store Connect → TestFlight |
 | `TESTFLIGHT_EXTERNAL_GROUP` | `release-beta` iOS promote | External group name; must already exist and be approved |
 | `PLAY_UPDATE_PRIORITY` | Android upload / production | `0`–`5`, Play in-app update priority |
@@ -419,7 +419,7 @@ with `artifacts.apkSha256` in `build-info.json`.
 That last one is no longer a permanent `skip`: the `android build` lane now
 records `artifacts.aabSha256` and `artifacts.apkSha256` (the AAB it produced and
 the universal APK extracted from that same bundle) into a **copy** of
-build-info.json written to `$RNW_OUTPUT_DIR/build-info.json`, next to the
+build-info.json written to `$WORKFLOWS_OUTPUT_DIR/build-info.json`, next to the
 artifacts. That copy is the gate's default source; `BUILD_INFO_FILE` overrides
 it. CI currently sets `BUILD_INFO_FILE` to the `release-meta` copy, which the
 build lane does not touch, so the check reports `skip` in the build job until

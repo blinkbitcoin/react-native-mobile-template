@@ -17,7 +17,7 @@ LOCKFILE=pnpm-lock.yaml
 # split on whitespace into an array once and run from there -- no globbing, no
 # re-splitting at call time -- so the contract is "words", not a quoted path:
 # an argument containing a space needs a wrapper script instead.
-read -ra install_cmd <<<"${RNW_INSTALL_CMD:-pnpm install --frozen-lockfile}"
+read -ra install_cmd <<<"${WORKFLOWS_INSTALL_CMD:-pnpm install --frozen-lockfile}"
 
 hook=${1:-}
 shift || true

@@ -13,7 +13,7 @@ export default defineConfig([
     'dist/**',
     'coverage/**',
     'vendor/bundle/**', // Ruby gems installed by `bundle install` (fastlane, cocoapods)
-    '.rnw/**',
+    '.workflows/**',
     'src/graphql/generated/**',
     'src/i18n/locales/**/messages.ts',
   ]),

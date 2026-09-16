@@ -19,7 +19,7 @@ running app and never restart it.
 - `scripts/e2e/maestro-ios.sh` — `xcrun simctl openurl booted
   "$SCHEME://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081"`,
   then `maestro test .maestro`; `maestro-android.sh` is the `adb` equivalent,
-  and CI does the same once per run via `$RNW/scripts/e2e/app-launch.sh`.
+  and CI does the same once per run via `$WORKFLOWS_DIR/scripts/e2e/app-launch.sh`.
 - `.maestro/flows/00-launch.yaml` — `launchApp: stopApp: false`, no
   `clearState`, `extendedWaitUntil` on `home-screen` (Maestro 2.x has no
   `timeout` on `assertVisible`); its launcher and LogBox taps are optional.

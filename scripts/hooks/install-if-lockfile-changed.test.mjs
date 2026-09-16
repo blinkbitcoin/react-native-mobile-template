@@ -21,7 +21,7 @@ function hook(...args) {
     cwd: repo,
     encoding: 'utf8',
     // The install itself is the one thing a unit test must not do.
-    env: { ...process.env, RNW_INSTALL_CMD: 'echo INSTALLED' },
+    env: { ...process.env, WORKFLOWS_INSTALL_CMD: 'echo INSTALLED' },
   });
 }
 

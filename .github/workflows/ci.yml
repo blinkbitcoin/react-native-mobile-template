@@ -41,7 +41,7 @@ jobs:
       # E2E_IOS=true for every run, or label a single PR `e2e:ios` (the
       # `labeled` trigger above is what makes the label alone start a run).
       ios: ${{ vars.E2E_IOS == 'true' || contains(github.event.pull_request.labels.*.name, 'e2e:ios') }}
-      macos-runner: ${{ vars.RNW_MACOS_RUNNER || 'macos-26' }}
+      macos-runner: ${{ vars.WORKFLOWS_MACOS_RUNNER || 'macos-26' }}
       dev-client: true
       e2e-setup-script: scripts/e2e/ci-mock-api-up.sh
       e2e-teardown-script: scripts/e2e/ci-mock-api-down.sh

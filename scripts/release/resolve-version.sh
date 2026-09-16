@@ -30,9 +30,9 @@ build=$((count + offset))
 # subject on `main` is `chore(main): release 1.2.0` and on `master` it is
 # `chore(master): release 1.2.0`. Hardcoding `main` meant releasing from any other
 # branch matched nothing here and fell through to the patch bump below, stamping
-# a wrong version on a real release with no error. RNW_RELEASE_SCOPE overrides the
+# a wrong version on a real release with no error. WORKFLOWS_RELEASE_SCOPE overrides the
 # branch name for a release-please config whose scope is not the branch.
-release_scope="${RNW_RELEASE_SCOPE:-${GITHUB_REF_NAME:-main}}"
+release_scope="${WORKFLOWS_RELEASE_SCOPE:-${GITHUB_REF_NAME:-main}}"
 release_prefix="chore($release_scope): release "
 
 # The subject of the release commit, if HEAD is one. `HEAD` covers a squash or

@@ -217,29 +217,29 @@ end
 # Where build artifacts land. CI overrides it so the upload job finds the same
 # paths the build job wrote, without either side hard-coding the other's layout.
 def output_dir(platform)
-  dir = ENV['RNW_OUTPUT_DIR'].to_s.strip
+  dir = ENV['WORKFLOWS_OUTPUT_DIR'].to_s.strip
   return root_path('artifacts', platform.to_s) if dir.empty?
 
   File.absolute_path?(dir) ? dir : root_path(dir)
 end
 
 # The directory a lane *reads* a finished artifact from, which is not the one
-# it would write to. A build job archives into $RNW_OUTPUT_DIR; a publish job
+# it would write to. A build job archives into $WORKFLOWS_OUTPUT_DIR; a publish job
 # never builds anything -- it downloads the build job's artifacts into
-# $RNW_ASSETS_DIR and uploads from there. Reading $RNW_OUTPUT_DIR in a publish
+# $WORKFLOWS_ASSETS_DIR and uploads from there. Reading $WORKFLOWS_OUTPUT_DIR in a publish
 # job pointed the upload lanes one directory above the binaries, which failed
 # the very first store stage of every run.
 #
 # Precedence, highest first:
 #   1. the lane's own `ipa:` / `aab:` / `apk:` option (handled at the call site)
-#   2. $RNW_ASSETS_DIR   -- the download directory in a publish job
-#   3. $RNW_OUTPUT_DIR   -- the build output directory (via output_dir)
+#   2. $WORKFLOWS_ASSETS_DIR   -- the download directory in a publish job
+#   3. $WORKFLOWS_OUTPUT_DIR   -- the build output directory (via output_dir)
 #
-# A set-but-missing $RNW_ASSETS_DIR falls through rather than failing here: it
+# A set-but-missing $WORKFLOWS_ASSETS_DIR falls through rather than failing here: it
 # means nothing was downloaded, and `output_dir` is then the honest answer for
 # a lane run on a laptop with a stale variable in its shell.
 def artifact_dir(platform)
-  assets = ENV['RNW_ASSETS_DIR'].to_s.strip
+  assets = ENV['WORKFLOWS_ASSETS_DIR'].to_s.strip
   return assets if !assets.empty? && Dir.exist?(assets)
 
   output_dir(platform)
