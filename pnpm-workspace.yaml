@@ -16,6 +16,22 @@ minimumReleaseAgeExclude:
   # `expo install expo-router ...` on 2026-09-06, within the 3-day window above.
   - 'expo-router@57.0.19'
   - '@expo/ui@57.0.16'
+# NOT excluded, on purpose, and this is the recurring case worth naming:
+# `expo install --check` (and expo-doctor's version check, which CI runs) demand
+# whatever patch the SDK currently expects, while the guard above refuses
+# anything younger than three days. Expo patches a dozen packages more often
+# than that, so the two are in permanent, low-grade tension.
+#
+# On 2026-09-16 that left `expo` at 57.0.20 against an expected ~57.0.23
+# published 2026-09-15 - one day old. The other eleven drifted packages were
+# 5.2 days old and were bumped; this one matures 2026-09-18 and is a one-line
+# `pnpm add expo@~57.0.23` then. Until it is done, expo-doctor fails that single
+# check and CI is red on it.
+#
+# Excluding it here would make CI green today. That is exactly the trade the
+# image-size note below refuses, for the same reason: a guard waived whenever it
+# is inconvenient is not a guard. Two days of a red check that names its own
+# cause is the cheaper cost.
 strictDepBuilds: true
 onlyBuiltDependencies:
   - '@biomejs/biome'
