@@ -38,7 +38,19 @@ function resolve(cwd, env = {}) {
     encoding: 'utf8',
     // A stray GH_TOKEN/GITHUB_OUTPUT in the ambient environment would make the
     // script hit the network or append to a real file, so both are cleared.
-    env: { ...process.env, GH_TOKEN: '', GITHUB_OUTPUT: '', RELEASE_PR_TITLE: '', ...env },
+    // GITHUB_REF_NAME is cleared for a sharper reason: it is always set inside
+    // GitHub Actions, it seeds the release scope, and leaving it ambient would
+    // make every `chore(main)` fixture below pass locally and fail in CI.
+    env: {
+      ...process.env,
+      GH_TOKEN: '',
+      GITHUB_OUTPUT: '',
+      RELEASE_PR_TITLE: '',
+      GITHUB_REF_NAME: '',
+      RNW_RELEASE_SCOPE: '',
+      BUILD_NUMBER_OFFSET: '',
+      ...env,
+    },
   });
   return Object.fromEntries(
     stdout
@@ -157,6 +169,41 @@ test('an ordinary commit subject does not look like a release', () => {
     const repo = fixtureRepo(2, { 1: 'v1.4.2' }, { 2: subject });
     assert.equal(resolve(repo).APP_VERSION, '1.4.3', `subject ${subject} was read as a release`);
   }
+});
+
+test('the release scope follows the branch, so releasing from master works', () => {
+  // release-please scopes the release commit with the release branch's name.
+  // With `main` hardcoded, this matched nothing and fell through to the patch
+  // bump -- 1.4.3 stamped on what is really the 1.5.0 release.
+  const repo = fixtureRepo(3, { 1: 'v1.4.2' }, { 3: 'chore(master): release 1.5.0' });
+  assert.equal(resolve(repo, { GITHUB_REF_NAME: 'master' }).APP_VERSION, '1.5.0');
+});
+
+test('RNW_RELEASE_SCOPE overrides the branch name', () => {
+  const repo = fixtureRepo(3, { 1: 'v1.4.2' }, { 3: 'chore(app): release 1.5.0' });
+  assert.equal(
+    resolve(repo, { GITHUB_REF_NAME: 'main', RNW_RELEASE_SCOPE: 'app' }).APP_VERSION,
+    '1.5.0',
+  );
+});
+
+test("a release commit scoped to another branch is not this branch's release", () => {
+  const repo = fixtureRepo(3, { 1: 'v1.4.2' }, { 3: 'chore(master): release 1.5.0' });
+  assert.equal(resolve(repo, { GITHUB_REF_NAME: 'main' }).APP_VERSION, '1.4.3');
+});
+
+test('a scope containing a slash is matched literally, not as a regex', () => {
+  const repo = fixtureRepo(3, { 1: 'v1.4.2' }, { 3: 'chore(release/v1): release 1.5.0' });
+  assert.equal(resolve(repo, { GITHUB_REF_NAME: 'release/v1' }).APP_VERSION, '1.5.0');
+});
+
+test('a non-numeric BUILD_NUMBER_OFFSET fails instead of counting as zero', () => {
+  // bash reads `abc` as 0, which makes the build number go backwards and the
+  // store reject the upload with a message that names nothing here.
+  assert.throws(
+    () => resolve(fixtureRepo(2), { BUILD_NUMBER_OFFSET: 'abc' }),
+    /BUILD_NUMBER_OFFSET must be a non-negative integer/,
+  );
 });
 
 test('build number is the first-parent commit count plus the default offset', () => {

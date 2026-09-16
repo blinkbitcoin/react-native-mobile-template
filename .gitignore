@@ -72,7 +72,11 @@ modules/*/android/.cxx/
 /.maestro/output
 
 # Ruby gems for fastlane/cocoapods (Gemfile.lock is committed, the gems are not)
-/vendor/bundle
+# No trailing path: a git worktree commonly symlinks `vendor` at the bundle the
+# main clone already installed, and `/vendor/bundle` does not match a symlink
+# named `vendor` - the same gap that once let a `node_modules` symlink be
+# committed. Nothing under vendor/ is tracked.
+/vendor
 
 # fastlane run output and local release credentials (never committed).
 # Signing material is covered by the *.jks/*.keystore/*.p8/*.p12/*.key rules

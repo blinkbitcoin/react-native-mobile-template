@@ -57,7 +57,20 @@ env \
 const fs = require("node:fs");
 // A provenance record must say what actually went into the build, so these
 // come from the installed package, not from the range in package.json.
-const installed = (n) => require(`${n}/package.json`).version;
+// A missing package yields null rather than throwing: losing one provenance
+// field is not worth failing a release over, and the copy in
+// react-native-workflows makes the same choice. test/build-info.bats over there
+// pins the two together.
+//
+// No apostrophes in this program: it reaches node inside a single-quoted shell
+// string, and one apostrophe ends that string.
+const installed = (n) => {
+  try {
+    return require(`${n}/package.json`).version ?? null;
+  } catch {
+    return null;
+  }
+};
 fs.writeFileSync(process.env.BUILD_INFO_OUT, `${JSON.stringify({
   sha: process.env.BUILD_INFO_SHA,
   version: process.env.BUILD_INFO_VERSION,
