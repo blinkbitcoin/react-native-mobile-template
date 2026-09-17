@@ -311,7 +311,7 @@ anyone who can see the run. Credentials go in `secrets:` instead.
 | `EXPO_PUBLIC_APP_NAME` | same | **Required for a CI build** (non-empty string) |
 | `EXPO_PUBLIC_WEB_DOMAIN` | same, plus `app.config.ts` universal links | Your web domain; empty disables the associated-domain / intent-filter entries |
 | `EXPO_PUBLIC_ALLOW_INSECURE_WEB_STORAGE` | same | `true`/`false`; the callers substitute `false` when the variable is unset, because `env.ts` rejects an empty string |
-| `E2E_IOS` | `ci.yml` | `true` runs iOS E2E on every push (macOS runners bill at 10x) |
+| `E2E_IOS` | `ci.yml` | `true` runs iOS E2E on every push.<br>Free on a public repo, 10x the Linux rate on a private one |
 
 `APP_VARIANT` is not a repo variable: the callers hard-code
 `"APP_VARIANT":"production"` in `build-env` for every release job. Without it
