@@ -31,6 +31,23 @@ tags: [smoke]
 - tapOn:
     text: '^Continue$'
     optional: true
+# Continue only dismisses the menu's intro page - it hands over to the dev menu
+# proper (Reload / Go home / TOOLS), which is still a sheet over the app. That
+# close was written, but only inside the launcher branch below, so it never ran
+# here: the first fix tapped Continue and then waited 90s on a menu it had just
+# paged forward. Close it the same way the branch below does.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: 'xmark'
+          optional: true
 - runFlow:
     when:
       visible:
