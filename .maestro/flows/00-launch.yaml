@@ -22,6 +22,15 @@ tags: [smoke]
 - tapOn:
     text: 'Dismiss'
     optional: true
+# The developer menu, not the launcher. expo-dev-client opens it by itself the
+# first time a given build runs, which on a fresh emulator is every CI run, and
+# it is a sheet over the app: Home renders fine underneath but `home-screen` is
+# not visible, so the whole suite failed on a working app. The launcher branch
+# below also taps Continue, but only when DEVELOPMENT SERVERS is on screen -
+# a different screen from this one, so it never fired here.
+- tapOn:
+    text: '^Continue$'
+    optional: true
 - runFlow:
     when:
       visible:
