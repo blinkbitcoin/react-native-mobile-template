@@ -21,7 +21,7 @@
     "@graphql-typed-document-node/core": "^3.2.0",
     "@lingui/core": "^6.6.0",
     "@lingui/react": "^6.6.0",
-    "expo": "~57.0.20",
+    "expo": "~57.0.23",
     "expo-constants": "~57.0.18",
     "expo-dev-client": "~57.0.19",
     "expo-font": "~57.0.4",
