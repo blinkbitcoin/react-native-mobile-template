@@ -42,7 +42,7 @@ jobs:
     # times the rate when iOS is on - to learn what unit already knew.
     needs: [checks, unit]
     if: ${{ needs.checks.outputs.docs-only != 'true' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/e2e.yml@7a491d13a293503f8caec1687fb410ec8b84adba
+    uses: blinkbitcoin/shared-workflows/.github/workflows/e2e.yml@e61c6b11630509af661d5b0671ce0bd5183e4942
     with:
       # iOS is opt-in (macOS runners bill at 10x): set the repo variable
       # E2E_IOS=true for every run, or label a single PR `e2e:ios` (the
