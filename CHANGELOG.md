@@ -5,6 +5,14 @@ by [release-please](https://github.com/googleapis/release-please) from
 [Conventional Commits](https://www.conventionalcommits.org/) — edit the commit
 messages, not this file. See [docs/release-runbook.md](docs/release-runbook.md).
 
+## [0.2.1](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.2.0...v0.2.1) (2026-09-17)
+
+
+### Bug Fixes
+
+* **ci:** grant CodeQL the permissions its analyze job asks for ([da8dcdb](https://github.com/blinkbitcoin/react-native-mobile-template/commit/da8dcdbad2519cc6f9efb88155ea3c8931abca02))
+* **docs:** make the mermaid gate render on CI instead of warning ([#5](https://github.com/blinkbitcoin/react-native-mobile-template/issues/5)) ([58a33a4](https://github.com/blinkbitcoin/react-native-mobile-template/commit/58a33a4bbe3c6847ca37231323b734c296ddbdb5))
+
 ## [0.2.0](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.1.0...v0.2.0) (2026-09-16)
 
 
