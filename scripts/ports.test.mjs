@@ -7,12 +7,12 @@ import { fileURLToPath } from 'node:url';
 import {
   BASE_DEFAULT,
   BASE_VAR,
-  SERVICES,
   baseFrom,
   envLines,
   mockApiUrl,
   portFrom,
   resolvePorts,
+  SERVICES,
 } from './ports.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -160,6 +160,22 @@ for (const file of ['.env.development', '.env.example']) {
   });
 }
 
+// The one place the URL has to be a literal. The iOS E2E app is a Release
+// build, so it embeds EXPO_PUBLIC_API_URL when the bundle is written - in a
+// job that runs before, and on a different runner from, the one that starts
+// the mock API. Nothing sets APP_PORT_BASE on a runner, so the default is what
+// the mock API will listen on; this test is what keeps the two in step if the
+// default ever moves.
+test('ci.yml builds the iOS E2E app against the default mock API port', () => {
+  const ci = read('.github/workflows/ci.yml');
+  const url = mockApiUrl(resolvePorts({}).mockApi);
+  assert.match(
+    ci,
+    new RegExp(`^\\s*build-env: '\\{"EXPO_PUBLIC_API_URL":"${url}"\\}'$`, 'm'),
+    `ci.yml must pass build-env with EXPO_PUBLIC_API_URL=${url}`,
+  );
+});
+
 // ---------------------------------------------------------------------------
 // The consumers derive rather than freeze
 // ---------------------------------------------------------------------------
@@ -236,6 +252,10 @@ const ALLOWED = [
   ['docs/decisions/', 'ADRs record what was true when they were accepted'],
   ['docs/superpowers/', 'archived plans and specs, not live documentation'],
   ['CHANGELOG.md', 'generated release history'],
+  [
+    '.github/workflows/ci.yml',
+    'the iOS E2E build-env URL, which must be a literal (the build job precedes the mock API job, on another runner) and is pinned above',
+  ],
 ];
 
 const allowed = (file) => ALLOWED.some(([prefix]) => file === prefix || file.startsWith(prefix));
