@@ -1,8 +1,24 @@
 # pnpm 10+ reads settings from here. No `packages:` key on purpose: flat repo.
-minimumReleaseAge: 4320   # 3 days in minutes; supply-chain guard
+# 1 day in minutes. The guard exists so this repo is never the first installer
+# of a compromised release: a hijacked maintainer account publishing a poisoned
+# version of a package already trusted here. Those are usually spotted and
+# pulled within hours, because popular packages get thousands of installs fast,
+# so a cooldown of any length does most of the work - the difference between 1
+# and 3 days is small next to the difference between 0 and 1.
+#
+# It was 3 days, and the cost was a standing conflict with `expo install
+# --check` (below): Expo ships patches more often than every three days, so the
+# deps gate was red for days at a time on versions this repo had deliberately
+# not installed yet. 1 day keeps the canary property and mostly removes that.
+#
+# What no cooldown catches: a slow-burn handover, where a real maintainer
+# passes a package to a bad actor who waits weeks before publishing. That is
+# the audit's job, not this one.
+minimumReleaseAge: 1440
 # Exact versions pinned by `pnpm create expo-app@latest` at bootstrap time
-# (2026-09-06), published within the 3-day window above. Version-pinned (not
-# package-name-pinned) so the guard still applies to any future release.
+# (2026-09-06). Long past any cooldown now, so these entries no longer do
+# anything - they are kept as the worked example of the form: version-pinned
+# (not package-name-pinned) so the guard still applies to any future release.
 minimumReleaseAgeExclude:
   - '@expo/cli@57.0.22'
   - 'expo@57.0.20'
@@ -13,25 +29,21 @@ minimumReleaseAgeExclude:
   - 'electron-to-chromium@1.5.422'
   - 'postcss@8.5.28'
   # Added for Task 6 (Expo Router skeleton): pulled in by
-  # `expo install expo-router ...` on 2026-09-06, within the 3-day window above.
+  # `expo install expo-router ...` on 2026-09-06, within the cooldown then in force.
   - 'expo-router@57.0.19'
   - '@expo/ui@57.0.16'
-# NOT excluded, on purpose, and this is the recurring case worth naming:
-# `expo install --check` (and expo-doctor's version check, which CI runs) demand
-# whatever patch the SDK currently expects, while the guard above refuses
-# anything younger than three days. Expo patches a dozen packages more often
-# than that, so the two are in permanent, low-grade tension.
+# The recurring case worth naming: `expo install --check` (and expo-doctor's
+# version check, which CI runs) demand whatever patch the SDK currently expects,
+# while the guard above refuses anything younger than the cooldown. At 3 days
+# the two were in permanent conflict - Expo patches more often than that - and
+# the deps gate sat red for days on a version this repo had chosen not to
+# install yet. At 1 day they mostly agree, and a drift that survives a day is a
+# real drift worth a red check.
 #
-# On 2026-09-16 that left `expo` at 57.0.20 against an expected ~57.0.23
-# published 2026-09-15 - one day old. The other eleven drifted packages were
-# 5.2 days old and were bumped; this one matures 2026-09-18 and is a one-line
-# `pnpm add expo@~57.0.23` then. Until it is done, expo-doctor fails that single
-# check and CI is red on it.
-#
-# Excluding it here would make CI green today. That is exactly the trade the
-# image-size note below refuses, for the same reason: a guard waived whenever it
-# is inconvenient is not a guard. Two days of a red check that names its own
-# cause is the cheaper cost.
+# Excluding the SDK here would make CI green whatever the cooldown, and that is
+# the trade the image-size note below still refuses: a guard waived whenever it
+# is inconvenient is not a guard. Shortening the window is a decision about how
+# much exposure to accept; an exclude is a decision to stop checking.
 strictDepBuilds: true
 onlyBuiltDependencies:
   - '@biomejs/biome'

@@ -211,7 +211,7 @@ commits already passed the hook once.
 | `Watchman` errors, or file changes are not picked up | `watchman watch-del-all`, then restart Metro. `make doctor` checks watchman is installed |
 | iOS build fails on a pod that was just added | `make prebuild`, which reruns pod install, or delete `ios/` and let `make ios` regenerate it |
 | `expo-doctor` complains about a package version | `pnpm expo install --check` is the fix path. `make check-deps` runs both.<br>Genuine exceptions go in `expo.install.exclude` in `package.json` |
-| A `pnpm install` fails on a package that is too new | `minimumReleaseAge` in `pnpm-workspace.yaml` is 3 days.<br>Wait, or add an exact `name@version` entry to `minimumReleaseAgeExclude` with a comment saying why |
+| A `pnpm install` fails on a package that is too new | `minimumReleaseAge` in `pnpm-workspace.yaml` is 1 day.<br>Wait, or add an exact `name@version` entry to `minimumReleaseAgeExclude` with a comment saying why |
 | `Cannot find native module 'HelloNative'` | You are on web or in Expo Go. Build a dev client: `make ios` or `make android` |
 | The app cannot reach the API on Android | The emulator needs `10.0.2.2`. See above |
 | The dev client sits on its launcher screen | Open the `expo-development-client` deep link. See above |
