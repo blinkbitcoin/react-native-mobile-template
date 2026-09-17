@@ -1170,6 +1170,12 @@ class LaneBehaviourTest < Minitest::Test
     out = File.join(dir, 'android', 'app', 'build', 'outputs', 'bundle', 'release')
     FileUtils.mkdir_p(out)
     File.write(File.join(out, 'app-release.aab'), 'aab')
+    # bundletool_command resolves a real binary, which a laptop has from brew
+    # and the Checks / Release runner does not - that job installs no Android
+    # tooling. Same stub the bundletool_*_args tests use.
+    File.write(File.join(dir, 'bundletool'), '#!/bin/sh')
+    FileUtils.chmod(0o755, File.join(dir, 'bundletool'))
+    ENV['PATH'] = dir
   end
 
   # The unsigned android build had no coverage at all - no [:android, :build]
