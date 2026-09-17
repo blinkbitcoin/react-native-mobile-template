@@ -7,12 +7,12 @@
         "path": "app.config.ts",
         "replace": [
           [
-            "process.env.IOS_BUNDLE_ID ?? 'com.example.rnmt'",
-            "process.env.IOS_BUNDLE_ID ?? '{{iosBundleId}}'"
+            "process.env.IOS_BUNDLE_ID || 'com.example.rnmt'",
+            "process.env.IOS_BUNDLE_ID || '{{iosBundleId}}'"
           ],
           [
-            "process.env.ANDROID_PACKAGE ?? 'com.example.rnmt'",
-            "process.env.ANDROID_PACKAGE ?? '{{androidPackage}}'"
+            "process.env.ANDROID_PACKAGE || 'com.example.rnmt'",
+            "process.env.ANDROID_PACKAGE || '{{androidPackage}}'"
           ]
         ]
       },
