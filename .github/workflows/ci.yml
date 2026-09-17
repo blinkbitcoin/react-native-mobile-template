@@ -42,7 +42,7 @@ jobs:
     # times the rate when iOS is on - to learn what unit already knew.
     needs: [checks, unit]
     if: ${{ needs.checks.outputs.docs-only != 'true' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/e2e.yml@181b2969a9f0653e29bd1b278afcf208edc6328b
+    uses: blinkbitcoin/shared-workflows/.github/workflows/e2e.yml@e1546ec98a0698ab51e6ec2a8eff90f89001441e
     with:
       # This repo is public, so standard runners - macOS included - are free
       # and E2E_IOS is set to true: there is no reason to skip the coverage.
