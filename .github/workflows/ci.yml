@@ -42,14 +42,31 @@ jobs:
     # times the rate when iOS is on - to learn what unit already knew.
     needs: [checks, unit]
     if: ${{ needs.checks.outputs.docs-only != 'true' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/e2e.yml@e61c6b11630509af661d5b0671ce0bd5183e4942
+    uses: blinkbitcoin/shared-workflows/.github/workflows/e2e.yml@181b2969a9f0653e29bd1b278afcf208edc6328b
     with:
-      # iOS is opt-in (macOS runners bill at 10x): set the repo variable
-      # E2E_IOS=true for every run, or label a single PR `e2e:ios` (the
-      # `labeled` trigger above is what makes the label alone start a run).
+      # This repo is public, so standard runners - macOS included - are free
+      # and E2E_IOS is set to true: there is no reason to skip the coverage.
+      # An app generated from this template is usually private, where macOS
+      # bills at 10x, which is why the workflow default is still off. Either
+      # way a single PR can opt in with the `e2e:ios` label (the `labeled`
+      # trigger above is what makes the label alone start a run).
       ios: ${{ vars.E2E_IOS == 'true' || contains(github.event.pull_request.labels.*.name, 'e2e:ios') }}
       macos-runner: ${{ vars.WORKFLOWS_MACOS_RUNNER || 'macos-26' }}
+      # Android only. The iOS suite runs a Release build below, which embeds the
+      # bundle and has no dev launcher, so e2e.yml forces dev-client off there.
       dev-client: true
+      # Release, because the Debug/dev-client path never ran twice in a row on a
+      # runner. It needed Metro up, a deep link delivered, an iOS "Open in
+      # <app>?" prompt answered, and a 2000-module bundle fetched over localhost
+      # before the dev client gave up - four things that each have to succeed
+      # every time, and three of which were seen to fail. A Release build needs
+      # none of them: `simctl launch` and the app is running.
+      #
+      # The cost, accepted: the iOS suite no longer exercises the Metro dev
+      # path. That is a development concern, and not something these flows
+      # assert - they check the app's screens, which a Release build shows the
+      # same way. Android still covers the dev-client path.
+      ios-configuration: Release
       e2e-setup-script: scripts/e2e/ci-mock-api-up.sh
       e2e-teardown-script: scripts/e2e/ci-mock-api-down.sh
   badges:
