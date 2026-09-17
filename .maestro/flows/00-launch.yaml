@@ -109,3 +109,32 @@ tags: [smoke]
     visible:
       id: home-screen
     timeout: 90000
+# The first URL a simulator session opens is the slow one, and it is where every
+# iOS deep-link failure so far actually happened - not in the flow that reported
+# it. `simctl openurl` puts up SpringBoard's "Open in <app>?" alert; tapping
+# Open hands the app a UIOpenURLAction, and on a loaded runner that first
+# hand-off was seen to take ~40s (runs 35244165974, 35249261053: the link
+# landed during the *next* flow, pushing Details over Settings). Locally the
+# same binary does it in 40ms, and once the choice has been confirmed iOS
+# stops asking: six consecutive opens produced one alert. So pay the first
+# open here, on a link that is a no-op on Home, inside the flow whose job is
+# to absorb cold costs - and every later openLink is alert-free and immediate.
+# The wait is generous and optional: the alert took up to 9s to appear on CI,
+# and on a suite retry (same boot) it does not appear at all.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - openLink: rnmt://
+      - extendedWaitUntil:
+          visible:
+            text: '^Open$'
+          timeout: 20000
+          optional: true
+      - tapOn:
+          text: '^Open$'
+          optional: true
+      - extendedWaitUntil:
+          visible:
+            id: home-screen
+          timeout: 60000
