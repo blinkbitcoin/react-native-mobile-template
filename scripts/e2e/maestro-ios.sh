@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Local iOS E2E: assumes `make ios` already installed the dev build on a booted
-# simulator and Metro is running (make start). CI uses react-native-workflows.
+# simulator and Metro is running (make start). CI uses shared-workflows.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 # Assigns METRO_PORT, MOCK_API_PORT and the rest from APP_PORT_BASE
@@ -10,7 +10,7 @@ bash scripts/e2e/wait-for-mock-api.sh
 APP_ID="${APP_ID:-com.example.rnmt.dev}"
 SCHEME="${SCHEME:-rnmt}"
 # Foreground the app through the expo-development-client deep link, exactly as
-# react-native-workflows' scripts/e2e/app-launch.sh does. The dev client's own
+# shared-workflows' scripts/e2e/app-launch.sh does. The dev client's own
 # launcher screen discovers Metro over Bonjour, which does not work on a
 # simulator, so the deep link is the only reliable way in; 00-launch.yaml then
 # attaches with `launchApp: stopApp: false`.

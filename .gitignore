@@ -106,7 +106,7 @@ modules/*/android/.cxx/
 *.dSYM.zip
 mapping.txt
 
-# react-native-workflows self-checkout (also added to .git/info/exclude by its setup action)
+# shared-workflows self-checkout (also added to .git/info/exclude by its setup action)
 /.workflows
 
 # Per-machine lefthook overrides (see CONTRIBUTING.md)

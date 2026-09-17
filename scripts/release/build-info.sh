@@ -59,7 +59,7 @@ const fs = require("node:fs");
 // come from the installed package, not from the range in package.json.
 // A missing package yields null rather than throwing: losing one provenance
 // field is not worth failing a release over, and the copy in
-// react-native-workflows makes the same choice. test/build-info.bats over there
+// shared-workflows makes the same choice. test/build-info.bats over there
 // pins the two together.
 //
 // No apostrophes in this program: it reaches node inside a single-quoted shell

@@ -23,7 +23,7 @@ has not been told to trust.
 | typos | 1.50.1 | `make spell` |
 
 `typos` is pinned rather than `latest` so this repo and
-`react-native-workflows` can never disagree about what counts as a typo.
+`shared-workflows` can never disagree about what counts as a typo.
 
 mise's `[env]` block also exports `EXPO_NO_TELEMETRY=1` and `APP_PORT_BASE`
 (see [Ports](#ports)), puts `node_modules/.bin` on `PATH` (so `biome`, `eslint`

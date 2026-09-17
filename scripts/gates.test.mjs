@@ -1,6 +1,6 @@
 // The gates this repo defines and the gates CI runs have to be the same gates.
 //
-// react-native-workflows now prefers this repo's own script for i18n, codegen,
+// shared-workflows now prefers this repo's own script for i18n, codegen,
 // Expo doctor, the audit and the CI linters, falling back to its own only when
 // we ship none (scripts/checks/run-consumer-or.sh over there). That makes these
 // scripts load-bearing in CI, so the properties below are no longer a local
@@ -21,7 +21,7 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const read = (rel) => readFileSync(path.join(root, rel), 'utf8');
 const pkg = JSON.parse(read('package.json'));
 
-// Every script name react-native-workflows' checks.yml and unit.yml ask this
+// Every script name shared-workflows' checks.yml and unit.yml ask this
 // consumer for. Adding a CI step that calls a script we do not ship fails the
 // step with "consumer package.json has no ... script"; this list is the local
 // half of that contract, so the failure arrives in a unit test instead.

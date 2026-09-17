@@ -1,7 +1,7 @@
 # Release runbook
 
 Everything between "a PR is merged" and "users have it". The mechanics live in
-[`blinkbitcoin/react-native-workflows`](https://github.com/blinkbitcoin/react-native-workflows);
+[`blinkbitcoin/shared-workflows`](https://github.com/blinkbitcoin/shared-workflows);
 this repository only ships policy — which workflow runs when, with which inputs.
 
 OTA is documented separately in [ota.md](ota.md).

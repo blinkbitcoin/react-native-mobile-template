@@ -3,7 +3,7 @@
 Expo SDK 57 store-app template (React Native 0.86, expo-router, Apollo, Lingui,
 TypeScript). Continuous Native Generation: `ios/` and `android/` are build
 output, never source. CI lives in a reusable-workflow repo
-(`blinkbitcoin/react-native-workflows`); this repo only pins and calls it.
+(`blinkbitcoin/shared-workflows`); this repo only pins and calls it.
 
 Read this file before touching anything. `make help` is the source of truth for
 commands, and `scripts/check-docs.sh` fails the build if it and the table below
@@ -179,7 +179,7 @@ barrel cannot lift the number while testing nothing. See `docs/testing.md`.
 
 ## CI, release and troubleshooting
 
-- CI is four callers into `blinkbitcoin/react-native-workflows`, pinned by SHA —
+- CI is four callers into `blinkbitcoin/shared-workflows`, pinned by SHA —
   `docs/ci.md` maps each `make` target to its CI job and explains `.workflows/`.
 - Releases (versions, build numbers, store notes, environments, rollback,
   hotfix): `docs/release-runbook.md`. Over-the-air updates and the channel

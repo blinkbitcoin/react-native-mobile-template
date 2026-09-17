@@ -84,7 +84,7 @@ someone applied to an Xcode project two years ago and cannot explain.
 #### CI is a dependency, not a directory
 
 The workflows live in
-[`blinkbitcoin/react-native-workflows`](https://github.com/blinkbitcoin/react-native-workflows),
+[`blinkbitcoin/shared-workflows`](https://github.com/blinkbitcoin/shared-workflows),
 pinned here at `@v0`. What is left in this repo is eleven short files naming
 which ones to run. A fix to the Android emulator boot lands once, for every app
 in the family.
@@ -128,7 +128,7 @@ Not in here, deliberately: `ios/` and `android/`. They are generated.
 ## The pipelines
 
 Eleven workflow files. Each is a thin caller —
-[`react-native-workflows`](https://github.com/blinkbitcoin/react-native-workflows)
+[`shared-workflows`](https://github.com/blinkbitcoin/shared-workflows)
 holds what they actually do. Job names are what the Actions graph shows.
 
 **CI** — on a pull request and on `main`

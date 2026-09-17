@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# E2E setup hook (react-native-workflows `e2e-setup-script`): start the local
+# E2E setup hook (shared-workflows `e2e-setup-script`): start the local
 # GraphQL mock API in the background and wait until it answers.
 # Run from the consumer root by $WORKFLOWS_DIR/scripts/e2e/run-hook.sh.
 set -euo pipefail
@@ -19,7 +19,7 @@ nohup pnpm mock-api >"$log" 2>&1 &
 echo $! >"$pidfile"
 echo "mock-api started (pid $(cat "$pidfile"), port $MOCK_API_PORT, log $log)"
 
-# react-native-workflows' android-emulator.sh reverses $WORKFLOWS_MOCK_API_PORT, which
+# shared-workflows' android-emulator.sh reverses $WORKFLOWS_MOCK_API_PORT, which
 # still defaults to the pre-APP_PORT_BASE 4000; reverse the port the app really
 # calls. No-op on the iOS job (no adb) and idempotent when the emulator already
 # has it. Remove once the workflows repo derives its ports from the same base.

@@ -29,7 +29,7 @@ jobs:
     # A `-build.N` pre-release from release-internal also publishes a `release`
     # event; only a real release may promote.
     if: ${{ github.event_name == 'workflow_dispatch' || !github.event.release.prerelease }}
-    uses: blinkbitcoin/react-native-workflows/.github/workflows/expo-prepare.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/expo-prepare.yml@v0
     permissions:
       contents: read
       # `require-green-workflow` runs `gh run list` against the gated workflow;
@@ -70,7 +70,7 @@ jobs:
     # credentials still runs everything that does not need one.
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' }}
     needs: prepare
-    uses: blinkbitcoin/react-native-workflows/.github/workflows/fastlane-lane.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/fastlane-lane.yml@v0
     permissions:
       contents: read
     with:
@@ -110,7 +110,7 @@ jobs:
     # credentials still runs everything that does not need one.
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' }}
     needs: prepare
-    uses: blinkbitcoin/react-native-workflows/.github/workflows/fastlane-lane.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/fastlane-lane.yml@v0
     permissions:
       contents: read
     with:
@@ -135,7 +135,7 @@ jobs:
     # uses a status function.
     needs: [prepare, promote-ios, promote-android]
     if: ${{ !cancelled() && !failure() }}
-    uses: blinkbitcoin/react-native-workflows/.github/workflows/github-release.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/github-release.yml@v0
     permissions:
       contents: write
     with:
@@ -200,7 +200,7 @@ jobs:
   store-notes:
     name: Append Notes
     needs: [prepare, store-notes-section]
-    uses: blinkbitcoin/react-native-workflows/.github/workflows/github-release.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/github-release.yml@v0
     permissions:
       contents: write
     with:
@@ -218,7 +218,7 @@ jobs:
     name: OTA
     needs: [prepare, github-release]
     if: ${{ vars.OTA_ENABLED == 'true' }}
-    uses: blinkbitcoin/react-native-workflows/.github/workflows/expo-ota-publish.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/expo-ota-publish.yml@v0
     permissions:
       contents: read
     with:

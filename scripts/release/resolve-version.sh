@@ -6,7 +6,7 @@
 #          ("chore(<scope>): release X.Y.Z") → X.Y.Z; else last tag patch+1.
 # Build number: first-parent commit count + BUILD_NUMBER_OFFSET (default 1000).
 #
-# react-native-workflows ships a contract-identical copy of this script;
+# shared-workflows ships a contract-identical copy of this script;
 # test/resolve-version.bats over there compares the two on stdout and on
 # $GITHUB_OUTPUT. Neither copy writes $GITHUB_ENV: resolving a version and
 # publishing it into a CI environment are two jobs, and this copy also runs on a

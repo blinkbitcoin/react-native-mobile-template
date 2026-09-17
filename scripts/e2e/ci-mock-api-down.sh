@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# E2E teardown hook (react-native-workflows `e2e-teardown-script`): stop the
+# E2E teardown hook (shared-workflows `e2e-teardown-script`): stop the
 # mock API started by ci-mock-api-up.sh. Never fails the job it is cleaning up
 # after — teardown runs with `if: always()`, including after a failed suite.
 set -euo pipefail

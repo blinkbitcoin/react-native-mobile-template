@@ -8,7 +8,7 @@ java = "temurin-17"
 ruby = "3.3"
 actionlint = "1.7.12"
 shellcheck = "0.11.0"
-# Pinned, not "latest": react-native-workflows pins the same version, so the two
+# Pinned, not "latest": shared-workflows pins the same version, so the two
 # repos can never disagree about what counts as a typo.
 typos = "1.50.1"
 
