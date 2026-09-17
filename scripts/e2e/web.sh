@@ -7,6 +7,12 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
+# playwright.config.ts reads these rather than importing ports.mjs - Playwright
+# require()s a .ts config, and requiring an ES module throws. Exporting here
+# means the suite works however it is started: `make e2e-web` (which also
+# evaluates this), `pnpm test:e2e:web`, or CI calling the script directly.
+eval "$(node scripts/ports.mjs --sh)"
+
 if [ -n "${PLAYWRIGHT_SKIP_EXPORT:-}" ]; then
   echo "PLAYWRIGHT_SKIP_EXPORT set - testing the existing dist/ export"
 else
