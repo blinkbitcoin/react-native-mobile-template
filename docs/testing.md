@@ -55,6 +55,13 @@ booting React Native:
 | `scripts/release/fingerprint.test.mjs` | The fingerprint and OTA plumbing |
 | `scripts/release/build-info.test.mjs` | The per-build provenance record |
 
+These run in `make ci` (and in CI's Unit job), **not** in `make check`, which
+is the static gates only. The port guard in `scripts/ports.test.mjs` and the
+`make init` manifest coverage live here, so a change that passes `make check`
+can still fail Unit on the runner — and Unit gates E2E, so the E2E run you
+wanted never starts. Run `make ci` before pushing anything that touches
+`scripts/`, the Maestro flows or `ci.yml`.
+
 ## Coverage
 
 `make coverage` enforces **100% of lines, branches, functions and statements**,
@@ -276,6 +283,26 @@ mock API, open the `expo-development-client` deep link (see
    from the mock API.
 5. Do not add `clearState` or restart the app. That throws away the
    deep-linked session and drops the dev client back on its launcher.
+6. Start from the tab bar. The suite runs with `stopApp: false`, so a flow
+   inherits whatever the previous one left on screen, and a pushed screen
+   (Details) covers the tab bar. `runFlow: ../helpers/to-tab-bar.yaml` first,
+   as every tab flow does, or one failure turns into a failure in every flow
+   after it.
+7. Never open the session's first URL. iOS puts up "Open in <app>?" for the
+   first `simctl openurl` of a simulator session and, on a loaded runner, acted
+   on that first link ~40 s late — during the *next* flow. `00-launch` opens
+   `rnmt://` once so every later `openLink` is alert-free and immediate. A flow
+   that opens a URL still waits with `extendedWaitUntil`; see
+   [ADR 0010](decisions/0010-ios-e2e-release-build.md).
+
+### iOS is a Release build in CI
+
+`ci.yml` passes `ios-configuration: Release`: the bundle is embedded, no Metro,
+no dev launcher, no prompt at launch. Two things follow. `EXPO_PUBLIC_*`
+values reach that app only through the `build-env` input — a Release bundle
+resolves `.env.production`, not `.env.development`, and an exported variable
+beats the dotenv file — so `ci.yml` passes the mock API URL explicitly.
+And the iOS suite no longer covers the Metro dev path; Android still does.
 
 ## Playwright
 
@@ -298,6 +325,19 @@ CI uploads named artifacts. Download these from the run summary first:
 | `forensics-android` | the `android` E2E job | Maestro debug tree, emulator recording, Metro log, logcat |
 | `playwright-report` | the web job | The Playwright HTML report with traces and screenshots |
 | `coverage` | the unit job | `coverage/`, uploaded on every run |
+
+`forensics-ios` also carries `ios-unified.log`, the simulator's unified log
+filtered to SpringBoard's alert lifecycle, FrontBoard's scene actions and any
+line naming the app id or scheme. For a deep link that "did nothing", that is
+the file: `Presenting <SBUserNotificationAlert` is the prompt, `url = rnmt://…`
+is the `UIOpenURLAction` reaching the app, and the gap to the next
+navigation-bar layout is where the time went.
+
+A green run is not the same as a green first attempt. The suite is retried
+once on a real failure and the artifact carries the retry; grep the job log
+for `rerunning the suite once`. A first attempt that failed is a flake to
+fix, and the flakes in this suite have all been one event reported by the
+flow it landed on, not the flow that caused it.
 
 Locally the same Maestro debug tree lands in `.maestro/output/`, which is
 gitignored. Full detail in [ci.md](ci.md).

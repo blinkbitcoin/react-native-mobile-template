@@ -15,6 +15,7 @@ checked against the repository rather than believed.
 | [0007](0007-mise-not-nix.md) | `mise` pins the toolchain for humans and CI, not Nix | 2026-09-05 |
 | [0008](0008-release-please-and-store-notes.md) | release-please in manifest mode owns versioning; store notes are generated prose | 2026-09-05 |
 | [0009](0009-e2e-launch-by-deep-link.md) | E2E foregrounds the dev client by deep link; the launcher's Bonjour discovery never works | 2026-09-06 |
+| [0010](0010-ios-e2e-release-build.md) | iOS E2E runs a Release build and opens the session's first URL itself; Android keeps 0009 | 2026-09-17 |
 
 ## Writing a new one
 
