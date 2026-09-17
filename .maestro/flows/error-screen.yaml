@@ -3,6 +3,17 @@ tags: [smoke]
 ---
 - tapOn:
     id: tab-settings
+# The dev menu carrying `settings-trigger-error` renders only when the app is
+# the development variant or the title has been tapped seven times
+# (SettingsScreen's TAPS_TO_REVEAL). The E2E build is not that variant, so the
+# button did not exist and this flow failed the first time it ever ran. Doing
+# the gesture works either way - seven extra taps on a revealed menu just
+# increment a counter nothing reads.
+- repeat:
+    times: 7
+    commands:
+      - tapOn:
+          id: settings-title
 - tapOn:
     id: settings-trigger-error
 # Development builds also raise React Native's LogBox overlay on a render error,
