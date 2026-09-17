@@ -162,10 +162,16 @@ Two script-contract details are load-bearing:
   Playwright job — the point being that Playwright tests the exact bytes that
   would deploy, not a second, possibly-different export.
 
-## E2E: iOS is opt-in
+## E2E: iOS is opt-in, and this repo opts in
 
-macOS GitHub-hosted runners bill at 10x, so `e2e.yml`'s `ios` input defaults to
-`false` and `ci.yml` passes:
+macOS GitHub-hosted runners bill at 10x **on a private repo**, which is why
+`e2e.yml`'s `ios` input defaults to `false` — the safe default for the app
+repos generated from this template. **On a public repo standard runners are
+free, macOS included**, so this repo sets `E2E_IOS=true` and runs the iOS suite
+on every push. There is no cost argument for skipping it here.
+
+What is still true either way is wall-clock: iOS takes roughly three times as
+long as Android. `ci.yml` passes:
 
 ```yaml
 ios: ${{ vars.E2E_IOS == 'true' || contains(github.event.pull_request.labels.*.name, 'e2e:ios') }}
