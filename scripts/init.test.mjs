@@ -742,8 +742,8 @@ describe('init --yes --no-web', () => {
     assert.match(config, /name: isDev \? 'Acme Wallet \(dev\)' : 'Acme Wallet'/);
     assert.match(config, /slug: 'acme-wallet'/);
     assert.match(config, /scheme: 'acme'/);
-    assert.match(config, /IOS_BUNDLE_ID \?\? 'com\.acme\.wallet'/);
-    assert.match(config, /ANDROID_PACKAGE \?\? 'com\.acme\.wallet'/);
+    assert.match(config, /IOS_BUNDLE_ID \|\| 'com\.acme\.wallet'/);
+    assert.match(config, /ANDROID_PACKAGE \|\| 'com\.acme\.wallet'/);
 
     const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
     assert.equal(pkg.name, 'acme-wallet');
