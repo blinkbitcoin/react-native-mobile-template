@@ -165,7 +165,11 @@ for (const file of ['.env.development', '.env.example']) {
 // ---------------------------------------------------------------------------
 
 for (const [file, needle] of [
-  ['playwright.config.ts', 'resolvePorts'],
+  // playwright.config.ts is not here on purpose: Playwright require()s a .ts
+  // config and this package is CommonJS, so importing an ES module throws.
+  // web.sh derives the ports and exports them; the config reads those. The
+  // literal guard below is what stops it hardcoding one instead.
+  ['scripts/e2e/web.sh', 'node scripts/ports.mjs --sh'],
   ['mocks/server.ts', 'resolvePorts'],
   ['scripts/e2e/wait-for-mock-api.sh', 'node scripts/ports.mjs --sh'],
   ['scripts/e2e/maestro-ios.sh', 'node scripts/ports.mjs --sh'],

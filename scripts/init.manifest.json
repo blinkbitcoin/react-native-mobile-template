@@ -247,7 +247,13 @@
         "$comment": "The port guard's pin on a config file this run deletes.",
         "path": "scripts/ports.test.mjs",
         "optional": true,
-        "lines": ["^  \\['playwright\\.config\\.ts', 'resolvePorts'\\],$"]
+        "lines": [
+          "^  // playwright\\.config\\.ts is not here on purpose: Playwright require\\(\\)s a \\.ts$",
+          "^  // config and this package is CommonJS, so importing an ES module throws\\.$",
+          "^  // web\\.sh derives the ports and exports them; the config reads those\\. The$",
+          "^  // literal guard below is what stops it hardcoding one instead\\.$",
+          "^  \\['scripts/e2e/web\\.sh', 'node scripts/ports\\.mjs --sh'\\],$"
+        ]
       },
       {
         "path": "mocks/README.md",
@@ -264,8 +270,8 @@
         "optional": true,
         "replace": [
           [
-            "| `.maestro/`, `e2e/` | Maestro flows for device E2E, Playwright specs for web |",
-            "| `.maestro/` | Maestro flows for device E2E |"
+            "| `.maestro/`, `e2e/` | Maestro flows for device E2E, Playwright specs for web                               |",
+            "| `.maestro/`         | Maestro flows for device E2E                                                         |"
           ]
         ]
       },
