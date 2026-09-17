@@ -50,15 +50,40 @@ def bundletool_build_apks_args(bundle, output)
   ]
 end
 
-# The four signing arguments, given the two password files. Empty when the build
-# is unsigned, which leaves bundletool to sign with its own debug key - matching
-# the debug-signed bundle gradle produced.
+# The four signing arguments for the upload keystore, given the two password
+# files. The unsigned build uses bundletool_debug_signing_args instead - never
+# no arguments at all, see there for why.
 def bundletool_signing_args(store_pass_file, key_pass_file)
   [
     "--ks=#{android_keystore_path}",
     "--ks-pass=file:#{store_pass_file}",
     "--ks-key-alias=#{ENV.fetch('ANDROID_UPLOAD_KEY_ALIAS')}",
     "--key-pass=file:#{key_pass_file}"
+  ]
+end
+
+# The same four arguments for the debug keystore `expo prebuild` ships at
+# android/app/debug.keystore - the one the release build type already falls back
+# to when the ANDROID_UPLOAD_* properties are absent
+# (plugins/with-android-release-signing.ts). So the universal APK carries the
+# same signature as the bundle it was derived from.
+#
+# Naming it is the point. Given no --ks at all, bundletool falls back to
+# ~/.android/debug.keystore, which Android Studio, adb or an emulator launch
+# creates - so a developer machine has one and a fresh CI runner does not. When
+# it is missing bundletool emits an *unsigned* APK and says nothing, and the
+# first thing to notice was `apksigner verify` failing in CI with
+# "Missing META-INF/MANIFEST.MF" on a build that passed on every laptop.
+#
+# The passwords are inline rather than in 0600 files like the signed branch:
+# `android` is the Android SDK's published constant for the debug keystore, not
+# a credential, and hiding it would imply otherwise.
+def bundletool_debug_signing_args
+  [
+    "--ks=#{root_path('android/app/debug.keystore')}",
+    '--ks-pass=pass:android',
+    '--ks-key-alias=androiddebugkey',
+    '--key-pass=pass:android'
   ]
 end
 
@@ -143,10 +168,10 @@ platform :android do
     # from a 0600 file that exists only for the length of the call.
     build_apks = bundletool_build_apks_args(File.join(out, 'app-release.aab'), apks)
     if skip_signing
-      # No signing arguments: bundletool signs with its own debug key, matching
-      # the debug-signed bundle gradle just produced. Nothing built this way is
-      # installable anywhere that checks a signature, which is the point.
-      sh(*build_apks, log: false)
+      # The bundle gradle just produced is debug-signed, so sign the APK with
+      # that same keystore. Installable for a smoke test, and recognisably not a
+      # release artifact - the debug certificate is what says so.
+      sh(*build_apks, *bundletool_debug_signing_args, log: false)
     else
       with_password_files(
         ENV.fetch('ANDROID_UPLOAD_KEYSTORE_PASSWORD'),
@@ -182,7 +207,15 @@ platform :android do
       UI.user_error!("Nothing to verify at #{path} — run `fastlane android build` first") unless File.exist?(path)
     end
 
-    sh('bash', script, aab, apk)
+    # Mirrors ios.rb's --no-signing forwarding, with the opposite meaning: iOS
+    # skips its signing checks because an unsigned archive has nothing to check,
+    # while an unsigned Android build still produces a debug-signed APK, so this
+    # asserts that identity. CI already passes skip_signing to this lane
+    # (shared-workflows' expo-build-android.yml); until now it was ignored.
+    args = ['bash', script, aab, apk]
+    args << '--expect-debug-signing' if truthy?(options[:skip_signing])
+
+    sh(*args)
   end
 
   desc 'Upload the AAB to the internal track (idempotent)'

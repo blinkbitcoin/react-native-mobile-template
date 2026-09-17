@@ -703,6 +703,35 @@ test('an input that was never supplied stays a skip even under --strict', () => 
   );
 });
 
+test('the debug certificate is recognised whatever the rest of the DN says', () => {
+  // The keystore expo prebuild ships and one keytool generates differ in
+  // OU/O/L/ST; CN is the stable part, so that is what the check keys on.
+  for (const dn of [
+    'CN=Android Debug, OU=Android, O=Unknown, L=Unknown, ST=Unknown, C=US',
+    'CN=Android Debug, O=Android, C=US',
+  ]) {
+    assert.match(
+      sh(`vc_reset; vc_verdict debug-signing "$(vc_debug_signing_verdict '${dn}')"`),
+      /^ok debug-signing/,
+    );
+  }
+});
+
+test('a release certificate fails the debug-signing check by name', () => {
+  const out = sh(
+    `vc_reset; vc_verdict debug-signing "$(vc_debug_signing_verdict 'CN=Blink Upload, O=Blink, C=SV')" || true`,
+  );
+  assert.match(out, /^fail debug-signing/);
+  assert.match(out, /CN=Android Debug/, 'the message must say what was expected');
+  assert.match(out, /CN=Blink Upload/, 'and what was found');
+});
+
+test('an unsigned apk fails debug-signing rather than reporting an empty signer', () => {
+  const out = sh(`vc_reset; vc_verdict debug-signing "$(vc_debug_signing_verdict '')" || true`);
+  assert.match(out, /^fail debug-signing/);
+  assert.match(out, /got no signer/);
+});
+
 test('summary cells escape a pipe so the job-summary table survives a path', () =>
   withTempDir((dir) => {
     const summary = path.join(dir, 'summary.md');
@@ -1105,6 +1134,8 @@ const ANDROID_TOOL_CHECKS = [
   'ota',
   'signature',
   'signing-cert',
+  // debug-signing is deliberately absent: it only appears with
+  // --expect-debug-signing, so it is not part of the always-present checklist.
 ];
 
 /**

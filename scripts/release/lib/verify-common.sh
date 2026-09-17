@@ -670,6 +670,20 @@ vc_cert_verdict() { # <expected> <actual>
   vc_sha_verdict 'signing certificate' "$1" "$2"
 }
 
+# Whether an APK's signer is the Android SDK's debug certificate, given the
+# `certificate DN:` line apksigner --print-certs prints. A pure function so the
+# unsigned-build assertion is unit-testable without an APK or an SDK.
+#
+# CN is the only stable part: the rest of the DN varies between the keystore
+# gradle ships and one keytool generates (OU/O/L/ST differ, C does not).
+vc_debug_signing_verdict() { # <signer DN>
+  case "$1" in
+    *'CN=Android Debug'*) printf 'ok signed by the Android debug certificate (%s)' "$1" ;;
+    '') printf 'fail expected the Android debug certificate (CN=Android Debug), got no signer' ;;
+    *) printf 'fail expected the Android debug certificate (CN=Android Debug), got: %s' "$1" ;;
+  esac
+}
+
 # dwarfdump --uuid output, one `UUID: <uuid> (<arch>) <path>` line per slice.
 vc_uuids() { # <dwarfdump --uuid output>
   printf '%s\n' "$1" | sed -n 's/^UUID: \([0-9A-Fa-f-]*\) .*/\1/p' | tr '[:lower:]' '[:upper:]' | sort -u || true
