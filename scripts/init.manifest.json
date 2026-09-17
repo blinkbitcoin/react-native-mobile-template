@@ -7,12 +7,12 @@
         "path": "app.config.ts",
         "replace": [
           [
-            "process.env.IOS_BUNDLE_ID ?? 'com.example.rnmt'",
-            "process.env.IOS_BUNDLE_ID ?? '{{iosBundleId}}'"
+            "process.env.IOS_BUNDLE_ID || 'com.example.rnmt'",
+            "process.env.IOS_BUNDLE_ID || '{{iosBundleId}}'"
           ],
           [
-            "process.env.ANDROID_PACKAGE ?? 'com.example.rnmt'",
-            "process.env.ANDROID_PACKAGE ?? '{{androidPackage}}'"
+            "process.env.ANDROID_PACKAGE || 'com.example.rnmt'",
+            "process.env.ANDROID_PACKAGE || '{{androidPackage}}'"
           ]
         ]
       },
@@ -61,7 +61,7 @@
       },
       {
         "path": "README.md",
-        "$comment": "The three gh-pages badge URLs and the links under them. Anchored on the host and repo together so the `blinkbitcoin/react-native-workflows` link further down keeps its owner; the repo half of each is renamed by the token pass, which runs after this one.",
+        "$comment": "The three gh-pages badge URLs and the links under them. Anchored on the host and repo together so the `blinkbitcoin/shared-workflows` link further down keeps its owner; the repo half of each is renamed by the token pass, which runs after this one.",
         "replace": [
           ["raw.githubusercontent.com/blinkbitcoin/", "raw.githubusercontent.com/{{owner}}/", 3],
           [
@@ -247,7 +247,13 @@
         "$comment": "The port guard's pin on a config file this run deletes.",
         "path": "scripts/ports.test.mjs",
         "optional": true,
-        "lines": ["^  \\['playwright\\.config\\.ts', 'resolvePorts'\\],$"]
+        "lines": [
+          "^  // playwright\\.config\\.ts is not here on purpose: Playwright require\\(\\)s a \\.ts$",
+          "^  // config and this package is CommonJS, so importing an ES module throws\\.$",
+          "^  // web\\.sh derives the ports and exports them; the config reads those\\. The$",
+          "^  // literal guard below is what stops it hardcoding one instead\\.$",
+          "^  \\['scripts/e2e/web\\.sh', 'node scripts/ports\\.mjs --sh'\\],$"
+        ]
       },
       {
         "path": "mocks/README.md",
@@ -264,8 +270,8 @@
         "optional": true,
         "replace": [
           [
-            "| `.maestro/`, `e2e/` | Maestro flows for device E2E, Playwright specs for web |",
-            "| `.maestro/` | Maestro flows for device E2E |"
+            "| `.maestro/`, `e2e/` | Maestro flows for device E2E, Playwright specs for web                               |",
+            "| `.maestro/`         | Maestro flows for device E2E                                                         |"
           ]
         ]
       },

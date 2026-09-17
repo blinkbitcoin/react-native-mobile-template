@@ -22,6 +22,32 @@ tags: [smoke]
 - tapOn:
     text: 'Dismiss'
     optional: true
+# The developer menu, not the launcher. expo-dev-client opens it by itself the
+# first time a given build runs, which on a fresh emulator is every CI run, and
+# it is a sheet over the app: Home renders fine underneath but `home-screen` is
+# not visible, so the whole suite failed on a working app. The launcher branch
+# below also taps Continue, but only when DEVELOPMENT SERVERS is on screen -
+# a different screen from this one, so it never fired here.
+- tapOn:
+    text: '^Continue$'
+    optional: true
+# Continue only dismisses the menu's intro page - it hands over to the dev menu
+# proper (Reload / Go home / TOOLS), which is still a sheet over the app. That
+# close was written, but only inside the launcher branch below, so it never ran
+# here: the first fix tapped Continue and then waited 90s on a menu it had just
+# paged forward. Close it the same way the branch below does.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: 'xmark'
+          optional: true
 - runFlow:
     when:
       visible:
@@ -30,7 +56,7 @@ tags: [smoke]
       # Any port, deliberately: Metro's is derived from APP_PORT_BASE
       # (scripts/ports.mjs) and CI picks its own, so a literal would pin the
       # flow to one worktree. `${METRO_PORT}` is not the answer either - this
-      # suite also runs from react-native-workflows, which passes only APP_ID,
+      # suite also runs from shared-workflows, which passes only APP_ID,
       # and Maestro aborts a flow on an unresolved variable. The cost, accepted:
       # this tap can no longer tell the right dev server from any dev server. It
       # is `optional: true` and only reached if the dev client landed on its

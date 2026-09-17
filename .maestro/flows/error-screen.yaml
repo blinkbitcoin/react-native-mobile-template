@@ -3,6 +3,18 @@ tags: [smoke]
 ---
 - tapOn:
     id: tab-settings
+# `Trigger error` is the last control in DevMenu and Settings is a scrolling
+# screen, so on an emulator it starts below the fold and `tapOn` cannot reach
+# it - which is why this flow failed the first time it ever ran, with "Element
+# not found". Scroll to it rather than assuming a viewport height.
+#
+# Not a reveal problem: DevMenu renders unconditionally in the development
+# variant, which is what CI builds, so the seven-tap gesture on the title is
+# not involved here.
+- scrollUntilVisible:
+    element:
+      id: settings-trigger-error
+    direction: DOWN
 - tapOn:
     id: settings-trigger-error
 # Development builds also raise React Native's LogBox overlay on a render error,

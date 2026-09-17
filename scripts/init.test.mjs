@@ -49,7 +49,7 @@ const RENAME_TOKENS = /rnmt|RN Mobile Template|react-native-mobile-template|rn-m
 // `blinkbitcoin` is two different things: the GitHub owner of THIS repo, which
 // init must rewrite, and the owner of the reusable-workflow repo, which it must
 // not. Blanking the second is what makes the first greppable.
-const WORKFLOWS_REPO = /blinkbitcoin\/react-native-workflows/g;
+const WORKFLOWS_REPO = /blinkbitcoin\/shared-workflows/g;
 const namesTheOwner = (text) => text.replace(WORKFLOWS_REPO, '').includes('blinkbitcoin');
 // `react-native-webview` and `--dev-client` are native, not web: the negative
 // lookaheads keep the sweep from flagging them.
@@ -679,7 +679,7 @@ describe('init --yes --no-web', () => {
     // The reusable-workflow repo keeps its owner.
     assert.match(
       readFileSync(path.join(root, '.github/workflows/ci.yml'), 'utf8'),
-      /blinkbitcoin\/react-native-workflows/,
+      /blinkbitcoin\/shared-workflows/,
     );
   });
 
@@ -742,8 +742,8 @@ describe('init --yes --no-web', () => {
     assert.match(config, /name: isDev \? 'Acme Wallet \(dev\)' : 'Acme Wallet'/);
     assert.match(config, /slug: 'acme-wallet'/);
     assert.match(config, /scheme: 'acme'/);
-    assert.match(config, /IOS_BUNDLE_ID \?\? 'com\.acme\.wallet'/);
-    assert.match(config, /ANDROID_PACKAGE \?\? 'com\.acme\.wallet'/);
+    assert.match(config, /IOS_BUNDLE_ID \|\| 'com\.acme\.wallet'/);
+    assert.match(config, /ANDROID_PACKAGE \|\| 'com\.acme\.wallet'/);
 
     const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
     assert.equal(pkg.name, 'acme-wallet');

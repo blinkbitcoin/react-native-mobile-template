@@ -96,7 +96,7 @@ codegen: ## Regenerate typed GraphQL documents
 # similar one. That used to be a comment claiming as much while five gates
 # (i18n, codegen, SDK drift, lockfile provenance, licences) ran here and in no
 # CI job at all. It is now enforced from the other side: consumer-contract.bats
-# in react-native-workflows reads this Makefile and the workflow YAML and fails
+# in shared-workflows reads this Makefile and the workflow YAML and fails
 # when they disagree.
 #
 # E2E is the deliberate exception: it needs a simulator or an emulator, so it

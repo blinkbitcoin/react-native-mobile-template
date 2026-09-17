@@ -111,7 +111,7 @@ green `make check` was making a claim about coverage CI was not providing, and
 nothing detected it.
 
 Two cases at the end of `test/consumer-contract.bats` in
-`react-native-workflows` now read the workflow YAML and this repo's `Makefile`
+`shared-workflows` now read the workflow YAML and this repo's `Makefile`
 and fail in both directions:
 
 - a script CI calls that `make ci` cannot reach;
@@ -130,7 +130,7 @@ and several here do: `check:docs`, `check:release`, `check:ci` and
 running in CI: the package script is the interface, make is the implementation.
 
 For five gates — i18n, codegen, Expo doctor, the audit and the CI linters —
-`react-native-workflows` prefers this repo's script and falls back to its own
+`shared-workflows` prefers this repo's script and falls back to its own
 only if we ship none. That makes `scripts/check-i18n.sh`, `check-codegen.sh` and
 `shellcheck.sh` load-bearing in CI, which is why they must be at least as strict
 as the fallbacks they displace; `scripts/gates.test.mjs` holds them to it.
@@ -252,7 +252,7 @@ but not yet installable, say what is holding it (a `minimumReleaseAge` window,
 a transitive pin) and from when it stops holding. In CI the audit is advisory
 on a pull request and
 blocking on `main` (`audit-soft-on-pr` in
-[the workflows' consumer guide](https://github.com/blinkbitcoin/react-native-workflows/blob/main/docs/consumer-guide.md)),
+[the workflows' consumer guide](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/consumer-guide.md)),
 so an ignore added to get a PR green is an ignore that was never needed.
 
 ## CodeQL, and why suppression is a source comment

@@ -8,4 +8,4 @@ permissions:
 jobs:
   pr-closed:
     name: Cleanup
-    uses: blinkbitcoin/react-native-workflows/.github/workflows/pr-closed.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/pr-closed.yml@v0

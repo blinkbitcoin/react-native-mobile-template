@@ -1,7 +1,7 @@
 # CI
 
 This repo runs almost no CI logic of its own. Nearly every job lives in
-[`blinkbitcoin/react-native-workflows`](https://github.com/blinkbitcoin/react-native-workflows)
+[`blinkbitcoin/shared-workflows`](https://github.com/blinkbitcoin/shared-workflows)
 and the eleven files in `.github/workflows/` are thin callers that pick inputs.
 Two of the eleven are the exception and are described below. The workflows repo's
 `docs/consumer-guide.md` is the contract; this page is the template's half of
@@ -105,7 +105,7 @@ Two gates are opt-in in CI and grouped locally as `make check-slow`:
 seconds. Enable the `prebuild-check` and `bundle-secrets` inputs on the
 `checks` call where the coverage earns the wall clock.
 
-That `make ci` and CI agree is enforced from `react-native-workflows`, whose
+That `make ci` and CI agree is enforced from `shared-workflows`, whose
 `consumer-contract.bats` reads this repo's `Makefile` against the workflow
 YAML and fails in either direction. See
 [quality.md](quality.md#make-check-is-the-ci-gate-set-and-that-is-enforced).
@@ -325,10 +325,10 @@ tag. Nine of the eleven files carry at least one, and several carry many:
 `release-retry.yml` call no reusable workflow at all.
 
 ```yaml
-uses: blinkbitcoin/react-native-workflows/.github/workflows/checks.yml@v0
+uses: blinkbitcoin/shared-workflows/.github/workflows/checks.yml@v0
 ```
 
-`react-native-workflows` is pre-1.0 and release-please-versioned from `0.1.0`;
+`shared-workflows` is pre-1.0 and release-please-versioned from `0.1.0`;
 `v0` is re-pointed at the tip of each `0.x.y` release. So `@v0` picks up fixes
 (and, pre-1.0, breaking changes) automatically.
 
@@ -350,7 +350,7 @@ and the script contract; mixing versions across them is untested.
 
 Every job checks the workflows repo out into `$GITHUB_WORKSPACE/.workflows` and
 reaches its scripts through `$WORKFLOWS_DIR`. Nothing in this repo references
-`react-native-workflows` paths directly. Local tooling that walks the whole
+`shared-workflows` paths directly. Local tooling that walks the whole
 tree ignores it: `biome.json` (`!**/.workflows`), `eslint.config.mjs`
 (`.workflows/**`), `tsconfig.json` (`exclude`), `typos.toml` (`extend-exclude`) and
 `.gitignore` (`/.workflows`).

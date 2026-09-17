@@ -1,5 +1,5 @@
 # scripts/release/lib/verify-common.sh is sourced by the verify-* scripts, so
 # shellcheck must follow it to see the shared helpers. Mirrors the
-# react-native-workflows repo so both resolve sources the same way.
+# shared-workflows repo so both resolve sources the same way.
 external-sources=true
 source-path=SCRIPTDIR

@@ -25,7 +25,7 @@ concurrency:
 jobs:
   prepare:
     name: Prepare
-    uses: blinkbitcoin/react-native-workflows/.github/workflows/expo-prepare.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/expo-prepare.yml@v0
     permissions:
       contents: read
       # expo-prepare declares `actions: read` statically (its green-workflow
@@ -73,7 +73,7 @@ jobs:
   build-ios:
     name: Build iOS
     needs: prepare
-    uses: blinkbitcoin/react-native-workflows/.github/workflows/expo-build-ios.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/expo-build-ios.yml@v0
     permissions:
       contents: read
     with:
@@ -116,7 +116,7 @@ jobs:
   build-android:
     name: Build Android
     needs: prepare
-    uses: blinkbitcoin/react-native-workflows/.github/workflows/expo-build-android.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/expo-build-android.yml@v0
     permissions:
       contents: read
     with:
@@ -158,7 +158,7 @@ jobs:
     # credentials still builds, verifies and publishes its artifacts.
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' }}
     needs: [prepare, build-ios]
-    uses: blinkbitcoin/react-native-workflows/.github/workflows/fastlane-lane.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/fastlane-lane.yml@v0
     permissions:
       contents: read
     with:
@@ -194,7 +194,7 @@ jobs:
     # credentials still builds, verifies and publishes its artifacts.
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' }}
     needs: [prepare, build-android]
-    uses: blinkbitcoin/react-native-workflows/.github/workflows/fastlane-lane.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/fastlane-lane.yml@v0
     permissions:
       contents: read
     with:
@@ -222,7 +222,7 @@ jobs:
     # uses a status function.
     needs: [prepare, build-ios, build-android, publish-ios, publish-android]
     if: ${{ !cancelled() && !failure() }}
-    uses: blinkbitcoin/react-native-workflows/.github/workflows/github-release.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/github-release.yml@v0
     permissions:
       # The called job creates a release; a called workflow can only narrow the
       # caller's token, so `contents: write` has to be granted here.
@@ -247,7 +247,7 @@ jobs:
     name: OTA
     needs: [prepare, github-prerelease]
     if: ${{ vars.OTA_ENABLED == 'true' }}
-    uses: blinkbitcoin/react-native-workflows/.github/workflows/expo-ota-publish.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/expo-ota-publish.yml@v0
     permissions:
       contents: read
     with:

@@ -93,7 +93,7 @@ jobs:
     name: Publish
     needs: baseline
     if: ${{ vars.OTA_ENABLED == 'true' }}
-    uses: blinkbitcoin/react-native-workflows/.github/workflows/expo-ota-publish.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/expo-ota-publish.yml@v0
     permissions:
       contents: read
     with:

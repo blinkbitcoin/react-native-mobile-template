@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Local Android E2E: assumes `make android` already installed the dev build on a
 # running emulator and Metro is running (make start). CI uses
-# react-native-workflows. `adb reverse` makes the host's Metro and mock API
+# shared-workflows. `adb reverse` makes the host's Metro and mock API
 # reachable from the emulator on the same ports.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -14,7 +14,7 @@ adb reverse "tcp:$MOCK_API_PORT" "tcp:$MOCK_API_PORT"
 APP_ID="${APP_ID:-com.example.rnmt.dev}"
 SCHEME="${SCHEME:-rnmt}"
 # Foreground the app through the expo-development-client deep link, exactly as
-# react-native-workflows' scripts/e2e/app-launch.sh does (10.0.2.2 is the
+# shared-workflows' scripts/e2e/app-launch.sh does (10.0.2.2 is the
 # host's loopback as seen from the emulator). The dev client's launcher screen
 # discovers Metro over Bonjour, which does not work on an emulator, so the deep
 # link is the only reliable way in; 00-launch.yaml then attaches with

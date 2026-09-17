@@ -73,7 +73,18 @@ const config: Config = {
       // `/plugins/` stays ignored here because the app project has no explicit
       // `testMatch`: without it, jest-expo would pick the plugin suites up as
       // well and every plugin test would run twice (once per project).
-      testPathIgnorePatterns: ['/node_modules/', '/e2e/', '/plugins/', '/scripts/'],
+      // `/.workflows/` because CI checks shared-workflows out into the
+      // workspace, and it ships its own `*.test.mjs`. jest-expo would pick
+      // those up and fail on `import.meta` - a consumer's Unit job going red
+      // over a file the consumer does not own. It is the seventh entry in the
+      // guide's `.workflows/` ignore list, added when that repo grew tests.
+      testPathIgnorePatterns: [
+        '/node_modules/',
+        '/e2e/',
+        '/plugins/',
+        '/scripts/',
+        '/\\.workflows/',
+      ],
       coveragePathIgnorePatterns,
     },
     {

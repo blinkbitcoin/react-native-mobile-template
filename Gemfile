@@ -3,7 +3,7 @@
 #
 # - fastlane drives the store lanes in fastlane/ (see docs/release-runbook.md)
 # - cocoapods is what `pod install` resolves to for the iOS project that
-#   `expo prebuild` generates; react-native-workflows' scripts/native/pods.sh
+#   `expo prebuild` generates; shared-workflows' scripts/native/pods.sh
 #   runs `bundle exec pod install` whenever a Gemfile is present.
 source 'https://rubygems.org'
 
