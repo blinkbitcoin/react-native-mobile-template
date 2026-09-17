@@ -3,17 +3,18 @@ tags: [smoke]
 ---
 - tapOn:
     id: tab-settings
-# The dev menu carrying `settings-trigger-error` renders only when the app is
-# the development variant or the title has been tapped seven times
-# (SettingsScreen's TAPS_TO_REVEAL). The E2E build is not that variant, so the
-# button did not exist and this flow failed the first time it ever ran. Doing
-# the gesture works either way - seven extra taps on a revealed menu just
-# increment a counter nothing reads.
-- repeat:
-    times: 7
-    commands:
-      - tapOn:
-          id: settings-title
+# `Trigger error` is the last control in DevMenu and Settings is a scrolling
+# screen, so on an emulator it starts below the fold and `tapOn` cannot reach
+# it - which is why this flow failed the first time it ever ran, with "Element
+# not found". Scroll to it rather than assuming a viewport height.
+#
+# Not a reveal problem: DevMenu renders unconditionally in the development
+# variant, which is what CI builds, so the seven-tap gesture on the title is
+# not involved here.
+- scrollUntilVisible:
+    element:
+      id: settings-trigger-error
+    direction: DOWN
 - tapOn:
     id: settings-trigger-error
 # Development builds also raise React Native's LogBox overlay on a render error,
