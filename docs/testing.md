@@ -291,8 +291,8 @@ mock API, open the `expo-development-client` deep link (see
 7. Never open the session's first URL. iOS puts up "Open in <app>?" for the
    first `simctl openurl` of a simulator session and, on a loaded runner, acted
    on that first link ~40 s late — during the *next* flow. `00-launch` opens
-   `rnmt://` once so every later `openLink` is alert-free and immediate. A flow
-   that opens a URL still waits with `extendedWaitUntil`; see
+   the scheme's bare root link once so every later `openLink` is alert-free and
+   immediate. A flow that opens a URL still waits with `extendedWaitUntil`; see
    [ADR 0010](decisions/0010-ios-e2e-release-build.md).
 
 ### iOS is a Release build in CI
@@ -329,7 +329,7 @@ CI uploads named artifacts. Download these from the run summary first:
 `forensics-ios` also carries `ios-unified.log`, the simulator's unified log
 filtered to SpringBoard's alert lifecycle, FrontBoard's scene actions and any
 line naming the app id or scheme. For a deep link that "did nothing", that is
-the file: `Presenting <SBUserNotificationAlert` is the prompt, `url = rnmt://…`
+the file: `Presenting <SBUserNotificationAlert` is the prompt, `url = <scheme>://…`
 is the `UIOpenURLAction` reaching the app, and the gap to the next
 navigation-bar layout is where the time went.
 
