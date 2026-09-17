@@ -2,8 +2,15 @@ import type { ConfigContext, ExpoConfig } from 'expo/config';
 
 const variant = process.env.APP_VARIANT === 'production' ? 'production' : 'development';
 const isDev = variant === 'development';
-const iosBundleId = process.env.IOS_BUNDLE_ID ?? 'com.example.rnmt';
-const androidPackage = process.env.ANDROID_PACKAGE ?? 'com.example.rnmt';
+// `||`, not `??`, and that is the whole point: a workflow input left unset
+// arrives as an empty string, not as an absent variable, and `??` only falls
+// back on null/undefined. `IOS_BUNDLE_ID: ''` therefore passed straight through
+// as the bundle identifier, Expo saw no identifier at all, and `expo prebuild`
+// died with "Cannot automatically write to dynamic config" while trying to
+// persist com.anonymous.<slug>. Empty is falsy but not nullish - the same trap
+// as the `&&`/`||` expression pitfall documented in the release workflows.
+const iosBundleId = process.env.IOS_BUNDLE_ID || 'com.example.rnmt';
+const androidPackage = process.env.ANDROID_PACKAGE || 'com.example.rnmt';
 const otaEnabled = process.env.OTA_ENABLED === 'true';
 const buildStamp = `${variant}-${process.env.GITHUB_SHA?.slice(0, 7) ?? 'local'}-${new Date().toISOString().slice(0, 10)}`;
 const webDomain = process.env.EXPO_PUBLIC_WEB_DOMAIN;
@@ -13,19 +20,19 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: isDev ? 'RN Mobile Template (dev)' : 'RN Mobile Template',
   slug: 'react-native-mobile-template',
   scheme: 'rnmt',
-  version: process.env.APP_VERSION ?? '0.0.0',
+  version: process.env.APP_VERSION || '0.0.0',
   orientation: 'portrait',
   userInterfaceStyle: 'automatic',
   icon: './assets/icon.png',
   ios: {
     bundleIdentifier: isDev ? `${iosBundleId}.dev` : iosBundleId,
-    buildNumber: process.env.APP_BUILD_NUMBER ?? '1',
+    buildNumber: process.env.APP_BUILD_NUMBER || '1',
     supportsTablet: false,
     associatedDomains: webDomain ? [`applinks:${webDomain}`] : [],
   },
   android: {
     package: isDev ? `${androidPackage}.dev` : androidPackage,
-    versionCode: Number(process.env.APP_BUILD_NUMBER ?? 1),
+    versionCode: Number(process.env.APP_BUILD_NUMBER || 1),
     adaptiveIcon: {
       foregroundImage: './assets/android-icon-foreground.png',
       backgroundImage: './assets/android-icon-background.png',
