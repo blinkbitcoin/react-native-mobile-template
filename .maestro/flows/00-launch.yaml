@@ -99,12 +99,7 @@ tags: [smoke]
 # invented failure on top of the real one, exactly when the signal matters
 # most. Optional, so it is a no-op on the cold start it was written for, and
 # it is what every other flow already does to reach its own tab.
-# A pushed screen (Details, reached by a deep link) hides the tab bar, so the
-# tap below cannot reach Home from there. Pop it first - optional, because on
-# the cold start this flow was written for there is nothing to pop.
-- tapOn:
-    id: 'BackButton'
-    optional: true
+- runFlow: ../helpers/to-tab-bar.yaml
 - tapOn:
     id: tab-home
     optional: true

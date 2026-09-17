@@ -1,35 +1,42 @@
 appId: ${APP_ID}
 tags: [smoke]
 ---
-# Canonical deep link. iOS may show a system "Open in ...?" confirmation dialog
-# when a link is opened from outside the app; the optional tap dismisses it and
-# is a no-op when the dialog does not appear.
-- openLink: rnmt://details/99
-- tapOn:
-    text: '^Open$'
-    optional: true
 # iOS delivers a simctl-opened URL asynchronously, and on a loaded CI runner
-# sometimes slowly - it was seen landing *after* this flow had given up at 30s,
-# which threw the next flow onto Details with no tab bar and turned one slow
-# delivery into three reported failures. `assertVisible` does not wait;
-# `extendedWaitUntil` is the supported way to wait out an async navigation, the
-# same reason 00-launch uses it.
-- extendedWaitUntil:
-    visible:
-      id: details-id
-    timeout: 30000
+# that delivery is not merely slow but unreliable. Both failure modes were seen
+# on green-looking runs: the link landing after a 30s wait had already given up,
+# and - worse - landing after the *next* flow had started, which threw that flow
+# onto Details (no tab bar) and turned one slow event into three reported
+# failures. Waiting longer only widens the window; re-issuing the link is what
+# recovers, so the open and the wait retry together as one unit.
+- retry:
+    maxRetries: 3
+    commands:
+      # iOS may show a system "Open in ...?" confirmation when a link arrives
+      # from outside the app; the optional tap dismisses it and is a no-op when
+      # the dialog does not appear.
+      - openLink: rnmt://details/99
+      - tapOn:
+          text: '^Open$'
+          optional: true
+      - extendedWaitUntil:
+          visible:
+            id: details-id
+          timeout: 20000
 - assertVisible:
     text: '99'
 - runFlow: ../helpers/go-back.yaml
 # Legacy path, rewritten to /details/7 by src/app/+native-intent.tsx.
-- openLink: rnmt://d/7
-- tapOn:
-    text: '^Open$'
-    optional: true
-- extendedWaitUntil:
-    visible:
-      id: details-id
-    timeout: 30000
+- retry:
+    maxRetries: 3
+    commands:
+      - openLink: rnmt://d/7
+      - tapOn:
+          text: '^Open$'
+          optional: true
+      - extendedWaitUntil:
+          visible:
+            id: details-id
+          timeout: 20000
 - assertVisible:
     text: '7'
 - runFlow: ../helpers/go-back.yaml
