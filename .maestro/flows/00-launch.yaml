@@ -93,6 +93,15 @@ tags: [smoke]
             platform: Android
           commands:
             - back
+# `stopApp: false` means this flow can start on whatever screen the previous
+# one left behind - `error-screen` ends on Settings - and on a suite retry it
+# does. Without this tap the retry fails here on a working app and stacks an
+# invented failure on top of the real one, exactly when the signal matters
+# most. Optional, so it is a no-op on the cold start it was written for, and
+# it is what every other flow already does to reach its own tab.
+- tapOn:
+    id: tab-home
+    optional: true
 # `assertVisible` has no `timeout` property in Maestro 2.x; `extendedWaitUntil`
 # is the supported way to wait out a cold start.
 - extendedWaitUntil:
