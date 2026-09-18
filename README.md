@@ -17,6 +17,10 @@ working.
 
 ---
 
+<p align="center">
+  <img src="docs/assets/readme-hero.svg" alt="Press Use this template and run make init to get an Expo and TypeScript app that runs on day one, with a themed component kit, GraphQL, i18n and one mock API for Jest and E2E. Every push runs Checks, Unit and device E2E through shared-workflows at @v0. A merge to main opens a release PR, then ships signed, verified builds to TestFlight and Google Play." width="960">
+</p>
+
 Every React Native project pays the same tax before it ships anything. Signing
 that only fails on a Tuesday. An emulator that hangs in CI and nowhere else.
 The eleventh linter. A release nobody remembers the order of. Months of it,
