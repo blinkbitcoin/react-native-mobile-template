@@ -80,10 +80,20 @@ jobs:
       # is the run that counts. It is a full CI run, E2E included, once per
       # update of the release PR - free on a public repository; a private
       # consumer that finds it too much can drop this one step.
+      # The PR's branch is read from the `pr` output in the shell, not with
+      # `fromJSON()` in `env:`: the runner validates a step's `env` expressions
+      # even when its `if` is false, and `fromJSON('')` is a template error -
+      # which failed this job on the first push that produced no release PR.
       - name: Run CI on the release PR
         if: ${{ steps.release.outputs.prs_created == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-          BRANCH: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
-        run: gh workflow run ci.yml --repo "$REPO" --ref "$BRANCH"
+          PR_JSON: ${{ steps.release.outputs.pr }}
+        run: |
+          branch="$(jq -r '.headBranchName // empty' <<<"$PR_JSON")"
+          if [ -z "$branch" ]; then
+            echo "release-please reported a PR but its 'pr' output has no headBranchName" >&2
+            exit 1
+          fi
+          gh workflow run ci.yml --repo "$REPO" --ref "$branch"
