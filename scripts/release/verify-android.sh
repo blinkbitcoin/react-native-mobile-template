@@ -34,17 +34,21 @@ repo_root="$(cd "$here/../.." && pwd)"
 MIN_SDK_FLOOR="${ANDROID_MIN_SDK:-24}"
 
 usage() {
-  echo "usage: verify-android.sh <aab> <apk> [--cert-sha256 <fingerprint>] [--strict]" >&2
+  echo "usage: verify-android.sh <aab> <apk> [--cert-sha256 <fingerprint>] [--expect-debug-signing] [--strict]" >&2
   exit 2
 }
 
 aab=''
 apk=''
 cert_sha=''
+expect_debug=''
 strict=''
 while [ $# -gt 0 ]; do
   case "$1" in
     --strict) strict=1 ;;
+    # An unsigned build is still expected to be *debug*-signed, so this asserts
+    # the identity rather than waiving the check. See the signing block below.
+    --expect-debug-signing) expect_debug=1 ;;
     --cert-sha256)
       shift
       [ $# -gt 0 ] || usage
@@ -265,6 +269,16 @@ elif ! "$apksigner" verify --print-certs "$apk" >"$work/certs.txt" 2>"$work/cert
 else
   actual_sha="$(sed -n 's/.*SHA-256 digest: *\([0-9a-fA-F]*\).*/\1/p' "$work/certs.txt" | head -1)"
   vc_ok signature "apksigner verified $(basename "$apk")"
+  # `--expect-debug-signing` is the unsigned build asserting what it is, not
+  # waiving a check: gradle debug-signs the bundle, bundletool signs the APK
+  # from the same keystore, and both must be the SDK's debug certificate. The
+  # iOS lane skips its signing checks in the equivalent case because an unsigned
+  # archive has nothing to check; an APK always does. A regression that produces
+  # an unsigned or release-signed APK fails here by name.
+  if [ -n "$expect_debug" ]; then
+    signer_dn="$(sed -n 's/.*certificate DN: *//p' "$work/certs.txt" | head -1)"
+    vc_verdict debug-signing "$(vc_debug_signing_verdict "$signer_dn")"
+  fi
   if [ -n "$cert_sha" ]; then
     vc_verdict signing-cert "$(vc_cert_verdict "$cert_sha" "$actual_sha")"
   else

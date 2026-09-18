@@ -22,6 +22,17 @@ tags: [smoke]
 - tapOn:
     text: 'Dismiss'
     optional: true
+# iOS asks "Open in <app>?" when a URL arrives from another app. The runner
+# foregrounds the app first so the open is not prompted
+# (shared-workflows' app-launch.sh), but a simulator that has never been asked
+# can still surface it - and unanswered it just sits there. A no-op elsewhere.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          text: '^Open$'
+          optional: true
 # The developer menu, not the launcher. expo-dev-client opens it by itself the
 # first time a given build runs, which on a fresh emulator is every CI run, and
 # it is a sheet over the app: Home renders fine underneath but `home-screen` is

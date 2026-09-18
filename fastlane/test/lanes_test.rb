@@ -1163,6 +1163,85 @@ class LaneBehaviourTest < Minitest::Test
                  'gradle resolves storeFile relative to android/app'
   end
 
+  # gradle is stubbed in these tests, so plant the .aab it would have written -
+  # the lane refuses to continue without one, which is why the unsigned branch
+  # was never reachable from a unit test before.
+  def generated_android_bundle(dir)
+    out = File.join(dir, 'android', 'app', 'build', 'outputs', 'bundle', 'release')
+    FileUtils.mkdir_p(out)
+    File.write(File.join(out, 'app-release.aab'), 'aab')
+    # bundletool_command resolves a real binary, which a laptop has from brew
+    # and the Checks / Release runner does not - that job installs no Android
+    # tooling. Same stub the bundletool_*_args tests use.
+    File.write(File.join(dir, 'bundletool'), '#!/bin/sh')
+    FileUtils.chmod(0o755, File.join(dir, 'bundletool'))
+    ENV['PATH'] = dir
+  end
+
+  # The unsigned android build had no coverage at all - no [:android, :build]
+  # case existed, signed or unsigned - which is how it shipped producing an
+  # APK with no signature. bundletool given no --ks falls back to
+  # ~/.android/debug.keystore, which a laptop has and a CI runner does not.
+  def test_android_build_signs_the_apk_with_the_projects_debug_keystore
+    in_project do |dir|
+      generated_android_bundle(dir)
+      run_lane(:android, :build, skip_signing: 'true')
+
+      bundletool = $calls.select { |name, _| name == :sh }
+                         .map(&:last)
+                         .find { |cmd| cmd.is_a?(Array) && cmd.include?('build-apks') }
+      refute_nil bundletool, "expected a bundletool build-apks call, got #{$calls.map(&:first).inspect}"
+
+      assert_includes bundletool, "--ks=#{root_path('android/app/debug.keystore')}",
+                      'naming the keystore is the fix: without --ks bundletool emits an unsigned APK'
+      assert_includes bundletool, '--ks-key-alias=androiddebugkey'
+      assert_includes bundletool, '--ks-pass=pass:android'
+      assert_includes bundletool, '--key-pass=pass:android'
+      refute bundletool.any? { |a| a.to_s.include?('file:') },
+             'the debug password is an SDK constant, not a secret needing a password file'
+    end
+  end
+
+  def test_android_build_unsigned_never_reads_the_upload_keystore
+    in_project do |dir|
+      generated_android_bundle(dir)
+      run_lane(:android, :build, skip_signing: 'true')
+
+      assert_empty args_for(:gradle)[:properties],
+                   'the config plugin only falls back when the properties are absent'
+      refute called?(:match)
+    end
+  end
+
+  def test_android_verify_asserts_debug_signing_when_the_build_was_unsigned
+    in_project do |dir|
+      File.write(File.join(dir, 'scripts', 'release', 'verify-android.sh'), '#!/bin/bash')
+      FileUtils.mkdir_p(File.join(dir, 'artifacts', 'android'))
+      %w[app-release.aab app-universal.apk].each do |name|
+        File.write(File.join(dir, 'artifacts', 'android', name), 'x')
+      end
+
+      run_lane(:android, :verify, skip_signing: 'true')
+      command = args_for(:sh)
+      assert_equal 'bash', command[0]
+      assert_includes command, '--expect-debug-signing',
+                      'CI passes skip_signing to this lane; it must reach the script'
+    end
+  end
+
+  def test_android_verify_does_not_assert_debug_signing_for_a_signed_build
+    in_project do |dir|
+      File.write(File.join(dir, 'scripts', 'release', 'verify-android.sh'), '#!/bin/bash')
+      FileUtils.mkdir_p(File.join(dir, 'artifacts', 'android'))
+      %w[app-release.aab app-universal.apk].each do |name|
+        File.write(File.join(dir, 'artifacts', 'android', name), 'x')
+      end
+
+      run_lane(:android, :verify)
+      refute_includes args_for(:sh), '--expect-debug-signing'
+    end
+  end
+
   def test_android_build_refuses_to_run_without_the_upload_keystore
     in_project do
       error = assert_raises(UI::UserError) { run_lane(:android, :build) }

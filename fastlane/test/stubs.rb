@@ -110,7 +110,26 @@ end
 def sh(*command, **options)
   $calls << [:sh, command]
   options
+  # bundletool's side effect, not just its argv: `build-apks` writes a zip that
+  # the lane immediately opens to extract universal.apk. A stub that records the
+  # call and writes nothing makes the unsigned branch untestable, which is part
+  # of why it had no coverage.
+  stub_bundletool_output(command) if command.include?('build-apks')
   ''
+end
+
+def stub_bundletool_output(command)
+  output = command.find { |arg| arg.to_s.start_with?('--output=') }
+  return if output.nil?
+
+  require 'zip'
+  require 'fileutils'
+  path = output.to_s.delete_prefix('--output=')
+  FileUtils.mkdir_p(File.dirname(path))
+  FileUtils.rm_f(path)
+  Zip::File.open(path, create: true) do |archive|
+    archive.get_output_stream('universal.apk') { |f| f.write('stub apk') }
+  end
 end
 
 # ---------------------------------------------------------------------------
