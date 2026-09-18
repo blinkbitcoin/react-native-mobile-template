@@ -52,7 +52,30 @@ jobs:
       # trigger above is what makes the label alone start a run).
       ios: ${{ vars.E2E_IOS == 'true' || contains(github.event.pull_request.labels.*.name, 'e2e:ios') }}
       macos-runner: ${{ vars.WORKFLOWS_MACOS_RUNNER || 'macos-26' }}
+      # Android only. The iOS suite runs a Release build below, which embeds the
+      # bundle and has no dev launcher, so e2e.yml forces dev-client off there.
       dev-client: true
+      # Release, because the Debug/dev-client path never ran twice in a row on a
+      # runner. It needed Metro up, a deep link delivered, an iOS "Open in
+      # <app>?" prompt answered, and a 2000-module bundle fetched over localhost
+      # before the dev client gave up - four things that each have to succeed
+      # every time, and three of which were seen to fail. A Release build needs
+      # none of them: `simctl launch` and the app is running.
+      #
+      # The cost, accepted: the iOS suite no longer exercises the Metro dev
+      # path. That is a development concern, and not something these flows
+      # assert - they check the app's screens, which a Release build shows the
+      # same way. Android still covers the dev-client path.
+      ios-configuration: Release
+      # The other half of that trade. A Release build resolves `.env.production`
+      # at bundle time, which points at a placeholder host, so the `home` flow -
+      # it asserts data fetched over GraphQL - had nothing to talk to. An
+      # exported variable wins over the dotenv file, so this is the URL the
+      # bundle embeds. It has to be a literal: the build job runs before, and on
+      # a different runner from, the job that starts the mock API. 8082 is
+      # `BASE_DEFAULT` 8080 plus `mockApi.offset` 2 from `scripts/ports.mjs`,
+      # deterministic on a runner because nothing sets `APP_PORT_BASE` there.
+      build-env: '{"EXPO_PUBLIC_API_URL":"http://localhost:8082/graphql"}'
       e2e-setup-script: scripts/e2e/ci-mock-api-up.sh
       e2e-teardown-script: scripts/e2e/ci-mock-api-down.sh
   badges:

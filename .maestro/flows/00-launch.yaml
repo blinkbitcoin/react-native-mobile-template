@@ -93,9 +93,48 @@ tags: [smoke]
             platform: Android
           commands:
             - back
+# `stopApp: false` means this flow can start on whatever screen the previous
+# one left behind - `error-screen` ends on Settings - and on a suite retry it
+# does. Without this tap the retry fails here on a working app and stacks an
+# invented failure on top of the real one, exactly when the signal matters
+# most. Optional, so it is a no-op on the cold start it was written for, and
+# it is what every other flow already does to reach its own tab.
+- runFlow: ../helpers/to-tab-bar.yaml
+- tapOn:
+    id: tab-home
+    optional: true
 # `assertVisible` has no `timeout` property in Maestro 2.x; `extendedWaitUntil`
 # is the supported way to wait out a cold start.
 - extendedWaitUntil:
     visible:
       id: home-screen
     timeout: 90000
+# The first URL a simulator session opens is the slow one, and it is where every
+# iOS deep-link failure so far actually happened - not in the flow that reported
+# it. `simctl openurl` puts up SpringBoard's "Open in <app>?" alert; tapping
+# Open hands the app a UIOpenURLAction, and on a loaded runner that first
+# hand-off was seen to take ~40s (runs 35244165974, 35249261053: the link
+# landed during the *next* flow, pushing Details over Settings). Locally the
+# same binary does it in 40ms, and once the choice has been confirmed iOS
+# stops asking: six consecutive opens produced one alert. So pay the first
+# open here, on a link that is a no-op on Home, inside the flow whose job is
+# to absorb cold costs - and every later openLink is alert-free and immediate.
+# The wait is generous and optional: the alert took up to 9s to appear on CI,
+# and on a suite retry (same boot) it does not appear at all.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - openLink: rnmt://
+      - extendedWaitUntil:
+          visible:
+            text: '^Open$'
+          timeout: 20000
+          optional: true
+      - tapOn:
+          text: '^Open$'
+          optional: true
+      - extendedWaitUntil:
+          visible:
+            id: home-screen
+          timeout: 60000

@@ -49,7 +49,11 @@ pre-push:
     knip:
       run: pnpm knip
     unit:
-      run: pnpm test -- --changedSince=origin/main --passWithNoTests
+      # No `--` before the flags: jest's parser stops at it and reads what
+      # follows as filename patterns, so `--passWithNoTests` became a pattern
+      # matching nothing and every push whose commits touched no test file was
+      # rejected. pnpm 12 forwards trailing args to the script without it.
+      run: pnpm test --changedSince=origin/main --passWithNoTests
 # Both hooks pass git's own arguments straight through: the script works out
 # which two revisions to compare (lefthook's `{1}` templating expanded inside
 # `HEAD@{1}`, which made git reject `HEAD@0` on every merge).

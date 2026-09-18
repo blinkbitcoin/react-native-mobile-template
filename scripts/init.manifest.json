@@ -95,6 +95,7 @@
       ".env.example",
       ".env.production",
       ".github/codeql/codeql-config.yml",
+      ".maestro/flows/00-launch.yaml",
       ".maestro/flows/deep-link.yaml",
       "app.config.ts",
       "certs/README.md",

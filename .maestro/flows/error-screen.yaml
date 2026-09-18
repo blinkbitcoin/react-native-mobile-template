@@ -1,6 +1,7 @@
 appId: ${APP_ID}
 tags: [smoke]
 ---
+- runFlow: ../helpers/to-tab-bar.yaml
 - tapOn:
     id: tab-settings
 # `Trigger error` is the last control in DevMenu and Settings is a scrolling

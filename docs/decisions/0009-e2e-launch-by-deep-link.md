@@ -1,6 +1,6 @@
 # 9. E2E launches the dev client by deep link, never from its launcher
 
-- **Status:** Accepted
+- **Status:** Accepted for Android; superseded for iOS by [0010](0010-ios-e2e-release-build.md)
 - **Date:** 2026-09-06
 
 ## Context

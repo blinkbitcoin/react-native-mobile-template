@@ -1,6 +1,7 @@
 appId: ${APP_ID}
 tags: [smoke]
 ---
+- runFlow: ../helpers/to-tab-bar.yaml
 - tapOn:
     id: tab-settings
 - assertVisible:

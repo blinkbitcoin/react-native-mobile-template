@@ -1,0 +1,20 @@
+appId: ${APP_ID}
+---
+# Get back to a screen that has the tab bar, so a flow can reach its own tab.
+#
+# The suite runs with `stopApp: false`, so every flow inherits whatever the
+# previous one left on screen. A pushed screen (Details) covers the tab bar,
+# and a flow that starts by tapping `tab-settings` then fails with "element not
+# found" - reporting a fault in itself for something the flow before it did.
+# This keeps one failure from cascading into every flow after it.
+#
+# iOS only, and optional. On Android the hardware back key would *exit the app*
+# when there is nothing to pop, which is a worse failure than the one this
+# guards against; the Android suite has not shown the cascade.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: 'BackButton'
+          optional: true
