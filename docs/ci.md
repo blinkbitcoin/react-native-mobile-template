@@ -160,7 +160,9 @@ Two script-contract details are load-bearing:
   `PLAYWRIGHT_SKIP_EXPORT` is set. `web.yml` exports once in its `build` job,
   uploads the result as the `web-dist` artifact, and sets that variable for the
   Playwright job — the point being that Playwright tests the exact bytes that
-  would deploy, not a second, possibly-different export.
+  would deploy, not a second, possibly-different export. Those bytes carry
+  `.env.production`'s API URL on a deploy run, so `e2e/web/fixtures.ts`
+  redirects the page's GraphQL calls to the mock API rather than rebuilding.
 
 ## E2E: iOS is opt-in, and this repo opts in
 
