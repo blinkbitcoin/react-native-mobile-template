@@ -9,7 +9,7 @@ wrong one is the usual source of pain.
 
 | You need to... | Use | Example here |
 | --- | --- | --- |
-| Change generated native project files: Info.plist keys, manifest entries, Gradle blocks, entitlements | A **config plugin** in `plugins/` | `with-build-stamp.ts`, `with-android-release-signing.ts`, `with-android-release-abis.ts` |
+| Change generated native project files: Info.plist keys, manifest entries, Gradle blocks, entitlements | A **config plugin** in `plugins/` | `with-build-stamp.ts`, `with-android-release-signing.ts`, `with-android-release-abis.ts`, `with-android-gradle-jvm-args.ts` |
 | Call platform code from JavaScript: a Swift or Kotlin API with no library, or one you want to wrap | A **local Expo module** in `modules/` | `hello-native` |
 | Change build settings only: iOS deployment target, `useFrameworks`, Android `compileSdkVersion`, NDK bits | **`expo-build-properties`** | Not installed. Add with `pnpm expo install expo-build-properties` and configure it in `app.config.ts` |
 | Use an existing native library | Install it, add its plugin to `app.config.ts` if it has one | The `expo-*` entries in `app.config.ts` |
@@ -84,12 +84,13 @@ mods registered. `withBuildStamp` registers two:
 The stamp itself is computed in `app.config.ts` as
 `<variant>-<sha7>-<date>` and passed as a plugin option.
 
-The other two plugins are worth reading for their own patterns:
+The other plugins are worth reading for their own patterns:
 
 | Plugin | Pattern |
 | --- | --- |
 | `with-android-release-signing.ts` | `withAppBuildGradle` plus `CodeGenerator.mergeContents` with a tag, which recognizes its own block and is idempotent.<br>It rewrites the release build type to use the release `signingConfig`,<br>and **throws** when the template it expects is not found.<br>A silent no-op there would ship a release build signed with the debug keystore |
 | `with-android-release-abis.ts` | `withGradleProperties`, setting `reactNativeArchitectures` to `armeabi-v7a,arm64-v8a`.<br>CI overrides it for x86 emulator builds with `-PreactNativeArchitectures=x86_64`, which wins over `gradle.properties` |
+| `with-android-gradle-jvm-args.ts` | `withGradleProperties`, replacing `org.gradle.jvmargs` with `-Xmx4096m -XX:MaxMetaspaceSize=1024m`.<br>The template's 512 MB Metaspace cap is what `lintVitalAnalyzeRelease` exhausts on a release build;<br>the daemon then hangs instead of failing |
 
 Order matters: plugins run in the order listed in `app.config.ts`, and a later
 plugin sees what an earlier one wrote.

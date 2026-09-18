@@ -81,6 +81,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ['./plugins/with-build-stamp', { stamp: buildStamp }],
     './plugins/with-android-release-signing',
     './plugins/with-android-release-abis',
+    './plugins/with-android-gradle-jvm-args',
     [
       'expo-splash-screen',
       {
