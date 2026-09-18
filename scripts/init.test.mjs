@@ -820,6 +820,13 @@ describe('init --yes --no-web', () => {
       'Setting `PLAYWRIGHT_SKIP_EXPORT` skips the export and tests whatever is',
       'already in `dist/`. CI sets it so Playwright exercises the exact artifact the',
       'deploy job would publish, instead of a second, possibly different export.',
+      'That artifact is a **production** export when it is going to deploy, and a',
+      "production export bakes `.env.production`'s API URL - a host no test can",
+      'reach. `e2e/web/fixtures.ts` therefore routes every `**/graphql` request the',
+      'page makes to the mock API and replays the response, whatever host the bundle',
+      'was built for. Specs import `test` from `./fixtures`, not from',
+      '`@playwright/test`. Rebuilding the export against the mock would have meant',
+      'testing different bytes from the ones that deploy.',
       '| `playwright-report` | the web job | The Playwright HTML report with traces and screenshots |',
     ]);
   });
