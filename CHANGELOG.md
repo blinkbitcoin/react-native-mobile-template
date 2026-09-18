@@ -5,6 +5,13 @@ by [release-please](https://github.com/googleapis/release-please) from
 [Conventional Commits](https://www.conventionalcommits.org/) — edit the commit
 messages, not this file. See [docs/release-runbook.md](docs/release-runbook.md).
 
+## [0.2.3](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.2.2...v0.2.3) (2026-09-18)
+
+
+### Bug Fixes
+
+* **ci:** read the release PR's branch in the shell, not with fromJSON in env ([#20](https://github.com/blinkbitcoin/react-native-mobile-template/issues/20)) ([c172946](https://github.com/blinkbitcoin/react-native-mobile-template/commit/c172946a40347af7eb74acd968bae6e0b3ef0a35))
+
 ## [0.2.2](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.2.1...v0.2.2) (2026-09-18)
 
 
