@@ -33,29 +33,15 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    # Exposed for a consumer that wants to chain a job off the cut release
-    # (e.g. moving a major tag). Nothing in this template consumes them; the
-    # `vX.Y.Z` release itself is what triggers release-beta.yml.
+      # The dispatch steps below write to the Actions API.
+      actions: write
+    # Consumed by the dispatch steps below, and exposed for a consumer that
+    # wants to chain something else off the cut release (e.g. moving a major
+    # tag).
     outputs:
       release-created: ${{ steps.release.outputs.release_created }}
       tag-name: ${{ steps.release.outputs.tag_name }}
-    env:
-      # The `secrets` context is not available in a step-level `if:`, so the app
-      # id is mirrored into `env` purely so the token step can branch on whether
-      # it was configured. Only the id, never the private key.
-      RELEASE_TAGGER_APP_ID: ${{ secrets.RELEASE_TAGGER_APP_ID }}
     steps:
-      # A release created with the default GITHUB_TOKEN does not trigger other
-      # workflows, so `release-beta.yml` (`release: published`) would never fire
-      # and the release PR would also be blocked by an org ruleset that forbids
-      # Actions-authored pushes. Configure both secrets or neither.
-      - name: GitHub App token
-        id: app-token
-        if: ${{ env.RELEASE_TAGGER_APP_ID != '' }}
-        uses: actions/create-github-app-token@v3
-        with:
-          app-id: ${{ secrets.RELEASE_TAGGER_APP_ID }}
-          private-key: ${{ secrets.RELEASE_TAGGER_APP_PRIVATE_KEY }}
       # Manifest mode only. `release-type`, `package-name`,
       # `include-component-in-tag`, `bump-minor-pre-major` and
       # `changelog-sections` all live in release-please-config.json under
@@ -67,4 +53,37 @@ jobs:
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-          token: ${{ steps.app-token.outputs.token || github.token }}
+      # Everything release-please creates - the PR, the tag, the release - is
+      # created with GITHUB_TOKEN, and GitHub never starts a workflow from an
+      # event that token caused, so nothing downstream would run from a
+      # `release: published` or `pull_request` trigger. The one exemption is
+      # `workflow_dispatch`, so the follow-on work is started here by name.
+      # `--ref "$TAG"` puts the run on the release commit: `github.sha` is then
+      # the same sha release-internal built, which is what release-retry.yml
+      # matches on.
+      - name: Start the beta promotion at the new tag
+        if: ${{ steps.release.outputs.release_created == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ steps.release.outputs.tag_name }}
+        run: gh workflow run release-beta.yml --repo "$REPO" --ref "$TAG" -f "tag=$TAG"
+      - name: Deploy the web build at the new tag
+        if: ${{ steps.release.outputs.release_created == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ steps.release.outputs.tag_name }}
+        run: gh workflow run web.yml --repo "$REPO" --ref "$TAG" -f "deploy=true"
+      # The release PR is bot-authored, so its own `pull_request` runs wait for
+      # a human to approve them and are marked failed when the PR merges. This
+      # is the run that counts. It is a full CI run, E2E included, once per
+      # update of the release PR - free on a public repository; a private
+      # consumer that finds it too much can drop this one step.
+      - name: Run CI on the release PR
+        if: ${{ steps.release.outputs.prs_created == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
+        run: gh workflow run ci.yml --repo "$REPO" --ref "$BRANCH"

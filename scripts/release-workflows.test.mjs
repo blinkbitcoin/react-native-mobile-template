@@ -66,6 +66,72 @@ const WORKFLOWS = {
   },
 };
 
+// release-please.yml chains everything after the cut release by dispatch. It
+// has to: the PR, tag and release are created with GITHUB_TOKEN, and GitHub
+// never starts a workflow from an event that token caused - except for
+// `workflow_dispatch`. A `release: published` trigger anywhere downstream is a
+// trigger that never fires (or, with an App token, fires on every `-build.N`
+// pre-release too).
+describe('release-please.yml chains the release by dispatch', () => {
+  const dir = path.join(root, '.github/workflows');
+  const rp = readFileSync(path.join(dir, 'release-please.yml'), 'utf8');
+  const code = rp
+    .split('\n')
+    .filter((l) => !l.trimStart().startsWith('#'))
+    .join('\n');
+
+  test('the job may write to the Actions API', () => {
+    assert.match(code, /^\s+actions: write$/m, 'release-please.yml lacks actions: write');
+  });
+
+  test('a cut release dispatches release-beta and web at the tag', () => {
+    for (const wf of ['release-beta.yml', 'web.yml']) {
+      const step = new RegExp(
+        `release_created == 'true'[\\s\\S]*?gh workflow run ${wf.replace('.', '\\.')} [^\n]*--ref "\\$TAG"`,
+      );
+      assert.match(code, step, `no dispatch of ${wf} gated on release_created`);
+    }
+    assert.match(code, /gh workflow run release-beta\.yml [^\n]*-f "tag=\$TAG"/);
+    assert.match(code, /gh workflow run web\.yml [^\n]*-f "deploy=true"/);
+  });
+
+  test('a created or updated release PR gets a CI run', () => {
+    assert.match(
+      code,
+      /prs_created == 'true'[\s\S]*?gh workflow run ci\.yml [^\n]*--ref "\$BRANCH"/,
+      'no CI dispatch gated on prs_created',
+    );
+    assert.match(code, /fromJSON\(steps\.release\.outputs\.pr\)\.headBranchName/);
+  });
+
+  test('nothing downstream waits on a release event, and no App token remains', () => {
+    for (const file of ['release-beta.yml', 'web.yml']) {
+      const text = readFileSync(path.join(dir, file), 'utf8')
+        .split('\n')
+        .filter((l) => !l.trimStart().startsWith('#'))
+        .join('\n');
+      assert.doesNotMatch(text, /^\s+release:\s*$/m, `${file} still triggers on release:`);
+      assert.match(text, /^\s+workflow_dispatch:\s*$/m, `${file} cannot be dispatched`);
+    }
+    const beta = readFileSync(path.join(dir, 'release-beta.yml'), 'utf8');
+    assert.match(beta, /tag:\n\s+description:[^\n]*\n\s+type: string\n\s+required: true/);
+    for (const file of [
+      'release-please.yml',
+      'release-internal.yml',
+      'release-beta.yml',
+      'release-production.yml',
+      'web.yml',
+    ]) {
+      const text = readFileSync(path.join(dir, file), 'utf8');
+      assert.doesNotMatch(
+        text,
+        /RELEASE_TAGGER|create-github-app-token/,
+        `${file} still references the App`,
+      );
+    }
+  });
+});
+
 describe('the release path without a store account', () => {
   for (const [file, spec] of Object.entries(WORKFLOWS)) {
     describe(file, () => {

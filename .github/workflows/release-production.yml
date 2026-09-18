@@ -248,9 +248,6 @@ jobs:
       # in the `&&` slot.
       body-note: >-
         ${{ vars.STORE_UPLOADS_ENABLED != 'true' && 'Store uploads were off for this build: it was never sent to TestFlight or Play. Set the repository variable STORE_UPLOADS_ENABLED to true to turn them on.' || '' }}
-    secrets:
-      RELEASE_TAGGER_APP_ID: ${{ secrets.RELEASE_TAGGER_APP_ID }}
-      RELEASE_TAGGER_APP_PRIVATE_KEY: ${{ secrets.RELEASE_TAGGER_APP_PRIVATE_KEY }}
 
   # A production dispatch otherwise leaves no record on the release of which
   # stage it reached — which release went out, when, to which stores, at what
@@ -299,9 +296,6 @@ jobs:
       append-title: Production
       notes-artifact: release-stage
       notes-file: production-stage.md
-    secrets:
-      RELEASE_TAGGER_APP_ID: ${{ secrets.RELEASE_TAGGER_APP_ID }}
-      RELEASE_TAGGER_APP_PRIVATE_KEY: ${{ secrets.RELEASE_TAGGER_APP_PRIVATE_KEY }}
 
   ota-production:
     name: OTA

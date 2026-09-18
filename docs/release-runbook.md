@@ -12,8 +12,8 @@ OTA is documented separately in [ota.md](ota.md).
 merge a PR ──► release-internal   TestFlight internal + Play internal
                     │              vX.Y.Z-build.N pre-release, OTA internal
                     ▼
-merge the release PR ──► release-please ──► vX.Y.Z release published
-                                                  │
+merge the release PR ──► release-please ──► vX.Y.Z release published,
+                                                  │  release-beta + web dispatched
                                                   ▼
                                             release-beta   TestFlight external
                                                   │        + Play open beta
@@ -57,14 +57,22 @@ instead; the script recovers by reading the merge's second parent, but squash is
 the setting that keeps this simple. Settings → General → Pull Requests: allow
 squash merging and make it the default.
 
+The release PR's own checks look odd and that is expected: a bot-authored PR's
+`pull_request` runs wait for a human to approve them and are marked failed when
+the PR merges. release-please dispatches `ci.yml` on the PR's branch instead
+every time it creates or updates the PR, and that run - a full one, E2E
+included - is the one to read. A private consumer that finds a full run per
+release-PR update too expensive drops that single step in `release-please.yml`.
+
 Optionally edit the release's `## Store notes` section first — see
 [Store notes](#store-notes). The section is read at promotion time, not at
 release time, so editing it before step 3 finishes is safe.
 
 ### 3. Beta promotes itself
 
-`release-beta.yml` fires on `release: published` (non-prerelease), waits for the
-release commit's internal run, then promotes to the TestFlight external group
+`release-please.yml` dispatches `release-beta.yml` at the new tag the moment
+the release exists (see [Why the hop is a dispatch](#why-the-hop-is-a-dispatch)).
+It waits for the release commit's internal run, then promotes to the TestFlight external group
 and the Play open beta track, moves the `vX.Y.Z-build.N` pre-release's assets
 onto the `vX.Y.Z` release (and deletes the pre-release and its tag afterwards),
 and publishes OTA `beta`.
@@ -336,8 +344,6 @@ you want a reviewer between a token and production.
 | `ANDROID_UPLOAD_KEY_ALIAS` | Android build | Key alias inside the keystore |
 | `ANDROID_UPLOAD_KEY_PASSWORD` | Android build | Password of that key |
 | `PLAY_SERVICE_ACCOUNT_JSON` | Android build and every Android lane | Google Cloud → service account → JSON key, then grant it release permissions in Play Console → Users and permissions |
-| `RELEASE_TAGGER_APP_ID` | `release-please`, every `github-release` call | A GitHub App installed on the repo with contents + pull-requests write |
-| `RELEASE_TAGGER_APP_PRIVATE_KEY` | same | That App's private key (`.pem`, whole file) |
 | `OTA_PUBLISH_TOKEN` | every `ota-*` job | One of the update server's `EOO_TOKENS`; scope per environment |
 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | `expo-prepare` (`notes.mjs`) | Only needed when `RELEASE_NOTES_LLM_PROVIDER` selects that provider. The notes fall back to deterministic prose without them |
 | `APP_REVIEW_EMAIL`, `APP_REVIEW_FIRST_NAME`, `APP_REVIEW_LAST_NAME`, `APP_REVIEW_PHONE` | iOS `promote_beta` and `release_production` lanes | The contact Apple reaches for review questions |
@@ -350,13 +356,30 @@ printed to the log. The lanes omit the whole argument when none of them is set �
 `pilot` PATCHes every key it is given, so blanks would erase the contact already
 configured in App Store Connect.
 
-### Why the GitHub App matters
+### Why the hop is a dispatch
 
-A release created with the default `GITHUB_TOKEN` **does not trigger other
-workflows**. Without `RELEASE_TAGGER_APP_ID` / `RELEASE_TAGGER_APP_PRIVATE_KEY`,
-release-please's `vX.Y.Z` release publishes but `release-beta.yml` never fires,
-and an org ruleset that forbids Actions-authored pushes blocks the release PR
-outright. Configure both or neither — the workflows branch on the id being set.
+Everything release-please creates — the PR, the tag, the `vX.Y.Z` release — is
+created with the workflow's own `GITHUB_TOKEN`, and GitHub **never starts a
+workflow from an event that token caused**, so that workflows cannot trigger
+each other forever. A `release: published` trigger on `release-beta.yml` or
+`web.yml` would therefore never fire. The rule has two exemptions,
+`workflow_dispatch` and `repository_dispatch`, so `release-please.yml` starts
+the follow-on work itself: `gh workflow run release-beta.yml --ref vX.Y.Z -f
+tag=vX.Y.Z`, the same for `web.yml` with `deploy=true`, and `ci.yml` on the
+release PR's branch whenever the PR is created or updated. The job needs
+`actions: write` for that, nothing else.
+
+`--ref` is the tag on purpose: the dispatched run's `github.sha` is then the
+release commit, the same sha `release-internal` built, which is what
+`release-retry.yml` matches a failed beta run on.
+
+The alternative is a GitHub App whose token creates the release, so that the
+`release:` event fires normally. It is more moving parts for the same result —
+an App to register, two secrets to rotate, and a `release:` trigger that then
+also fires on every `-build.N` pre-release from `release-internal` unless every
+listener filters `prerelease`. The reusable `github-release.yml` still accepts
+`RELEASE_TAGGER_APP_ID` / `RELEASE_TAGGER_APP_PRIVATE_KEY` for a consumer that
+already has such an App; this template does not use them.
 
 ### Concurrency: which workflows share a queue
 
@@ -366,9 +389,10 @@ Every **store-affecting** workflow — `release-internal`, `release-beta`,
 time and none is ever cancelled half-way.
 
 The group is a **constant**, not `release-${{ github.ref }}`. `github.ref` is
-`refs/heads/main` on a push or a dispatch but `refs/tags/vX.Y.Z` on a
-`release: published` event, so a ref-keyed group put `release-beta` in a queue of
-its own — and the same workflow changed queue depending on how it was started.
+`refs/heads/main` on a push or a manual dispatch but `refs/tags/vX.Y.Z` on the
+dispatch release-please makes at the tag, so a ref-keyed group put
+`release-beta` in a queue of its own — and the same workflow changed queue
+depending on how it was started.
 
 `release-please` and `release-retry` deliberately have their own groups
 (`release-please-*`, `release-retry-*`). GitHub keeps only one *pending* run per
