@@ -219,9 +219,13 @@ jobs:
     # jobs: this release carries their artifacts and has never needed a store.
     # `!cancelled() && !failure()` is what lets it run when the uploads are
     # skipped - a skipped dependency skips its dependents unless the condition
-    # uses a status function.
+    # uses a status function. It is not enough on its own: a build job killed
+    # by its timeout reports `cancelled`, which `cancelled()` (the *run's*
+    # state) and `failure()` both miss - the first internal release shipped a
+    # pre-release with no binaries that way. So both builds are required to
+    # have succeeded, by name.
     needs: [prepare, build-ios, build-android, publish-ios, publish-android]
-    if: ${{ !cancelled() && !failure() }}
+    if: ${{ !cancelled() && !failure() && needs.build-ios.result == 'success' && needs.build-android.result == 'success' }}
     uses: blinkbitcoin/shared-workflows/.github/workflows/github-release.yml@v0
     permissions:
       # The called job creates a release; a called workflow can only narrow the
