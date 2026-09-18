@@ -1,11 +1,10 @@
 name: CD / Beta
-# Fires when release-please's PR is merged and the `vX.Y.Z` release is
-# published. It never builds: it waits for that exact commit's
-# `release-internal` run to be green and then promotes the binary that run
-# already uploaded, so beta ships bytes that were tested on internal.
+# Dispatched by release-please.yml the moment it cuts the `vX.Y.Z` release
+# (not `release: published`: a release created with GITHUB_TOKEN never fires
+# that). It never builds: it waits for that exact commit's `release-internal`
+# run to be green and then promotes the binary that run already uploaded, so
+# beta ships bytes that were tested on internal.
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       tag:
@@ -26,9 +25,6 @@ concurrency:
 jobs:
   prepare:
     name: Prepare
-    # A `-build.N` pre-release from release-internal also publishes a `release`
-    # event; only a real release may promote.
-    if: ${{ github.event_name == 'workflow_dispatch' || !github.event.release.prerelease }}
     uses: blinkbitcoin/shared-workflows/.github/workflows/expo-prepare.yml@v0
     permissions:
       contents: read
@@ -38,12 +34,10 @@ jobs:
     with:
       # `release-tag` (not `ref`) is what makes this correct: it becomes the
       # checkout ref, the gated and stamped commit (`TAG^{commit}`, exposed as
-      # the `sha` output) and the source of the store notes. `github.sha` on a
-      # `release: published` event is the default branch's tip when the event
-      # fired, which may already be ahead of the tag — gating on it would check
-      # the wrong commit's CI, and on the workflow_dispatch path it would gate
-      # on main while promoting an older tag.
-      release-tag: ${{ inputs.tag || github.event.release.tag_name }}
+      # the `sha` output) and the source of the store notes. A manual dispatch
+      # can run on main while promoting an older tag - gating on `github.sha`
+      # would check the wrong commit's CI.
+      release-tag: ${{ inputs.tag }}
       stage: beta
       build-number-offset: ${{ fromJSON(vars.BUILD_NUMBER_OFFSET || '1000') }}
       # A promotion must never ship a binary whose own build never went green.
@@ -140,7 +134,7 @@ jobs:
       contents: write
     with:
       mode: promote
-      tag: ${{ inputs.tag || github.event.release.tag_name }}
+      tag: ${{ inputs.tag }}
       # The promoted release must ship the bytes internal testers actually ran.
       # `from-tag` re-uploads the pre-release's ipa/aab/apk/dSYM/mapping to this
       # tag and regenerates SHA256SUMS over the merged set; a rebuild from the
@@ -162,9 +156,6 @@ jobs:
       # release is the single record of what beta got — and so the OTA gate
       # below has a fingerprint baseline to download.
       assets-artifacts: release-meta
-    secrets:
-      RELEASE_TAGGER_APP_ID: ${{ secrets.RELEASE_TAGGER_APP_ID }}
-      RELEASE_TAGGER_APP_PRIVATE_KEY: ${{ secrets.RELEASE_TAGGER_APP_PRIVATE_KEY }}
 
   # The store notes are what beta testers and, later, App Review actually read,
   # and until now nothing showed the operator what the pipeline would ship. The
@@ -206,13 +197,10 @@ jobs:
     with:
       # Marker-delimited and idempotent across re-runs, so a retry is safe.
       mode: append
-      tag: ${{ inputs.tag || github.event.release.tag_name }}
+      tag: ${{ inputs.tag }}
       append-title: Store notes
       notes-artifact: release-store-notes
       notes-file: store-notes-section.md
-    secrets:
-      RELEASE_TAGGER_APP_ID: ${{ secrets.RELEASE_TAGGER_APP_ID }}
-      RELEASE_TAGGER_APP_PRIVATE_KEY: ${{ secrets.RELEASE_TAGGER_APP_PRIVATE_KEY }}
 
   ota-beta:
     name: OTA
@@ -224,14 +212,14 @@ jobs:
     with:
       ota-enabled: ${{ vars.OTA_ENABLED == 'true' }}
       # The commit the tag actually points at, resolved by prepare — not the
-      # branch tip the release event carried.
+      # ref the dispatch carried.
       ref: ${{ needs.prepare.outputs.sha }}
       channel: beta
       rollout: 100
       environment: beta
       ota-cli-version: ${{ vars.OTA_CLI_VERSION }}
       # The release being promoted is the binary now on the beta track.
-      baseline-tag: ${{ inputs.tag || github.event.release.tag_name }}
+      baseline-tag: ${{ inputs.tag }}
       manifest-url: ${{ vars.EXPO_UPDATES_URL }}
       runtime-version: ${{ needs.prepare.outputs.fp-ios }}
     secrets:

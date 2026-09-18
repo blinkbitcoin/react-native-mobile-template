@@ -69,7 +69,7 @@ twenty-minute Android suite or a macOS runner.
 | File | Trigger | Calls | Notes |
 | --- | --- | --- | --- |
 | `ci.yml` | `push` to `main` (all paths), `pull_request` (`opened`, `synchronize`, `reopened`, `labeled`), `workflow_dispatch` | `checks.yml`, `unit.yml`, `e2e.yml`, `badges.yml` | `unit` and `e2e` both `needs: checks` and skip when `checks` reports<br>`docs-only` — on a push as well as a PR; `badges` runs under `always()`<br>and publishes this branch's badges (see [Badges](#badges)) |
-| `web.yml` | `pull_request`, `release: published` | `web.yml` | PR = dev export + Playwright smoke; release = production export + Pages deploy |
+| `web.yml` | `pull_request`, `workflow_dispatch` (`deploy`) | `web.yml` | PR = dev export + Playwright smoke; a `deploy` dispatch from `release-please.yml`<br>at the tag = production export + Pages deploy |
 | `pr-closed.yml` | `pull_request: closed` | `pr-closed.yml` | cancels the closed PR's in-flight runs and drops its `gh-pages` badge directory; needs `actions: write` and `contents: write` |
 | `pr-title.yml` | `pull_request: edited` (only when the title changed) | `pr-title.yml` | `opened`/`synchronize` are already covered by `checks.yml`'s `commitlint` |
 | `codeql.yml` | `push` to `main`, `pull_request` to `main`, `schedule` (Mon 06:17 UTC) | `codeql.yml` | CodeQL advanced setup. Informational — **never** a required check.<br>Config in `.github/codeql/codeql-config.yml`; `make codeql` runs the same queries locally |
@@ -121,11 +121,11 @@ break. The expensive half, the native matrix, still skips.
 
 | File | Trigger | Calls | Notes |
 | --- | --- | --- | --- |
-| `release-please.yml` | `push` to `main` (all paths), `workflow_dispatch` | `googleapis/release-please-action@v5`, `actions/create-github-app-token@v2` | Keeps one release PR open. Calls no reusable workflow from the workflows repo |
+| `release-please.yml` | `push` to `main` (all paths), `workflow_dispatch` | `googleapis/release-please-action@v5` | Keeps one release PR open and dispatches `ci.yml` on its branch.<br>On a cut release, dispatches `release-beta.yml` and `web.yml` at the tag.<br>Calls no reusable workflow from the workflows repo |
 | `release-internal.yml` | `push` to `main` (skipping `docs/**`, `**.md`), `workflow_dispatch` | `expo-prepare.yml`, `expo-build-ios.yml`, `expo-build-android.yml`,<br>`fastlane-lane.yml`, `github-release.yml`, `expo-ota-publish.yml` | The only workflow that builds binaries |
-| `release-beta.yml` | `release: published`, `workflow_dispatch` (`tag`) | `expo-prepare.yml`, `fastlane-lane.yml`, `github-release.yml`, `expo-ota-publish.yml` | Promotes the binary internal already built and tested. Never builds |
+| `release-beta.yml` | `workflow_dispatch` (`tag`), from `release-please.yml` or by hand | `expo-prepare.yml`, `fastlane-lane.yml`, `github-release.yml`, `expo-ota-publish.yml` | Promotes the binary internal already built and tested. Never builds |
 | `release-production.yml` | `workflow_dispatch` (`tag`, `action`) | `expo-prepare.yml`, `fastlane-lane.yml`, `github-release.yml`, `expo-ota-publish.yml`, `web.yml` | `action` selects release, rollout, halt, resume or complete |
-| `release-retry.yml` | `workflow_run` on a completed `release-internal` for `main` | nothing: it re-runs a failed beta run with `gh` | Closes the hole where `release: published` fires once, before internal is green |
+| `release-retry.yml` | `workflow_run` on a completed `release-internal` for `main` | nothing: it re-runs a failed beta run with `gh` | Closes the hole where the beta dispatch arrives once, before internal is green |
 | `ota-hotfix.yml` | `workflow_dispatch` (`channel`, `ref`, rollout) | `expo-ota-publish.yml` | JavaScript-only fixes. The fingerprint gate rejects anything native |
 
 On a repo that never turns OTA on, the store path still works: only the `ota-*`
