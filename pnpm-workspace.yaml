@@ -33,16 +33,19 @@ minimumReleaseAgeExclude:
   - 'expo-router@57.0.19'
   - '@expo/ui@57.0.16'
 # The recurring case worth naming: `expo install --check` (and expo-doctor's
-# version check, which CI runs) demand whatever patch the SDK currently expects,
-# while the guard above refuses anything younger than the cooldown. At 3 days
-# the two were in permanent conflict - Expo patches more often than that - and
-# the deps gate sat red for days on a version this repo had chosen not to
-# install yet. At 1 day they mostly agree, and a drift that survives a day is a
-# real drift worth a red check.
+# version check) demand whatever patch the SDK currently expects, while the
+# guard above refuses anything younger than the cooldown. At 3 days the two
+# were in permanent conflict - Expo patches more often than that - and the deps
+# gate sat red for days on a version this repo had chosen not to install yet.
+# At 1 day they still disagreed for a day after every Expo patch, and that day
+# turned every open PR red and skipped its unit and E2E jobs. So the drift
+# check is advisory now - `scripts/check-deps.sh` prints the table and CI
+# annotates a warning - and the guard is the only thing that decides when a
+# patch comes in.
 #
-# Excluding the SDK here would make CI green whatever the cooldown, and that is
-# the trade the image-size note below still refuses: a guard waived whenever it
-# is inconvenient is not a guard. Shortening the window is a decision about how
+# Excluding the SDK here would make the guard silent, and that is the trade the
+# image-size note below still refuses: a guard waived whenever it is
+# inconvenient is not a guard. Shortening the window is a decision about how
 # much exposure to accept; an exclude is a decision to stop checking.
 strictDepBuilds: true
 onlyBuiltDependencies:
