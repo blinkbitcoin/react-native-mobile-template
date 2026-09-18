@@ -1,0 +1,153 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="340" viewBox="0 0 960 340" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" role="img" aria-label="react-native-mobile-template: press Use this template and run make init to get an Expo app that already runs, with a themed component kit, GraphQL and i18n; every push runs Checks, Unit and device E2E through shared-workflows at v0; a merge to main opens a release PR and ships signed builds to TestFlight and Google Play.">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#9292A0"/>
+    </marker>
+    <marker id="arrowOrange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#fc5805"/>
+    </marker>
+    <linearGradient id="bolt" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffad0d"/>
+      <stop offset="1" stop-color="#fc5805"/>
+    </linearGradient>
+    <linearGradient id="ramp" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#fc5805"/>
+      <stop offset="1" stop-color="#ffad0d"/>
+    </linearGradient>
+  </defs>
+
+  <!-- canvas -->
+  <rect x="0.5" y="0.5" width="959" height="339" rx="16" fill="#F9F9F9" stroke="#E2E2E4"/>
+
+  <!-- ===== Column 1: the template ===== -->
+  <text x="130" y="40" text-anchor="middle" font-size="13" font-weight="700" fill="#393939" letter-spacing="1">START HERE</text>
+
+  <!-- repo card -->
+  <g transform="translate(53 62)">
+    <rect x="8" y="8" width="154" height="146" rx="8" fill="#F2F2F4" stroke="#E2E2E4"/>
+    <rect x="0" y="0" width="154" height="146" rx="8" fill="#ffffff" stroke="#E2E2E4"/>
+    <!-- folder rows -->
+    <g fill="#ffd9a8">
+      <path d="M14 18 h6 l2 2 h8 v9 h-16 z"/>
+      <path d="M14 38 h6 l2 2 h8 v9 h-16 z"/>
+      <path d="M14 58 h6 l2 2 h8 v9 h-16 z"/>
+    </g>
+    <rect x="38" y="21" width="46" height="5" rx="2.5" fill="#393939"/>
+    <rect x="38" y="41" width="62" height="5" rx="2.5" fill="#E2E2E4"/>
+    <rect x="38" y="61" width="54" height="5" rx="2.5" fill="#E2E2E4"/>
+    <rect x="16" y="80" width="12" height="5" rx="2.5" fill="#E2E2E4"/>
+    <rect x="38" y="80" width="70" height="5" rx="2.5" fill="#E2E2E4"/>
+    <!-- use this template button -->
+    <rect x="14" y="104" width="126" height="28" rx="14" fill="url(#ramp)"/>
+    <text x="77" y="122" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">Use this template</text>
+  </g>
+  <text x="130" y="234" text-anchor="middle" font-size="12" font-weight="600" fill="#393939">Expo &#183; TypeScript</text>
+  <text x="130" y="251" text-anchor="middle" font-size="11" fill="#9292A0">native folders are build output</text>
+  <text x="130" y="268" text-anchor="middle" font-size="11" fill="#9292A0">signing and stores pre-wired</text>
+
+  <!-- arrow 1 -->
+  <line x1="226" y1="140" x2="286" y2="140" stroke="#9292A0" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="256" y="128" text-anchor="middle" font-size="10" fill="#9292A0">make init</text>
+
+  <!-- ===== Column 2: your app ===== -->
+  <text x="365" y="40" text-anchor="middle" font-size="13" font-weight="700" fill="#393939" letter-spacing="1">YOUR APP</text>
+
+  <!-- phone -->
+  <g transform="translate(323.6 60) scale(0.92)">
+    <rect x="0" y="0" width="90" height="162" rx="16" fill="#393939"/>
+    <rect x="5" y="5" width="80" height="152" rx="12" fill="#ffffff"/>
+    <rect x="32" y="9" width="26" height="6" rx="3" fill="#393939"/>
+    <!-- bolt -->
+    <path d="M48 28 L37 50 L45 50 L41 66 L57 42 L48 42 L54 28 Z" fill="url(#bolt)"/>
+    <rect x="22" y="78" width="46" height="5" rx="2.5" fill="#393939"/>
+    <rect x="16" y="90" width="58" height="4" rx="2" fill="#E2E2E4"/>
+    <rect x="22" y="100" width="46" height="4" rx="2" fill="#E2E2E4"/>
+    <rect x="14" y="120" width="62" height="20" rx="10" fill="url(#ramp)"/>
+    <rect x="31" y="128" width="28" height="4" rx="2" fill="#ffffff"/>
+  </g>
+  <text x="365" y="234" text-anchor="middle" font-size="12" font-weight="600" fill="#393939">Runs on day one</text>
+  <text x="365" y="251" text-anchor="middle" font-size="11" fill="#9292A0">themed kit &#183; GraphQL &#183; i18n</text>
+  <text x="365" y="268" text-anchor="middle" font-size="11" fill="#9292A0">one mock API for Jest and E2E</text>
+
+  <!-- arrow 2 -->
+  <line x1="424" y1="140" x2="484" y2="140" stroke="#9292A0" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="454" y="128" text-anchor="middle" font-size="10" fill="#9292A0">push</text>
+
+  <!-- ===== Column 3: CI ===== -->
+  <text x="590" y="40" text-anchor="middle" font-size="13" font-weight="700" fill="#393939" letter-spacing="1">CI AS A DEPENDENCY</text>
+
+  <!-- window with pipeline rows -->
+  <g transform="translate(495 62)">
+    <rect x="0" y="0" width="190" height="146" rx="8" fill="#ffffff" stroke="#E2E2E4"/>
+    <rect x="0" y="0" width="190" height="20" rx="8" fill="#E2E2E4"/>
+    <rect x="0" y="12" width="190" height="8" fill="#E2E2E4"/>
+    <circle cx="12" cy="10" r="3" fill="#fc5805"/>
+    <circle cx="23" cy="10" r="3" fill="#fe990d"/>
+    <circle cx="34" cy="10" r="3" fill="#ffad0d"/>
+
+    <g transform="translate(14 32)">
+      <circle cx="9" cy="9" r="9" fill="#ffad0d"/>
+      <path d="M5 9.5 l3 3 l5.5 -6" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="28" y="13" font-size="12" font-weight="600" fill="#393939">Checks</text>
+      <rect x="92" y="6" width="70" height="6" rx="3" fill="#ffad0d"/>
+    </g>
+    <g transform="translate(14 68)">
+      <circle cx="9" cy="9" r="9" fill="#fe990d"/>
+      <path d="M5 9.5 l3 3 l5.5 -6" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="28" y="13" font-size="12" font-weight="600" fill="#393939">Unit</text>
+      <rect x="92" y="6" width="70" height="6" rx="3" fill="#fe990d"/>
+    </g>
+    <g transform="translate(14 104)">
+      <circle cx="9" cy="9" r="9" fill="#fc5805"/>
+      <path d="M5 9.5 l3 3 l5.5 -6" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="28" y="13" font-size="12" font-weight="600" fill="#393939">E2E</text>
+      <rect x="92" y="6" width="70" height="6" rx="3" fill="#F2F2F4"/>
+      <rect x="92" y="6" width="52" height="6" rx="3" fill="#fc5805"/>
+    </g>
+  </g>
+  <text x="590" y="234" text-anchor="middle" font-size="12" font-weight="600" fill="#393939">shared-workflows @v0</text>
+  <text x="590" y="251" text-anchor="middle" font-size="11" fill="#9292A0">every gate is a make target</text>
+  <text x="590" y="268" text-anchor="middle" font-size="11" fill="#9292A0">real devices &#183; iOS and Android</text>
+
+  <!-- arrows to shipping -->
+  <line x1="691" y1="110" x2="751" y2="96" stroke="#9292A0" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="691" y1="170" x2="751" y2="186" stroke="#fc5805" stroke-width="1.5" marker-end="url(#arrowOrange)"/>
+  <text x="721" y="86" text-anchor="middle" font-size="10" fill="#9292A0">merge</text>
+  <text x="721" y="200" text-anchor="middle" font-size="10" fill="#fc5805">ship</text>
+
+  <!-- ===== Column 4: shipped ===== -->
+  <text x="842" y="40" text-anchor="middle" font-size="13" font-weight="700" fill="#393939" letter-spacing="1">SHIPPED</text>
+
+  <!-- release PR tile -->
+  <g transform="translate(761 58)">
+    <rect x="0" y="0" width="162" height="64" rx="8" fill="#ffffff" stroke="#E2E2E4"/>
+    <g transform="translate(14 14)">
+      <circle cx="6" cy="5" r="4" fill="none" stroke="#fc5805" stroke-width="2"/>
+      <circle cx="6" cy="31" r="4" fill="none" stroke="#fc5805" stroke-width="2"/>
+      <circle cx="28" cy="31" r="4" fill="none" stroke="#fc5805" stroke-width="2"/>
+      <path d="M6 9 V27 M12 5 H20 Q28 5 28 13 V27" fill="none" stroke="#fc5805" stroke-width="2"/>
+    </g>
+    <text x="60" y="28" font-size="12" font-weight="600" fill="#393939">Release PR</text>
+    <text x="60" y="44" font-size="10.5" fill="#9292A0">version + changelog</text>
+  </g>
+
+  <!-- stores tile -->
+  <g transform="translate(761 148)">
+    <rect x="0" y="0" width="162" height="86" rx="8" fill="#ffffff" stroke="#fc5805"/>
+    <!-- box / package -->
+    <g transform="translate(14 12)">
+      <path d="M18 2 L34 10 L34 28 L18 36 L2 28 L2 10 Z" fill="url(#bolt)"/>
+      <path d="M2 10 L18 18 L34 10 M18 18 V36" fill="none" stroke="#ffffff" stroke-width="1.6" stroke-linejoin="round"/>
+    </g>
+    <text x="60" y="24" font-size="12" font-weight="600" fill="#393939">Signed builds</text>
+    <text x="60" y="40" font-size="10.5" fill="#9292A0">verified artifact</text>
+    <rect x="12" y="56" width="74" height="20" rx="10" fill="#1d1d1d"/>
+    <text x="49" y="70" text-anchor="middle" font-size="10.5" font-weight="600" fill="#ffffff">TestFlight</text>
+    <rect x="92" y="56" width="58" height="20" rx="10" fill="#F2F2F4" stroke="#E2E2E4"/>
+    <text x="121" y="70" text-anchor="middle" font-size="10.5" fill="#393939">Play</text>
+  </g>
+  <text x="842" y="268" text-anchor="middle" font-size="11" fill="#9292A0">promote &#183; staged rollout &#183; halt</text>
+
+  <!-- footer caption -->
+  <text x="480" y="316" text-anchor="middle" font-size="11.5" fill="#9292A0">The React Native tax, paid once &#8212; builds, tests itself on real devices, ships from a merged pull request.</text>
+</svg>
