@@ -5,6 +5,15 @@ by [release-please](https://github.com/googleapis/release-please) from
 [Conventional Commits](https://www.conventionalcommits.org/) — edit the commit
 messages, not this file. See [docs/release-runbook.md](docs/release-runbook.md).
 
+## [0.2.2](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.2.1...v0.2.2) (2026-09-18)
+
+
+### Bug Fixes
+
+* make the CI and CD pipelines actually run ([#7](https://github.com/blinkbitcoin/react-native-mobile-template/issues/7)) ([7bc692a](https://github.com/blinkbitcoin/react-native-mobile-template/commit/7bc692aac1447c5b9ebee8b4b3862bea141ad520))
+* **native:** give Gradle the Metaspace a release build needs; gate the pre-release on both builds ([#18](https://github.com/blinkbitcoin/react-native-mobile-template/issues/18)) ([136f68a](https://github.com/blinkbitcoin/react-native-mobile-template/commit/136f68a936244fdb26cd9f4fe3d43ccd21c2fc16))
+* **release:** sign the unsigned APK with the bundle's own debug key ([#12](https://github.com/blinkbitcoin/react-native-mobile-template/issues/12)) ([e2f83da](https://github.com/blinkbitcoin/react-native-mobile-template/commit/e2f83da75570734ef76879926d216b62454db5ef))
+
 ## [0.2.1](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.2.0...v0.2.1) (2026-09-17)
 
 
