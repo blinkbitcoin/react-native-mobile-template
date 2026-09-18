@@ -56,6 +56,22 @@ describe('the scripts CI calls', () => {
     );
   });
 
+  test('deps:check reports Expo SDK drift instead of failing on it', () => {
+    // Expo patches most weeks and minimumReleaseAge holds each patch for a
+    // day; a blocking drift check turned every open PR red for that day and
+    // skipped unit and E2E behind it. scripts/check-deps.sh says the rest.
+    assert.equal(pkg.scripts['deps:check'], 'bash scripts/check-deps.sh');
+    const script = readFileSync(new URL('./check-deps.sh', import.meta.url), 'utf8');
+    assert.match(script, /EXPO_DOCTOR_SKIP_DEPENDENCY_VERSION_CHECK=1 pnpm deps:doctor/);
+    assert.equal(pkg.scripts['deps:doctor'], 'expo-doctor');
+    assert.match(script, /expo install --check/);
+    assert.match(
+      script,
+      /\|\| drift_status=\$\?/,
+      'the drift exit code is captured, never propagated',
+    );
+  });
+
   test('knip stays a binary, not a script', () => {
     // Deliberate: a package.json script literally named `knip` fails
     // expo-doctor's "scripts in package.json conflict with node_modules/.bin"

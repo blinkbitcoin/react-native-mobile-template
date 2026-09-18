@@ -99,6 +99,7 @@
       ".maestro/flows/deep-link.yaml",
       "app.config.ts",
       "certs/README.md",
+      "docs/assets/readme-hero.svg",
       "docs/ci.md",
       "fastlane/lanes/android.rb",
       "fastlane/metadata/android/en-US/full_description.txt",

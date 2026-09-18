@@ -111,7 +111,8 @@
     "check:ci": "make check-ci",
     "check:bundle-secrets": "make bundle-secrets-check",
     "mock-api": "tsx mocks/server.ts",
-    "deps:check": "expo install --check && expo-doctor",
+    "deps:check": "bash scripts/check-deps.sh",
+    "deps:doctor": "expo-doctor",
     "deps:audit": "pnpm audit --audit-level=high --prod && bash scripts/check-lockfile.sh",
     "deps:licenses": "node scripts/check-licenses.mjs",
     "check-bundle-secrets": "bash scripts/check-bundle-secrets.sh"
