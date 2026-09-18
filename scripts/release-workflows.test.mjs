@@ -18,7 +18,7 @@
 // before asserting anything about them, so a parse that silently yields nothing
 // fails rather than passes.
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import test, { describe } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -72,6 +72,34 @@ const WORKFLOWS = {
 // `workflow_dispatch`. A `release: published` trigger anywhere downstream is a
 // trigger that never fires (or, with an App token, fires on every `-build.N`
 // pre-release too).
+// `workflow_run` filters name the *display name* of the workflow they follow,
+// not its file. Renaming a workflow silently disconnects every listener - the
+// beta retry listened for "release-internal" for two days after that workflow
+// became "CD / Internal" and never fired. So every listener must name a
+// workflow that exists.
+describe('every workflow_run listener names a workflow that exists', () => {
+  const dir = path.join(root, '.github/workflows');
+  const files = readdirSync(dir).filter((f) => f.endsWith('.yml'));
+  const names = new Set(
+    files
+      .map((f) => readFileSync(path.join(dir, f), 'utf8').match(/^name:\s*(.+?)\s*$/m)?.[1])
+      .filter(Boolean),
+  );
+  for (const file of files) {
+    const text = readFileSync(path.join(dir, file), 'utf8');
+    const m = text.match(/^\s+workflows:\s*\[([^\]]+)\]/m);
+    if (!m) continue;
+    test(`${file} follows workflows that exist`, () => {
+      for (const wanted of m[1].split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, ''))) {
+        assert.ok(
+          names.has(wanted),
+          `${file} listens for "${wanted}", but no workflow has that name (have: ${[...names].join(', ')})`,
+        );
+      }
+    });
+  }
+});
+
 describe('release-please.yml chains the release by dispatch', () => {
   const dir = path.join(root, '.github/workflows');
   const rp = readFileSync(path.join(dir, 'release-please.yml'), 'utf8');

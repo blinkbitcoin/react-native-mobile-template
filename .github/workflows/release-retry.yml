@@ -7,7 +7,11 @@ name: CD / Beta Retry
 # beta run for the same commit.
 on:
   workflow_run:
-    workflows: [release-internal]
+    # The workflow's *display name*, not its file name: `workflow_run` matches
+    # on `name:`. This listened for "release-internal" after that workflow was
+    # renamed "CD / Internal", and never fired again (v0.2.3's beta had to be
+    # re-run by hand). scripts/release-workflows.test.mjs pins the pairing.
+    workflows: [CD / Internal]
     types: [completed]
     branches: [main]
 permissions:
