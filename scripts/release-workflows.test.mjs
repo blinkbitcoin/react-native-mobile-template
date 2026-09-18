@@ -98,10 +98,15 @@ describe('release-please.yml chains the release by dispatch', () => {
   test('a created or updated release PR gets a CI run', () => {
     assert.match(
       code,
-      /prs_created == 'true'[\s\S]*?gh workflow run ci\.yml [^\n]*--ref "\$BRANCH"/,
+      /prs_created == 'true'[\s\S]*?gh workflow run ci\.yml [^\n]*--ref "\$branch"/,
       'no CI dispatch gated on prs_created',
     );
-    assert.match(code, /fromJSON\(steps\.release\.outputs\.pr\)\.headBranchName/);
+    // Parsed in the shell on purpose: `fromJSON()` in `env:` is validated even
+    // when the step's `if` is false, and the output is empty on a push that
+    // produces no release PR.
+    assert.doesNotMatch(code, /fromJSON\(steps\.release\.outputs\.pr\)/);
+    assert.match(code, /PR_JSON: \$\{\{ steps\.release\.outputs\.pr \}\}/);
+    assert.match(code, /jq -r '\.headBranchName \/\/ empty'/);
   });
 
   test('nothing downstream waits on a release event, and no App token remains', () => {
