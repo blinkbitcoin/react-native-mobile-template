@@ -5,6 +5,14 @@ by [release-please](https://github.com/googleapis/release-please) from
 [Conventional Commits](https://www.conventionalcommits.org/) — edit the commit
 messages, not this file. See [docs/release-runbook.md](docs/release-runbook.md).
 
+## [0.2.4](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.2.3...v0.2.4) (2026-09-18)
+
+
+### Bug Fixes
+
+* **ci:** make the beta retry listen for the workflow's display name ([#23](https://github.com/blinkbitcoin/react-native-mobile-template/issues/23)) ([ef649b4](https://github.com/blinkbitcoin/react-native-mobile-template/commit/ef649b415dd6fd5a25b0c5a859460c78e3275bf6))
+* **e2e:** answer the web bundle's GraphQL calls from the mock, whatever host it was built for ([#22](https://github.com/blinkbitcoin/react-native-mobile-template/issues/22)) ([0cedca5](https://github.com/blinkbitcoin/react-native-mobile-template/commit/0cedca58f03cc4d0c017ef410ddf95db6ef00f14))
+
 ## [0.2.3](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.2.2...v0.2.3) (2026-09-18)
 
 
