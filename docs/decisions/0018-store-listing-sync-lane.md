@@ -33,10 +33,14 @@ write to a real store by accident.
 
 The listing now has two writers, the tree and the console, so the tree must
 stay the source of truth or they drift. A pull overwrites local prose with the
-console's copy; the diff is the review step. Apple's constraint that name,
-subtitle, keywords, categories and screenshots need a version in preparation
+console's copy; the diff is the review step. Apple's constraint that the name,
+subtitle, keywords, privacy URL and screenshots need a version in preparation
 is now documented lane behaviour (`IOS_METADATA_EDIT_LIVE`), not a surprise
-hit by hand in App Store Connect.
+hit by hand in App Store Connect; the age rating is app-level and pushes in
+both modes. Categories stay console-only: the template ships no
+`primary_category.txt`, because `release_production` reads the same
+`metadata_path` and a category found there also makes `deliver` rewrite the
+four sub-category slots. A consumer opts in by creating the files.
 
 ## Alternatives
 
