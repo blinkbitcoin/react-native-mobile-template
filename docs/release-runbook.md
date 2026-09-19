@@ -243,17 +243,30 @@ from a version release.
 
 | CD owns per version | sync owns | Console-only |
 | --- | --- | --- |
-| Release notes / What's new, the binary,<br>the review submission, track and rollout | Name, subtitle, description, keywords,<br>promotional text, URLs, copyright,<br>categories, age rating, review contact,<br>iOS screenshots under<br>`fastlane/screenshots/<locale>/`, Play icon,<br>feature graphic and screenshots | Apple: App Privacy labels, pricing and<br>availability, agreements, TestFlight groups,<br>bundle id.<br>Play: content rating, data safety, target<br>audience, app access, countries, tracks<br>and testers |
+| Release notes / What's new, the binary,<br>the review submission, track and rollout | Name, subtitle, description, keywords,<br>promotional text, URLs, copyright,<br>age rating, review contact, the version's<br>review attachment (deleted on every push;<br>re-upload it in the console after a sync if<br>you use one), iOS screenshots under<br>`fastlane/screenshots/<locale>/`, Play icon,<br>feature graphic and screenshots | Apple: categories (until the category files<br>exist — see below), App Privacy labels,<br>pricing and availability, agreements,<br>TestFlight groups, bundle id.<br>Play: content rating, data safety, target<br>audience, app access, countries, tracks<br>and testers |
 
-**Apple's edit-version constraint.** Name, subtitle, keywords, categories and
-screenshots only exist on a version that is in preparation — Apple will not let
-them be edited on the live version at all. Set `IOS_METADATA_EDIT_LIVE=true`
-(or pass `live:true`) to edit the live version's smaller editable subset instead
-(description, promotional text, the URLs, the copyright) when no version is in
-preparation. In live mode, `deliver` first looks for an edit version
-unconditionally; with none in preparation, it retries for roughly 15 minutes
-before falling back to that live-editable subset. The lane prints a notice when
-this happens — it is slow, not stuck, so do not kill it.
+**Apple's edit-version constraint.** Live mode
+(`IOS_METADATA_EDIT_LIVE=true`, or `live:true`) edits the description,
+promotional text, the support and marketing URLs and the copyright on the live
+version. The privacy URL, name, subtitle, keywords and screenshots need a
+version in "Prepare for Submission": `deliver` collects the privacy URL for a
+live edit but drops the whole localization it belongs to, and the rest Apple
+will not accept on a live version at all. The age rating — and the categories,
+once the category files exist — are app-level rather than version-level and go
+through in both modes.
+
+**The default mode is the slow one.** With no version in preparation,
+`deliver` retries for about 20 minutes (seven attempts, backing off 20 s to
+5 min) and then fails with "Cannot update languages - could not find an
+editable version", having written nothing. The lane says so before it starts.
+Live mode does not wait: it fetches the live version first with no retry, and
+only falls back to the edit version if the app has no live version yet. So the
+fix for a slow default run is `live:true` for the live-editable subset, not
+patience.
+
+**Screenshots never push in live mode**, whatever `fastlane/screenshots/`
+holds: the lane forces `skip_screenshots` when `live` is set, because a
+screenshot upload needs the edit version this mode is avoiding.
 
 **iOS screenshots are all-or-nothing per locale.** They push with
 `overwrite_screenshots`, which deletes every display type (iPhone, iPad, Mac)
@@ -261,10 +274,21 @@ for each locale present under `fastlane/screenshots/` before uploading what is
 there. A locale directory holding only iPhone shots erases that locale's
 existing iPad set. Stage complete sets per locale before pushing.
 
+**Store assets are committed.** `fastlane/screenshots/<locale>/**` and
+`fastlane/metadata/android/<locale>/images/**` (icon, feature graphic, promo
+graphic, the screenshot folders) are tracked, not ignored: a CI push can only
+send what the checkout holds, and nothing in this repo generates them. Commit
+them alongside the copy they belong to.
+
 **A blank field cannot be pushed from the tree.** The staged copy drops
-zero-byte `.txt` files before either lane runs, because `deliver` and `supply`
-read fields by file existence and an empty file would clear whatever value the
-console already holds. To blank a field, do it in the console.
+zero-byte `.txt` files before either lane runs, because `supply` reads a field
+by file existence — it assigns the file's contents whenever the file is there,
+so an empty file clears whatever value Play already holds. (`deliver` skips an
+empty value instead, but the tree is staged the same way for both.) The case
+people hit is `fastlane/metadata/android/en-US/video.txt`: a Play promo video
+that has been removed cannot be cleared from the tree, so clear it in the
+console. The file stays in the repository because `supply init` writes it, and
+its absence would show up as a spurious new file on the next pull.
 
 **Play reviews listing edits**, same as it reviews a release. A brand-new Play
 app needs one internal upload before a metadata push has any track to hang the
@@ -284,17 +308,29 @@ log, no commit), because that job has `contents: read`.
 screenshots belong in `fastlane/screenshots/<locale>/` and the lane asserts
 this before it does anything else (`assert_ios_metadata_dirs!`).
 
+**Categories are console-only until you create the files.** The template ships
+no `primary_category.txt`, because `release_production` reads the same
+`metadata_path` and a guessed category would change what that lane does to a
+live store page. Create `fastlane/metadata/ios/primary_category.txt` (and
+optionally `secondary_category.txt`) with a current id such as `UTILITIES`
+when you want the sync to own them. Note what `deliver` does then: whenever
+`primary_category` is present it also writes the four sub-category slots, from
+`primary_first_sub_category.txt`, `primary_second_sub_category.txt`,
+`secondary_first_sub_category.txt` and `secondary_second_sub_category.txt`, and
+clears any of them that are absent. So ship every sub-category file the app
+uses, or none of them.
+
 **`app_rating_config.json` and the category files are outside the placeholder
-gate.** `assert_metadata_ready!` only rejects `Replace this text` inside
-`.txt` files, so a wrong value in `app_rating_config.json`,
-`primary_category.txt` or `secondary_category.txt` reaches Apple unchallenged —
-review them yourself. The shipped `app_rating_config.json` deliberately omits
-`developerAgeRatingInfoUrl` (there is no safe default) and `gamblingAndContests`
-(deprecated). It sets `socialMedia` and `socialMediaAgeRestricted` to `"NONE"`
-as rating-scale values, following fastlane's generated documentation, while
-spaceship's `AgeRatingDeclaration` model groups both with the booleans instead;
-if App Store Connect rejects `"NONE"` on either, that mismatch is where the
-error comes from.
+gate.** `assert_metadata_ready!` only rejects `Replace this text` inside `.txt`
+files, so a wrong value in `app_rating_config.json` or a category file reaches
+Apple unchallenged — review them yourself. The shipped
+`app_rating_config.json` deliberately omits `developerAgeRatingInfoUrl` (there
+is no safe default) and `gamblingAndContests` (deprecated). It sets
+`socialMedia` and `socialMediaAgeRestricted` to `false`, following spaceship's
+`AgeRatingDeclaration` model, which groups both with the booleans, while
+fastlane's generated documentation lists them as rating-scale keys; if App
+Store Connect rejects `false` on either, that mismatch is where the error comes
+from.
 
 ## Before you have store accounts
 
@@ -380,7 +416,7 @@ anyone who can see the run. Credentials go in `secrets:` instead.
 | `ANDROID_SIGNING_ENABLED` | repo variable; `build-android` in `release-internal` | `true` signs with the upload keystore.<br>Unset falls back to the debug keystore, which needs no Play account |
 | `STORE_UPLOADS_ENABLED` | repo variable; every store job in all three release workflows | `true` turns on TestFlight and Play uploads.<br>Unset means off, and the store credentials below<br>are only needed once it is on — see<br>[Before you have store accounts](#before-you-have-store-accounts) |
 | `STORE_METADATA_SYNC_ENABLED` | repo variable; both jobs in `store-metadata.yml`<br>and the `sync_metadata` lanes | `true` lets a lane write the public store page.<br>Unset means off and the lane refuses |
-| `IOS_METADATA_EDIT_LIVE` | `ios sync_metadata` / `pull_metadata` via `env-json` | `true` edits the live version's editable subset<br>when no version is in preparation |
+| `IOS_METADATA_EDIT_LIVE` | `ios sync_metadata` via `env-json` | `true` edits the live version's editable subset<br>when no version is in preparation.<br>`pull_metadata` ignores it: `deliver`'s<br>download always takes the latest version |
 | `PLAY_METADATA_TRACK` | `android sync_metadata` / `pull_metadata` via `env-json` | Track whose release the listing edit rides on;<br>default first of `production`, `beta`, `internal`<br>with one |
 | `BUILD_NUMBER_OFFSET` | every `expo-prepare` call | Integer, default `1000`. Raise only |
 | `WORKFLOWS_MACOS_RUNNER` | iOS build + iOS internal upload | Runner label, default `macos-26` |
