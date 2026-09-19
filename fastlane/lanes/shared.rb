@@ -479,3 +479,143 @@ def assert_ios_metadata_dirs!(metadata_path)
     'screenshots belong in fastlane/screenshots/<locale>/ (see docs/release-runbook.md)'
   )
 end
+
+# ---------- store listing sync (fastlane/metadata/** -> the consoles) -------
+#
+# The sync lanes push the *baseline* listing at any time, independent of a
+# release. What a release owns and this must never touch: the per-version
+# release notes (write_release_notes!), the binary, the review submission, the
+# Play track. Both consoles are told only what the repository holds, and the
+# repository holds only what a diff has been reviewed for.
+
+# The repository variable that arms the push lanes, checked before anything
+# else in them. Off by default and refused loudly: every other tier in this
+# repo works that way (STORE_UPLOADS_ENABLED, IOS_SIGNING_ENABLED), and a
+# consumer who has not opted in must not be able to overwrite a live store
+# page by running a lane whose name looks harmless.
+def assert_metadata_sync_enabled!
+  return if truthy?(ENV['STORE_METADATA_SYNC_ENABLED'])
+
+  UI.user_error!(
+    'Store listing sync is off: set the repository variable ' \
+    'STORE_METADATA_SYNC_ENABLED=true (or export it locally) before a lane may ' \
+    'write the public store page (see docs/release-runbook.md)'
+  )
+end
+
+# deliver and supply upload whatever is on disk under metadata_path, so the
+# only way to withhold a file from them is not to show it to them: the push
+# lanes run against a staged copy of the tree with the per-version paths
+# removed. Copying rather than deleting also means a lane can never damage the
+# working tree of the checkout it runs in.
+SYNC_EXCLUDED_FILES = %w[release_notes.txt].freeze
+SYNC_EXCLUDED_DIRS = %w[changelogs].freeze
+
+def with_baseline_metadata(source, exclude_files: SYNC_EXCLUDED_FILES, exclude_dirs: SYNC_EXCLUDED_DIRS)
+  require 'tmpdir'
+  require 'fileutils'
+  Dir.mktmpdir('store-metadata-sync') do |tmp|
+    staged = File.join(tmp, File.basename(source))
+    FileUtils.cp_r(source, staged)
+    exclude_dirs.each { |name| Dir.glob(File.join(staged, '**', name)).each { |dir| FileUtils.rm_rf(dir) } }
+    exclude_files.each { |name| Dir.glob(File.join(staged, '**', name)).each { |file| FileUtils.rm_f(file) } }
+    UI.message("Staged baseline metadata at #{staged} (excluded: #{(exclude_files + exclude_dirs).join(', ')})")
+    yield staged
+  end
+end
+
+def ios_screenshots_path
+  root_path('fastlane', 'screenshots')
+end
+
+# Whether there is anything to upload. Asked before skip_screenshots is
+# cleared, because deliver's screenshot upload demands an edit version even
+# when it would find no files (deliver/lib/deliver/upload_screenshots.rb:22).
+def ios_screenshots?
+  !Dir.glob(File.join(ios_screenshots_path, '*', '*.{png,jpg,jpeg}'), File::FNM_CASEFOLD).empty?
+end
+
+def ios_app_rating_config_path(metadata_path)
+  path = File.join(metadata_path, 'app_rating_config.json')
+  File.exist?(path) ? path : nil
+end
+
+# supply attaches a listing edit to a release: perform_upload_meta looks up a
+# track and a release for a version code before it writes a single listing
+# field, and errors out if it finds neither (supply/lib/supply/uploader.rb:84).
+# So a listing-only sync still has to name the release it rides on. It changes
+# nothing about it - no binary, no rollout, no promotion.
+PLAY_METADATA_TRACKS = %w[production beta internal].freeze
+
+def play_metadata_target
+  package = ENV.fetch('ANDROID_PACKAGE')
+  configured = ENV['PLAY_METADATA_TRACK'].to_s.strip
+  tracks = configured.empty? ? PLAY_METADATA_TRACKS : [configured]
+
+  tracks.each do |track|
+    codes = Array(store_action(:google_play_track_version_codes,
+                               package_name: package, track: track, **play_json_key_args))
+    next if codes.empty?
+
+    return [track, codes.map(&:to_i).max]
+  end
+
+  # DRY_RUN returns [] for every track, so a rehearsal would otherwise stop
+  # with a store-shaped error it cannot answer.
+  return ['production', ENV.fetch('APP_BUILD_NUMBER').to_i] if ENV['DRY_RUN'] == '1'
+
+  UI.user_error!(
+    "Play has no release on #{tracks.join(', ')} for #{package}: upload a build first " \
+    '(`fastlane android upload_internal`), or set PLAY_METADATA_TRACK (see docs/release-runbook.md)'
+  )
+end
+
+# The App Store Connect key as deliver's *command line* wants it: a JSON file.
+# The lanes hand the key to actions as a hash, but `deliver download_metadata`
+# is a fastlane command, not an action, so it runs in its own process with its
+# own configuration. 0600 in a temp dir, and never an argument: an argv is
+# world-readable (same reason as with_password_files in android.rb).
+def with_asc_api_key_file
+  require 'tmpdir'
+  require 'json'
+  require_env!(%w[ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64])
+  Dir.mktmpdir('asc-api-key') do |dir|
+    path = File.join(dir, 'key.json')
+    File.open(path, File::WRONLY | File::CREAT | File::EXCL, 0o600) do |file|
+      file.write(JSON.generate(
+                   key_id: ENV.fetch('ASC_KEY_ID'),
+                   issuer_id: ENV.fetch('ASC_ISSUER_ID'),
+                   key: ENV.fetch('ASC_KEY_P8_BASE64'),
+                   is_key_content_base64: true,
+                   in_house: false
+                 ))
+    end
+    yield path
+  end
+end
+
+# The same, for supply's command line: `--json_key <path>`.
+def with_play_json_key_file
+  args = play_json_key_args
+  return yield(args[:json_key]) if args[:json_key]
+
+  require 'tmpdir'
+  Dir.mktmpdir('play-json-key') do |dir|
+    path = File.join(dir, 'key.json')
+    File.open(path, File::WRONLY | File::CREAT | File::EXCL, 0o600) { |f| f.write(args.fetch(:json_key_data)) }
+    yield path
+  end
+end
+
+# A pull overwrites files a human wrote. Say so before, and show the damage
+# after: `git diff` in the run log is the whole review surface when the pull
+# ran in CI, where nothing can be committed.
+def warn_metadata_overwrite!(relative_path)
+  UI.important("This overwrites #{relative_path}/** with what the console holds. " \
+               'Review `git diff` before committing: the console, not this tree, wrote these files.')
+end
+
+def report_metadata_diff!(*relative_paths)
+  sh('git', 'status', '--porcelain', '--', *relative_paths)
+  sh('git', '--no-pager', 'diff', '--stat', '--', *relative_paths)
+end

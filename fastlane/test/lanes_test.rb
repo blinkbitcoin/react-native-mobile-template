@@ -686,6 +686,205 @@ class LanesTest < Minitest::Test
     assert_includes assert_raises(UI::UserError) { assert_project_version!('1.2.2', '42') }.message, 'APP_VERSION'
     assert_includes assert_raises(UI::UserError) { assert_project_version!('1.2.3', '41') }.message, 'APP_BUILD_NUMBER'
   end
+
+  # ---------- store listing sync: shared helpers ----------
+
+  def test_assert_metadata_sync_enabled_accepts_common_true_values
+    %w[true 1 yes].each do |value|
+      ENV['STORE_METADATA_SYNC_ENABLED'] = value
+      assert_nil assert_metadata_sync_enabled!
+    end
+  end
+
+  def test_assert_metadata_sync_enabled_refuses_when_unset_or_false
+    [nil, 'false', '0'].each do |value|
+      value.nil? ? ENV.delete('STORE_METADATA_SYNC_ENABLED') : ENV['STORE_METADATA_SYNC_ENABLED'] = value
+      error = assert_raises(UI::UserError) { assert_metadata_sync_enabled! }
+      assert_includes error.message, 'STORE_METADATA_SYNC_ENABLED'
+      assert_includes error.message, 'docs/release-runbook.md'
+    end
+  end
+
+  def test_with_baseline_metadata_stages_a_copy_without_the_per_version_paths
+    Dir.mktmpdir do |dir|
+      source = File.join(dir, 'metadata')
+      FileUtils.mkdir_p(File.join(source, 'en-US', 'changelogs'))
+      File.write(File.join(source, 'en-US', 'description.txt'), 'A real description.')
+      File.write(File.join(source, 'en-US', 'release_notes.txt'), 'v1 notes')
+      File.write(File.join(source, 'en-US', 'changelogs', '100.txt'), 'changelog')
+      source_snapshot = Dir.glob(File.join(source, '**', '*')).sort
+
+      staged_path = nil
+      with_baseline_metadata(source) do |staged|
+        staged_path = staged
+        assert_equal 'A real description.', File.read(File.join(staged, 'en-US', 'description.txt'))
+        refute File.exist?(File.join(staged, 'en-US', 'release_notes.txt'))
+        refute Dir.exist?(File.join(staged, 'en-US', 'changelogs'))
+      end
+
+      assert_equal source_snapshot, Dir.glob(File.join(source, '**', '*')).sort
+      assert_equal 'A real description.', File.read(File.join(source, 'en-US', 'description.txt'))
+      assert_equal 'v1 notes', File.read(File.join(source, 'en-US', 'release_notes.txt'))
+      refute Dir.exist?(staged_path), 'the staged copy must not outlive the block'
+    end
+  end
+
+  # ios_screenshots_path is anchored on root_path, which the existing paths
+  # test exercises the same way: a scratch checkout, chdir'd into.
+  def in_screenshots_root(*filenames)
+    Dir.mktmpdir do |tmp|
+      dir = File.realpath(tmp)
+      FileUtils.mkdir_p(File.join(dir, 'fastlane', 'lanes'))
+      screenshots_dir = File.join(dir, 'fastlane', 'screenshots', 'en-US')
+      FileUtils.mkdir_p(screenshots_dir)
+      filenames.each { |name| File.write(File.join(screenshots_dir, name), 'x') }
+      Dir.chdir(dir) { yield }
+    end
+  end
+
+  def test_ios_screenshots_is_false_for_an_empty_or_gitkeep_only_tree
+    in_screenshots_root { refute ios_screenshots? }
+    in_screenshots_root('.gitkeep') { refute ios_screenshots? }
+  end
+
+  def test_ios_screenshots_is_true_for_a_png_case_insensitively
+    in_screenshots_root('01.png') { assert ios_screenshots? }
+    in_screenshots_root('01.PNG') { assert ios_screenshots? }
+  end
+
+  def test_ios_app_rating_config_path_is_nil_when_absent
+    Dir.mktmpdir { |dir| assert_nil ios_app_rating_config_path(dir) }
+  end
+
+  def test_ios_app_rating_config_path_is_the_path_when_present
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, 'app_rating_config.json')
+      File.write(path, '{}')
+      assert_equal path, ios_app_rating_config_path(dir)
+    end
+  end
+
+  # google_play_track_version_codes has to answer differently per track for
+  # these tests, which $stub_results (keyed only by action name) cannot do --
+  # so the stub is swapped out directly, the same way the android halt
+  # fallback test does it.
+  def with_play_credentials
+    ENV['PLAY_SERVICE_ACCOUNT_JSON'] = '{"type":"service_account"}'
+    ENV.delete('PLAY_SERVICE_ACCOUNT_JSON_PATH')
+  end
+
+  def stub_play_track_version_codes(mapping)
+    original = Object.instance_method(:google_play_track_version_codes)
+    Object.send(:define_method, :google_play_track_version_codes) do |**args|
+      $calls << [:google_play_track_version_codes, args]
+      mapping.fetch(args[:track], [])
+    end
+    yield
+  ensure
+    Object.send(:define_method, :google_play_track_version_codes, original)
+  end
+
+  def test_play_metadata_target_returns_the_highest_code_on_production
+    ENV['ANDROID_PACKAGE'] = 'com.example.app'
+    with_play_credentials
+    ENV.delete('PLAY_METADATA_TRACK')
+    ENV.delete('DRY_RUN')
+    stub_play_track_version_codes('production' => [3, 7]) do
+      assert_equal ['production', 7], play_metadata_target
+    end
+  end
+
+  def test_play_metadata_target_falls_through_to_the_next_track_when_empty
+    ENV['ANDROID_PACKAGE'] = 'com.example.app'
+    with_play_credentials
+    ENV.delete('PLAY_METADATA_TRACK')
+    ENV.delete('DRY_RUN')
+    stub_play_track_version_codes('production' => [], 'beta' => [5]) do
+      assert_equal ['beta', 5], play_metadata_target
+    end
+  end
+
+  def test_play_metadata_target_only_asks_the_configured_track
+    ENV['ANDROID_PACKAGE'] = 'com.example.app'
+    ENV['PLAY_METADATA_TRACK'] = 'internal'
+    with_play_credentials
+    ENV.delete('DRY_RUN')
+    stub_play_track_version_codes('internal' => [9]) do
+      assert_equal ['internal', 9], play_metadata_target
+      asked = $calls.select { |name, _| name == :google_play_track_version_codes }.map { |_, args| args[:track] }
+      assert_equal ['internal'], asked
+    end
+  end
+
+  def test_play_metadata_target_raises_naming_every_track_when_all_are_empty
+    ENV['ANDROID_PACKAGE'] = 'com.example.app'
+    with_play_credentials
+    ENV.delete('PLAY_METADATA_TRACK')
+    ENV.delete('DRY_RUN')
+    stub_play_track_version_codes({}) do
+      error = assert_raises(UI::UserError) { play_metadata_target }
+      assert_includes error.message, 'production, beta, internal'
+      assert_includes error.message, 'upload_internal'
+    end
+  end
+
+  def test_play_metadata_target_falls_back_to_the_build_number_under_dry_run
+    ENV['ANDROID_PACKAGE'] = 'com.example.app'
+    with_play_credentials
+    ENV.delete('PLAY_METADATA_TRACK')
+    ENV['APP_BUILD_NUMBER'] = '42'
+    ENV['DRY_RUN'] = '1'
+    assert_equal ['production', 42], play_metadata_target
+  end
+
+  def test_with_asc_api_key_file_writes_a_0600_json_file_and_removes_it_after
+    ENV['ASC_KEY_ID'] = 'KEYID'
+    ENV['ASC_ISSUER_ID'] = 'ISSUER'
+    ENV['ASC_KEY_P8_BASE64'] = 'BASE64P8'
+    captured_path = nil
+    with_asc_api_key_file do |path|
+      captured_path = path
+      assert_equal 0o600, File.stat(path).mode & 0o777
+      key = JSON.parse(File.read(path))
+      assert_equal 'KEYID', key['key_id']
+      assert_equal 'ISSUER', key['issuer_id']
+      assert_equal 'BASE64P8', key['key']
+      assert_equal true, key['is_key_content_base64']
+      assert_equal false, key['in_house']
+    end
+    refute File.exist?(captured_path)
+  end
+
+  def test_with_play_json_key_file_yields_the_configured_path_unchanged
+    ENV.delete('PLAY_SERVICE_ACCOUNT_JSON')
+    ENV['PLAY_SERVICE_ACCOUNT_JSON_PATH'] = '/tmp/key.json'
+    with_play_json_key_file { |path| assert_equal '/tmp/key.json', path }
+  end
+
+  def test_with_play_json_key_file_writes_the_inline_json_to_a_0600_file_and_removes_it_after
+    ENV['PLAY_SERVICE_ACCOUNT_JSON'] = '{"type":"service_account"}'
+    ENV.delete('PLAY_SERVICE_ACCOUNT_JSON_PATH')
+    captured_path = nil
+    with_play_json_key_file do |path|
+      captured_path = path
+      assert_equal 0o600, File.stat(path).mode & 0o777
+      assert_equal '{"type":"service_account"}', File.read(path)
+    end
+    refute File.exist?(captured_path)
+  end
+
+  def test_warn_metadata_overwrite_names_the_path_and_points_at_git_diff
+    warn_metadata_overwrite!('fastlane/metadata/ios')
+    assert_includes UI.messages.last, 'fastlane/metadata/ios'
+    assert_includes UI.messages.last, 'git diff'
+  end
+
+  def test_report_metadata_diff_runs_git_status_and_diff_stat_scoped_to_the_paths
+    report_metadata_diff!('fastlane/metadata/ios', 'fastlane/metadata/android')
+    commands = $calls.select { |name, _| name == :sh }.map(&:last)
+    assert_includes commands, ['git', 'status', '--porcelain', '--', 'fastlane/metadata/ios', 'fastlane/metadata/android']
+    assert_includes commands, ['git', '--no-pager', 'diff', '--stat', '--', 'fastlane/metadata/ios', 'fastlane/metadata/android']
+  end
 end
 
 # Lane-level tests: the promotion logic itself, exercised through the recorded
