@@ -5,6 +5,13 @@ by [release-please](https://github.com/googleapis/release-please) from
 [Conventional Commits](https://www.conventionalcommits.org/) — edit the commit
 messages, not this file. See [docs/release-runbook.md](docs/release-runbook.md).
 
+## [0.3.1](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.3.0...v0.3.1) (2026-09-19)
+
+
+### Bug Fixes
+
+* **ci:** queue CI on main per commit, so a merge never evicts the previous one ([#33](https://github.com/blinkbitcoin/react-native-mobile-template/issues/33)) ([3c3ec86](https://github.com/blinkbitcoin/react-native-mobile-template/commit/3c3ec860d9134d286f4d58159f019362418fd55b))
+
 ## [0.3.0](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.2.6...v0.3.0) (2026-09-19)
 
 
