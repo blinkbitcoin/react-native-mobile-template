@@ -5,6 +5,18 @@ by [release-please](https://github.com/googleapis/release-please) from
 [Conventional Commits](https://www.conventionalcommits.org/) — edit the commit
 messages, not this file. See [docs/release-runbook.md](docs/release-runbook.md).
 
+## [0.3.0](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.2.6...v0.3.0) (2026-09-19)
+
+
+### Features
+
+* **release:** let beta dispatch the internal build it is missing ([#32](https://github.com/blinkbitcoin/react-native-mobile-template/issues/32)) ([5c6a1a1](https://github.com/blinkbitcoin/react-native-mobile-template/commit/5c6a1a1f7e5cc5d143b05c1e691c6ac3ea0a56d6))
+
+
+### Bug Fixes
+
+* **ci:** queue the internal release per commit, so a second push never evicts it ([#30](https://github.com/blinkbitcoin/react-native-mobile-template/issues/30)) ([9419246](https://github.com/blinkbitcoin/react-native-mobile-template/commit/941924690b77661d54ebc38d19dd6f6607ba20f2))
+
 ## [0.2.6](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.2.5...v0.2.6) (2026-09-19)
 
 
