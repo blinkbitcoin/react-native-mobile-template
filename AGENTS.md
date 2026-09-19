@@ -77,6 +77,7 @@ Every row is a make target; nothing here is run through pnpm directly.
 | `make check-deps` | SDK drift, audit, lockfile provenance, licenses |
 | `make check-ci` | actionlint (workflows) + shellcheck (scripts) |
 | `make check-docs` | Docs freshness, this file's command table vs the Makefile, table widths, mermaid blocks |
+| `make check-skills` | The offline test suite of every skill under `.claude/skills/` (part of `make check`) |
 | `make check-prebuild` | Prebuild both platforms in a temp dir, assert plugin output |
 | `make check-release` | Ruby syntax + fastlane lane parse + lane unit tests |
 | `make bundle-secrets-check` | Export the bundle, assert no non-public keys leaked |

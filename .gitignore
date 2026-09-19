@@ -113,3 +113,6 @@ mapping.txt
 
 # Per-machine lefthook overrides (see CONTRIBUTING.md)
 /lefthook-local.yml
+
+# one clone's store-setup progress; holds account-identifying facts, never credentials
+/.store-setup/

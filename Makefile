@@ -149,7 +149,10 @@ check-release: ## Ruby syntax + fastlane lane parse + lane unit tests
 	FASTLANE_SKIP_ENV_ASSERT=1 bundle exec fastlane lanes
 	bundle exec ruby -Ifastlane/test fastlane/test/lanes_test.rb
 
-check: check-code check-gen check-deps check-ci check-docs check-release ## Every static gate the checks workflow runs (no tests/builds)
+check-skills: ## Run the test suite of every skill under .claude/skills/ (offline, fakes only)
+	@set -e; found=0; for t in .claude/skills/*/tests/run.sh; do [ -f "$$t" ] || continue; found=1; echo "== $$t"; bash "$$t"; done; [ "$$found" -eq 1 ] || echo "no skills yet"
+
+check: check-code check-gen check-deps check-ci check-docs check-release check-skills ## Every static gate the checks workflow runs (no tests/builds)
 
 # The two expensive gates are not in `check` and are off by default in CI for
 # the same reason: a prebuild of both platforms and a web export are minutes
@@ -201,4 +204,4 @@ reset: clean ## clean + reinstall
 help: ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: init doctor install ports start ios android web mock-api prebuild build-web version verify-ios verify-android release-notes i18n codegen typecheck lint format format-check knip spell check-gen check-prebuild check-code check-deps check-ci check-docs bundle-secrets-check check-release check check-slow ci codeql test-scripts unit coverage badges e2e-ios e2e-android e2e-web test clean reset help
+.PHONY: init doctor install ports start ios android web mock-api prebuild build-web version verify-ios verify-android release-notes i18n codegen typecheck lint format format-check knip spell check-gen check-prebuild check-code check-deps check-ci check-docs check-skills bundle-secrets-check check-release check check-slow ci codeql test-scripts unit coverage badges e2e-ios e2e-android e2e-web test clean reset help
