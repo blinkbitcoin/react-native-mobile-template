@@ -33,8 +33,9 @@ Deploy under the sub-path, and test exactly the bytes that deploy.
 
 ## Consequences
 
-A deploy export is exercised for the first time at the tag; PR runs still use
-a dev export. Specs navigate with `./` paths because a leading `/` discards
+A deploy export used to be exercised for the first time at the tag, PR runs
+using a dev export; amended 2026-09-19: every export is a production export,
+so a PR tests the flavour that deploys (#36). Specs navigate with `./` paths because a leading `/` discards
 the base path when Playwright joins it to `baseURL`. Pages is today's target,
 not the interface: `Deploy` is deliberately not named for it.
 
