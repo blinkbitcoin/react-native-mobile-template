@@ -44,6 +44,7 @@ all).
 | Path | Contents |
 | --- | --- |
 | `AGENTS.md` | The canonical rules-of-the-road file for humans and coding agents. `CLAUDE.md` includes it |
+| `.claude/skills/` | Agent skills that ship with the template: store setup, console walkthroughs, credential validation, store metadata |
 | `mocks/README.md` | The mock GraphQL schema, the yoga server and the MSW handlers that share it |
 | `certs/README.md` | The expo-updates code-signing certificate and key handling |
 | `deploy/ota/README.md` | The self-hosted update server deployment |
