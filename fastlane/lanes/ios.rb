@@ -226,6 +226,68 @@ platform :ios do
     store_action(:upload_to_app_store, **args)
   end
 
+  desc 'Push the baseline store listing from fastlane/metadata/ios to App Store Connect (no binary, no review submission, no release notes)'
+  lane :sync_metadata do |options|
+    assert_metadata_sync_enabled!
+    require_env!(%w[ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64])
+    source = ios_metadata_path
+    assert_metadata_locales!(source)
+    assert_ios_metadata_dirs!(source)
+    assert_metadata_ready!(source)
+
+    # Apple's constraint, not ours: name, subtitle, keywords, categories and
+    # screenshots only exist on a version that is being prepared. `live:true`
+    # (or IOS_METADATA_EDIT_LIVE) edits the live version instead, which Apple
+    # allows for description, promotional text, the URLs and the copyright and
+    # nothing else (deliver/lib/deliver/upload_metadata.rb:67).
+    live = truthy?(options[:live] || ENV['IOS_METADATA_EDIT_LIVE'])
+    # deliver PATCHes every review-detail field it is handed, so the *empty*
+    # review_information/*.txt this template ships would clear the contact
+    # already configured in App Store Connect. The staged tree keeps that
+    # directory only when the APP_REVIEW_* environment has something to put in
+    # it - and never in live mode, where review detail is not editable.
+    review = live ? {} : review_information
+    excluded_dirs = SYNC_EXCLUDED_DIRS + (review.empty? ? %w[review_information] : [])
+    screenshots = !live && ios_screenshots?
+
+    with_baseline_metadata(source, exclude_dirs: excluded_dirs) do |staged|
+      args = {
+        api_key: api_key,
+        app_identifier: ENV.fetch('IOS_BUNDLE_ID'),
+        metadata_path: staged,
+        # No app_version, and skip_app_version_update on top of it: deliver
+        # creates or renames a version only when it is given one
+        # (deliver/lib/deliver/runner.rb:58). This lane must never move the
+        # version App Store Connect is holding, and must never be the thing
+        # that opens one.
+        skip_app_version_update: true,
+        skip_binary_upload: true,
+        skip_metadata: false,
+        # The three that make this a listing edit rather than a release:
+        submit_for_review: false,
+        run_precheck_before_submit: false,
+        edit_live: live,
+        # Neither automatic_release nor auto_release_date: both write the
+        # version's releaseType, which belongs to release_production.
+        force: true, # no HTML preview to confirm on a runner
+        skip_screenshots: !screenshots,
+        overwrite_screenshots: screenshots
+      }
+      if screenshots
+        # A sibling of the staged metadata, never inside it: `screenshots` is
+        # the one directory name deliver rejects under metadata_path.
+        staged_shots = File.join(File.dirname(staged), 'screenshots')
+        FileUtils.cp_r(ios_screenshots_path, staged_shots)
+        args[:screenshots_path] = staged_shots
+      end
+      rating = ios_app_rating_config_path(staged)
+      args[:app_rating_config_path] = rating if rating
+      args[:app_review_information] = review unless review.empty?
+
+      store_action(:upload_to_app_store, **args)
+    end
+  end
+
   desc 'Control the 7-day phased release of the live version (action:pause|resume|complete)'
   lane :phased do |options|
     require_env!(%w[ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64])

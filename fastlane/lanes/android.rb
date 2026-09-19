@@ -327,6 +327,41 @@ platform :android do
     store_action(:upload_to_play_store, **args)
   end
 
+  desc 'Push the baseline store listing from fastlane/metadata/android to Google Play (no binary, no track change, no changelogs)'
+  lane :sync_metadata do
+    assert_metadata_sync_enabled!
+    source = android_metadata_path
+    assert_metadata_locales!(source)
+    assert_metadata_ready!(source)
+    package = ENV.fetch('ANDROID_PACKAGE')
+    track, version_code = play_metadata_target
+    UI.message("Syncing the Play listing against #{track} version code #{version_code}")
+
+    with_baseline_metadata(source) do |staged|
+      store_action(
+        :upload_to_play_store,
+        package_name: package,
+        # The track and version code that are already there, so supply can
+        # find the release its listing edit hangs off. Nothing moves: no
+        # binary is uploaded, and with no track_promote_to and no rollout
+        # supply never touches the track itself (uploader.rb:29-42).
+        track: track,
+        version_code: version_code,
+        skip_upload_aab: true,
+        skip_upload_apk: true,
+        metadata_path: staged,
+        skip_upload_metadata: false,
+        skip_upload_images: false,
+        skip_upload_screenshots: false,
+        # "What's new" is per version and belongs to release_production's
+        # write_release_notes!; the staged tree has no changelogs/ either, so
+        # this is belt and braces on purpose.
+        skip_upload_changelogs: true,
+        **play_json_key_args
+      )
+    end
+  end
+
   desc 'Change the production staged-rollout share. Whole number = percent (percent:1 is 1%, percent:100 completes); a decimal is a fraction (percent:0.01 is 1%, percent:1.0 completes)'
   lane :rollout do |options|
     fraction = rollout_fraction(options[:percent] || ENV['PLAY_ROLLOUT'])

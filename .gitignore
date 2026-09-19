@@ -96,6 +96,9 @@ modules/*/android/.cxx/
 !/fastlane/screenshots/*/.gitkeep
 /fastlane/metadata/android/*/images/*
 !/fastlane/metadata/android/*/images/.gitkeep
+!/fastlane/metadata/android/*/images/phoneScreenshots/
+/fastlane/metadata/android/*/images/phoneScreenshots/*
+!/fastlane/metadata/android/*/images/phoneScreenshots/.gitkeep
 
 # Release artifacts. `artifacts/` is where the lanes write by default, but
 # WORKFLOWS_OUTPUT_DIR can point anywhere, so the shapes are ignored by extension too.

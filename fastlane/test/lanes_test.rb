@@ -916,6 +916,7 @@ class LaneBehaviourTest < Minitest::Test
     ANDROID_UPLOAD_KEYSTORE_PATH ANDROID_UPLOAD_KEYSTORE_PASSWORD
     ANDROID_UPLOAD_KEY_ALIAS ANDROID_UPLOAD_KEY_PASSWORD
     MATCH_GIT_URL MATCH_PASSWORD
+    STORE_METADATA_SYNC_ENABLED IOS_METADATA_EDIT_LIVE PLAY_METADATA_TRACK
   ].freeze
 
   def setup
@@ -1208,6 +1209,178 @@ class LaneBehaviourTest < Minitest::Test
     end
   end
 
+  # ---------- ios sync_metadata ----------
+
+  def test_ios_sync_metadata_refuses_when_disabled
+    in_project do
+      error = assert_raises(UI::UserError) { run_lane(:ios, :sync_metadata) }
+      assert_includes error.message, 'STORE_METADATA_SYNC_ENABLED'
+      refute called?(:upload_to_app_store)
+    end
+  end
+
+  def test_ios_sync_metadata_pushes_metadata_only
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    in_project do
+      run_lane(:ios, :sync_metadata)
+
+      args = args_for(:upload_to_app_store)
+      assert args[:skip_binary_upload], 'sync_metadata must never touch the binary'
+      assert args[:skip_app_version_update], 'sync_metadata must never move the version'
+      refute args[:submit_for_review]
+      refute args[:run_precheck_before_submit]
+      refute args[:edit_live]
+      assert args[:force]
+      refute args[:skip_metadata]
+      refute args.key?(:app_version)
+      refute args.key?(:automatic_release)
+      refute args.key?(:phased_release)
+      refute args.key?(:submission_information)
+      refute_equal root_path('fastlane', 'metadata', 'ios'), args[:metadata_path],
+                    'a staged copy must be pushed, never the working tree'
+    end
+  end
+
+  def test_ios_sync_metadata_excludes_release_notes_from_the_staged_tree
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    in_project do
+      File.write('fastlane/metadata/ios/en-US/description.txt', 'The story of this app.')
+      File.write('fastlane/metadata/ios/en-US/release_notes.txt', "What's new.")
+      run_lane(:ios, :sync_metadata)
+
+      snapshot = $metadata_snapshots.last
+      assert_includes snapshot, 'en-US/description.txt'
+      refute_includes snapshot, 'en-US/release_notes.txt'
+      assert File.exist?('fastlane/metadata/ios/en-US/release_notes.txt'),
+             'the working tree copy must survive: only the staged copy is trimmed'
+    end
+  end
+
+  def test_ios_sync_metadata_omits_review_information_when_unconfigured
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    in_project do
+      run_lane(:ios, :sync_metadata)
+
+      refute args_for(:upload_to_app_store).key?(:app_review_information)
+      refute $metadata_snapshots.last.any? { |f| f.start_with?('review_information') },
+             'an empty review_information would clear the contact already on file'
+    end
+  end
+
+  def test_ios_sync_metadata_includes_review_information_when_configured
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    ENV['APP_REVIEW_EMAIL'] = 'review@example.com'
+    in_project do
+      run_lane(:ios, :sync_metadata)
+
+      args = args_for(:upload_to_app_store)
+      assert_equal 'review@example.com', args[:app_review_information][:email_address]
+      assert $metadata_snapshots.last.any? { |f| f.start_with?('review_information') }
+    end
+  end
+
+  def test_ios_sync_metadata_live_option_edits_the_live_version_only
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    ENV['APP_REVIEW_EMAIL'] = 'review@example.com'
+    in_project do
+      run_lane(:ios, :sync_metadata, live: true)
+
+      args = args_for(:upload_to_app_store)
+      assert args[:edit_live]
+      assert args[:skip_screenshots]
+      refute args.key?(:app_review_information), 'review detail is not editable in live mode'
+    end
+  end
+
+  def test_ios_sync_metadata_edit_live_env_edits_the_live_version_only
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    ENV['IOS_METADATA_EDIT_LIVE'] = 'true'
+    ENV['APP_REVIEW_EMAIL'] = 'review@example.com'
+    in_project do
+      run_lane(:ios, :sync_metadata)
+
+      args = args_for(:upload_to_app_store)
+      assert args[:edit_live]
+      assert args[:skip_screenshots]
+      refute args.key?(:app_review_information)
+    end
+  end
+
+  def test_ios_sync_metadata_stages_screenshots_as_a_sibling_of_the_metadata_tree
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    in_project do |dir|
+      FileUtils.mkdir_p(File.join(dir, 'fastlane', 'screenshots', 'en-US'))
+      File.write(File.join(dir, 'fastlane', 'screenshots', 'en-US', 'home.png'), 'png')
+      run_lane(:ios, :sync_metadata)
+
+      args = args_for(:upload_to_app_store)
+      refute args[:skip_screenshots]
+      assert args[:overwrite_screenshots]
+      refute_nil args[:screenshots_path]
+      refute args[:screenshots_path].start_with?(args[:metadata_path]),
+             'screenshots is the one directory name deliver rejects under metadata_path'
+    end
+  end
+
+  def test_ios_sync_metadata_skips_screenshots_when_none_are_staged
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    in_project do
+      run_lane(:ios, :sync_metadata)
+
+      args = args_for(:upload_to_app_store)
+      assert args[:skip_screenshots]
+      refute args.key?(:screenshots_path)
+    end
+  end
+
+  def test_ios_sync_metadata_passes_app_rating_config_path_only_when_present
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    in_project do
+      run_lane(:ios, :sync_metadata)
+      refute args_for(:upload_to_app_store).key?(:app_rating_config_path)
+    end
+
+    reset_calls!
+    in_project do
+      File.write('fastlane/metadata/ios/app_rating_config.json', '{}')
+      run_lane(:ios, :sync_metadata)
+
+      args = args_for(:upload_to_app_store)
+      refute_nil args[:app_rating_config_path]
+      assert args[:app_rating_config_path].start_with?(args[:metadata_path]),
+             'the rating config must come from the staged tree, not the working tree'
+    end
+  end
+
+  def test_ios_sync_metadata_refuses_placeholder_metadata
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    in_project do
+      File.write('fastlane/metadata/ios/en-US/description.txt', 'Replace this text with the story of your own app.')
+      error = assert_raises(UI::UserError) { run_lane(:ios, :sync_metadata) }
+      assert_includes error.message, 'description.txt'
+      refute called?(:upload_to_app_store)
+    end
+  end
+
+  def test_ios_sync_metadata_refuses_a_tree_with_no_locales
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    in_project(locales: []) do
+      error = assert_raises(UI::UserError) { run_lane(:ios, :sync_metadata) }
+      assert_includes error.message, 'No locale directories'
+      refute called?(:upload_to_app_store)
+    end
+  end
+
+  def test_ios_sync_metadata_refuses_a_screenshots_directory_inside_metadata
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    in_project do
+      FileUtils.mkdir_p('fastlane/metadata/ios/screenshots')
+      error = assert_raises(UI::UserError) { run_lane(:ios, :sync_metadata) }
+      assert_includes error.message, 'screenshots'
+      refute called?(:upload_to_app_store)
+    end
+  end
+
   # ---------- ios phased ----------
 
   def test_ios_phased_drives_the_live_versions_phased_release
@@ -1313,6 +1486,62 @@ class LaneBehaviourTest < Minitest::Test
     in_project do
       run_lane(:android, :release_production)
       assert_equal '1', args_for(:upload_to_play_store)[:rollout]
+    end
+  end
+
+  # ---------- android sync_metadata ----------
+
+  def test_android_sync_metadata_refuses_when_disabled
+    in_project do
+      error = assert_raises(UI::UserError) { run_lane(:android, :sync_metadata) }
+      assert_includes error.message, 'STORE_METADATA_SYNC_ENABLED'
+      refute called?(:upload_to_play_store)
+    end
+  end
+
+  def test_android_sync_metadata_pushes_metadata_only
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    in_project do
+      File.write('fastlane/metadata/android/en-US/title.txt', 'App')
+      FileUtils.mkdir_p('fastlane/metadata/android/en-US/changelogs')
+      File.write('fastlane/metadata/android/en-US/changelogs/42.txt', 'notes')
+      stub_result(:google_play_track_version_codes, [41, 42])
+      run_lane(:android, :sync_metadata)
+
+      args = args_for(:upload_to_play_store)
+      assert args[:skip_upload_aab]
+      assert args[:skip_upload_apk]
+      assert args[:skip_upload_changelogs], "what's new belongs to release_production"
+      refute args[:skip_upload_metadata]
+      refute args[:skip_upload_images]
+      refute args[:skip_upload_screenshots]
+      refute args.key?(:track_promote_to)
+      refute args.key?(:rollout)
+      refute args.key?(:in_app_update_priority)
+      assert_equal 'production', args[:track]
+      assert_equal 42, args[:version_code]
+
+      snapshot = $metadata_snapshots.last
+      assert_includes snapshot, 'en-US/title.txt'
+      refute snapshot.any? { |f| f.start_with?('en-US/changelogs') }
+    end
+  end
+
+  # ---------- sync_metadata under DRY_RUN ----------
+
+  def test_sync_metadata_dry_run_does_not_upload_or_touch_the_working_tree
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    ENV['DRY_RUN'] = '1'
+    in_project do
+      before = Dir.glob('fastlane/metadata/**/*').sort
+      run_lane(:ios, :sync_metadata)
+      run_lane(:android, :sync_metadata)
+      after = Dir.glob('fastlane/metadata/**/*').sort
+
+      refute called?(:upload_to_app_store)
+      refute called?(:upload_to_play_store)
+      assert UI.messages.any? { |m| m.include?('[dry-run]') }, UI.messages.inspect
+      assert_equal before, after
     end
   end
 
@@ -1524,6 +1753,7 @@ class LaneBehaviourTest < Minitest::Test
       ENV['APP_REVIEW_DEMO_USER'] = 'demo'
       ENV['APP_REVIEW_DEMO_PASSWORD'] = 'demopass'
       ENV['PLAY_UPDATE_PRIORITY'] = '3'
+      ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
 
       [
         [:ios, :build, { skip_signing: 'true' }],
@@ -1531,11 +1761,14 @@ class LaneBehaviourTest < Minitest::Test
         [:ios, :upload_internal, {}],
         [:ios, :promote_beta, {}],
         [:ios, :release_production, {}],
+        [:ios, :sync_metadata, {}],
+        [:ios, :sync_metadata, { live: 'true' }],
         [:ios, :phased, { action: 'pause' }],
         [:ios, :upload_symbols, {}],
         [:android, :upload_internal, {}],
         [:android, :promote_beta, {}],
         [:android, :release_production, {}],
+        [:android, :sync_metadata, {}],
         [:android, :rollout, { percent: 50 }],
         [:android, :halt, {}]
       ].each do |platform_name, lane_name, options|
