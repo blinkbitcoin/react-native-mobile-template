@@ -583,6 +583,24 @@ class LanesTest < Minitest::Test
     end
   end
 
+  def test_assert_ios_metadata_dirs_accepts_locales_and_deliver_folders
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, 'en-US'))
+      FileUtils.mkdir_p(File.join(dir, 'review_information'))
+      assert_nil assert_ios_metadata_dirs!(dir)
+    end
+  end
+
+  def test_assert_ios_metadata_dirs_rejects_a_screenshots_directory
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, 'en-US'))
+      FileUtils.mkdir_p(File.join(dir, 'screenshots'))
+      err = assert_raises(UI::UserError) { assert_ios_metadata_dirs!(dir) }
+      assert_includes err.message, 'screenshots'
+      assert_includes err.message, 'fastlane/screenshots/'
+    end
+  end
+
   def test_write_release_notes_refuses_a_tree_with_no_locales
     Dir.mktmpdir do |dir|
       ENV['RELEASE_NOTES_STORE_FILE'] = write_file('Some notes.')
@@ -975,6 +993,15 @@ class LaneBehaviourTest < Minitest::Test
       File.write('fastlane/metadata/ios/en-US/description.txt', 'Replace this text with the story of your own app.')
       error = assert_raises(UI::UserError) { run_lane(:ios, :release_production) }
       assert_includes error.message, 'description.txt'
+      refute called?(:upload_to_app_store)
+    end
+  end
+
+  def test_ios_release_production_refuses_a_screenshots_directory
+    in_project do
+      FileUtils.mkdir_p('fastlane/metadata/ios/screenshots')
+      error = assert_raises(UI::UserError) { run_lane(:ios, :release_production) }
+      assert_includes error.message, 'screenshots'
       refute called?(:upload_to_app_store)
     end
   end

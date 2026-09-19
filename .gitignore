@@ -88,11 +88,12 @@ modules/*/android/.cxx/
 /fastlane/.env*
 /fastlane/*.json
 # Screenshots are generated, but the directories are kept so fastlane and CI
-# have somewhere to write.
-/fastlane/screenshots/*
-!/fastlane/screenshots/.gitkeep
-/fastlane/metadata/ios/screenshots/*
-!/fastlane/metadata/ios/screenshots/.gitkeep
+# have somewhere to write. iOS screenshots live under fastlane/screenshots/
+# <locale>/ (deliver's own default) rather than fastlane/metadata/ios/
+# screenshots/, which deliver refuses to see (assert_ios_metadata_dirs! in
+# fastlane/lanes/shared.rb).
+/fastlane/screenshots/*/*
+!/fastlane/screenshots/*/.gitkeep
 /fastlane/metadata/android/*/images/*
 !/fastlane/metadata/android/*/images/.gitkeep
 

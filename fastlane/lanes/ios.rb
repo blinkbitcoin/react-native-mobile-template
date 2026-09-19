@@ -193,6 +193,7 @@ platform :ios do
   desc 'Submit the existing build to the App Store with metadata and release notes'
   lane :release_production do
     require_env!(%w[ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64])
+    assert_ios_metadata_dirs!(ios_metadata_path)
     assert_metadata_ready!(ios_metadata_path)
     written = write_release_notes!(ios_metadata_path, kind: :appstore, limit: APP_STORE_NOTES_LIMIT)
     UI.message("Release notes written: #{written.join(', ')}")

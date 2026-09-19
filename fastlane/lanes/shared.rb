@@ -455,3 +455,27 @@ def assert_metadata_ready!(metadata_path)
 
   UI.user_error!("Store metadata still contains template placeholder text: #{offenders.join(', ')} (see docs/release-runbook.md)")
 end
+
+# deliver rejects a directory under metadata_path that is neither an Apple
+# locale nor one of its own special folders, *before* it uploads anything
+# (deliver/lib/deliver/loader.rb:167) - and its error lists every locale Apple
+# supports, which buries the one useful fact. Say it here instead. This is why
+# iOS screenshots live in fastlane/screenshots/<locale>/, deliver's own
+# default: `screenshots` is exactly the directory name that trips it.
+IOS_METADATA_ALLOWED_DIRS = %w[
+  review_information trade_representative_contact_information
+  app_clip_review_information default appleTV iMessage
+].freeze
+
+def assert_ios_metadata_dirs!(metadata_path)
+  offenders = Dir.children(metadata_path).select do |name|
+    File.directory?(File.join(metadata_path, name)) &&
+      !LOCALE_DIR_PATTERN.match?(name) && !IOS_METADATA_ALLOWED_DIRS.include?(name)
+  end
+  return if offenders.empty?
+
+  UI.user_error!(
+    "#{metadata_path} holds directories deliver will reject: #{offenders.sort.join(', ')} - " \
+    'screenshots belong in fastlane/screenshots/<locale>/ (see docs/release-runbook.md)'
+  )
+end
