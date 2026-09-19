@@ -18,7 +18,8 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 jobs:
   web:
-    name: Export
+    # The called workflow's jobs show as "<this name> / Build|Playwright|Deploy".
+    name: Web
     uses: blinkbitcoin/shared-workflows/.github/workflows/web.yml@v0
     permissions:
       contents: read
@@ -35,3 +36,7 @@ jobs:
       # string is falsy) and would quietly deploy a dev bundle.
       export-args: ${{ !inputs.deploy && '--dev' || '' }}
       deploy: ${{ inputs.deploy == true }}
+      # A project Pages site is served under `/<repo>/`; a custom domain
+      # (EXPO_PUBLIC_WEB_DOMAIN) is served at `/`. app.config.ts turns this into
+      # `experiments.baseUrl`. Empty on a PR export, which is served at `/` too.
+      base-url: ${{ inputs.deploy && vars.EXPO_PUBLIC_WEB_DOMAIN == '' && format('/{0}', github.event.repository.name) || '' }}

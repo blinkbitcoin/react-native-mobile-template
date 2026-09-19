@@ -69,7 +69,7 @@ twenty-minute Android suite or a macOS runner.
 | File | Trigger | Calls | Notes |
 | --- | --- | --- | --- |
 | `ci.yml` | `push` to `main` (all paths), `pull_request` (`opened`, `synchronize`, `reopened`, `labeled`), `workflow_dispatch` | `checks.yml`, `unit.yml`, `e2e.yml`, `badges.yml` | `unit` and `e2e` both `needs: checks` and skip when `checks` reports<br>`docs-only` — on a push as well as a PR; `badges` runs under `always()`<br>and publishes this branch's badges (see [Badges](#badges)) |
-| `web.yml` | `pull_request`, `workflow_dispatch` (`deploy`) | `web.yml` | PR = dev export + Playwright smoke; a `deploy` dispatch from `release-please.yml`<br>at the tag = production export + Pages deploy |
+| `web.yml` | `pull_request`, `workflow_dispatch` (`deploy`) | `web.yml` | PR = dev export + Playwright smoke; a `deploy` dispatch from `release-please.yml`<br>at the tag = production export + Pages deploy, with `base-url` = `/<repo>` unless a custom<br>domain is set, and `+not-found.html` copied to `404.html` so a deep link boots the router |
 | `pr-closed.yml` | `pull_request: closed` | `pr-closed.yml` | cancels the closed PR's in-flight runs and drops its `gh-pages` badge directory; needs `actions: write` and `contents: write` |
 | `pr-title.yml` | `pull_request: edited` (only when the title changed) | `pr-title.yml` | `opened`/`synchronize` are already covered by `checks.yml`'s `commitlint` |
 | `codeql.yml` | `push` to `main`, `pull_request` to `main`, `schedule` (Mon 06:17 UTC) | `codeql.yml` | CodeQL advanced setup. Informational — **never** a required check.<br>Config in `.github/codeql/codeql-config.yml`; `make codeql` runs the same queries locally |

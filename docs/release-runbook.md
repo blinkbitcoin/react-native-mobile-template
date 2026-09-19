@@ -410,7 +410,7 @@ Settings → Environments. Four, three of which exist only to scope secrets:
 | `internal` | none | Scopes the signing and store credentials used by `release-internal` |
 | `beta` | none | Scopes the credentials used by `release-beta` |
 | `production` | **Required reviewers** (at least one, "prevent self-review" on), deployment branches and tags limited to the tag pattern `v*` | Gates every store job in `release-production.yml` and a production OTA hotfix |
-| `github-pages` | GitHub creates it | Used by the `web.yml` deploy job |
+| `github-pages` | GitHub creates it, allowing `main` only; **add a tag policy `v*`** | Used by the `web.yml` deploy job, which runs at the release tag.<br>Without the tag policy the deploy is rejected: "Tag … is not allowed to deploy to github-pages" |
 
 The `production` reviewer is the release gate: nothing in `release-production.yml`
 or a production `ota-hotfix` starts until someone approves. On a private
