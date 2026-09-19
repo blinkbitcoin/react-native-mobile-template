@@ -1,4 +1,4 @@
-name: CD / Release PR
+name: CD / Release
 # Keeps one "chore(main): release X.Y.Z" PR open against main. Merging that PR
 # is the only human action that cuts a release: it bumps package.json, writes
 # the CHANGELOG section, tags `vX.Y.Z` and publishes the GitHub release, which
@@ -27,7 +27,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   release-please:
-    name: Release PR
+    name: Release
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

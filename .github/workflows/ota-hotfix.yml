@@ -43,7 +43,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   baseline:
-    name: Baseline
+    name: Fingerprint baseline
     # Same gate as `publish`: without it a dispatch on a repo with OTA off burns
     # a runner and then fails with "no baseline release found", which reads as a
     # hotfix problem rather than "OTA is not enabled here".

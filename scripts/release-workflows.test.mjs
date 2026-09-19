@@ -2,7 +2,7 @@
 // Play account.
 //
 // It did not. Every stage chained its GitHub release behind its store uploads —
-// `github-prerelease` needed `publish-ios` and `publish-android`, and neither
+// `github-prerelease` needed `upload-ios` and `upload-android`, and neither
 // upload job carried a condition — so without credentials nothing past the
 // native builds ran, including the release itself, which needs only the default
 // token. On a template that fires `release-internal` on every push to `main`,
@@ -53,7 +53,7 @@ function parseJobs(file) {
 
 const WORKFLOWS = {
   'release-internal.yml': {
-    storeJobs: ['publish-ios', 'publish-android'],
+    storeJobs: ['upload-ios', 'upload-android'],
     releaseJobs: ['github-prerelease'],
   },
   'release-beta.yml': {
