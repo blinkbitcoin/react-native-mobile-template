@@ -869,7 +869,7 @@ describe('init --yes --web', () => {
     assert.ok(existsSync(path.join(root, '.github/workflows/web.yml')));
     assert.ok(existsSync(path.join(root, 'src/features/settings/NativeDemoCard.web.tsx')));
     const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
-    assert.equal(pkg.scripts['build:web'], 'expo export --platform web');
+    assert.equal(pkg.scripts['build:web'], 'bash scripts/build-web.sh');
     assert.ok(pkg.dependencies['react-native-web']);
     assert.match(readFileSync(path.join(root, 'Makefile'), 'utf8'), /^e2e-web:/m);
     assert.match(readFileSync(path.join(root, 'app.config.ts'), 'utf8'), /^\s*web: \{/m);

@@ -83,7 +83,7 @@
     "ios": "expo run:ios",
     "android": "expo run:android",
     "web": "expo start --web",
-    "build:web": "expo export --platform web",
+    "build:web": "bash scripts/build-web.sh",
     "prebuild": "expo prebuild --clean",
     "doctor": "node scripts/doctor.mjs",
     "test:scripts": "node --test \"scripts/**/*.test.mjs\"",
