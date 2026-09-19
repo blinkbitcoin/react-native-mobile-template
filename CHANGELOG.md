@@ -5,6 +5,13 @@ by [release-please](https://github.com/googleapis/release-please) from
 [Conventional Commits](https://www.conventionalcommits.org/) — edit the commit
 messages, not this file. See [docs/release-runbook.md](docs/release-runbook.md).
 
+## [0.4.0](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.3.2...v0.4.0) (2026-09-19)
+
+
+### Features
+
+* **release:** reserve the build tag at push time, while the commit is still main's tip ([#40](https://github.com/blinkbitcoin/react-native-mobile-template/issues/40)) ([d6fd36d](https://github.com/blinkbitcoin/react-native-mobile-template/commit/d6fd36d953f169996d94c310602d5a302bee685a))
+
 ## [0.3.2](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.3.1...v0.3.2) (2026-09-19)
 
 
