@@ -22,6 +22,7 @@ checked against the repository rather than believed.
 | [0014](0014-green-gate-heals-itself.md) | Beta's green gate dispatches the internal build it is missing instead of waiting for a human | 2026-09-19 |
 | [0015](0015-web-on-pages.md) | The web target deploys to a Pages sub-path, with a 404 shell for deep links, tested as the same bytes | 2026-09-19 |
 | [0016](0016-job-names-by-purpose.md) | Workflow and job names say what a step is for, in store vocabulary, never a tool's | 2026-09-19 |
+| [0017](0017-build-tag-reserved-at-push.md) | The `-build.N` tag is created in Prepare at push time, while the commit is still main's tip;<br>GitHub refuses a later tag once a workflow file changed | 2026-09-19 |
 
 ## Writing a new one
 

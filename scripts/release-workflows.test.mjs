@@ -168,6 +168,21 @@ describe('the beta gate dispatches the build it is missing', () => {
     assert.match(prepare, /release-tag: \$\{\{ inputs\.tag \}\}/);
   });
 
+  test('the internal release reserves its build tag at push time, with contents: write', () => {
+    // GitHub refuses GITHUB_TOKEN a new tag on a commit whose workflow files
+    // differ from main's tip; an hour after the push that is often the case.
+    const internal = readFileSync(path.join(root, '.github/workflows/release-internal.yml'), 'utf8')
+      .split('\n')
+      .filter((l) => !l.trimStart().startsWith('#'))
+      .join('\n');
+    const prep = internal.slice(
+      internal.indexOf('\n  prepare:'),
+      internal.indexOf('\n  build-ios:'),
+    );
+    assert.match(prep, /reserve-tag: true/);
+    assert.match(prep, /^\s+contents: write$/m);
+  });
+
   test('prepare grants actions: write, which the dispatch needs', () => {
     assert.match(prepare, /^\s+actions: write$/m);
   });
