@@ -19,13 +19,14 @@
 #   REPO_ROOT         defaults to `git rev-parse --show-toplevel`
 #
 # Exit codes: 0 ok, 1 validation failed (or a `note` refused as
-# credential-shaped), 3 nothing to do (`next` found no eligible step), 64
-# usage.
+# credential-shaped), 2 gated (no state.json yet, or the step is missing from
+# an older one), 3 nothing to do (`next` found no eligible step), 64 usage.
 
 set -uo pipefail
 
 die() { echo "FATAL: $*" >&2; exit 1; }
 usage() { echo "FATAL: $*" >&2; exit 64; }
+gated() { echo "FATAL: $*" >&2; exit 2; }
 
 # The step vocabulary: id|owner|needs (needs is a comma-separated list of ids,
 # empty for none). This exact table, in this exact order, is the interface
@@ -181,6 +182,12 @@ if (op === "mode") {
 
 if (op === "set") {
   const [step, status, note] = args;
+  if (!state.steps[step]) {
+    process.stderr.write(
+      "FATAL: step \"" + step + "\" is not present in " + file + " - run state.sh init (or init --force) to add it\n"
+    );
+    process.exit(2);
+  }
   state.steps[step].status = status;
   if (note !== undefined) state.steps[step].note = note;
   save(state);
@@ -188,7 +195,14 @@ if (op === "set") {
 }
 
 if (op === "get") {
-  process.stdout.write(state.steps[args[0]].status + "\n");
+  const st = state.steps[args[0]];
+  if (!st) {
+    process.stderr.write(
+      "FATAL: step \"" + args[0] + "\" is not present in " + file + " - run state.sh init (or init --force) to add it\n"
+    );
+    process.exit(2);
+  }
+  process.stdout.write(st.status + "\n");
   process.exit(0);
 }
 
@@ -217,7 +231,8 @@ if (op === "render") {
   for (const s of steps) {
     const st = state.steps[s.id];
     if (markdown) {
-      const mark = st.status === "done" ? "x" : st.status === "skipped" ? "~" : " ";
+      const mark =
+        st.status === "done" ? "x" : st.status === "doing" ? "~" : st.status === "skipped" ? "-" : " ";
       let line = `- [${mark}] ${s.id}`;
       if (st.note) line += ` - ${st.note}`;
       process.stdout.write(line + "\n");
@@ -237,6 +252,14 @@ process.exit(70);
 
 CMD="${1:-}"
 [ $# -ge 1 ] && shift
+
+# Every subcommand but `init` and `--list-steps` reads state.json; run
+# straight into a node TypeError otherwise (and exit 1, which collides with
+# the credential-refusal exit code) rather than a clear, gated failure.
+case "$CMD" in
+  init | --list-steps | '') : ;;
+  *) [ -f "$STATE_FILE" ] || gated "no state.json at $STATE_FILE - run state.sh init first" ;;
+esac
 
 case "$CMD" in
   --list-steps)

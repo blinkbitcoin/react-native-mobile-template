@@ -142,6 +142,12 @@ homes for repo-level truth stay GitHub variables/secrets, `fastlane/metadata/**`
 and the consoles themselves — `state.json` is a worklist, not a source of
 truth, and losing it costs re-running `state.sh next` a few times, not data.
 
+`state.sh render --markdown` marks each status distinctly: `- [x]` done,
+`- [~]` doing, `- [-]` skipped, `- [ ]` todo. Every subcommand but `init` and
+`--list-steps` requires `state.json` to already exist — run `state.sh init`
+first, or you get a gated exit (2) naming the missing file instead of a
+crash.
+
 ## After Editing the Scripts
 
 ```bash
