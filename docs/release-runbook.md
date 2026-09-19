@@ -154,6 +154,13 @@ and takes Play to 100%. `action: halt` stops both. See
   platforms, derivable from the tagged commit alone, monotonic on main and
   idempotent on a re-run. It needs `fetch-depth: 0`, which the reusable
   workflows set.
+- **The `vX.Y.Z-build.N` tag is created in Prepare, seconds after the push**,
+  not when the pre-release is published an hour later (`reserve-tag`, ADR
+  0017): GitHub refuses `GITHUB_TOKEN` a new tag on a commit whose workflow
+  files differ from main's tip, and by publish time a later merge may have
+  changed one. A tag with no release behind it means a run reserved it and
+  then failed; the run deletes it on a red gate, and `gh run rerun --failed`
+  finishes the rest.
 - **Raise `BUILD_NUMBER_OFFSET`, never lower it.** App Store Connect and Play
   both reject a build number that goes backwards, permanently.
 - **A non-numeric `BUILD_NUMBER_OFFSET` is refused** by both copies of the

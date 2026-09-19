@@ -30,14 +30,20 @@ jobs:
     name: Prepare
     uses: blinkbitcoin/shared-workflows/.github/workflows/expo-prepare.yml@v0
     permissions:
-      contents: read
-      # expo-prepare declares `actions: read` statically (its green-workflow
-      # gate runs `gh run list`), and a called workflow can only narrow the
-      # caller's token — so it has to be granted here even though this caller
-      # sets no `require-green-workflow`.
+      # `contents: write` for `reserve-tag` below (it creates the build tag);
+      # `actions: read` for the green gate's `gh run list`. expo-prepare
+      # inherits exactly what is granted here.
+      contents: write
       actions: read
     with:
       stage: internal
+      # The `v<version>-build.<n>` tag is created here, seconds after the push,
+      # while this commit is still main's tip - not when the release is
+      # published an hour later. GitHub refuses GITHUB_TOKEN a new tag on a
+      # commit whose workflow files differ from the tip, and by publish time a
+      # later merge may have changed one (ADR 0017: every pre-release between
+      # 01:30Z and 03:10Z on 2026-09-19 failed that way).
+      reserve-tag: true
       # Both this workflow and ci.yml fire on the same push, so without a gate a
       # red main still starts a macOS build and, with uploads on, still reaches a
       # store. This blocks inside the job - polling every 30s, 45-minute cap,
