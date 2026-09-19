@@ -383,10 +383,23 @@ already has such an App; this template does not use them.
 
 ### Concurrency: which workflows share a queue
 
-Every **store-affecting** workflow — `release-internal`, `release-beta`,
-`release-production`, `ota-hotfix` — shares `concurrency: release` with
-`cancel-in-progress: false`, so two of them can never touch a store at the same
-time and none is ever cancelled half-way.
+The **promoting** workflows — `release-beta`, `release-production`,
+`ota-hotfix` — share `concurrency: release` with `cancel-in-progress: false`,
+so two of them can never touch a store at the same time and none is ever
+cancelled half-way. `release-internal` used to share it too, and that is where
+releases got lost: GitHub keeps one *pending* run per group and evicts the
+older one, and an internal run spends ~35 minutes in Prepare waiting for its
+commit's CI before it builds at all. A release PR merged behind a fix — the
+normal sequence — had its own internal build evicted, and its beta then failed
+the green gate (v0.2.3, v0.2.4 and v0.2.5 each needed a manual dispatch).
+
+So `release-internal` queues **per commit** (`release-internal-<sha>`): nothing
+is evicted, and two commits' builds run side by side. Only its store-touching
+jobs — `upload-ios`, `upload-android`, `ota-internal` — join the `release`
+queue, each at job level. The residual: a *pending* upload can still be evicted
+by the next pending store job. That takes two uploads queued within minutes of
+each other; it shows as a red internal run, and `gh run rerun <id> --failed`
+finishes it.
 
 The group is a **constant**, not `release-${{ github.ref }}`. `github.ref` is
 `refs/heads/main` on a push or a manual dispatch but `refs/tags/vX.Y.Z` on the
