@@ -120,6 +120,12 @@ describe('the internal release queues per commit; only its store jobs share the 
     assert.match(topGroup(strip('release-internal.yml')) ?? '', /github\.sha/);
   });
 
+  test('CI on main is keyed on the commit too, so a merge never evicts the previous one', () => {
+    const group = topGroup(strip('ci.yml')) ?? '';
+    assert.match(group, /github\.sha/);
+    assert.match(group, /github\.ref == 'refs\/heads\/main' &&/);
+  });
+
   test('the promoting workflows still share the literal release queue', () => {
     for (const file of ['release-beta.yml', 'release-production.yml', 'ota-hotfix.yml']) {
       assert.equal(topGroup(strip(file)), 'release', `${file} left the release queue`);

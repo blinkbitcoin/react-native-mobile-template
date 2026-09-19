@@ -12,7 +12,14 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: ci-${{ github.ref }}
+  # On a branch, one group per ref and the newest push cancels the rest. On
+  # main, one group per *commit*: GitHub keeps a single pending run per group
+  # and evicts the older one, so two quick merges behind a running main CI
+  # lost the middle commit's run entirely (5c6a1a1, 1eb3037) - and with no
+  # green CI, that commit's internal release refused to build. A main push
+  # must never be cancelled by the next one; the non-empty value sits in the
+  # `&&` slot on purpose (GitHub's `&&` yields its first falsy operand).
+  group: ci-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 jobs:
   checks:
