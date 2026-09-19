@@ -29,14 +29,14 @@ flowchart TD
     checks["Checks"] --> unit["Unit"] --> e2e["E2E"] --> badges["Badges"]
   end
 
-  CI -->|"push to main"| rp["CD / Release PR<br/>(release-please)"]
+  CI -->|"push to main"| rp["CD / Release<br/>(release-please)"]
   CI -->|"push to main"| internal
 
   subgraph internal["CD / Internal"]
     direction LR
     prep["Prepare<br/>(waits for green CI)"] --> builds["Build iOS<br/>Build Android"]
     builds --> up["Upload iOS<br/>Upload Android"]
-    up --> pre["GitHub Pre-release"]
+    up --> pre["Pre-release"]
   end
 
   rp -->|"merge the release PR"| tag["tag vX.Y.Z<br/>release published"]
@@ -44,7 +44,7 @@ flowchart TD
 
   subgraph beta["CD / Beta"]
     direction LR
-    bprep["Prepare"] --> promote["Promote iOS<br/>Promote Android"] --> brel["GitHub Release"]
+    bprep["Prepare"] --> promote["Promote iOS<br/>Promote Android"] --> brel["Release"]
   end
 
   beta -->|"workflow_dispatch"| prod

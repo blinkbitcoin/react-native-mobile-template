@@ -152,7 +152,7 @@ jobs:
       ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
       PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
 
-  publish-ios:
+  upload-ios:
     name: Upload iOS
     # Off unless the repository says otherwise, so a checkout with no store
     # credentials still builds, verifies and publishes its artifacts.
@@ -188,7 +188,7 @@ jobs:
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
 
-  publish-android:
+  upload-android:
     name: Upload Android
     # Off unless the repository says otherwise, so a checkout with no store
     # credentials still builds, verifies and publishes its artifacts.
@@ -214,7 +214,7 @@ jobs:
       PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
 
   github-prerelease:
-    name: GitHub Pre-release
+    name: Pre-release
     # The build jobs are named directly rather than reached through the upload
     # jobs: this release carries their artifacts and has never needed a store.
     # `!cancelled() && !failure()` is what lets it run when the uploads are
@@ -224,7 +224,7 @@ jobs:
     # state) and `failure()` both miss - the first internal release shipped a
     # pre-release with no binaries that way. So both builds are required to
     # have succeeded, by name.
-    needs: [prepare, build-ios, build-android, publish-ios, publish-android]
+    needs: [prepare, build-ios, build-android, upload-ios, upload-android]
     if: ${{ !cancelled() && !failure() && needs.build-ios.result == 'success' && needs.build-android.result == 'success' }}
     uses: blinkbitcoin/shared-workflows/.github/workflows/github-release.yml@v0
     permissions:

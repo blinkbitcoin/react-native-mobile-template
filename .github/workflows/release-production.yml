@@ -227,7 +227,7 @@ jobs:
   # ---- action=release only: mark latest, publish OTA, deploy web ------------
 
   github-release:
-    name: GitHub Release
+    name: Release
     # `prepare` is ordering, not data: this job keys off `inputs.tag`, but the
     # `release-meta` artifact it attaches only exists once prepare has run.
     needs: [prepare, ios-release, android-release]
@@ -259,7 +259,7 @@ jobs:
   # the download directory, and an artifact carrying one of those names would
   # replace the checksums of the release's binaries.
   stage-note:
-    name: Stage Note
+    name: Record stage
     needs: [prepare, ios-release, android-release, ios-phased, android-rollout, android-halt]
     if: ${{ !failure() && !cancelled() }}
     runs-on: ubuntu-latest
@@ -284,7 +284,7 @@ jobs:
           if-no-files-found: error
 
   stage-append:
-    name: Append Note
+    name: Attach stage note
     needs: [prepare, stage-note]
     if: ${{ !failure() && !cancelled() }}
     uses: blinkbitcoin/shared-workflows/.github/workflows/github-release.yml@v0
