@@ -28,7 +28,15 @@ function required(name: string, value: string | undefined): string {
 }
 
 const webPreviewPort = required('WEB_PREVIEW_PORT', process.env.WEB_PREVIEW_PORT);
-const previewUrl = `http://localhost:${webPreviewPort}`;
+// A deploy export is built for `/<repo>/` (EXPO_PUBLIC_BASE_URL, set by the
+// web workflow on a deploy and handed to this suite too); a PR export and a
+// local one are built for `/`. The preview server serves `dist` under the same
+// path, so the suite tests the export as it will be served.
+const basePath = (process.env.EXPO_PUBLIC_BASE_URL ?? '').trim().replace(/\/+$/, '');
+// Trailing slash on purpose: Playwright joins a spec's path onto `baseURL` with
+// URL resolution, where a leading `/` discards the base path. Specs therefore
+// navigate with `./` and `./details/42`, which stay under the base path.
+const previewUrl = `http://localhost:${webPreviewPort}${basePath}/`;
 // ports.mjs builds this one itself (mockApiUrl), so read it rather than
 // rebuild the path here and have two places that know about /graphql.
 const mockApiUrl = required('EXPO_PUBLIC_API_URL', process.env.EXPO_PUBLIC_API_URL);
@@ -46,7 +54,12 @@ export default defineConfig({
       stdout: 'ignore',
     },
     {
-      command: `pnpm exec expo serve dist --port ${webPreviewPort}`,
+      // Not `expo serve`: it serves at `/` only, and a deploy export's paths
+      // all carry the base path. scripts/e2e/serve-dist.mjs serves the export
+      // the way GitHub Pages does - under the base path, `/settings` from
+      // `settings.html`, and `404.html` (with a 404) for a path with no file,
+      // which is how a deep link into a dynamic route boots the router.
+      command: 'node scripts/e2e/serve-dist.mjs',
       url: previewUrl,
       reuseExistingServer: false,
       timeout: 60_000,

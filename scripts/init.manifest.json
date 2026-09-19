@@ -142,6 +142,8 @@
     "files": [
       "playwright.config.ts",
       "scripts/build-web.sh",
+      "scripts/e2e/serve-dist.mjs",
+      "scripts/e2e/serve-dist.test.mjs",
       "scripts/e2e/web.sh",
       ".github/workflows/web.yml",
       "docs/web-files.txt",
