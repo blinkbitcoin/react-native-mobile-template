@@ -5,6 +5,13 @@ by [release-please](https://github.com/googleapis/release-please) from
 [Conventional Commits](https://www.conventionalcommits.org/) — edit the commit
 messages, not this file. See [docs/release-runbook.md](docs/release-runbook.md).
 
+## [0.3.2](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.3.1...v0.3.2) (2026-09-19)
+
+
+### Bug Fixes
+
+* **web:** export production bytes on pull requests, not a dev export ([#38](https://github.com/blinkbitcoin/react-native-mobile-template/issues/38)) ([f81b75e](https://github.com/blinkbitcoin/react-native-mobile-template/commit/f81b75e047522f5924f0fc5afaf3a1d53963b704)), closes [#36](https://github.com/blinkbitcoin/react-native-mobile-template/issues/36)
+
 ## [0.3.1](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.3.0...v0.3.1) (2026-09-19)
 
 
