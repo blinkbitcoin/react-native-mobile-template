@@ -5,6 +5,13 @@ by [release-please](https://github.com/googleapis/release-please) from
 [Conventional Commits](https://www.conventionalcommits.org/) — edit the commit
 messages, not this file. See [docs/release-runbook.md](docs/release-runbook.md).
 
+## [0.2.5](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.2.4...v0.2.5) (2026-09-19)
+
+
+### Bug Fixes
+
+* **web:** serve the Pages site from its sub-path, boot the router on deep links, name the job Web ([#25](https://github.com/blinkbitcoin/react-native-mobile-template/issues/25)) ([7e17216](https://github.com/blinkbitcoin/react-native-mobile-template/commit/7e17216f0202a84adcabd62f419c1f2f8922fa66))
+
 ## [0.2.4](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.2.3...v0.2.4) (2026-09-18)
 
 
