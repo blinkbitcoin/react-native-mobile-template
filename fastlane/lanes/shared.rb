@@ -462,15 +462,23 @@ end
 # supports, which buries the one useful fact. Say it here instead. This is why
 # iOS screenshots live in fastlane/screenshots/<locale>/, deliver's own
 # default: `screenshots` is exactly the directory name that trips it.
+#
+# The list is deliver's own EXCEPTION_DIRECTORIES (deliver/lib/deliver/
+# loader.rb:19-24) plus the three folders it treats as language folders of
+# their own (`default`, `appleTV`, `iMessage`). The comparison is
+# case-insensitive because deliver's is: LanguageFolder#valid? downcases the
+# directory name before matching, so an `appletv` or `Review_Information` that
+# deliver accepts must not be refused here.
 IOS_METADATA_ALLOWED_DIRS = %w[
   review_information trade_representative_contact_information
-  app_clip_review_information default appleTV iMessage
+  app_clip_review_information default fonts appleTV iMessage android
 ].freeze
+IOS_METADATA_ALLOWED_DIRS_DOWNCASED = IOS_METADATA_ALLOWED_DIRS.map(&:downcase).freeze
 
 def assert_ios_metadata_dirs!(metadata_path)
   offenders = Dir.children(metadata_path).select do |name|
     File.directory?(File.join(metadata_path, name)) &&
-      !LOCALE_DIR_PATTERN.match?(name) && !IOS_METADATA_ALLOWED_DIRS.include?(name)
+      !LOCALE_DIR_PATTERN.match?(name) && !IOS_METADATA_ALLOWED_DIRS_DOWNCASED.include?(name.downcase)
   end
   return if offenders.empty?
 
@@ -519,10 +527,13 @@ def with_baseline_metadata(source, exclude_files: SYNC_EXCLUDED_FILES, exclude_d
     FileUtils.cp_r(source, staged)
     exclude_dirs.each { |name| Dir.glob(File.join(staged, '**', name)).each { |dir| FileUtils.rm_rf(dir) } }
     exclude_files.each { |name| Dir.glob(File.join(staged, '**', name)).each { |file| FileUtils.rm_f(file) } }
-    # supply and deliver both read a listing field by file existence: a
-    # zero-byte file PATCHes an empty value and clears whatever the console
-    # already holds. A consumer who wants to blank a field does it in the
-    # console, not by shipping an empty template file.
+    # supply reads a listing field by file existence: it assigns
+    # `File.read(path)` whenever the file is there (supply/lib/supply/
+    # uploader.rb:269-271), so a zero-byte file PATCHes an empty value and
+    # clears whatever the console already holds. (deliver is the kinder of the
+    # two -- it skips an empty value, upload_metadata.rb:151 and :177 -- but
+    # the tree is staged the same way for both.) A consumer who wants to blank
+    # a field does it in the console, not by shipping an empty template file.
     Dir.glob(File.join(staged, '**', '*.txt')).each { |file| FileUtils.rm_f(file) if File.zero?(file) }
     UI.message("Staged baseline metadata at #{staged} (excluded: #{(exclude_files + exclude_dirs).join(', ')})")
     yield staged
@@ -623,9 +634,17 @@ end
 # Returns the argv, it does not run it: this file is loaded standalone by the
 # tests, without fastlane, and its header forbids `sh` here -- the pull lanes
 # are the ones that run these through `sh`.
-def metadata_diff_commands(*relative_paths)
+#
+# `-C <repo root>` and absolute pathspecs, not repo-root-relative ones: git
+# resolves a pathspec against the process's working directory, and fastlane
+# runs every lane from `fastlane/` (fastlane/lib/fastlane/runner.rb:42-45, and
+# see `repo_root` above). A `--porcelain -- fastlane/metadata/ios` issued from
+# there matches nothing and exits 0, so a pull that rewrote the whole tree
+# would report no changes at all. Callers pass `root_path(...)` values.
+def metadata_diff_commands(*paths)
+  root = repo_root
   [
-    ['git', 'status', '--porcelain', '--', *relative_paths],
-    ['git', '--no-pager', 'diff', '--stat', '--', *relative_paths]
+    ['git', '-C', root, 'status', '--porcelain', '--', *paths],
+    ['git', '-C', root, '--no-pager', 'diff', '--stat', '--', *paths]
   ]
 end

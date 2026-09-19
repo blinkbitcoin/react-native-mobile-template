@@ -87,18 +87,16 @@ modules/*/android/.cxx/
 /fastlane/test_output/
 /fastlane/.env*
 /fastlane/*.json
-# Screenshots are generated, but the directories are kept so fastlane and CI
-# have somewhere to write. iOS screenshots live under fastlane/screenshots/
-# <locale>/ (deliver's own default) rather than fastlane/metadata/ios/
-# screenshots/, which deliver refuses to see (assert_ios_metadata_dirs! in
-# fastlane/lanes/shared.rb).
-/fastlane/screenshots/*/*
-!/fastlane/screenshots/*/.gitkeep
-/fastlane/metadata/android/*/images/*
-!/fastlane/metadata/android/*/images/.gitkeep
-!/fastlane/metadata/android/*/images/phoneScreenshots/
-/fastlane/metadata/android/*/images/phoneScreenshots/*
-!/fastlane/metadata/android/*/images/phoneScreenshots/.gitkeep
+# Store assets are NOT ignored: the sync lanes push whatever these directories
+# hold to App Store Connect and Google Play, and a CI checkout only has what
+# the tree carries - so the screenshots, icon, feature graphic and promo
+# graphic belong in the repository. Nothing in scripts/, fastlane/, the
+# Makefile or the workflows generates files here; the only writer is
+# `pull_metadata`, which downloads the console's copy for review.
+# iOS screenshots live under fastlane/screenshots/<locale>/ (deliver's own
+# default) rather than fastlane/metadata/ios/screenshots/, which deliver
+# refuses to see (assert_ios_metadata_dirs! in fastlane/lanes/shared.rb).
+# The .gitkeep files keep the empty template directories in the tree.
 
 # Release artifacts. `artifacts/` is where the lanes write by default, but
 # WORKFLOWS_OUTPUT_DIR can point anywhere, so the shapes are ignored by extension too.

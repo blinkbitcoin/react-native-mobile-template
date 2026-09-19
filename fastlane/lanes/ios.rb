@@ -290,25 +290,34 @@ platform :ios do
       args[:app_rating_config_path] = rating if rating
       args[:app_review_information] = review unless review.empty?
 
-      if live
-        # deliver fetches the in-progress edit version unconditionally
-        # before falling back to the live-editable subset; with no edit
-        # version open, that fetch retries for roughly 15 minutes
-        # (deliver/lib/deliver/upload_metadata.rb:104). Slow, not stuck.
-        UI.important('Live metadata edit: deliver may spend several minutes looking for an edit ' \
-                      'version before it falls back to the live-editable fields - do not kill the lane.')
+      unless live
+        # The default path needs a version in "Prepare for Submission" and
+        # waits a long time to find out it has none:
+        # verify_available_version_languages! -> fetch_edit_app_store_version
+        # retries 7 times with a 20,40,80,160,300,300,300 s backoff
+        # (deliver/lib/deliver/upload_metadata.rb:464-481) and then raises
+        # "Cannot update languages - could not find an editable version"
+        # (:557-560), having written nothing. Live mode is the one that does
+        # not wait: it fetches the live version first, with no retry (:107).
+        UI.important('With no version in preparation deliver retries for about 20 minutes and then ' \
+                     'fails without writing anything. Use live:true (or IOS_METADATA_EDIT_LIVE=true) ' \
+                     'to edit the live version\'s smaller editable subset instead.')
       end
 
+      # deliver deletes the version's App Store review attachment on every
+      # push: review_attachment_file(version) runs unconditionally and, with
+      # no app_review_attachment_file given, removes whatever is attached
+      # (deliver/lib/deliver/upload_metadata.rb:752-768). Re-upload it in the
+      # console after a sync if the app uses one.
       store_action(:upload_to_app_store, **args)
     end
   end
 
   desc 'Pull the App Store listing and screenshots into the repo (overwrites local files - review the diff)'
-  lane :pull_metadata do |options|
+  lane :pull_metadata do
     require_env!(%w[ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64])
     warn_metadata_overwrite!('fastlane/metadata/ios and fastlane/screenshots')
     bundle_id = ENV.fetch('IOS_BUNDLE_ID')
-    live = truthy?(options[:live] || ENV['IOS_METADATA_EDIT_LIVE'])
 
     if ENV['DRY_RUN'] == '1'
       UI.important("[dry-run] deliver download_metadata + download_screenshots for #{bundle_id} " \
@@ -317,9 +326,14 @@ platform :ios do
     end
 
     # Commands, not actions - so they are a subprocess with its own key file.
+    # No --use_live_version: deliver's download_metadata and
+    # download_screenshots ignore it. Both take the *latest* App Store version
+    # and consult only `app_version`
+    # (deliver/lib/deliver/commands_generator.rb:172-200), so passing it would
+    # only suggest a choice the download does not make. `IOS_METADATA_EDIT_LIVE`
+    # belongs to sync_metadata alone.
     with_asc_api_key_file do |key_path|
-      common = ['--api_key_path', key_path, '--app_identifier', bundle_id,
-                '--use_live_version', live ? 'true' : 'false']
+      common = ['--api_key_path', key_path, '--app_identifier', bundle_id]
       sh('bundle', 'exec', 'fastlane', 'deliver', 'download_metadata',
          *common, '--metadata_path', ios_metadata_path, '--force')
       sh('bundle', 'exec', 'fastlane', 'deliver', 'download_screenshots',
@@ -327,8 +341,9 @@ platform :ios do
     end
 
     # shared.rb cannot call `sh` itself (see its header) - it only builds the
-    # argv, and it is run here.
-    metadata_diff_commands('fastlane/metadata/ios', 'fastlane/screenshots').each { |argv| sh(*argv) }
+    # argv, and it is run here. Absolute paths: the lane's cwd is `fastlane/`,
+    # not the repo root (see metadata_diff_commands).
+    metadata_diff_commands(ios_metadata_path, ios_screenshots_path).each { |argv| sh(*argv) }
   end
 
   desc 'Control the 7-day phased release of the live version (action:pause|resume|complete)'

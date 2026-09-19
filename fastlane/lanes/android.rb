@@ -376,11 +376,13 @@ platform :android do
 
     require 'tmpdir'
     require 'fileutils'
-    # `supply init` refuses to write into a metadata_path that already exists
-    # (supply/lib/supply/setup.rb:7), which is every checkout of this
-    # template. So it downloads into a staging directory and the tree is
-    # updated from it, file by file - a local file supply does not know about
-    # (a locale it has never seen) is left where it is.
+    # `supply init` does something worse than refuse an existing
+    # metadata_path: it prints "Metadata already exists" and returns having
+    # downloaded nothing, exit 0 (supply/lib/supply/setup.rb:6-9). Every
+    # checkout of this template has that directory, so a pull straight into
+    # the tree would report success and change nothing. Hence the staging
+    # directory, from which the tree is updated file by file - a local file
+    # supply does not know about (a locale it has never seen) is left alone.
     Dir.mktmpdir('play-metadata-pull') do |dir|
       staged = File.join(dir, 'android')
       with_play_json_key_file do |key_path|
@@ -392,8 +394,9 @@ platform :android do
     end
 
     # shared.rb cannot call `sh` itself (see its header) - it only builds the
-    # argv, and it is run here.
-    metadata_diff_commands('fastlane/metadata/android').each { |argv| sh(*argv) }
+    # argv, and it is run here. Absolute paths: the lane's cwd is `fastlane/`,
+    # not the repo root (see metadata_diff_commands).
+    metadata_diff_commands(android_metadata_path).each { |argv| sh(*argv) }
   end
 
   desc 'Change the production staged-rollout share. Whole number = percent (percent:1 is 1%, percent:100 completes); a decimal is a fraction (percent:0.01 is 1%, percent:1.0 completes)'

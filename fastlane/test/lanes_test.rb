@@ -583,10 +583,14 @@ class LanesTest < Minitest::Test
     end
   end
 
-  def test_assert_ios_metadata_dirs_accepts_locales_and_deliver_folders
+  # deliver's own exception directories, in deliver's own spelling and in the
+  # case a consumer might type: LanguageFolder#valid? downcases before it
+  # matches, so `appletv` and `Review_Information` are fine there too.
+  def test_assert_ios_metadata_dirs_accepts_locales_and_deliver_folders_in_any_case
     Dir.mktmpdir do |dir|
-      FileUtils.mkdir_p(File.join(dir, 'en-US'))
-      FileUtils.mkdir_p(File.join(dir, 'review_information'))
+      %w[en-US review_information Review_Information appleTV appletv iMessage default fonts android].each do |name|
+        FileUtils.mkdir_p(File.join(dir, name))
+      end
       assert_nil assert_ios_metadata_dirs!(dir)
     end
   end
@@ -898,14 +902,29 @@ class LanesTest < Minitest::Test
     assert_includes UI.messages.last, 'git diff'
   end
 
-  def test_metadata_diff_commands_returns_the_git_argv_scoped_to_the_paths_without_running_anything
-    commands = metadata_diff_commands('fastlane/metadata/ios', 'fastlane/metadata/android')
+  # A lane's cwd is `fastlane/`, so a repo-root-relative pathspec would match
+  # nothing there and `git status --porcelain` would exit 0 on a tree the pull
+  # had just rewritten. `-C <repo root>` plus absolute pathspecs is the fix.
+  def test_metadata_diff_commands_runs_git_from_the_repo_root_with_absolute_pathspecs
+    in_screenshots_root do
+      root = repo_root
+      ios = root_path('fastlane', 'metadata', 'ios')
+      android = root_path('fastlane', 'metadata', 'android')
+      commands = metadata_diff_commands(ios, android)
 
-    assert_equal [
-      ['git', 'status', '--porcelain', '--', 'fastlane/metadata/ios', 'fastlane/metadata/android'],
-      ['git', '--no-pager', 'diff', '--stat', '--', 'fastlane/metadata/ios', 'fastlane/metadata/android']
-    ], commands
-    assert_empty $calls, 'shared.rb must not run sh -- it is loaded without fastlane by the tests'
+      assert_equal [
+        ['git', '-C', root, 'status', '--porcelain', '--', ios, android],
+        ['git', '-C', root, '--no-pager', 'diff', '--stat', '--', ios, android]
+      ], commands
+      commands.each do |argv|
+        assert_equal '-C', argv[1]
+        assert File.absolute_path?(argv[2]), "the -C root must be absolute: #{argv[2]}"
+        argv.drop(argv.index('--') + 1).each do |pathspec|
+          assert File.absolute_path?(pathspec), "pathspec must be absolute: #{pathspec}"
+        end
+      end
+      assert_empty $calls, 'shared.rb must not run sh -- it is loaded without fastlane by the tests'
+    end
   end
 end
 
@@ -1309,6 +1328,22 @@ class LaneBehaviourTest < Minitest::Test
       assert args[:edit_live]
       assert args[:skip_screenshots]
       refute args.key?(:app_review_information), 'review detail is not editable in live mode'
+      # Live mode is the path that does *not* wait: it fetches the live
+      # version first, with no retry (deliver/lib/deliver/upload_metadata.rb:107).
+      refute UI.messages.any? { |m| m.include?('20 minutes') }, UI.messages.inspect
+    end
+  end
+
+  # The default path is the slow one: with no version in "Prepare for
+  # Submission" deliver retries for about 20 minutes and then fails without
+  # writing (upload_metadata.rb:464-481, :557-560). The lane says so up front.
+  def test_ios_sync_metadata_warns_that_a_version_in_preparation_is_needed
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    in_project do
+      run_lane(:ios, :sync_metadata)
+
+      assert UI.messages.any? { |m| m.include?('20 minutes') && m.include?('IOS_METADATA_EDIT_LIVE') },
+             UI.messages.inspect
     end
   end
 
@@ -1424,8 +1459,11 @@ class LaneBehaviourTest < Minitest::Test
       assert_includes metadata_call, '--api_key_path'
       assert_includes metadata_call, '--app_identifier'
       assert_includes metadata_call, 'com.example.app'
-      assert_includes metadata_call, '--use_live_version'
-      assert_includes metadata_call, 'false'
+      # deliver's download_metadata ignores use_live_version -- it takes the
+      # latest App Store version and consults only app_version
+      # (deliver/lib/deliver/commands_generator.rb:172-200) -- so the lane must
+      # not pass an option that suggests a choice it does not make.
+      refute_includes metadata_call, '--use_live_version'
       assert_includes metadata_call, '--metadata_path'
       assert_includes metadata_call, root_path('fastlane', 'metadata', 'ios')
       assert_includes metadata_call, '--force'
@@ -1434,9 +1472,15 @@ class LaneBehaviourTest < Minitest::Test
       assert_equal %w[bundle exec fastlane deliver download_screenshots], screenshots_call[0, 5]
       assert_includes screenshots_call, '--screenshots_path'
       assert_includes screenshots_call, root_path('fastlane', 'screenshots')
+      refute_includes screenshots_call, '--use_live_version'
 
-      assert_equal ['git', 'status', '--porcelain', '--', 'fastlane/metadata/ios', 'fastlane/screenshots'], sh_calls[2]
-      assert_equal ['git', '--no-pager', 'diff', '--stat', '--', 'fastlane/metadata/ios', 'fastlane/screenshots'], sh_calls[3]
+      # The diff runs from the repo root with absolute pathspecs: the lane's
+      # own cwd is `fastlane/`, where a relative pathspec matches nothing.
+      ios = root_path('fastlane', 'metadata', 'ios')
+      shots = root_path('fastlane', 'screenshots')
+      assert_equal ['git', '-C', repo_root, 'status', '--porcelain', '--', ios, shots], sh_calls[2]
+      assert_equal ['git', '-C', repo_root, '--no-pager', 'diff', '--stat', '--', ios, shots], sh_calls[3]
+      [ios, shots].each { |path| assert File.absolute_path?(path), path }
 
       refute sh_calls.flatten.any? { |arg| arg.to_s.include?('BASE64P8') }, 'no credential value in any argv'
     end
@@ -1615,10 +1659,14 @@ class LaneBehaviourTest < Minitest::Test
       assert_includes supply_call, '--metadata_path'
       assert_includes supply_call, '--json_key'
       refute_includes supply_call, android_metadata_path,
-                       'supply init refuses to write into an existing metadata_path -- it must be a tmpdir'
+                       'supply init skips an existing metadata_path and downloads nothing -- it must be a tmpdir'
 
-      assert_equal ['git', 'status', '--porcelain', '--', 'fastlane/metadata/android'], sh_calls[1]
-      assert_equal ['git', '--no-pager', 'diff', '--stat', '--', 'fastlane/metadata/android'], sh_calls[2]
+      # From the repo root, with an absolute pathspec: a lane's cwd is
+      # `fastlane/` and a relative pathspec would match nothing there.
+      android = root_path('fastlane', 'metadata', 'android')
+      assert File.absolute_path?(android), android
+      assert_equal ['git', '-C', repo_root, 'status', '--porcelain', '--', android], sh_calls[1]
+      assert_equal ['git', '-C', repo_root, '--no-pager', 'diff', '--stat', '--', android], sh_calls[2]
 
       refute sh_calls.flatten.any? { |arg| arg.to_s.include?('service_account') }, 'no credential value in any argv'
     end

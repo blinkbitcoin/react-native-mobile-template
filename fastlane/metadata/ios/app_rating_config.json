@@ -9,8 +9,6 @@
   "profanityOrCrudeHumor": "NONE",
   "sexualContentGraphicAndNudity": "NONE",
   "sexualContentOrNudity": "NONE",
-  "socialMedia": "NONE",
-  "socialMediaAgeRestricted": "NONE",
   "violenceCartoonOrFantasy": "NONE",
   "violenceRealistic": "NONE",
   "violenceRealisticProlongedGraphicOrSadistic": "NONE",
@@ -23,6 +21,8 @@
   "lootBox": false,
   "messagingAndChat": false,
   "parentalControls": false,
+  "socialMedia": false,
+  "socialMediaAgeRestricted": false,
   "unrestrictedWebAccess": false,
   "userGeneratedContent": false,
   "kidsAgeBand": null
