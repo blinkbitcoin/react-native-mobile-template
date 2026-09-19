@@ -290,10 +290,11 @@ gate.** `assert_metadata_ready!` only rejects `Replace this text` inside
 `primary_category.txt` or `secondary_category.txt` reaches Apple unchallenged —
 review them yourself. The shipped `app_rating_config.json` deliberately omits
 `developerAgeRatingInfoUrl` (there is no safe default) and `gamblingAndContests`
-(deprecated). It groups `socialMedia` and `socialMediaAgeRestricted` as
-booleans even though fastlane's own documentation lists them as rating-scale
-keys; if App Store Connect rejects `"NONE"` on either, that mismatch is where
-the error comes from.
+(deprecated). It sets `socialMedia` and `socialMediaAgeRestricted` to `"NONE"`
+as rating-scale values, following fastlane's generated documentation, while
+spaceship's `AgeRatingDeclaration` model groups both with the booleans instead;
+if App Store Connect rejects `"NONE"` on either, that mismatch is where the
+error comes from.
 
 ## Before you have store accounts
 
