@@ -224,3 +224,10 @@ public to anyone who can read the run.
 
 The full list, with which workflow reads each, is in
 [release-runbook.md](release-runbook.md#variables-and-secrets).
+
+**Store listing sync.** `PLAY_SERVICE_ACCOUNT_JSON` above is also what
+`android sync_metadata` / `pull_metadata` use to edit the Play listing, so the
+service account needs the **Manage store presence** permission in Play
+Console → Users and permissions, not just release access. See
+[Store listing metadata](release-runbook.md#store-listing-metadata) for what
+those lanes do.

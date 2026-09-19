@@ -232,7 +232,73 @@ The three variables reach `notes.mjs` through `expo-prepare`'s `build-env`; the
 two keys are declared secrets on `expo-prepare.yml`, because `build-env` is a
 workflow input and would publish them in the run's parameters.
 
+## Store listing metadata
+
+`fastlane/metadata/**` is the source of truth for the public store page.
+`fastlane ios sync_metadata` and `android sync_metadata` push it; `pull_metadata`
+pulls the console's copy back. Both are gated on `STORE_METADATA_SYNC_ENABLED`
+and both are wired into the **Store listing** workflow
+(`store-metadata.yml`, `workflow_dispatch`, `direction: push | pull`), separate
+from a version release.
+
+| CD owns per version | sync owns | Console-only |
+| --- | --- | --- |
+| Release notes / What's new, the binary,<br>the review submission, track and rollout | Name, subtitle, description, keywords,<br>promotional text, URLs, copyright,<br>categories, age rating, review contact,<br>iOS screenshots under<br>`fastlane/screenshots/<locale>/`, Play icon,<br>feature graphic and screenshots | Apple: App Privacy labels, pricing and<br>availability, agreements, TestFlight groups,<br>bundle id.<br>Play: content rating, data safety, target<br>audience, app access, countries, tracks<br>and testers |
+
+**Apple's edit-version constraint.** Name, subtitle, keywords, categories and
+screenshots only exist on a version that is in preparation — Apple will not let
+them be edited on the live version at all. Set `IOS_METADATA_EDIT_LIVE=true`
+(or pass `live:true`) to edit the live version's smaller editable subset instead
+(description, promotional text, the URLs, the copyright) when no version is in
+preparation. In live mode, `deliver` first looks for an edit version
+unconditionally; with none in preparation, it retries for roughly 15 minutes
+before falling back to that live-editable subset. The lane prints a notice when
+this happens — it is slow, not stuck, so do not kill it.
+
+**iOS screenshots are all-or-nothing per locale.** They push with
+`overwrite_screenshots`, which deletes every display type (iPhone, iPad, Mac)
+for each locale present under `fastlane/screenshots/` before uploading what is
+there. A locale directory holding only iPhone shots erases that locale's
+existing iPad set. Stage complete sets per locale before pushing.
+
+**A blank field cannot be pushed from the tree.** The staged copy drops
+zero-byte `.txt` files before either lane runs, because `deliver` and `supply`
+read fields by file existence and an empty file would clear whatever value the
+console already holds. To blank a field, do it in the console.
+
+**Play reviews listing edits**, same as it reviews a release. A brand-new Play
+app needs one internal upload before a metadata push has any track to hang the
+edit off — `play_metadata_target` looks for an existing release on
+`PLAY_METADATA_TRACK` (or the first of `production`, `beta`, `internal` with
+one) and fails with that instruction if it finds none.
+
+**Seeding the tree.** Run `pull_metadata` to download the console's current
+listing into `fastlane/metadata/**` (and, for iOS, `fastlane/screenshots/**`),
+then review the diff before committing — a pull overwrites local files with
+whatever the console holds. Run this locally so the review happens on your
+machine; a pull dispatched in CI can only report (`git diff --stat` in the run
+log, no commit), because that job has `contents: read`.
+
+**A `screenshots` directory inside `fastlane/metadata/ios` is refused.**
+`deliver` treats it as metadata rather than as screenshots and rejects it;
+screenshots belong in `fastlane/screenshots/<locale>/` and the lane asserts
+this before it does anything else (`assert_ios_metadata_dirs!`).
+
+**`app_rating_config.json` and the category files are outside the placeholder
+gate.** `assert_metadata_ready!` only rejects `Replace this text` inside
+`.txt` files, so a wrong value in `app_rating_config.json`,
+`primary_category.txt` or `secondary_category.txt` reaches Apple unchallenged —
+review them yourself. The shipped `app_rating_config.json` deliberately omits
+`developerAgeRatingInfoUrl` (there is no safe default) and `gamblingAndContests`
+(deprecated). It groups `socialMedia` and `socialMediaAgeRestricted` as
+booleans even though fastlane's own documentation lists them as rating-scale
+keys; if App Store Connect rejects `"NONE"` on either, that mismatch is where
+the error comes from.
+
 ## Before you have store accounts
+
+The listing-sync tier above is independent of `STORE_UPLOADS_ENABLED` below and
+needs the same store accounts, even though it never uploads a binary.
 
 The release path runs in two phases, and the first needs no Apple or Google
 account at all.
@@ -312,6 +378,9 @@ anyone who can see the run. Credentials go in `secrets:` instead.
 | `IOS_SIGNING_ENABLED` | repo variable; `build-ios` in `release-internal` | `true` signs and exports an `.ipa`.<br>Unset archives unsigned, which needs no Apple account |
 | `ANDROID_SIGNING_ENABLED` | repo variable; `build-android` in `release-internal` | `true` signs with the upload keystore.<br>Unset falls back to the debug keystore, which needs no Play account |
 | `STORE_UPLOADS_ENABLED` | repo variable; every store job in all three release workflows | `true` turns on TestFlight and Play uploads.<br>Unset means off, and the store credentials below<br>are only needed once it is on — see<br>[Before you have store accounts](#before-you-have-store-accounts) |
+| `STORE_METADATA_SYNC_ENABLED` | repo variable; both jobs in `store-metadata.yml`<br>and the `sync_metadata` lanes | `true` lets a lane write the public store page.<br>Unset means off and the lane refuses |
+| `IOS_METADATA_EDIT_LIVE` | `ios sync_metadata` / `pull_metadata` via `env-json` | `true` edits the live version's editable subset<br>when no version is in preparation |
+| `PLAY_METADATA_TRACK` | `android sync_metadata` / `pull_metadata` via `env-json` | Track whose release the listing edit rides on;<br>default first of `production`, `beta`, `internal`<br>with one |
 | `BUILD_NUMBER_OFFSET` | every `expo-prepare` call | Integer, default `1000`. Raise only |
 | `WORKFLOWS_MACOS_RUNNER` | iOS build + iOS internal upload | Runner label, default `macos-26` |
 | `TESTFLIGHT_INTERNAL_GROUP` | `release-internal` iOS upload | Group name in App Store Connect → TestFlight |
@@ -630,6 +699,26 @@ rehearsal leaves the working tree exactly as it found it. And both
 stop on the shipped placeholder prose (`Replace this text ...`) in
 `description.txt` / `full_description.txt` — that gate is the point, so replace
 the copy for your own app before reading anything into the failure.
+
+**Rehearsing the listing-sync lanes.** Same idea, no build-info or notes needed:
+
+```bash
+export DRY_RUN=1 STORE_METADATA_SYNC_ENABLED=true
+export APP_VERSION=0.0.0 APP_BUILD_NUMBER=0
+export IOS_BUNDLE_ID=com.example.app IOS_SCHEME=App ANDROID_PACKAGE=com.example.app
+export ASC_KEY_ID=DUMMY ASC_ISSUER_ID=DUMMY ASC_KEY_P8_BASE64=DUMMY
+export PLAY_SERVICE_ACCOUNT_JSON='{"type":"service_account"}'
+bundle exec fastlane ios sync_metadata
+bundle exec fastlane android sync_metadata
+bundle exec fastlane ios pull_metadata     # logs, downloads nothing
+```
+
+`PLAY_SERVICE_ACCOUNT_JSON` (or `_PATH`) is still required here even though
+nothing is uploaded: the Android lanes build their Play API key arguments
+before the `DRY_RUN` short-circuit, so a missing value fails the rehearsal
+before it gets that far. On the template itself, both push lanes still stop on
+`Replace this text` in the shipped placeholder copy — by design, the same gate
+as above.
 
 ## Future stores
 
