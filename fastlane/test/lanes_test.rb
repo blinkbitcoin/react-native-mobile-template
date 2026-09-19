@@ -879,11 +879,14 @@ class LanesTest < Minitest::Test
     assert_includes UI.messages.last, 'git diff'
   end
 
-  def test_report_metadata_diff_runs_git_status_and_diff_stat_scoped_to_the_paths
-    report_metadata_diff!('fastlane/metadata/ios', 'fastlane/metadata/android')
-    commands = $calls.select { |name, _| name == :sh }.map(&:last)
-    assert_includes commands, ['git', 'status', '--porcelain', '--', 'fastlane/metadata/ios', 'fastlane/metadata/android']
-    assert_includes commands, ['git', '--no-pager', 'diff', '--stat', '--', 'fastlane/metadata/ios', 'fastlane/metadata/android']
+  def test_metadata_diff_commands_returns_the_git_argv_scoped_to_the_paths_without_running_anything
+    commands = metadata_diff_commands('fastlane/metadata/ios', 'fastlane/metadata/android')
+
+    assert_equal [
+      ['git', 'status', '--porcelain', '--', 'fastlane/metadata/ios', 'fastlane/metadata/android'],
+      ['git', '--no-pager', 'diff', '--stat', '--', 'fastlane/metadata/ios', 'fastlane/metadata/android']
+    ], commands
+    assert_empty $calls, 'shared.rb must not run sh -- it is loaded without fastlane by the tests'
   end
 end
 

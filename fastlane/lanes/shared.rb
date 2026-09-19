@@ -615,7 +615,12 @@ def warn_metadata_overwrite!(relative_path)
                'Review `git diff` before committing: the console, not this tree, wrote these files.')
 end
 
-def report_metadata_diff!(*relative_paths)
-  sh('git', 'status', '--porcelain', '--', *relative_paths)
-  sh('git', '--no-pager', 'diff', '--stat', '--', *relative_paths)
+# Returns the argv, it does not run it: this file is loaded standalone by the
+# tests, without fastlane, and its header forbids `sh` here -- the pull lanes
+# are the ones that run these through `sh`.
+def metadata_diff_commands(*relative_paths)
+  [
+    ['git', 'status', '--porcelain', '--', *relative_paths],
+    ['git', '--no-pager', 'diff', '--stat', '--', *relative_paths]
+  ]
 end
