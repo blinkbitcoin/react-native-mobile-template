@@ -147,7 +147,8 @@
       "scripts/e2e/web.sh",
       ".github/workflows/web.yml",
       "docs/web-files.txt",
-      "docs/decisions/0006-web-opt-in.md"
+      "docs/decisions/0006-web-opt-in.md",
+      "docs/decisions/0015-web-on-pages.md"
     ],
     "packageScripts": ["web", "build:web", "test:e2e:web"],
     "packageDependencies": ["@expo/metro-runtime", "react-dom", "react-native-web"],
@@ -240,7 +241,7 @@
         "$comment": "The ADR itself is deleted above; this is its row in the index.",
         "path": "docs/decisions/README.md",
         "optional": true,
-        "lines": ["^\\s*\\| \\[0006\\]"]
+        "lines": ["^\\s*\\| \\[0006\\]", "^\\s*\\| \\[0015\\]"]
       },
       {
         "$comment": "The web preview port's row in the port table. WEB_PREVIEW_PORT itself stays in scripts/ports.mjs: an offset nobody binds costs nothing, and removing it would renumber the table.",
