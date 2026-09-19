@@ -141,6 +141,7 @@
     "commitlintConfig": "commitlint.config.mjs",
     "files": [
       "playwright.config.ts",
+      "scripts/build-web.sh",
       "scripts/e2e/web.sh",
       ".github/workflows/web.yml",
       "docs/web-files.txt",
