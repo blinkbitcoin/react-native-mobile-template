@@ -303,6 +303,34 @@ platform :ios do
     end
   end
 
+  desc 'Pull the App Store listing and screenshots into the repo (overwrites local files - review the diff)'
+  lane :pull_metadata do |options|
+    require_env!(%w[ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64])
+    warn_metadata_overwrite!('fastlane/metadata/ios and fastlane/screenshots')
+    bundle_id = ENV.fetch('IOS_BUNDLE_ID')
+    live = truthy?(options[:live] || ENV['IOS_METADATA_EDIT_LIVE'])
+
+    if ENV['DRY_RUN'] == '1'
+      UI.important("[dry-run] deliver download_metadata + download_screenshots for #{bundle_id} " \
+                   "into #{ios_metadata_path} and #{ios_screenshots_path}")
+      next
+    end
+
+    # Commands, not actions - so they are a subprocess with its own key file.
+    with_asc_api_key_file do |key_path|
+      common = ['--api_key_path', key_path, '--app_identifier', bundle_id,
+                '--use_live_version', live ? 'true' : 'false']
+      sh('bundle', 'exec', 'fastlane', 'deliver', 'download_metadata',
+         *common, '--metadata_path', ios_metadata_path, '--force')
+      sh('bundle', 'exec', 'fastlane', 'deliver', 'download_screenshots',
+         *common, '--screenshots_path', ios_screenshots_path)
+    end
+
+    # shared.rb cannot call `sh` itself (see its header) - it only builds the
+    # argv, and it is run here.
+    metadata_diff_commands('fastlane/metadata/ios', 'fastlane/screenshots').each { |argv| sh(*argv) }
+  end
+
   desc 'Control the 7-day phased release of the live version (action:pause|resume|complete)'
   lane :phased do |options|
     require_env!(%w[ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64])

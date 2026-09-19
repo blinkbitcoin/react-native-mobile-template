@@ -362,6 +362,40 @@ platform :android do
     end
   end
 
+  desc 'Pull the Play listing, images and screenshots into the repo (overwrites local files - review the diff)'
+  lane :pull_metadata do
+    warn_metadata_overwrite!('fastlane/metadata/android')
+    package = ENV.fetch('ANDROID_PACKAGE')
+    track = ENV['PLAY_METADATA_TRACK'].to_s.strip
+    track = 'production' if track.empty?
+
+    if ENV['DRY_RUN'] == '1'
+      UI.important("[dry-run] supply init for #{package} (#{track}) into #{android_metadata_path}")
+      next
+    end
+
+    require 'tmpdir'
+    require 'fileutils'
+    # `supply init` refuses to write into a metadata_path that already exists
+    # (supply/lib/supply/setup.rb:7), which is every checkout of this
+    # template. So it downloads into a staging directory and the tree is
+    # updated from it, file by file - a local file supply does not know about
+    # (a locale it has never seen) is left where it is.
+    Dir.mktmpdir('play-metadata-pull') do |dir|
+      staged = File.join(dir, 'android')
+      with_play_json_key_file do |key_path|
+        sh('bundle', 'exec', 'fastlane', 'supply', 'init',
+           '--package_name', package, '--track', track,
+           '--metadata_path', staged, '--json_key', key_path)
+      end
+      FileUtils.cp_r(Dir.glob(File.join(staged, '*')), android_metadata_path)
+    end
+
+    # shared.rb cannot call `sh` itself (see its header) - it only builds the
+    # argv, and it is run here.
+    metadata_diff_commands('fastlane/metadata/android').each { |argv| sh(*argv) }
+  end
+
   desc 'Change the production staged-rollout share. Whole number = percent (percent:1 is 1%, percent:100 completes); a decimal is a fraction (percent:0.01 is 1%, percent:1.0 completes)'
   lane :rollout do |options|
     fraction = rollout_fraction(options[:percent] || ENV['PLAY_ROLLOUT'])

@@ -1401,6 +1401,47 @@ class LaneBehaviourTest < Minitest::Test
     end
   end
 
+  # ---------- ios pull_metadata ----------
+
+  def test_ios_pull_metadata_dry_run_logs_and_makes_no_sh_call
+    ENV['DRY_RUN'] = '1'
+    in_project do
+      run_lane(:ios, :pull_metadata)
+      assert UI.messages.any? { |m| m.include?('[dry-run]') }, UI.messages.inspect
+      refute called?(:sh)
+    end
+  end
+
+  def test_ios_pull_metadata_downloads_metadata_and_screenshots_then_reports_the_diff
+    in_project do
+      run_lane(:ios, :pull_metadata)
+
+      sh_calls = $calls.select { |name, _| name == :sh }.map(&:last)
+      assert_equal 4, sh_calls.length, sh_calls.inspect
+
+      metadata_call = sh_calls[0]
+      assert_equal %w[bundle exec fastlane deliver download_metadata], metadata_call[0, 5]
+      assert_includes metadata_call, '--api_key_path'
+      assert_includes metadata_call, '--app_identifier'
+      assert_includes metadata_call, 'com.example.app'
+      assert_includes metadata_call, '--use_live_version'
+      assert_includes metadata_call, 'false'
+      assert_includes metadata_call, '--metadata_path'
+      assert_includes metadata_call, root_path('fastlane', 'metadata', 'ios')
+      assert_includes metadata_call, '--force'
+
+      screenshots_call = sh_calls[1]
+      assert_equal %w[bundle exec fastlane deliver download_screenshots], screenshots_call[0, 5]
+      assert_includes screenshots_call, '--screenshots_path'
+      assert_includes screenshots_call, root_path('fastlane', 'screenshots')
+
+      assert_equal ['git', 'status', '--porcelain', '--', 'fastlane/metadata/ios', 'fastlane/screenshots'], sh_calls[2]
+      assert_equal ['git', '--no-pager', 'diff', '--stat', '--', 'fastlane/metadata/ios', 'fastlane/screenshots'], sh_calls[3]
+
+      refute sh_calls.flatten.any? { |arg| arg.to_s.include?('BASE64P8') }, 'no credential value in any argv'
+    end
+  end
+
   # ---------- ios phased ----------
 
   def test_ios_phased_drives_the_live_versions_phased_release
@@ -1544,6 +1585,42 @@ class LaneBehaviourTest < Minitest::Test
       snapshot = $metadata_snapshots.last
       assert_includes snapshot, 'en-US/title.txt'
       refute snapshot.any? { |f| f.start_with?('en-US/changelogs') }
+    end
+  end
+
+  # ---------- android pull_metadata ----------
+
+  def test_android_pull_metadata_dry_run_logs_and_makes_no_sh_call
+    ENV['DRY_RUN'] = '1'
+    in_project do
+      run_lane(:android, :pull_metadata)
+      assert UI.messages.any? { |m| m.include?('[dry-run]') }, UI.messages.inspect
+      refute called?(:sh)
+    end
+  end
+
+  def test_android_pull_metadata_runs_supply_init_into_a_tmpdir_then_reports_the_diff
+    in_project do
+      run_lane(:android, :pull_metadata)
+
+      sh_calls = $calls.select { |name, _| name == :sh }.map(&:last)
+      assert_equal 3, sh_calls.length, sh_calls.inspect
+
+      supply_call = sh_calls[0]
+      assert_equal %w[bundle exec fastlane supply init], supply_call[0, 5]
+      assert_includes supply_call, '--package_name'
+      assert_includes supply_call, 'com.example.app'
+      assert_includes supply_call, '--track'
+      assert_includes supply_call, 'production'
+      assert_includes supply_call, '--metadata_path'
+      assert_includes supply_call, '--json_key'
+      refute_includes supply_call, android_metadata_path,
+                       'supply init refuses to write into an existing metadata_path -- it must be a tmpdir'
+
+      assert_equal ['git', 'status', '--porcelain', '--', 'fastlane/metadata/android'], sh_calls[1]
+      assert_equal ['git', '--no-pager', 'diff', '--stat', '--', 'fastlane/metadata/android'], sh_calls[2]
+
+      refute sh_calls.flatten.any? { |arg| arg.to_s.include?('service_account') }, 'no credential value in any argv'
     end
   end
 
