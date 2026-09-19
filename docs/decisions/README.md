@@ -16,6 +16,12 @@ checked against the repository rather than believed.
 | [0008](0008-release-please-and-store-notes.md) | release-please in manifest mode owns versioning; store notes are generated prose | 2026-09-05 |
 | [0009](0009-e2e-launch-by-deep-link.md) | E2E foregrounds the dev client by deep link; the launcher's Bonjour discovery never works | 2026-09-06 |
 | [0010](0010-ios-e2e-release-build.md) | iOS E2E runs a Release build and opens the session's first URL itself; Android keeps 0009 | 2026-09-17 |
+| [0011](0011-release-chain-by-dispatch.md) | release-please starts beta, web and the release PR's CI by `workflow_dispatch`; no GitHub App | 2026-09-18 |
+| [0012](0012-expo-sdk-drift-is-advisory.md) | Expo SDK patch drift is a warning; `minimumReleaseAge` alone decides when a patch comes in | 2026-09-18 |
+| [0013](0013-per-commit-queues.md) | CI on `main` and the internal release queue per commit; only store-touching jobs share the `release` queue | 2026-09-19 |
+| [0014](0014-green-gate-heals-itself.md) | Beta's green gate dispatches the internal build it is missing instead of waiting for a human | 2026-09-19 |
+| [0015](0015-web-on-pages.md) | The web target deploys to a Pages sub-path, with a 404 shell for deep links, tested as the same bytes | 2026-09-19 |
+| [0016](0016-job-names-by-purpose.md) | Workflow and job names say what a step is for, in store vocabulary, never a tool's | 2026-09-19 |
 
 ## Writing a new one
 
