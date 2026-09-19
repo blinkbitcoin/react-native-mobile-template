@@ -73,7 +73,10 @@ var_is_set() {
 }
 
 var_value() {
-  printf '%s\n' "$VAR_LINES" | awk -F'\t' -v n="$1" '$1==n{print $2; exit}'
+  # `-F'\t'` would truncate at the first tab if a value itself contains one;
+  # strip only the "name<TAB>" prefix instead so the rest of the line -
+  # tabs and all - reaches the caller intact.
+  printf '%s\n' "$VAR_LINES" | awk -F'\t' -v n="$1" '$1==n{sub(/^[^\t]*\t/, ""); print; exit}'
 }
 
 # --- 1. presence -------------------------------------------------------------

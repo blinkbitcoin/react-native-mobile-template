@@ -164,6 +164,23 @@ json_field() {
 }
 
 echo
+echo "state.sh guard before init"
+
+export STORE_SETUP_DIR="$WORK/store-unguarded"
+out=$("$STATE" next 2>&1)
+rc=$?
+check "next before init exits 2 (gated, not a crash)" "2" "$rc"
+check "next before init prints no stack trace" "no" \
+  "$(printf '%s\n' "$out" | grep -Eq '^node:|^[[:space:]]*at ' && echo yes || echo no)"
+
+mkdir -p "$STORE_SETUP_DIR"
+cat >"$STORE_SETUP_DIR/state.json" <<'EOF'
+{ "schema": 1, "mode": null, "steps": {}, "facts": {} }
+EOF
+"$STATE" get identifiers >/dev/null 2>&1
+check "get on a step absent from an older state.json exits 2, not a crash" "2" "$?"
+
+echo
 echo "state.sh init"
 
 export STORE_SETUP_DIR="$WORK/store-init"
@@ -253,6 +270,16 @@ export STORE_SETUP_DIR="$WORK/store-render"
 check "render lists every step exactly once" "41" "$("$STATE" render --markdown | wc -l | tr -d ' ')"
 check "--list-steps matches the spec exactly, in order" "$EXPECTED_STEPS" "$("$STATE" --list-steps)"
 
+"$STATE" set preflight doing >/dev/null
+"$STATE" set identifiers skipped >/dev/null
+RENDER_OUT="$("$STATE" render --markdown)"
+check "doing renders as - [~], distinct from todo" "- [~] preflight" \
+  "$(printf '%s\n' "$RENDER_OUT" | grep '^- \[.\] preflight$')"
+check "skipped renders as - [-], distinct from done" "- [-] identifiers" \
+  "$(printf '%s\n' "$RENDER_OUT" | grep '^- \[.\] identifiers$')"
+check "an untouched step still renders as - [ ]" "- [ ] apple-enrolment" \
+  "$(printf '%s\n' "$RENDER_OUT" | grep '^- \[.\] apple-enrolment$')"
+
 echo
 echo "preflight.sh"
 
@@ -299,6 +326,13 @@ check "a missing IOS_SCHEME variable exits 2" "2" "$?"
 check "the remedy gives the exact gh variable set line" "yes" \
   "$(printf '%s' "$out" | grep -q "gh variable set IOS_SCHEME --body" && echo yes || echo no)"
 
+VARS_TAB="$WORK/vars-acme-tab.json"
+cat >"$VARS_TAB" <<'EOF'
+[{"name":"IOS_BUNDLE_ID","value":"com.acme.app\textra"},{"name":"ANDROID_PACKAGE","value":"com.acme.app"},{"name":"IOS_SCHEME","value":"acme"}]
+EOF
+out=$(REPO_ROOT="$REPO_ACME" FAKE_GH_VARS="$VARS_TAB" "$IDENTIFIERS" 2>&1)
+check "a tab embedded in a variable value still exits 2 (not silently truncated)" "2" "$?"
+
 echo
 echo "SKILL.md and references/modes.md"
 
@@ -312,6 +346,11 @@ check "SKILL.md prohibits match nuke" "yes" "$(grep -qi 'nuke' "$SKILL_MD" && ec
 check "SKILL.md documents state.sh next" "yes" "$(grep -q 'state.sh next' "$SKILL_MD" && echo yes || echo no)"
 # shellcheck disable=SC2016 # the pattern is a literal regex, not a shell expansion
 check "SKILL.md checklist has all 41 ids" "41" "$(grep -cE '^\| `[a-z-]+` \|' "$SKILL_MD")"
+
+# shellcheck disable=SC2016 # the patterns are literal regexes, not shell expansions
+SKILL_MD_IDS="$(grep -oE '^\| `[a-z0-9-]+` \|' "$SKILL_MD" | sed -E 's/^\| `//; s/` \|$//')"
+check "SKILL.md checklist ids match state.sh --list-steps exactly, in order" "" \
+  "$(diff <(printf '%s\n' "$SKILL_MD_IDS") <("$STATE" --list-steps))"
 
 check "modes.md carries the mode prompt verbatim too" "yes" \
   "$(grep -qF 'Store setup is roughly forty console steps across two consoles, some irreversible.' "$MODES_MD" && echo yes || echo no)"
