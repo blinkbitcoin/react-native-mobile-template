@@ -729,6 +729,25 @@ class LanesTest < Minitest::Test
     end
   end
 
+  def test_with_baseline_metadata_drops_zero_byte_files_from_the_staged_copy
+    Dir.mktmpdir do |dir|
+      source = File.join(dir, 'metadata')
+      FileUtils.mkdir_p(File.join(source, 'en-US'))
+      File.write(File.join(source, 'en-US', 'video.txt'), '')
+      File.write(File.join(source, 'en-US', 'title.txt'), 'App')
+      source_snapshot = Dir.glob(File.join(source, '**', '*')).sort
+
+      with_baseline_metadata(source) do |staged|
+        refute File.exist?(File.join(staged, 'en-US', 'video.txt')),
+               'a zero-byte file PATCHes an empty value and clears the console field'
+        assert_equal 'App', File.read(File.join(staged, 'en-US', 'title.txt'))
+      end
+
+      assert_equal source_snapshot, Dir.glob(File.join(source, '**', '*')).sort
+      assert File.exist?(File.join(source, 'en-US', 'video.txt')), 'only the staged copy is trimmed'
+    end
+  end
+
   # ios_screenshots_path is anchored on root_path, which the existing paths
   # test exercises the same way: a scratch checkout, chdir'd into.
   def in_screenshots_root(*filenames)
@@ -1227,14 +1246,15 @@ class LaneBehaviourTest < Minitest::Test
       args = args_for(:upload_to_app_store)
       assert args[:skip_binary_upload], 'sync_metadata must never touch the binary'
       assert args[:skip_app_version_update], 'sync_metadata must never move the version'
-      refute args[:submit_for_review]
-      refute args[:run_precheck_before_submit]
-      refute args[:edit_live]
+      assert_equal false, args[:submit_for_review], 'deliver defaults this to true'
+      assert_equal false, args[:run_precheck_before_submit], 'deliver defaults this to true'
+      assert_equal false, args[:edit_live], 'deliver defaults this to true'
       assert args[:force]
-      refute args[:skip_metadata]
+      assert_equal false, args[:skip_metadata], 'deliver defaults this to true'
       refute args.key?(:app_version)
       refute args.key?(:automatic_release)
       refute args.key?(:phased_release)
+      refute args.key?(:auto_release_date)
       refute args.key?(:submission_information)
       refute_equal root_path('fastlane', 'metadata', 'ios'), args[:metadata_path],
                     'a staged copy must be pushed, never the working tree'
@@ -1754,6 +1774,12 @@ class LaneBehaviourTest < Minitest::Test
       ENV['APP_REVIEW_DEMO_PASSWORD'] = 'demopass'
       ENV['PLAY_UPDATE_PRIORITY'] = '3'
       ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+      # So sync_metadata records app_rating_config_path and screenshots_path
+      # too: both are conditional on the file/PNG existing, and neither
+      # option name is validated against the real action otherwise.
+      File.write(File.join(dir, 'fastlane', 'metadata', 'ios', 'app_rating_config.json'), '{}')
+      FileUtils.mkdir_p(File.join(dir, 'fastlane', 'screenshots', 'en-US'))
+      File.write(File.join(dir, 'fastlane', 'screenshots', 'en-US', '01.png'), 'x')
 
       [
         [:ios, :build, { skip_signing: 'true' }],
@@ -1779,6 +1805,16 @@ class LaneBehaviourTest < Minitest::Test
         $calls.each do |action, args|
           next unless STUBBED_FASTLANE_ACTIONS.include?(action)
 
+          if args.key?(:app_rating_config_path)
+            # deliver's app_rating_config_path option verifies the file exists
+            # at validation time (deliver/lib/deliver/options.rb:270), but the
+            # staged copy sync_metadata actually passed is deleted the moment
+            # the lane returns. The source file it was copied from has the
+            # same content and outlives this whole test, so swap it in here --
+            # this still validates the option name and a real JSON file, just
+            # not the exact (necessarily transient) path.
+            args = args.merge(app_rating_config_path: File.join(dir, 'fastlane', 'metadata', 'ios', 'app_rating_config.json'))
+          end
           recorded << { action: action.to_s, args: args, lane: "#{platform_name} #{lane_name}" }
         end
       end

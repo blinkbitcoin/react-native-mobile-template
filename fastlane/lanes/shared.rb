@@ -519,6 +519,11 @@ def with_baseline_metadata(source, exclude_files: SYNC_EXCLUDED_FILES, exclude_d
     FileUtils.cp_r(source, staged)
     exclude_dirs.each { |name| Dir.glob(File.join(staged, '**', name)).each { |dir| FileUtils.rm_rf(dir) } }
     exclude_files.each { |name| Dir.glob(File.join(staged, '**', name)).each { |file| FileUtils.rm_f(file) } }
+    # supply and deliver both read a listing field by file existence: a
+    # zero-byte file PATCHes an empty value and clears whatever the console
+    # already holds. A consumer who wants to blank a field does it in the
+    # console, not by shipping an empty template file.
+    Dir.glob(File.join(staged, '**', '*.txt')).each { |file| FileUtils.rm_f(file) if File.zero?(file) }
     UI.message("Staged baseline metadata at #{staged} (excluded: #{(exclude_files + exclude_dirs).join(', ')})")
     yield staged
   end

@@ -241,11 +241,13 @@ platform :ios do
     # allows for description, promotional text, the URLs and the copyright and
     # nothing else (deliver/lib/deliver/upload_metadata.rb:67).
     live = truthy?(options[:live] || ENV['IOS_METADATA_EDIT_LIVE'])
-    # deliver PATCHes every review-detail field it is handed, so the *empty*
-    # review_information/*.txt this template ships would clear the contact
-    # already configured in App Store Connect. The staged tree keeps that
-    # directory only when the APP_REVIEW_* environment has something to put in
-    # it - and never in live mode, where review detail is not editable.
+    # deliver writes demo_account_required from whether a demo user is in this
+    # hash - unconditionally, whether or not the hash is present at all
+    # (deliver/lib/deliver/upload_metadata.rb:690). An unconfigured run must
+    # not send an empty hash and flip that flag off on an app that does
+    # require a demo account, so the staged tree keeps review_information only
+    # when the APP_REVIEW_* environment has something to put in it - and never
+    # in live mode, where review detail is not editable.
     review = live ? {} : review_information
     excluded_dirs = SYNC_EXCLUDED_DIRS + (review.empty? ? %w[review_information] : [])
     screenshots = !live && ios_screenshots?
@@ -271,6 +273,10 @@ platform :ios do
         # version's releaseType, which belongs to release_production.
         force: true, # no HTML preview to confirm on a runner
         skip_screenshots: !screenshots,
+        # When screenshots are staged, this must be true: deliver deletes
+        # every display type for a staged locale before uploading what is
+        # staged, so an en-US holding iPhone shots only would otherwise erase
+        # that locale's existing iPad set (deliver/lib/deliver/upload_screenshots.rb:82-89).
         overwrite_screenshots: screenshots
       }
       if screenshots
@@ -283,6 +289,15 @@ platform :ios do
       rating = ios_app_rating_config_path(staged)
       args[:app_rating_config_path] = rating if rating
       args[:app_review_information] = review unless review.empty?
+
+      if live
+        # deliver fetches the in-progress edit version unconditionally
+        # before falling back to the live-editable subset; with no edit
+        # version open, that fetch retries for roughly 15 minutes
+        # (deliver/lib/deliver/upload_metadata.rb:104). Slow, not stuck.
+        UI.important('Live metadata edit: deliver may spend several minutes looking for an edit ' \
+                      'version before it falls back to the live-editable fields - do not kill the lane.')
+      end
 
       store_action(:upload_to_app_store, **args)
     end
