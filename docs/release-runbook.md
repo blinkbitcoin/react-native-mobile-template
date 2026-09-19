@@ -72,7 +72,10 @@ release time, so editing it before step 3 finishes is safe.
 
 `release-please.yml` dispatches `release-beta.yml` at the new tag the moment
 the release exists (see [Why the hop is a dispatch](#why-the-hop-is-a-dispatch)).
-It waits for the release commit's internal run, then promotes to the TestFlight external group
+It waits for the release commit's internal run - and if that run is missing,
+cancelled or failed, it dispatches one at the tag itself and waits for that
+(`require-green-dispatch`). There is no moment at which merging the release PR
+is "too early": the pipeline builds what it needs. Then it promotes to the TestFlight external group
 and the Play open beta track, moves the `vX.Y.Z-build.N` pre-release's assets
 onto the `vX.Y.Z` release (and deletes the pre-release and its tag afterwards),
 and publishes OTA `beta`.

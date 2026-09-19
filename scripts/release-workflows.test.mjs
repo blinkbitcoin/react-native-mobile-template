@@ -145,6 +145,28 @@ describe('the internal release queues per commit; only its store jobs share the 
   });
 });
 
+// The beta gate must heal itself: when the release commit's internal run is
+// missing or red it dispatches one at the tag, which needs actions: write on
+// the calling job. Without both, a release merged at the wrong moment waits
+// for a human - which is what happened on v0.2.3, v0.2.4 and v0.2.5.
+describe('the beta gate dispatches the build it is missing', () => {
+  const text = readFileSync(path.join(root, '.github/workflows/release-beta.yml'), 'utf8')
+    .split('\n')
+    .filter((l) => !l.trimStart().startsWith('#'))
+    .join('\n');
+  const prepare = text.slice(text.indexOf('\n  prepare:'), text.indexOf('\n  promote-ios:'));
+
+  test('prepare asks the gate to dispatch, at the release tag', () => {
+    assert.match(prepare, /require-green-workflow: release-internal\.yml/);
+    assert.match(prepare, /require-green-dispatch: true/);
+    assert.match(prepare, /release-tag: \$\{\{ inputs\.tag \}\}/);
+  });
+
+  test('prepare grants actions: write, which the dispatch needs', () => {
+    assert.match(prepare, /^\s+actions: write$/m);
+  });
+});
+
 describe('release-please.yml chains the release by dispatch', () => {
   const dir = path.join(root, '.github/workflows');
   const rp = readFileSync(path.join(dir, 'release-please.yml'), 'utf8');

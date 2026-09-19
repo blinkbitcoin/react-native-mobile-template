@@ -28,9 +28,10 @@ jobs:
     uses: blinkbitcoin/shared-workflows/.github/workflows/expo-prepare.yml@v0
     permissions:
       contents: read
-      # `require-green-workflow` runs `gh run list` against the gated workflow;
-      # without this the gate cannot see release-internal's runs.
-      actions: read
+      # `require-green-workflow` runs `gh run list` against the gated workflow,
+      # and `require-green-dispatch` runs `gh workflow run` to start the
+      # internal build when it is missing or red. Write covers both.
+      actions: write
     with:
       # `release-tag` (not `ref`) is what makes this correct: it becomes the
       # checkout ref, the gated and stamped commit (`TAG^{commit}`, exposed as
@@ -42,6 +43,11 @@ jobs:
       build-number-offset: ${{ fromJSON(vars.BUILD_NUMBER_OFFSET || '1000') }}
       # A promotion must never ship a binary whose own build never went green.
       require-green-workflow: release-internal.yml
+      # ...and a release must never wait for a human either. When that build is
+      # missing, cancelled or failed - lost to a queue eviction, a flaky runner -
+      # the gate dispatches release-internal at this tag once and waits for it.
+      # Merge the release PR whenever; the pipeline sorts the rest out.
+      require-green-dispatch: true
       build-env: >-
         {"APP_VARIANT":"production",
         "OTA_ENABLED":"${{ vars.OTA_ENABLED }}",
