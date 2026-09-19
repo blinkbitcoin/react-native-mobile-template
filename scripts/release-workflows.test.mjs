@@ -100,6 +100,51 @@ describe('every workflow_run listener names a workflow that exists', () => {
   }
 });
 
+// GitHub keeps one *pending* run per concurrency group and evicts the older
+// one. release-internal waits ~35 minutes in Prepare for the commit's CI
+// before it builds, so on the shared `release` queue any push inside that
+// window lost its internal build - and the release's beta then failed its
+// green gate (v0.2.3, v0.2.4, v0.2.5). Internal therefore queues per commit,
+// and only its store-touching jobs join the shared queue, one job at a time.
+describe('the internal release queues per commit; only its store jobs share the release queue', () => {
+  const dir = path.join(root, '.github/workflows');
+  const strip = (file) =>
+    readFileSync(path.join(dir, file), 'utf8')
+      .split('\n')
+      .filter((l) => !l.trimStart().startsWith('#'))
+      .join('\n');
+  const topGroup = (text) =>
+    text.match(/^concurrency:\n(?: {2}[^\n]*\n)*? {2}group: ([^\n]+)/m)?.[1];
+
+  test('release-internal.yml is keyed on the commit', () => {
+    assert.match(topGroup(strip('release-internal.yml')) ?? '', /github\.sha/);
+  });
+
+  test('the promoting workflows still share the literal release queue', () => {
+    for (const file of ['release-beta.yml', 'release-production.yml', 'ota-hotfix.yml']) {
+      assert.equal(topGroup(strip(file)), 'release', `${file} left the release queue`);
+    }
+  });
+
+  test('exactly the store-touching internal jobs join the release queue, per job', () => {
+    const text = strip('release-internal.yml');
+    const jobs = {};
+    let current = null;
+    for (const line of text.split('\n')) {
+      const header = line.match(/^ {2}([a-z][a-z0-9-]*):\s*$/);
+      if (header) {
+        current = header[1];
+        jobs[current] = '';
+      } else if (current && /^ {4}/.test(line)) jobs[current] += `${line}\n`;
+    }
+    const queued = Object.entries(jobs)
+      .filter(([, body]) => /^ {4}concurrency:\n {6}group: release\n/m.test(body))
+      .map(([id]) => id)
+      .sort();
+    assert.deepEqual(queued, ['ota-internal', 'upload-android', 'upload-ios']);
+  });
+});
+
 describe('release-please.yml chains the release by dispatch', () => {
   const dir = path.join(root, '.github/workflows');
   const rp = readFileSync(path.join(dir, 'release-please.yml'), 'utf8');
