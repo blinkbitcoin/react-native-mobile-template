@@ -16,7 +16,8 @@ eval "$(node scripts/ports.mjs --sh)"
 if [ -n "${PLAYWRIGHT_SKIP_EXPORT:-}" ]; then
   echo "PLAYWRIGHT_SKIP_EXPORT set - testing the existing dist/ export"
 else
-  pnpm build:web --dev
+  # A production export, like CI: the flavour that deploys is the one tested.
+  pnpm build:web
 fi
 
 exec pnpm exec playwright test "$@"
