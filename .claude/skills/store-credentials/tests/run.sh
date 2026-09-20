@@ -330,6 +330,41 @@ out=$(REPO_ROOT="$MATCH_APP_REPO" STORE_SETUP_DIR="$WORK/no-state-match" "$VALID
 check_contains "an existing certs/ dir triggers a warning" "WARN" "$out"
 rm -rf "$MATCH_APP_REPO/certs"
 
+# I7: the basic-auth header comes from MATCH_GIT_BASIC_AUTHORIZATION and
+# reaches git through GIT_CONFIG_*, never through argv (a `git -c
+# http.extraHeader=...` would show the credential in every process listing).
+out=$(REPO_ROOT="$MATCH_APP_REPO" STORE_SETUP_DIR="$WORK/no-state-match" \
+  "$VALIDATE_MATCH_REPO" --git-url "$BARE_REPO" --basic-auth "dXNlcjp0b2tlbg==" 2>&1)
+rc=$?
+check "--basic-auth is a usage error" "64" "$rc"
+check_contains "...naming the environment variable instead" "MATCH_GIT_BASIC_AUTHORIZATION" "$out"
+
+GITFAKE_DIR="$WORK/gitfake"
+mkdir -p "$GITFAKE_DIR"
+GIT_FAKE_ARGV_LOG="$WORK/git-argv.log"
+GIT_FAKE_ENV_LOG="$WORK/git-env.log"
+cat >"$GITFAKE_DIR/git" <<'FAKE_GIT'
+#!/bin/bash
+{ printf 'ARGV:'; printf ' %s' "$@"; printf '\n'; } >>"${GIT_FAKE_ARGV_LOG:?}"
+env >>"${GIT_FAKE_ENV_LOG:?}"
+exit 0
+FAKE_GIT
+chmod +x "$GITFAKE_DIR/git"
+
+BASIC_AUTH_VALUE="dXNlcjpuZXZlci1pbi1hcmd2"
+: >"$GIT_FAKE_ARGV_LOG"
+: >"$GIT_FAKE_ENV_LOG"
+out=$(PATH="$GITFAKE_DIR:$PATH" GIT_FAKE_ARGV_LOG="$GIT_FAKE_ARGV_LOG" GIT_FAKE_ENV_LOG="$GIT_FAKE_ENV_LOG" \
+  MATCH_GIT_BASIC_AUTHORIZATION="$BASIC_AUTH_VALUE" \
+  REPO_ROOT="$MATCH_APP_REPO" STORE_SETUP_DIR="$WORK/no-state-match" \
+  "$VALIDATE_MATCH_REPO" --git-url "https://example.invalid/match.git" 2>&1)
+check "a reachable url with MATCH_GIT_BASIC_AUTHORIZATION set exits 0" "0" "$?"
+check "the basic-auth value never appears in git's argv" "0" "$(grep -cF "$BASIC_AUTH_VALUE" "$GIT_FAKE_ARGV_LOG")"
+check "the basic-auth value reaches git through its environment" "yes" \
+  "$(grep -qF "GIT_CONFIG_VALUE_0=Authorization: Basic $BASIC_AUTH_VALUE" "$GIT_FAKE_ENV_LOG" && echo yes || echo no)"
+check "git is called with ls-remote --exit-code" "yes" \
+  "$(grep -qF 'ARGV: ls-remote --exit-code' "$GIT_FAKE_ARGV_LOG" && echo yes || echo no)"
+
 echo
 echo "== new-upload-keystore.sh"
 
@@ -566,6 +601,68 @@ while IFS='|' read -r toggle needs; do
 done <<<"$TOGGLE_LINES"
 
 echo
+echo "== push-to-github.sh: a failing gh list is fatal, not an empty list"
+
+# I4: with no listing, a name that is already set cannot be told from one
+# that is missing - reporting everything missing (--plan) or "nothing to
+# verify" (--verify) would both be lies.
+GHFAIL_DIR="$WORK/ghfail"
+mkdir -p "$GHFAIL_DIR"
+cat >"$GHFAIL_DIR/gh" <<'FAKE_GH_FAIL'
+#!/bin/bash
+echo "gh: could not determine the repository" >&2
+exit 1
+FAKE_GH_FAIL
+chmod +x "$GHFAIL_DIR/gh"
+
+out=$(PATH="$GHFAIL_DIR:$PATH" "$PUSH_TO_GITHUB" --plan 2>&1)
+rc=$?
+check "--plan with a failing gh exits 1" "1" "$rc"
+check_contains "...saying it cannot tell set from missing" "FATAL: gh variable list failed - cannot tell set from missing" "$out"
+check_not_contains "...and reports nothing as missing" "missing" "$(printf '%s\n' "$out" | grep -v 'cannot tell set from missing')"
+
+out=$(PATH="$GHFAIL_DIR:$PATH" "$PUSH_TO_GITHUB" --verify 2>&1)
+rc=$?
+check "--verify with a failing gh exits 1 (not 3)" "1" "$rc"
+check_contains "...with the same fatal message" "cannot tell set from missing" "$out"
+
+echo
+echo "== push-to-github.sh: credential paths git could track are refused"
+
+# I6: the same rule new-upload-keystore.sh applies to the files it writes -
+# an env file (or an @file= target) inside a repository with no ignore rule
+# covering it is one `git add -A` away from a committed credential.
+PUSH_TRACKED_REPO="$WORK/push-tracked-repo"
+mkdir -p "$PUSH_TRACKED_REPO/ignored" "$PUSH_TRACKED_REPO/tracked"
+git init -q "$PUSH_TRACKED_REPO"
+git -C "$PUSH_TRACKED_REPO" config user.email t@example.com
+git -C "$PUSH_TRACKED_REPO" config user.name t
+printf 'ignored/\n' >"$PUSH_TRACKED_REPO/.gitignore"
+git -C "$PUSH_TRACKED_REPO" add .gitignore
+git -C "$PUSH_TRACKED_REPO" commit -qm init
+
+printf 'variable IOS_BUNDLE_ID=com.acme.app\n' >"$PUSH_TRACKED_REPO/tracked/creds.env"
+out=$(FAKE_GH_VARS="$VARS_EMPTY" FAKE_GH_SECRETS="$SECRETS_EMPTY" GH_LOG="$GH_LOG" \
+  "$PUSH_TO_GITHUB" --plan --from-env-file "$PUSH_TRACKED_REPO/tracked/creds.env" 2>&1)
+rc=$?
+check "an env file inside a repo with no ignore rule is refused" "2" "$rc"
+check_contains "...naming the path" "tracked/creds.env" "$out"
+
+printf 'variable IOS_BUNDLE_ID=com.acme.app\n' >"$PUSH_TRACKED_REPO/ignored/creds.env"
+FAKE_GH_VARS="$VARS_EMPTY" FAKE_GH_SECRETS="$SECRETS_EMPTY" GH_LOG="$GH_LOG" \
+  "$PUSH_TO_GITHUB" --plan --from-env-file "$PUSH_TRACKED_REPO/ignored/creds.env" >/dev/null 2>&1
+check "the same env file under a .gitignore'd dir is accepted" "0" "$?"
+
+printf 'not-really-a-key\n' >"$PUSH_TRACKED_REPO/tracked/play.json"
+printf 'secret PLAY_SERVICE_ACCOUNT_JSON@file=%s\n' "$PUSH_TRACKED_REPO/tracked/play.json" \
+  >"$PUSH_TRACKED_REPO/ignored/at-file.env"
+out=$(FAKE_GH_VARS="$VARS_EMPTY" FAKE_GH_SECRETS="$SECRETS_EMPTY" GH_LOG="$GH_LOG" \
+  "$PUSH_TO_GITHUB" --plan --from-env-file "$PUSH_TRACKED_REPO/ignored/at-file.env" 2>&1)
+rc=$?
+check "an @file= path git could track is refused too" "2" "$rc"
+check_contains "...naming that path" "tracked/play.json" "$out"
+
+echo
 echo "== the class table matches docs/release-runbook.md"
 
 RUNBOOK_VAR_CELLS="$(awk '
@@ -629,6 +726,30 @@ check "SKILL.md names new-upload-keystore.sh" "yes" "$(grep -qF 'new-upload-keys
 check "SKILL.md names push-to-github.sh" "yes" "$(grep -qF 'push-to-github.sh' "$SKILL_MD" && echo yes || echo no)"
 check "SKILL.md mentions match nuke as a red flag" "yes" "$(grep -qF 'match nuke' "$SKILL_MD" && echo yes || echo no)"
 check "SKILL.md documents the @file env-file line form" "yes" "$(grep -qF '@file=' "$SKILL_MD" && echo yes || echo no)"
+check "SKILL.md says where production_match_git_url comes from" "yes" \
+  "$(grep -qF 'production_match_git_url' "$SKILL_MD" && grep -qF 'apple-match-repo' "$SKILL_MD" && echo yes || echo no)"
+check "SKILL.md documents the basic-auth header as an environment variable" "yes" \
+  "$(grep -qF 'MATCH_GIT_BASIC_AUTHORIZATION' "$SKILL_MD" && echo yes || echo no)"
+check "SKILL.md's env-file example keeps the file out of the repository" "yes" \
+  "$(# shellcheck disable=SC2016 # the single-quoted "$TMPDIR/creds.env" is the literal the SKILL.md must contain
+  grep -qF '"$TMPDIR/creds.env"' "$SKILL_MD" && echo yes || echo no)"
+
+# I2: the cred-* ids this skill names and the cred-* ids in the checklist
+# vocabulary are the same set, in both directions.
+STATE_SH="$(cd "$SKILL_DIR/../store-setup/scripts" && pwd)/state.sh"
+VOCABULARY_CRED_IDS="$("$STATE_SH" --list-steps | grep -E '^cred-' | sort -u)"
+SKILL_MD_CRED_IDS="$(grep -ohE 'cred-[a-z0-9-]+' "$SKILL_MD" | sort -u)"
+check "every cred-* id in SKILL.md is in state.sh --list-steps, and every one of those is in SKILL.md" "" \
+  "$(diff <(printf '%s\n' "$VOCABULARY_CRED_IDS") <(printf '%s\n' "$SKILL_MD_CRED_IDS"))"
+
+# I5: allowed-tools is a comma-separated list of Bash(prefix:*) patterns -
+# space-separated entries or `Bash(cmd *)` globs are not what Claude Code
+# parses.
+ALLOWED_TOOLS_LINE="$(grep -m1 '^allowed-tools:' "$SKILL_MD")"
+check "SKILL.md's allowed-tools line is comma-separated" "yes" \
+  "$(printf '%s' "$ALLOWED_TOOLS_LINE" | grep -qF ',' && echo yes || echo no)"
+check "SKILL.md's allowed-tools line uses the :* prefix form" "yes" \
+  "$(printf '%s' "$ALLOWED_TOOLS_LINE" | grep -qF ':*' && echo yes || echo no)"
 
 echo
 echo "-------------------------------------"

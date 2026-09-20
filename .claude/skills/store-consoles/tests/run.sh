@@ -63,33 +63,21 @@ export REPO_ROOT="$WORK/empty-repo"
 mkdir -p "$REPO_ROOT"
 export STORE_SETUP_DIR="$WORK/no-state"
 
-# The exact 21-id vocabulary this skill covers, in order.
-EXPECTED_IDS="apple-enrolment
-apple-agreements
-apple-bundle-id
-apple-app-record
-apple-asc-key
-apple-match-repo
-apple-testflight-groups
-apple-privacy-labels
-apple-pricing
-google-account
-google-app-record
-google-play-app-signing
-google-service-account
-google-play-grant
-google-tracks
-google-store-listing-fields
-google-content-rating
-google-data-safety
-google-target-audience
-google-app-access
-google-pricing"
+# The vocabulary this skill covers is not restated here: it is whatever
+# `state.sh --list-steps` calls an `apple-*`/`google-*` step. A literal copy
+# would let the two drift apart silently, which is the only way these ids can
+# go wrong.
+STATE_SH="$(cd "$SKILL_DIR/../store-setup/scripts" && pwd)/state.sh"
+VOCABULARY_IDS="$("$STATE_SH" --list-steps | grep -E '^(apple|google)-')"
+LIST_IDS="$(FAKE_GH_VARS="$VARS_PLACEHOLDER" "$CONSOLE_STEP" --list)"
 
 echo
 echo "console-step.sh --list"
 
-check "--list matches the spec exactly, in order" "$EXPECTED_IDS" "$(FAKE_GH_VARS="$VARS_PLACEHOLDER" "$CONSOLE_STEP" --list)"
+check "--list equals the apple-*/google-* ids in state.sh --list-steps, in order" "" \
+  "$(diff <(printf '%s\n' "$LIST_IDS") <(printf '%s\n' "$VOCABULARY_IDS"))"
+
+EXPECTED_IDS="$LIST_IDS"
 
 echo
 echo "every id resolves with the required fields"
@@ -222,6 +210,26 @@ check "SKILL.md says the four questionnaires are mode (c) only" "yes" \
   "$(grep -qi 'mode (c) only' "$SKILL_MD" && echo yes || echo no)"
 check "SKILL.md points at store-setup/references/modes.md" "yes" \
   "$(grep -qF 'store-setup/references/modes.md' "$SKILL_MD" && echo yes || echo no)"
+# I5: allowed-tools is a comma-separated list of Bash(prefix:*) patterns -
+# space-separated entries or `Bash(cmd *)` globs are not what Claude Code
+# parses.
+ALLOWED_TOOLS_LINE="$(grep -m1 '^allowed-tools:' "$SKILL_MD")"
+check "SKILL.md's allowed-tools line is comma-separated" "yes" \
+  "$(printf '%s' "$ALLOWED_TOOLS_LINE" | grep -qF ',' && echo yes || echo no)"
+check "SKILL.md's allowed-tools line uses the :* prefix form" "yes" \
+  "$(printf '%s' "$ALLOWED_TOOLS_LINE" | grep -qF ':*' && echo yes || echo no)"
+
+echo
+echo "apple-match-repo records the production match repo url"
+
+# I3: validate-match-repo.sh reads state.facts.production_match_git_url, so
+# some step has to write it; this is that step.
+check "the apple-match-repo block's Then: line notes production_match_git_url" "yes" \
+  "$(awk '/^### `apple-match-repo`/{f=1} f && /^### `/ && !/apple-match-repo/{exit} f' "$APPLE_MD" |
+    grep -qF 'state.sh note production_match_git_url' && echo yes || echo no)"
+check "console-step.sh prints that note in the step's Then: line" "yes" \
+  "$(FAKE_GH_VARS="$VARS_PLACEHOLDER" "$CONSOLE_STEP" apple-match-repo |
+    grep '^Then:' | grep -qF 'state.sh note production_match_git_url' && echo yes || echo no)"
 
 echo
 echo "-------------------------------------"

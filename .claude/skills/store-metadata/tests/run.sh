@@ -312,6 +312,13 @@ done
 out=$(REPO_ROOT="$REVIEW_TREE" "$CHECK_METADATA" --platform ios 2>&1)
 check_not_contains "an entirely-full review_information passes" "review_information is partially filled" "$out"
 
+# Minors: all-or-nothing counts against the fixed seven names, so a deleted
+# file is a missing field, not one fewer field to count.
+rm -f "$REVIEW_TREE/fastlane/metadata/ios/review_information/demo_password.txt"
+out=$(REPO_ROOT="$REVIEW_TREE" "$CHECK_METADATA" --platform ios 2>&1)
+check_contains "six filled fields with demo_password.txt deleted is still partially filled" \
+  "review_information is partially filled" "$out"
+
 # category ids
 CATEGORY_TREE="$WORK/category-tree"
 setup_metadata_tree "$CATEGORY_TREE"
@@ -552,6 +559,31 @@ check "SKILL.md names sync.sh" "yes" "$(grep -qF 'sync.sh' "$SKILL_MD" && echo y
 check "SKILL.md mentions the METADATA_PLACEHOLDER literal" "yes" "$(grep -qF 'Replace this text' "$SKILL_MD" && echo yes || echo no)"
 check "SKILL.md mentions overwrite_screenshots" "yes" "$(grep -qF 'overwrite_screenshots' "$SKILL_MD" && echo yes || echo no)"
 check "SKILL.md mentions STORE_METADATA_SYNC_ENABLED" "yes" "$(grep -qF 'STORE_METADATA_SYNC_ENABLED' "$SKILL_MD" && echo yes || echo no)"
+check "SKILL.md explains why bypassing sync.sh does not bypass the gate" "yes" \
+  "$(grep -qF 'does not bypass the gate' "$SKILL_MD" && echo yes || echo no)"
+check "SKILL.md says release_notes.txt must be non-empty for the gate" "yes" \
+  "$(grep -qF 'release_notes.txt' "$SKILL_MD" && echo yes || echo no)"
+check "SKILL.md uses the shared section headings" "yes" \
+  "$(grep -qF '## After Editing the Scripts' "$SKILL_MD" &&
+    grep -qF '## Common Mistakes' "$SKILL_MD" &&
+    grep -qF '## Red Flags — Stop' "$SKILL_MD" && echo yes || echo no)"
+
+# I2: the meta-* ids this skill names and the meta-* ids in the checklist
+# vocabulary are the same set, in both directions.
+STATE_SH="$(cd "$SKILL_DIR/../store-setup/scripts" && pwd)/state.sh"
+VOCABULARY_META_IDS="$("$STATE_SH" --list-steps | grep -E '^meta-' | sort -u)"
+SKILL_MD_META_IDS="$(grep -ohE 'meta-[a-z0-9-]+' "$SKILL_MD" | sort -u)"
+check "every meta-* id in SKILL.md is in state.sh --list-steps, and every one of those is in SKILL.md" "" \
+  "$(diff <(printf '%s\n' "$VOCABULARY_META_IDS") <(printf '%s\n' "$SKILL_MD_META_IDS"))"
+
+# I5: allowed-tools is a comma-separated list of Bash(prefix:*) patterns -
+# space-separated entries or `Bash(cmd *)` globs are not what Claude Code
+# parses.
+ALLOWED_TOOLS_LINE="$(grep -m1 '^allowed-tools:' "$SKILL_MD")"
+check "SKILL.md's allowed-tools line is comma-separated" "yes" \
+  "$(printf '%s' "$ALLOWED_TOOLS_LINE" | grep -qF ',' && echo yes || echo no)"
+check "SKILL.md's allowed-tools line uses the :* prefix form" "yes" \
+  "$(printf '%s' "$ALLOWED_TOOLS_LINE" | grep -qF ':*' && echo yes || echo no)"
 
 echo
 echo "-------------------------------------"
