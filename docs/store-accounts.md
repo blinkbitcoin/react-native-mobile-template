@@ -206,9 +206,12 @@ at registration and cannot be changed afterwards, so pick it deliberately.
    and permanent for that app** — there is no way back once enabled. The
    template's default is the reversible path: keep signing with the
    repository's own upload key and leave App Signing off.
-5. **Fill in the listing** (`huawei-listing`). Icon, screenshots, privacy
-   policy URL, category, age rating questionnaire, release countries and
-   pricing, all in the console. Nothing here is synced by the pipeline (see
+5. **Fill in the listing** (`huawei-listing`). Icon (216 by 216 pixels,
+   PNG), at least three screenshots (16:9 or 9:16, at most 2 MB each), privacy
+   policy URL, category, age rating questionnaire (bands 3+, 7+, 12+, 15+,
+   18+), release countries and pricing, all in the console. The bundle must
+   target Android API level 30 or higher and ship 64-bit code; the template's
+   Android build already does both. Nothing here is synced by the pipeline (see
    [Store listing metadata](release-runbook.md#store-listing-metadata) for
    what is, on Apple and Google). A draft listing publishes nothing; the
    lane's submit is the step that makes a version public. Review takes days

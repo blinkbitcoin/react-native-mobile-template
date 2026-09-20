@@ -1984,6 +1984,8 @@ class LaneBehaviourTest < Minitest::Test
       error = assert_raises(UI::UserError) { run_lane(:android, :upload_huawei) }
       assert_includes error.message, 'HUAWEI_SUBMIT_DELAY_SECONDS'
       refute called?(:huawei_appgallery_connect)
+      # A configuration typo must not cost a real AppGallery call.
+      refute called?(:huawei_appgallery_connect_get_app_info)
     end
   end
 

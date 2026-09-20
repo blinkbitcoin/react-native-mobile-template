@@ -33,8 +33,9 @@ end
 # upload action then only prints a message, so a wrong or revoked secret would
 # be a green job that uploaded nothing. Asking for the app record first makes
 # that red before any binary moves. get_app_info answers nil when the token is
-# nil, false when AppGallery refused the request, and an empty hash when the
-# app record is not visible to this client.
+# nil, an empty hash when the app record is not visible to this client, and
+# false when AppGallery refused the request (the plugin's own user_error!
+# normally raises before that return, so false is a belt-and-braces case).
 def assert_huawei_credentials!(credentials)
   info = store_action(:huawei_appgallery_connect_get_app_info, **credentials)
   blank = !info || (info.respond_to?(:empty?) && info.empty?)
@@ -83,6 +84,9 @@ platform :android do
       UI.user_error!("No Android App Bundle at #{aab} - the huawei-binary job stages it from the release tag")
     end
 
+    # Configuration is checked before the pre-flight, so a typo in the delay
+    # costs no real AppGallery call.
+    submit_delay = huawei_submit_delay_seconds
     credentials = huawei_credentials
     assert_huawei_credentials!(credentials)
     # No idempotency query: get_app_info answers app-level fields only, with no
@@ -92,7 +96,7 @@ platform :android do
       apk_path: aab,
       is_aab: true,
       submit_for_review: true,
-      delay_before_submit_for_review: huawei_submit_delay_seconds
+      delay_before_submit_for_review: submit_delay
     )
     with_huawei_changelog do |path|
       args[:changelog_path] = path if path
