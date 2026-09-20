@@ -156,7 +156,7 @@ test('shellcheck.sh walks the tree instead of globbing to a fixed depth', () => 
     .split('\n')
     .filter((line) => !line.trimStart().startsWith('#'))
     .join('\n');
-  assert.match(src, /find scripts -name '\*\.sh'/);
+  assert.match(src, /find scripts \.claude\/skills -name '\*\.sh' -exec shellcheck -x \{\} \+/);
   assert.doesNotMatch(
     src,
     /scripts\/\*\/\*\//,

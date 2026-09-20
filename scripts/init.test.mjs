@@ -410,6 +410,9 @@ describe('the manifest', () => {
         '.',
         ':!docs/superpowers',
         ':!pnpm-lock.yaml',
+        // Test fixtures, not renamed: they feed the skill's own scripts sample
+        // template-default values as *input*, not as text the template ships.
+        ':(exclude,glob).claude/skills/*/tests/**',
       ],
       {
         cwd: REPO,
@@ -458,8 +461,18 @@ describe('the manifest', () => {
 // ---------------------------------------------------------------------------
 
 // The planning trees are checked in but are not part of the product, and they
-// are full of the very tokens the scan asserts on.
-const SKIP_PREFIXES = ['docs/superpowers/', '.superpowers/'];
+// are full of the very tokens the scan asserts on. The two skill test dirs are
+// the same story: their fixtures feed the template-default values in as test
+// *input*, so they are deliberately outside the rename manifest and must
+// survive `make init` unchanged.
+const SKIP_PREFIXES = [
+  'docs/superpowers/',
+  '.superpowers/',
+  '.claude/skills/store-consoles/tests/',
+  '.claude/skills/store-setup/tests/',
+  '.claude/skills/store-credentials/tests/',
+  '.claude/skills/store-metadata/tests/',
+];
 // Skipped wherever they appear when walking the result.
 const SKIP_ANYWHERE = new Set(['node_modules', '.git', '.expo', '.workflows']);
 // Skipped only at the repo root: `ios`/`android` there would be prebuild output,
@@ -650,6 +663,23 @@ describe('init --yes --no-web', () => {
   test('leaves no rename token anywhere', () => {
     const offenders = files.filter(([, text]) => RENAME_TOKENS.test(text)).map(([rel]) => rel);
     assert.deepEqual(offenders, []);
+  });
+
+  // The four store setup skills get the same rename as the rest of the
+  // template: none of them may still say `com.example.rnmt`, `rn-mobile-template`,
+  // `RN Mobile Template` or `react-native-mobile-template` afterwards, and the
+  // reusable-workflow repo they call out to (not a rename token) must survive.
+  test('renames the store setup skills, keeping blinkbitcoin/shared-workflows', () => {
+    const skillFiles = files.filter(([rel]) => rel.startsWith('.claude/skills/'));
+    assert.ok(skillFiles.length > 0, 'no .claude/skills files were scanned');
+    const offenders = skillFiles.filter(([, text]) => RENAME_TOKENS.test(text)).map(([rel]) => rel);
+    assert.deepEqual(offenders, []);
+    // `blinkbitcoin` names the reusable-workflow repo, not this one, so it is
+    // deliberately not a rename token — it must still appear somewhere in the
+    // renamed tree (e.g. the CI workflows the skills' scripts read `gh` state
+    // through), the same fact the GitHub-owner sweep above already relies on.
+    const survivors = files.filter(([, text]) => text.includes('blinkbitcoin/shared-workflows'));
+    assert.ok(survivors.length > 0, 'no file names blinkbitcoin/shared-workflows anymore');
   });
 
   test('leaves no web reference anywhere', () => {

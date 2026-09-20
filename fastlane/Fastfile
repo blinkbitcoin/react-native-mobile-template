@@ -4,6 +4,7 @@ fastlane_require 'json'
 import 'lanes/shared.rb'
 import 'lanes/ios.rb'
 import 'lanes/android.rb'
+import 'lanes/huawei.rb'
 import 'lanes/future.rb'
 
 before_all do |lane, options|

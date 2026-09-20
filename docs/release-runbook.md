@@ -109,11 +109,47 @@ before any store job starts. It then:
 
 - submits to the App Store (phased release on by default) and rolls out on Play
   at `play_rollout_percent` (default `10`),
+- uploads to Huawei AppGallery and submits it, when that store is turned on
+  (see [Huawei AppGallery](#huawei-appgallery) below),
 - marks the GitHub release `latest`,
 - publishes OTA `production` at 100%,
 - deploys the web export to GitHub Pages.
 
 `platforms` (`both` / `ios` / `android`) narrows it when one store is behind.
+`android` covers Huawei too, because it is the same bundle.
+
+#### Huawei AppGallery
+
+Off unless the repository variable `HUAWEI_UPLOADS_ENABLED` is `true`, and only
+on the **release** tier — there is no internal or beta Huawei job. Credentials
+and the console steps that produce them are in
+[store-accounts.md](store-accounts.md#huawei-appgallery).
+
+Two jobs run it. Huawei is the one store whose production dispatch is its
+**first** upload rather than the promotion of a binary it already holds, so
+`Stage Huawei binary` downloads the signed `.aab` back off the release tag into
+an artifact, and `Release Huawei` runs `fastlane android upload_huawei` against
+it. "No bundle on the tag" therefore means the beta promote never ran for this
+tag: re-run [step 3](#3-beta-promotes-itself) and dispatch production again.
+
+Things worth knowing before you read a red job:
+
+- **A failed Huawei job never blocks the rest.** `Release` (marking the tag
+  latest), the OTA publish and the web deploy do not wait for it. AppGallery is
+  additive, and a slow third-party store must not hold up the release.
+- **The lane pre-flights the credentials.** It asks AppGallery Connect for the
+  app record before any binary moves, because the plugin's token helper returns
+  nothing on a bad client id or secret and its upload action treats that as a
+  no-op — a green job that uploaded nothing. A wrong or revoked pair therefore
+  fails fast, naming `HUAWEI_APP_ID`.
+- **Submit happens after the upload, and separately.** If the upload succeeded
+  and the submit failed, re-run the `Release Huawei` job: `upload_huawei` is the
+  whole lane and Huawei rejects a duplicate version code, so a re-run either
+  submits the version it already has or stops on the duplicate.
+- **The listing is console-only.** No metadata tree, no `sync_metadata`
+  counterpart; icon, screenshots, category, age rating and release countries
+  are edited in AppGallery Connect by hand.
+- **Review takes days.** Nothing in the pipeline polls it; watch the console.
 
 ### 6. Ramp, then close
 
@@ -389,6 +425,11 @@ Why a variable rather than detecting the secrets: GitHub's `secrets` context is
 not available in a job-level `if:`, so a job cannot ask whether its own
 credentials exist.
 
+`.claude/skills/store-setup/` enforces that order as three checklist steps —
+`toggle-signing`, then `rehearse-dry-run`, then `toggle-uploads` — so signing
+can never be turned on ahead of its credentials, nor uploads ahead of a
+passing dry run.
+
 ## Variables and secrets
 
 Where each value comes from — which console, which page, and what it can
@@ -415,6 +456,9 @@ anyone who can see the run. Credentials go in `secrets:` instead.
 | `IOS_SIGNING_ENABLED` | repo variable; `build-ios` in `release-internal` | `true` signs and exports an `.ipa`.<br>Unset archives unsigned, which needs no Apple account |
 | `ANDROID_SIGNING_ENABLED` | repo variable; `build-android` in `release-internal` | `true` signs with the upload keystore.<br>Unset falls back to the debug keystore, which needs no Play account |
 | `STORE_UPLOADS_ENABLED` | repo variable; every store job in all three release workflows | `true` turns on TestFlight and Play uploads.<br>Unset means off, and the store credentials below<br>are only needed once it is on — see<br>[Before you have store accounts](#before-you-have-store-accounts) |
+| `HUAWEI_UPLOADS_ENABLED` | repo variable; both Huawei jobs in `release-production.yml`<br>and the `upload_huawei` lane via `env-json` | `true` turns on the Huawei AppGallery upload,<br>on top of `STORE_UPLOADS_ENABLED`. Unset means off<br>and neither job runs — see [Huawei AppGallery](#huawei-appgallery) |
+| `HUAWEI_APP_ID` | `android upload_huawei` via `env-json` | The numeric app id under the AppGallery Connect<br>app record's information page. An identifier, not a<br>credential, so it is a variable and appears in the log |
+| `HUAWEI_SUBMIT_DELAY_SECONDS` | `android upload_huawei` via `env-json` | Optional. Whole seconds to wait between the upload<br>and the submit; default `60`. Raise it if AppGallery<br>refuses the submit because the bundle is still compiling |
 | `STORE_METADATA_SYNC_ENABLED` | repo variable; both jobs in `store-metadata.yml`<br>and the `sync_metadata` lanes | `true` lets a lane write the public store page.<br>Unset means off and the lane refuses |
 | `IOS_METADATA_EDIT_LIVE` | `ios sync_metadata` via `env-json` | `true` edits the live version's editable subset<br>when no version is in preparation.<br>`pull_metadata` ignores it: `deliver`'s<br>download always takes the latest version |
 | `PLAY_METADATA_TRACK` | `android sync_metadata` / `pull_metadata` via `env-json` | Track whose release the listing edit rides on;<br>default first of `production`, `beta`, `internal`<br>with one |
@@ -443,6 +487,10 @@ anyone who can see the run. Credentials go in `secrets:` instead.
 and package name, which would then disagree with the `IOS_BUNDLE_ID` /
 `ANDROID_PACKAGE` the lanes assert.
 
+`.claude/skills/store-credentials/scripts/push-to-github.sh --plan` prints
+`unchanged` / `set` / `missing` for every variable above, without writing
+anything.
+
 Repository / environment **secrets**. Scope the store credentials to the
 `internal`, `beta` and `production` environments rather than the repository when
 you want a reviewer between a token and production.
@@ -460,11 +508,17 @@ you want a reviewer between a token and production.
 | `ANDROID_UPLOAD_KEY_ALIAS` | Android build | Key alias inside the keystore |
 | `ANDROID_UPLOAD_KEY_PASSWORD` | Android build | Password of that key |
 | `PLAY_SERVICE_ACCOUNT_JSON` | Android build and every Android lane | Google Cloud → service account → JSON key, then grant it release permissions in Play Console → Users and permissions |
+| `HUAWEI_CLIENT_ID` | Release / Huawei | AppGallery Connect → Users and permissions → API key → Connect API → Create; the client id half of the pair |
+| `HUAWEI_CLIENT_SECRET` | Release / Huawei | Same page, the client secret half. It is shown exactly once |
 | `OTA_PUBLISH_TOKEN` | every `ota-*` job | One of the update server's `EOO_TOKENS`; scope per environment |
 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | `expo-prepare` (`notes.mjs`) | Only needed when `RELEASE_NOTES_LLM_PROVIDER` selects that provider. The notes fall back to deterministic prose without them |
 | `APP_REVIEW_EMAIL`, `APP_REVIEW_FIRST_NAME`, `APP_REVIEW_LAST_NAME`, `APP_REVIEW_PHONE` | iOS `promote_beta` and `release_production` lanes | The contact Apple reaches for review questions |
 | `APP_REVIEW_DEMO_USER`, `APP_REVIEW_DEMO_PASSWORD` | same | A working login for the reviewer; omit both if the app needs no account |
 | `APP_REVIEW_NOTES` | same | Free-text notes for the reviewer |
+
+`.claude/skills/store-credentials/scripts/push-to-github.sh --plan` covers
+the secrets above too, reporting the same three statuses per name without
+ever printing a value.
 
 The seven `APP_REVIEW_*` values are **secrets, not `build-env` or `env-json`
 values**: a reviewer demo login is a real credential and both of those inputs are
@@ -726,6 +780,10 @@ export ASC_KEY_ID=DUMMY ASC_ISSUER_ID=DUMMY ASC_KEY_P8_BASE64=DUMMY
 
 bundle exec fastlane ios upload_internal
 bundle exec fastlane android rollout percent:50
+
+# Huawei AppGallery: its own toggle, and the credentials are dummies too.
+export HUAWEI_CLIENT_ID=DUMMY HUAWEI_CLIENT_SECRET=DUMMY HUAWEI_APP_ID=123456789
+DRY_RUN=1 HUAWEI_UPLOADS_ENABLED=true bundle exec fastlane android upload_huawei
 ```
 
 One thing to expect. Under `DRY_RUN=1` the lanes do **not** write into
@@ -759,20 +817,22 @@ as above.
 
 ## Future stores
 
-`fastlane/lanes/future.rb` holds deliberate stubs that fail loudly rather than
-pretending to work:
+`fastlane/lanes/future.rb` holds two deliberate stubs that fail loudly rather
+than pretending to work:
 
 | Lane | Store | What implementing it needs |
 | --- | --- | --- |
-| `upload_huawei` | Huawei AppGallery | An AppGallery Connect client id/secret, the `fastlane-plugin-huawei_appgallery_connect` plugin,<br>and an HMS-free build (no Google Play Services dependency at runtime) |
 | `upload_samsung` | Samsung Galaxy Store | Seller Portal API credentials and the Galaxy Store CLI; the same `.aab` works |
 | `fdroid_metadata` | F-Droid | Reproducible builds and metadata YAML in `fdroiddata`;<br>F-Droid builds from source, so it needs the release to be buildable without any proprietary dependency |
 
 Signup, consoles and credentials for both are in
-[store-accounts.md](store-accounts.md); the Huawei entry also covers the part
-that is not the lane, which is that Huawei devices ship without Google Play
-Services.
+[store-accounts.md](store-accounts.md). Huawei AppGallery used to be a third
+stub and is now implemented — see [Huawei AppGallery](#huawei-appgallery) —
+though only the binary half: the part that is not the lane, making a bundle
+work on devices that ship without Google Play Services, still needs a Huawei
+Mobile Services equivalent for anything that depends on it at runtime.
 
-Each raises `UI.user_error!` pointing back at this section. Add a store by
-implementing its lane and adding a job to `release-production.yml` behind the
-`platforms` input — nothing else in the path assumes there are only two stores.
+Each stub raises `UI.user_error!` pointing back at this section. Add a store the
+way Huawei was added: implement its lane and add a job to
+`release-production.yml` behind the `platforms` input and a toggle of its own —
+nothing else in the path assumes there are only two stores.

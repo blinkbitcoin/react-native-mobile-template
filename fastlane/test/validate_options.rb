@@ -15,6 +15,13 @@ require 'json'
 require 'fastlane'
 
 Fastlane.load_actions
+# Fastlane.load_actions only loads the actions that ship with fastlane, so
+# without this the one plugin action set in fastlane/Pluginfile would come back
+# as "no such fastlane action". Loading is deliberately unguarded: a missing gem
+# must fail this validator loudly rather than quietly skip the only option names
+# in the suite that nobody has ever typed by hand (`bundle check` is already a
+# hard precondition of `make check-release`).
+Fastlane.plugin_manager.load_plugins(print_table: false)
 
 def action_class(name)
   Fastlane::Actions.const_get("#{name.split('_').map(&:capitalize).join}Action")

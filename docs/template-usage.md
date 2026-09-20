@@ -131,11 +131,15 @@ Answering "yes" keeps all of it, and `make e2e-web` keeps working.
    [docs/release-runbook.md](release-runbook.md) — `IOS_BUNDLE_ID`,
    `IOS_SCHEME`, `ANDROID_PACKAGE`, the App Store Connect and Play credentials,
    and the `EXPO_PUBLIC_*` values. Nothing in the release path works until they
-   exist.
+   exist. `.claude/skills/store-setup/` walks you through getting every one of
+   these from a console to a GitHub variable or secret, in the right order.
+   Huawei AppGallery is optional and stays off until you set the repository
+   variable `HUAWEI_UPLOADS_ENABLED=true`, after that skill's Huawei steps.
 2. Create the `production` GitHub environment with required reviewers (see the
    same runbook) — it is what makes a store release a two-person action.
 3. Replace the placeholder assets in `assets/` and the store copy in
-   `fastlane/metadata/**`. Then set the repository variable
+   `fastlane/metadata/**`; `.claude/skills/store-metadata/scripts/check-metadata.sh`
+   tells you what is still a placeholder. Then set the repository variable
    `STORE_METADATA_SYNC_ENABLED=true` and run the **Store listing** workflow
    with `direction: push`, `dry_run: true` first — or seed the tree from an
    existing app with `direction: pull` instead of writing the copy by hand.

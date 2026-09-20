@@ -77,6 +77,7 @@ Every row is a make target; nothing here is run through pnpm directly.
 | `make check-deps` | SDK drift, audit, lockfile provenance, licenses |
 | `make check-ci` | actionlint (workflows) + shellcheck (scripts) |
 | `make check-docs` | Docs freshness, this file's command table vs the Makefile, table widths, mermaid blocks |
+| `make check-skills` | The offline test suite of every skill under `.claude/skills/` (part of `make check`) |
 | `make check-prebuild` | Prebuild both platforms in a temp dir, assert plugin output |
 | `make check-release` | Ruby syntax + fastlane lane parse + lane unit tests |
 | `make bundle-secrets-check` | Export the bundle, assert no non-public keys leaked |
@@ -151,6 +152,14 @@ Every row is a make target; nothing here is run through pnpm directly.
   `sed` a version into `package.json`, `app.config.ts` or the manifest. Store
   notes prose is edited in the release body, then previewed with
   `make release-notes` — see `docs/release-runbook.md`.
+- **No vague abbreviations, anywhere a human reads.** Write the word:
+  identifiers, organisation, credentials, repository, configuration,
+  environment. This applies to prose, plans, commit messages, comments and
+  names alike. Keep an abbreviation only when it is the industry's own name
+  for the thing (App Store Connect's `ASC_`, OTA, 2FA, API, JSON, CI, CD) and
+  expand an uncommon one on first use. A prefix made of the family's initials
+  was rejected for exactly this reason; so was "ids" for identifiers in a
+  status message.
 - **Docs ship with the code.** Architecture-relevant changes without a `docs/`
   change get a warning from `make check-docs` (a dependency bump does not count,
   and Dependabot is exempt); adding a make target without a row in the table

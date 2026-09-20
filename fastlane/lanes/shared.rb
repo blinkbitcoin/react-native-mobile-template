@@ -12,9 +12,9 @@ require 'json'
 # GitHub only masks values registered as secrets in that job -- so the dry-run
 # log redacts these itself. The pattern catches names this list has not met yet.
 REDACTED_ARG_KEYS = %i[
-  api_key api_token app_specific_password auth_token demo_password json_key
-  json_key_data key_content key_password keystore_password match_password
-  password private_key store_password token
+  api_key api_token app_specific_password auth_token client_id demo_password
+  json_key json_key_data key_content key_password keystore_password
+  match_password password private_key store_password token
 ].freeze
 # Case-insensitive: fastlane and the workflows both pass keys through from
 # environment names, so a `JSON_KEY` or `Password` must redact like `json_key`.
@@ -40,7 +40,11 @@ DRY_RUN_RESULTS = {
   latest_testflight_build_number: 0,
   upload_to_testflight: nil,
   upload_to_app_store: nil,
-  download_dsyms: nil
+  download_dsyms: nil,
+  # A non-empty stand-in: the Huawei lane treats a blank answer as an
+  # authentication failure, which a rehearsal must not trip over.
+  huawei_appgallery_connect_get_app_info: { 'appName' => '[dry-run]' },
+  huawei_appgallery_connect: nil
 }.freeze
 DRY_RUN_DEFAULT_RESULT = [].freeze
 
@@ -516,6 +520,16 @@ end
 # lanes run against a staged copy of the tree with the per-version paths
 # removed. Copying rather than deleting also means a lane can never damage the
 # working tree of the checkout it runs in.
+def assert_huawei_uploads_enabled!
+  return if truthy?(ENV['HUAWEI_UPLOADS_ENABLED'])
+
+  UI.user_error!(
+    'Huawei AppGallery uploads are off: set the repository variable ' \
+    'HUAWEI_UPLOADS_ENABLED=true (or export it locally) before a lane may ' \
+    'publish to AppGallery (see docs/release-runbook.md)'
+  )
+end
+
 SYNC_EXCLUDED_FILES = %w[release_notes.txt].freeze
 SYNC_EXCLUDED_DIRS = %w[changelogs].freeze
 
