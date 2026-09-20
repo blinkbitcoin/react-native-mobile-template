@@ -55,7 +55,7 @@ WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/validate-keystore.XXXXXX")"
 trap 'rm -rf "$WORKDIR"' EXIT
 
 LIST_OUT="$WORKDIR/list.out"
-if ! keytool -list -v -keystore "$KEYSTORE" -alias "$ALIAS" -storepass "$STOREPASS" \
+if ! keytool -list -v -keystore "$KEYSTORE" -alias "$ALIAS" -storepass:env ANDROID_UPLOAD_KEYSTORE_PASSWORD \
   >"$LIST_OUT" 2>&1; then
   if grep -qi 'does not exist' "$LIST_OUT"; then
     fail "alias '$ALIAS' does not exist in $KEYSTORE"
@@ -85,7 +85,7 @@ SHA256="$(sed -nE 's/^[[:space:]]*SHA256: (.*)$/\1/p' "$LIST_OUT" | head -1)"
 # parsing keytool's locale-dependent "Valid ... until:" date string.
 TWENTY_FIVE_YEARS=788400000
 CERT_PEM="$WORKDIR/cert.pem"
-if keytool -exportcert -alias "$ALIAS" -keystore "$KEYSTORE" -storepass "$STOREPASS" -rfc \
+if keytool -exportcert -alias "$ALIAS" -keystore "$KEYSTORE" -storepass:env ANDROID_UPLOAD_KEYSTORE_PASSWORD -rfc \
   >"$CERT_PEM" 2>"$WORKDIR/export.err"; then
   if ! openssl x509 -in "$CERT_PEM" -noout -checkend "$TWENTY_FIVE_YEARS" >/dev/null 2>&1; then
     fail "certificate is valid for less than 25 years from now"
@@ -95,8 +95,8 @@ else
 fi
 
 CSR_OUT="$WORKDIR/csr.pem"
-if ! keytool -certreq -alias "$ALIAS" -keystore "$KEYSTORE" -storepass "$STOREPASS" \
-  -keypass "$KEYPASS" -file "$CSR_OUT" >"$WORKDIR/certreq.out" 2>&1; then
+if ! keytool -certreq -alias "$ALIAS" -keystore "$KEYSTORE" -storepass:env ANDROID_UPLOAD_KEYSTORE_PASSWORD \
+  -keypass:env ANDROID_UPLOAD_KEY_PASSWORD -file "$CSR_OUT" >"$WORKDIR/certreq.out" 2>&1; then
   fail "ANDROID_UPLOAD_KEY_PASSWORD did not open the private key for alias '$ALIAS'"
 fi
 

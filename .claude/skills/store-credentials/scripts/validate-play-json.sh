@@ -83,6 +83,16 @@ if [ ${#FAILURES[@]} -eq 0 ]; then
   if [ -z "$CLIENT_EMAIL" ]; then
     fail "missing 'client_email' field"
   fi
+
+  PRIVATE_KEY_PEM="$WORKDIR/private_key.pem"
+  (umask 077 && : >"$PRIVATE_KEY_PEM")
+  node -e 'const d=require(process.argv[1]); process.stdout.write(typeof d.private_key==="string"?d.private_key:"")' "$FIELDS_OUT" 2>/dev/null >"$PRIVATE_KEY_PEM"
+  if [ ! -s "$PRIVATE_KEY_PEM" ]; then
+    fail "missing or empty 'private_key' field"
+  elif ! openssl pkey -in "$PRIVATE_KEY_PEM" -noout 2>"$WORKDIR/pkey.err"; then
+    fail "'private_key' does not parse as a private key: $(head -1 "$WORKDIR/pkey.err")"
+  fi
+  rm -f "$PRIVATE_KEY_PEM"
 fi
 
 if [ ${#FAILURES[@]} -eq 0 ]; then
