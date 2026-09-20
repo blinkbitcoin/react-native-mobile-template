@@ -166,30 +166,80 @@ gate that exists to catch a wrong signing identity stops checking.
 
 ## Huawei AppGallery
 
-**Not implemented.** `fastlane/lanes/future.rb` has an `upload_huawei` lane
-that fails loudly rather than pretending to work. This section is what
-implementing it would need.
+**Optional, and off until you turn it on.** `fastlane android upload_huawei`
+uploads the same signed `.aab` the Play path produces and submits it for
+review; the production dispatch runs it only when the repository variable
+`HUAWEI_UPLOADS_ENABLED` is `true`. The upload path is the community plugin
+[`fastlane-plugin-huawei_appgallery_connect`](https://github.com/shr3jn/fastlane-plugin-huawei_appgallery_connect),
+pinned exactly — Huawei publishes no first-party command-line tool. See
+[decisions/0019](decisions/0019-huawei-appgallery-release-lane.md) for why the
+lane stops at the binary.
 
 **Account:** [Huawei Developer](https://developer.huawei.com/consumer/en/) —
 free, but identity verification is required and an organisation account asks
-for business documents. Allow days, not hours.
+for business documents. Allow days, not hours. The account's country is fixed
+at registration and cannot be changed afterwards, so pick it deliberately.
 
 **Console:** [AppGallery Connect](https://developer.huawei.com/consumer/en/service/josp/agc/index.html)
 → My apps.
 
-The credentials are a **client ID and client secret** from AppGallery Connect
-(Users and permissions → API key / Connect API), plus the app id from the app
-record. The community plugin is
-[`fastlane-plugin-huawei_appgallery_connect`](https://github.com/shr3jn/fastlane-plugin-huawei_appgallery_connect).
+### Steps
 
-The real work is not the upload. Huawei devices ship without Google Play
-Services, so anything depending on it at runtime — Firebase Cloud Messaging,
-Google Maps, Play Integrity — needs a Huawei Mobile Services equivalent or a
-graceful fallback. Budget for that, not for the lane.
+1. **Register the developer account** (`huawei-account`). Sign up, then submit
+   identity documents and wait for verification. Everything below is behind
+   that wait, so start it first.
+2. **Create the app record** (`huawei-app-record`). AppGallery Connect → My
+   apps → **New**. The package name is entered here and fixes what the record
+   can ever publish; use the same value as `ANDROID_PACKAGE`. The Publishing
+   API cannot create apps, so this step is always by hand. After it is
+   created, the numeric **App ID** is shown under the app's information page —
+   that is `HUAWEI_APP_ID`, a repository variable rather than a secret,
+   because it identifies the app and unlocks nothing on its own.
+3. **Create an API client** (`huawei-api-client`). Users and permissions →
+   API key → Connect API → **Create**. Keep its roles to app administration
+   rather than account-wide. The pair it yields is a **Client ID** and a
+   **Client Secret**, two strings and no file; the secret is shown **once**.
+   Menu wording here has moved before, so verify the labels on screen and look
+   for the page that produces a client id and secret pair.
+4. **Decide about App Signing** (`huawei-app-signing`). Enrolling lets Huawei
+   hold the release key and re-sign every bundle you upload. It is **optional
+   and permanent for that app** — there is no way back once enabled. The
+   template's default is the reversible path: keep signing with the
+   repository's own upload key and leave App Signing off.
+5. **Fill in the listing** (`huawei-listing`). Icon, screenshots, privacy
+   policy URL, category, age rating questionnaire, release countries and
+   pricing, all in the console. Nothing here is synced by the pipeline (see
+   [Store listing metadata](release-runbook.md#store-listing-metadata) for
+   what is, on Apple and Google). A draft listing publishes nothing; the
+   lane's submit is the step that makes a version public. Review takes days
+   rather than hours — verify the current estimate on screen.
+
+### What you end up with
+
+| Value | Where it came from | Repo secret or variable |
+| --- | --- | --- |
+| Client ID | Step 3 | `HUAWEI_CLIENT_ID` (secret) |
+| Client Secret | Step 3, shown once | `HUAWEI_CLIENT_SECRET` (secret) |
+| App ID | Step 2, under the app's information page | `HUAWEI_APP_ID` (variable) |
+| Uploads on or off | Your choice; off until set | `HUAWEI_UPLOADS_ENABLED` (variable) |
+
+The client id and secret pair is **team-level**: it authenticates against the
+Connect API for the whole developer account, and what it can reach is decided
+by the roles you gave it, not by which app it belongs to. Scope those roles,
+and rotate by deleting the API client in the console and creating a new one.
+
+> **Out of scope for the lane.** Huawei devices ship without Google Play
+> Services, so anything depending on it at runtime — Firebase Cloud Messaging,
+> Google Maps, Play Integrity — needs a Huawei Mobile Services equivalent or a
+> graceful fallback. The lane uploads whatever bundle the Android build
+> produced; making that bundle work on a device without Google Play Services
+> is a separate piece of work, and the larger one.
 
 ## Samsung Galaxy Store
 
-**Not implemented**, same as above: `upload_samsung` is a stub.
+**Not implemented.** `fastlane/lanes/future.rb` has an `upload_samsung` lane
+that fails loudly rather than pretending to work. This section is what
+implementing it would need.
 
 **Account:** [Samsung Seller Portal](https://seller.samsungapps.com) — free.
 A commercial seller account needs business verification.
@@ -199,8 +249,8 @@ A commercial seller account needs business verification.
 Authentication is a service account issued in Seller Portal, exchanged for a
 short-lived access token; there is no long-lived API key to paste into a
 secret, so the lane has to do a token exchange before it uploads. Samsung
-accepts the **same `.aab`** Play does, which makes this the cheapest of the
-two additional stores to add — the packaging work is already done.
+accepts the **same `.aab`** Play and AppGallery do, so the packaging work is
+already done and only the credential exchange is new.
 
 ---
 
@@ -212,6 +262,7 @@ two additional stores to add — the packaging work is already done.
 | `MATCH_PASSWORD` | Re-encrypt the match repo with a new passphrase | The certificates in that repo, which are team-wide |
 | `PLAY_SERVICE_ACCOUNT_JSON` | Delete the key in Google Cloud, add a new one | Only the apps the account was granted in Play Console |
 | `ANDROID_UPLOAD_KEYSTORE_BASE64` | Request an upload key reset in Play Console | Uploads only, if Play App Signing is on. Otherwise the app |
+| `HUAWEI_CLIENT_SECRET` | Delete the API client in AppGallery Connect, create a new one | Whatever the client's roles reach — the pair is team-level, so scope the roles |
 
 Two things follow from that table. Scope the App Store Connect key to one app,
 because it is the one Apple credential whose reach you control. And turn on

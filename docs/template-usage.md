@@ -133,6 +133,8 @@ Answering "yes" keeps all of it, and `make e2e-web` keeps working.
    and the `EXPO_PUBLIC_*` values. Nothing in the release path works until they
    exist. `.claude/skills/store-setup/` walks you through getting every one of
    these from a console to a GitHub variable or secret, in the right order.
+   Huawei AppGallery is optional and stays off until you set the repository
+   variable `HUAWEI_UPLOADS_ENABLED=true`, after that skill's Huawei steps.
 2. Create the `production` GitHub environment with required reviewers (see the
    same runbook) — it is what makes a store release a two-person action.
 3. Replace the placeholder assets in `assets/` and the store copy in
