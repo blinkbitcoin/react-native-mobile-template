@@ -547,8 +547,15 @@ end
 # Whether there is anything to upload. Asked before skip_screenshots is
 # cleared, because deliver's screenshot upload demands an edit version even
 # when it would find no files (deliver/lib/deliver/upload_screenshots.rb:22).
+IOS_SCREENSHOT_EXTENSIONS = %w[.png .jpg .jpeg].freeze
+
+# Dir.glob ignores File::FNM_CASEFOLD on a case-sensitive filesystem, so a
+# `*.png` glob that matched `01.PNG` on macOS matched nothing on the Linux
+# runner. The extension is compared after downcasing instead.
 def ios_screenshots?
-  !Dir.glob(File.join(ios_screenshots_path, '*', '*.{png,jpg,jpeg}'), File::FNM_CASEFOLD).empty?
+  Dir.glob(File.join(ios_screenshots_path, '*', '*')).any? do |file|
+    File.file?(file) && IOS_SCREENSHOT_EXTENSIONS.include?(File.extname(file).downcase)
+  end
 end
 
 def ios_app_rating_config_path(metadata_path)
