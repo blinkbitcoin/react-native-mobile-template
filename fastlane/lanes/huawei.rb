@@ -103,7 +103,9 @@ end
 # submission moves the record into one of these states is unverified, so an
 # unknown or absent answer has to read as "go ahead" rather than "stop".
 def huawei_version_busy(info)
-  return nil unless info.respond_to?(:[])
+  # A Hash only: the plugin's get_app_info returns the appInfo hash, nil or
+  # false, and anything else must fall through rather than raise on `[]`.
+  return nil unless info.is_a?(Hash)
 
   state = (info[:releaseState] || info['releaseState']).to_s.strip
   return nil unless /\A\d+\z/.match?(state)

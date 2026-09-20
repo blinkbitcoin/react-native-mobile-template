@@ -2143,13 +2143,17 @@ class LaneBehaviourTest < Minitest::Test
 
   def test_a_test_window_that_is_not_a_whole_number_of_days_is_refused
     ENV['HUAWEI_UPLOADS_ENABLED'] = 'true'
-    ENV['HUAWEI_TEST_DAYS'] = 'three weeks'
-    in_project do
-      error = assert_raises(UI::UserError) { run_lane(:android, :upload_huawei_internal) }
-      assert_includes error.message, 'HUAWEI_TEST_DAYS'
-      refute called?(:huawei_appgallery_connect)
-      # A configuration typo must not cost a real AppGallery call.
-      refute called?(:huawei_appgallery_connect_get_app_info)
+    # Zero passes the digits check and fails only the above-zero one.
+    ['three weeks', '0'].each do |value|
+      reset_calls!
+      ENV['HUAWEI_TEST_DAYS'] = value
+      in_project do
+        error = assert_raises(UI::UserError) { run_lane(:android, :upload_huawei_internal) }
+        assert_includes error.message, 'HUAWEI_TEST_DAYS'
+        refute called?(:huawei_appgallery_connect)
+        # A configuration typo must not cost a real AppGallery call.
+        refute called?(:huawei_appgallery_connect_get_app_info)
+      end
     end
   end
 
