@@ -166,14 +166,20 @@ gate that exists to catch a wrong signing identity stops checking.
 
 ## Huawei AppGallery
 
-**Optional, and off until you turn it on.** `fastlane android upload_huawei`
-uploads the same signed `.aab` the Play path produces and submits it for
-review; the production dispatch runs it only when the repository variable
-`HUAWEI_UPLOADS_ENABLED` is `true`. The upload path is the community plugin
+**Optional, and off until you turn it on.** Three lanes upload the same signed
+`.aab` the Play path produces and submit it: `fastlane android
+upload_huawei_internal` on every push to main, as a test version with manual
+review skipped; `fastlane android promote_huawei_beta` on every release, as an
+open test version with review; and `fastlane android upload_huawei` on the
+production dispatch, as the formal release. All three run only when the
+repository variable `HUAWEI_UPLOADS_ENABLED` is `true`, on top of
+`STORE_UPLOADS_ENABLED`. The upload path is the community plugin
 [`fastlane-plugin-huawei_appgallery_connect`](https://github.com/shr3jn/fastlane-plugin-huawei_appgallery_connect),
 pinned exactly — Huawei publishes no first-party command-line tool. See
 [decisions/0019](decisions/0019-huawei-appgallery-release-lane.md) for why the
-lane stops at the binary.
+lanes stop at the binary and
+[decisions/0020](decisions/0020-huawei-joins-every-tier.md) for why there is one
+on every tier.
 
 **Account:** [Huawei Developer](https://developer.huawei.com/consumer/en/) —
 free, but identity verification is required and an organisation account asks
@@ -216,6 +222,13 @@ at registration and cannot be changed afterwards, so pick it deliberately.
    what is, on Apple and Google). A draft listing publishes nothing; the
    lane's submit is the step that makes a version public. Review takes days
    rather than hours — verify the current estimate on screen.
+6. **Create a test user list** (`huawei-testers`). Users and permissions →
+   List management → User list → **New** (verify the wording on screen; this
+   menu has moved before). Name the list and add the testers' Huawei IDs, then
+   open the version's open testing page and select the list there. Nothing in
+   the API manages testers: a list is console-only, up to 100 testers on an
+   internal test version and 5,000 on an open one, and the list has to be
+   selected **per release**. Testers install through the AppGallery app.
 
 ### What you end up with
 
