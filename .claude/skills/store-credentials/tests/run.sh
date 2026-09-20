@@ -1,9 +1,11 @@
 #!/bin/bash
 # Offline tests for the store-credentials skill: all six scripts and
 # SKILL.md. Real openssl throughout; real keytool if it is on PATH
-# (generating an actual keystore under $WORK), otherwise a fake keytool
-# serving canned `-list -v` output. `gh` is always a fake that records argv
-# and stdin (never a real network call, never a real repository).
+# (generating an actual keystore under $WORK, and wrapped by a PATH shim
+# that logs argv - never a password value - before exec'ing the real
+# binary), otherwise a fake keytool serving canned `-list -v` output. `gh`
+# is always a fake that records argv and stdin (never a real network call,
+# never a real repository).
 #
 #   ./tests/run.sh
 
@@ -159,12 +161,34 @@ fs.writeFileSync(process.argv[2], JSON.stringify(d));
 "$VALIDATE_PLAY_JSON" --file "$MISSING_EMAIL_JSON" >/dev/null 2>&1
 check "missing client_email fails" "1" "$?"
 
+MISSING_PRIVATE_KEY_JSON="$WORK/missing-private-key.json"
+node -e '
+const fs=require("fs");
+const d=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));
+delete d.private_key;
+fs.writeFileSync(process.argv[2], JSON.stringify(d));
+' "$FIXTURES_DIR/play-service-account.json" "$MISSING_PRIVATE_KEY_JSON"
+out=$("$VALIDATE_PLAY_JSON" --file "$MISSING_PRIVATE_KEY_JSON" 2>&1)
+check "missing private_key fails" "1" "$?"
+check_contains "missing private_key names the field" "missing or empty 'private_key'" "$out"
+
+GARBAGE_PRIVATE_KEY_JSON="$WORK/garbage-private-key.json"
+node -e '
+const fs=require("fs");
+const d=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));
+d.private_key="not a real key, just garbage text";
+fs.writeFileSync(process.argv[2], JSON.stringify(d));
+' "$FIXTURES_DIR/play-service-account.json" "$GARBAGE_PRIVATE_KEY_JSON"
+out=$("$VALIDATE_PLAY_JSON" --file "$GARBAGE_PRIVATE_KEY_JSON" 2>&1)
+check "garbage private_key fails" "1" "$?"
+check_contains "garbage private_key names the parse problem" "does not parse as a private key" "$out"
+
 echo "refused --check-access without --yes"
 printf 'n\n' | "$VALIDATE_PLAY_JSON" --file "$FIXTURES_DIR/play-service-account.json" --check-access >/dev/null 2>&1
 check "--check-access declined on stdin exits 2" "2" "$?"
 
 echo
-echo "== validate-keystore.sh"
+echo "== validate-keystore.sh / new-upload-keystore.sh (keytool)"
 
 KEYSTORE_GOOD="$WORK/upload-good.keystore"
 KEYSTORE_SHORT="$WORK/upload-short.keystore"
@@ -172,8 +196,23 @@ STOREPASS="StorePass123!"
 KEYPASS="KeyPass123!"
 
 HAVE_REAL_KEYTOOL=0
+KEYTOOL_ARGV_LOG="$WORK/keytool-argv.log"
+: >"$KEYTOOL_ARGV_LOG"
+export KEYTOOL_ARGV_LOG
+
 if command -v keytool >/dev/null 2>&1; then
   HAVE_REAL_KEYTOOL=1
+  REAL_KEYTOOL_BIN="$(command -v keytool)"
+  # A logging shim, first on PATH: records argv (never a password - both
+  # scripts under test are required to pass passwords via -storepass:env /
+  # -keypass:env, never on argv) then execs the real keytool.
+  cat >"$FAKEBIN/keytool" <<SHIM
+#!/bin/bash
+{ printf 'ARGV:'; printf ' %q' "\$@"; printf '\n'; } >>"\${KEYTOOL_ARGV_LOG:-/dev/null}"
+exec "$REAL_KEYTOOL_BIN" "\$@"
+SHIM
+  chmod +x "$FAKEBIN/keytool"
+
   keytool -genkeypair -keyalg RSA -keysize 2048 -storetype JKS \
     -keystore "$KEYSTORE_GOOD" -alias upload -storepass "$STOREPASS" -keypass "$KEYPASS" \
     -validity 10950 -dname "CN=Test Upload, O=Test, C=US" >/dev/null 2>&1
@@ -183,11 +222,14 @@ if command -v keytool >/dev/null 2>&1; then
 fi
 
 if [ "$HAVE_REAL_KEYTOOL" -eq 1 ]; then
+  : >"$KEYTOOL_ARGV_LOG"
   out=$(ANDROID_UPLOAD_KEYSTORE_PASSWORD="$STOREPASS" ANDROID_UPLOAD_KEY_PASSWORD="$KEYPASS" \
     "$VALIDATE_KEYSTORE" --keystore "$KEYSTORE_GOOD" --alias upload 2>&1)
   rc=$?
   check "a good keystore passes" "0" "$rc"
   check_contains "it prints ANDROID_UPLOAD_CERT_SHA256=" "ANDROID_UPLOAD_CERT_SHA256=" "$out"
+  check "validate-keystore.sh's keytool argv never carries the store password" "0" "$(grep -cF -- "$STOREPASS" "$KEYTOOL_ARGV_LOG")"
+  check "validate-keystore.sh's keytool argv never carries the key password" "0" "$(grep -cF -- "$KEYPASS" "$KEYTOOL_ARGV_LOG")"
 
   out=$(ANDROID_UPLOAD_KEYSTORE_PASSWORD="$STOREPASS" ANDROID_UPLOAD_KEY_PASSWORD="$KEYPASS" \
     "$VALIDATE_KEYSTORE" --keystore "$KEYSTORE_GOOD" --alias nope 2>&1)
@@ -209,8 +251,6 @@ else
   echo "  (keytool not on PATH - installing a fake for canned output)"
   cat >"$FAKEBIN/keytool" <<'FAKE_KEYTOOL'
 #!/bin/bash
-# Canned `-list -v` output keyed on which fixture keystore path is given.
-for a in "$@"; do :; done
 KEYSTORE=""
 ALIAS=""
 STOREPASS=""
@@ -238,9 +278,6 @@ if [ "$1" = "-list" ]; then
   exit 0
 fi
 if [ "$1" = "-exportcert" ]; then
-  case "$KEYSTORE" in
-    *short*) exit 3 ;; # forces the -checkend openssl step to fail below via an empty file
-  esac
   exit 3
 fi
 exit 1
@@ -305,27 +342,50 @@ printf 'certs/\n' >"$KEYSTORE_APP_REPO/.gitignore"
 git -C "$KEYSTORE_APP_REPO" add .gitignore
 git -C "$KEYSTORE_APP_REPO" commit -qm init
 
+NEW_UPLOAD_ENV_FILE="$WORK/new-upload-keystore-stdout.env"
+
 if [ "$HAVE_REAL_KEYTOOL" -eq 1 ]; then
   "$NEW_UPLOAD_KEYSTORE" --out "$KEYSTORE_APP_REPO/notignored/upload.keystore" --alias upload >/dev/null 2>&1
   check "a non-gitignored --out is refused" "2" "$?"
 
+  : >"$KEYTOOL_ARGV_LOG"
   out=$("$NEW_UPLOAD_KEYSTORE" --out "$KEYSTORE_APP_REPO/certs/upload.keystore" --alias upload 2>/dev/null)
   rc=$?
   check "a fresh gitignored --out succeeds" "0" "$rc"
-  check "it prints exactly three KEY=value lines" "3" "$(printf '%s\n' "$out" | grep -cE '^[A-Z0-9_]+=')"
-  check_contains "it prints ANDROID_UPLOAD_KEY_ALIAS=upload" "ANDROID_UPLOAD_KEY_ALIAS=upload" "$out"
-  check_contains "it prints ANDROID_UPLOAD_CERT_SHA256=" "ANDROID_UPLOAD_CERT_SHA256=" "$out"
-  check_contains "it prints ANDROID_UPLOAD_KEYSTORE_BASE64_FILE=" "ANDROID_UPLOAD_KEYSTORE_BASE64_FILE=" "$out"
+  printf '%s\n' "$out" >"$NEW_UPLOAD_ENV_FILE"
+  check "it prints exactly five env-file lines" "5" "$(printf '%s\n' "$out" | grep -cE '^(variable|secret) ')"
+  check_contains "it prints the ANDROID_UPLOAD_KEYSTORE_BASE64 @file line" "secret ANDROID_UPLOAD_KEYSTORE_BASE64@file=" "$out"
+  check_contains "it prints the ANDROID_UPLOAD_KEYSTORE_PASSWORD @file line" "secret ANDROID_UPLOAD_KEYSTORE_PASSWORD@file=" "$out"
+  check_contains "it prints the ANDROID_UPLOAD_KEY_PASSWORD @file line" "secret ANDROID_UPLOAD_KEY_PASSWORD@file=" "$out"
+  check_contains "it prints secret ANDROID_UPLOAD_KEY_ALIAS=upload" "secret ANDROID_UPLOAD_KEY_ALIAS=upload" "$out"
+  check_contains "it prints variable ANDROID_UPLOAD_CERT_SHA256=" "variable ANDROID_UPLOAD_CERT_SHA256=" "$out"
 
-  FULL_OUTPUT="$("$NEW_UPLOAD_KEYSTORE" --out "$KEYSTORE_APP_REPO/certs/upload2.keystore" --alias upload2 2>&1)"
-  GEN2_STOREPASS="$(cat "$KEYSTORE_APP_REPO/certs/upload2.keystore.storepass" 2>/dev/null)"
-  check_not_contains "the generated store password never appears in combined output" "$GEN2_STOREPASS" "$FULL_OUTPUT"
+  check "new-upload-keystore.sh's keytool argv never carries a password value" "0" \
+    "$(grep -cF -- "$(cat "$KEYSTORE_APP_REPO/certs/upload.keystore.storepass")" "$KEYTOOL_ARGV_LOG")"
+
+  GEN_STOREPASS="$(cat "$KEYSTORE_APP_REPO/certs/upload.keystore.storepass" 2>/dev/null)"
+  check_not_contains "the generated store password never appears in combined stdout+stderr" "$GEN_STOREPASS" "$out"
 
   "$NEW_UPLOAD_KEYSTORE" --out "$KEYSTORE_APP_REPO/certs/upload.keystore" --alias upload >/dev/null 2>&1
   check "an existing file without --force is refused" "2" "$?"
 
   "$NEW_UPLOAD_KEYSTORE" --out "$KEYSTORE_APP_REPO/certs/upload3.keystore" --alias upload3 --validity 100 >/dev/null 2>&1
   check "--validity 100 fails validation" "1" "$?"
+
+  # I4: check-ignore every path it will write, not just --out.
+  PARTIAL_GITIGNORE_REPO="$WORK/partial-gitignore-repo"
+  mkdir -p "$PARTIAL_GITIGNORE_REPO/certs"
+  git init -q "$PARTIAL_GITIGNORE_REPO"
+  git -C "$PARTIAL_GITIGNORE_REPO" config user.email t@example.com
+  git -C "$PARTIAL_GITIGNORE_REPO" config user.name t
+  printf '*.keystore\n' >"$PARTIAL_GITIGNORE_REPO/.gitignore"
+  git -C "$PARTIAL_GITIGNORE_REPO" add .gitignore
+  git -C "$PARTIAL_GITIGNORE_REPO" commit -qm init
+  out=$("$NEW_UPLOAD_KEYSTORE" --out "$PARTIAL_GITIGNORE_REPO/certs/upload.keystore" --alias upload 2>&1)
+  rc=$?
+  check "a .gitignore covering only *.keystore is refused" "2" "$rc"
+  check_contains "the refusal names the uncovered .storepass file" ".storepass" "$out"
+  check "nothing was written under a partially-ignored dir" "" "$(ls "$PARTIAL_GITIGNORE_REPO/certs" 2>/dev/null)"
 else
   echo "  (keytool not on PATH - skipping new-upload-keystore.sh's keytool-dependent cases)"
 fi
@@ -372,6 +432,36 @@ FAKE_GH_VARS="$VARS_EMPTY" FAKE_GH_SECRETS="$SECRETS_EMPTY" GH_LOG="$GH_LOG" \
   "$PUSH_TO_GITHUB" --plan --from-env-file "$UNKNOWN_NAME_FILE" >/dev/null 2>&1
 check "an unknown name exits 64" "64" "$?"
 
+MALFORMED_LINE_FILE="$WORK/malformed-line.env"
+echo "variable NAME_WITH_NO_EQUALS_OR_AT_FILE" >"$MALFORMED_LINE_FILE"
+FAKE_GH_VARS="$VARS_EMPTY" FAKE_GH_SECRETS="$SECRETS_EMPTY" GH_LOG="$GH_LOG" \
+  "$PUSH_TO_GITHUB" --plan --from-env-file "$MALFORMED_LINE_FILE" >/dev/null 2>&1
+check "a line with neither = nor @file= exits 64" "64" "$?"
+
+DUPLICATE_NAME_FILE="$WORK/duplicate-name.env"
+cat >"$DUPLICATE_NAME_FILE" <<EOF
+variable IOS_BUNDLE_ID=com.example.app
+variable IOS_BUNDLE_ID=com.example.other
+EOF
+FAKE_GH_VARS="$VARS_EMPTY" FAKE_GH_SECRETS="$SECRETS_EMPTY" GH_LOG="$GH_LOG" \
+  "$PUSH_TO_GITHUB" --plan --from-env-file "$DUPLICATE_NAME_FILE" >/dev/null 2>&1
+check "a duplicate name exits 64" "64" "$?"
+
+# C2/I7: the @file form carries a multi-line value intact.
+MULTILINE_JSON_FILE="$WORK/multiline.json"
+printf '{\n  "a": 1,\n  "b": 2\n}\n' >"$MULTILINE_JSON_FILE"
+AT_FILE_ENV="$WORK/at-file.env"
+echo "secret PLAY_SERVICE_ACCOUNT_JSON@file=$MULTILINE_JSON_FILE" >"$AT_FILE_ENV"
+: >"$GH_LOG"
+out=$(FAKE_GH_VARS="$VARS_EMPTY" FAKE_GH_SECRETS="$SECRETS_EMPTY" GH_LOG="$GH_LOG" \
+  "$PUSH_TO_GITHUB" --apply --yes --from-env-file "$AT_FILE_ENV" 2>&1)
+rc=$?
+check "--apply --yes with an @file entry exits 0" "0" "$rc"
+MULTILINE_STDIN_LOGGED="$(grep -v '^ARGV' "$GH_LOG")"
+check_contains "the 3-line JSON reached gh's stdin with its first line intact" '{' "$MULTILINE_STDIN_LOGGED"
+check_contains "...and its middle line" '"a": 1' "$MULTILINE_STDIN_LOGGED"
+check_contains "...and its last line" '}' "$MULTILINE_STDIN_LOGGED"
+
 APPLY_ENV_FILE="$WORK/apply.env"
 SECRET_VALUE="s3cr3t-value-that-must-never-appear-in-argv"
 cat >"$APPLY_ENV_FILE" <<EOF
@@ -400,7 +490,80 @@ out=$(FAKE_GH_VARS="$VARS_EMPTY" FAKE_GH_SECRETS="$SECRETS_EMPTY" GH_LOG="$GH_LO
 rc=$?
 check "a gh failure mid-apply exits 1" "1" "$rc"
 check_contains "the name before the failure was set" "set: IOS_BUNDLE_ID" "$out"
-check_not_contains "the name after the failure was never attempted" "ANDROID_PACKAGE" "$out"
+check_not_contains "the name after the failure was never attempted (stdout)" "ANDROID_PACKAGE" "$out"
+check_not_contains "the name after the failure has no gh.log entry at all" "ANDROID_PACKAGE" "$(cat "$GH_LOG")"
+
+# new-upload-keystore.sh's own stdout is a valid env file.
+if [ "$HAVE_REAL_KEYTOOL" -eq 1 ] && [ -s "$NEW_UPLOAD_ENV_FILE" ]; then
+  : >"$GH_LOG"
+  out=$(FAKE_GH_VARS="$VARS_EMPTY" FAKE_GH_SECRETS="$SECRETS_EMPTY" GH_LOG="$GH_LOG" \
+    "$PUSH_TO_GITHUB" --plan --from-env-file "$NEW_UPLOAD_ENV_FILE" 2>&1)
+  check "new-upload-keystore.sh's stdout parses cleanly as a push-to-github.sh env file" "0" "$?"
+fi
+
+echo
+echo "== push-to-github.sh --verify (C1 exit polarity, I6 toggle map)"
+
+VARS_NOTHING_ON="$WORK/vars-nothing-on.json"
+node -e 'console.log(JSON.stringify(
+  ["IOS_SIGNING_ENABLED","ANDROID_SIGNING_ENABLED","STORE_UPLOADS_ENABLED","STORE_METADATA_SYNC_ENABLED","OTA_ENABLED"]
+    .map((n)=>({name:n,value:"false"}))
+))' >"$VARS_NOTHING_ON"
+out=$(FAKE_GH_VARS="$VARS_NOTHING_ON" FAKE_GH_SECRETS="$SECRETS_EMPTY" GH_LOG="$GH_LOG" "$PUSH_TO_GITHUB" --verify 2>&1)
+check "--verify with no toggle on exits 3 (nothing to verify)" "3" "$?"
+
+VARS_OTA_ON_SATISFIED="$WORK/vars-ota-on-satisfied.json"
+node -e 'console.log(JSON.stringify([
+  {name:"OTA_ENABLED",value:"true"},
+  {name:"OTA_CLI_VERSION",value:"1.2.3"},
+  {name:"EXPO_UPDATES_URL",value:"https://updates.example.com"}
+]))' >"$VARS_OTA_ON_SATISFIED"
+SECRETS_OTA_SATISFIED="$WORK/secrets-ota-satisfied.json"
+echo '[{"name":"OTA_PUBLISH_TOKEN"}]' >"$SECRETS_OTA_SATISFIED"
+out=$(FAKE_GH_VARS="$VARS_OTA_ON_SATISFIED" FAKE_GH_SECRETS="$SECRETS_OTA_SATISFIED" GH_LOG="$GH_LOG" "$PUSH_TO_GITHUB" --verify 2>&1)
+check "--verify with a satisfied toggle exits 0" "0" "$?"
+
+VARS_OTA_ON="$WORK/vars-ota-on.json"
+echo '[{"name":"OTA_ENABLED","value":"true"}]' >"$VARS_OTA_ON"
+out=$(FAKE_GH_VARS="$VARS_OTA_ON" FAKE_GH_SECRETS="$SECRETS_EMPTY" GH_LOG="$GH_LOG" "$PUSH_TO_GITHUB" --verify 2>&1)
+check "--verify with an unsatisfied toggle exits 1" "1" "$?"
+check_contains "...and reports what is missing" "missing:" "$out"
+
+echo "I6: MATCH_GIT_BASIC_AUTHORIZATION is a warn under IOS_SIGNING_ENABLED, not a hard requirement"
+VARS_IOS_SIGNING_ON="$WORK/vars-ios-signing-on.json"
+echo '[{"name":"IOS_SIGNING_ENABLED","value":"true"}]' >"$VARS_IOS_SIGNING_ON"
+SECRETS_IOS_SIGNING_SATISFIED="$WORK/secrets-ios-signing-satisfied.json"
+echo '[{"name":"MATCH_PASSWORD"},{"name":"MATCH_GIT_URL"},{"name":"ASC_KEY_ID"},{"name":"ASC_ISSUER_ID"},{"name":"ASC_KEY_P8_BASE64"}]' >"$SECRETS_IOS_SIGNING_SATISFIED"
+out=$(FAKE_GH_VARS="$VARS_IOS_SIGNING_ON" FAKE_GH_SECRETS="$SECRETS_IOS_SIGNING_SATISFIED" GH_LOG="$GH_LOG" "$PUSH_TO_GITHUB" --verify 2>&1)
+rc=$?
+check "IOS_SIGNING_ENABLED with the hard set satisfied still exits 0" "0" "$rc"
+check_contains "...but warns about the missing basic-auth header" "WARN: MATCH_GIT_BASIC_AUTHORIZATION" "$out"
+
+echo "I6: ANDROID_UPLOAD_CERT_SHA256 is a warn under ANDROID_SIGNING_ENABLED (signature gate degrades to skip)"
+VARS_ANDROID_SIGNING_ON="$WORK/vars-android-signing-on.json"
+echo '[{"name":"ANDROID_SIGNING_ENABLED","value":"true"}]' >"$VARS_ANDROID_SIGNING_ON"
+SECRETS_ANDROID_SIGNING_SATISFIED="$WORK/secrets-android-signing-satisfied.json"
+echo '[{"name":"ANDROID_UPLOAD_KEYSTORE_BASE64"},{"name":"ANDROID_UPLOAD_KEYSTORE_PASSWORD"},{"name":"ANDROID_UPLOAD_KEY_ALIAS"},{"name":"ANDROID_UPLOAD_KEY_PASSWORD"}]' >"$SECRETS_ANDROID_SIGNING_SATISFIED"
+out=$(FAKE_GH_VARS="$VARS_ANDROID_SIGNING_ON" FAKE_GH_SECRETS="$SECRETS_ANDROID_SIGNING_SATISFIED" GH_LOG="$GH_LOG" "$PUSH_TO_GITHUB" --verify 2>&1)
+rc=$?
+check "ANDROID_SIGNING_ENABLED with the hard set satisfied still exits 0" "0" "$rc"
+check_contains "...but warns the signature gate degrades to skip" "WARN: ANDROID_UPLOAD_CERT_SHA256" "$out"
+check_contains "...naming the degrade explicitly" "degrades to 'skip'" "$out"
+
+echo "I6: every toggle in TOGGLES_TABLE, exercised generically"
+TOGGLE_LINES="$(sed -n '/^TOGGLES_TABLE="$/,/^"$/p' "$PUSH_TO_GITHUB" | sed '1d;$d')"
+while IFS='|' read -r toggle needs; do
+  [ -n "$toggle" ] || continue
+  VARS_TOGGLE_ONLY="$WORK/vars-toggle-only-$toggle.json"
+  node -e 'console.log(JSON.stringify([{name:process.argv[1],value:"true"}]))' "$toggle" >"$VARS_TOGGLE_ONLY"
+  out=$(FAKE_GH_VARS="$VARS_TOGGLE_ONLY" FAKE_GH_SECRETS="$SECRETS_EMPTY" GH_LOG="$GH_LOG" "$PUSH_TO_GITHUB" --verify 2>&1)
+  rc=$?
+  needed_count=0
+  for _n in $needs; do needed_count=$((needed_count + 1)); done
+  missing_count=$(printf '%s\n' "$out" | grep -c '^missing:')
+  check "verify: $toggle=true alone exits 1" "1" "$rc"
+  check "verify: $toggle=true reports all $needed_count required names missing" "$needed_count" "$missing_count"
+done <<<"$TOGGLE_LINES"
 
 echo
 echo "== the class table matches docs/release-runbook.md"
@@ -432,6 +595,13 @@ check "the script's secret names equal the runbook's secret table (union with AP
 echo
 echo "== no 'nuke' outside a 'never'-comment"
 
+EXPECTED_SCRIPTS="validate-asc-key.sh validate-keystore.sh validate-play-json.sh validate-match-repo.sh new-upload-keystore.sh push-to-github.sh"
+ALL_SCRIPTS_EXIST=1
+for name in $EXPECTED_SCRIPTS; do
+  [ -f "$SKILL_DIR/scripts/$name" ] || ALL_SCRIPTS_EXIST=0
+done
+check "all six script files exist" "yes" "$([ "$ALL_SCRIPTS_EXIST" -eq 1 ] && echo yes || echo no)"
+
 NUKE_VIOLATIONS=0
 for f in "$SKILL_DIR"/scripts/*.sh; do
   while IFS= read -r line; do
@@ -458,6 +628,7 @@ check "SKILL.md names validate-match-repo.sh" "yes" "$(grep -qF 'validate-match-
 check "SKILL.md names new-upload-keystore.sh" "yes" "$(grep -qF 'new-upload-keystore.sh' "$SKILL_MD" && echo yes || echo no)"
 check "SKILL.md names push-to-github.sh" "yes" "$(grep -qF 'push-to-github.sh' "$SKILL_MD" && echo yes || echo no)"
 check "SKILL.md mentions match nuke as a red flag" "yes" "$(grep -qF 'match nuke' "$SKILL_MD" && echo yes || echo no)"
+check "SKILL.md documents the @file env-file line form" "yes" "$(grep -qF '@file=' "$SKILL_MD" && echo yes || echo no)"
 
 echo
 echo "-------------------------------------"

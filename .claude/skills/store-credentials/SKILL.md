@@ -70,10 +70,24 @@ run.
 ```
 
 `certs/` must already be in `.gitignore` (it is, in this template) — the
-script refuses to write anywhere `git check-ignore` does not cover, and
-refuses an existing file without `--force`. It never prints a password:
-generated store/key passwords are written once to `<out>.storepass` /
-`<out>.keypass` for you to move into a password manager and delete.
+script checks `git check-ignore` on every file it is about to write
+(`<out>`, `<out>.storepass`, `<out>.keypass`, `<out>.b64`) before writing
+any of them, and refuses (exit 2) naming the first one not covered.
+Refuses an existing `<out>` without `--force`. Passwords never touch argv
+(`keytool ... -storepass:env ANDROID_UPLOAD_KEYSTORE_PASSWORD -keypass:env
+ANDROID_UPLOAD_KEY_PASSWORD`) or any output stream — a generated password
+is written straight to `<out>.storepass` / `<out>.keypass`.
+
+Its stdout is five lines in `push-to-github.sh --from-env-file` format —
+pipe them straight through:
+
+```bash
+.claude/skills/store-credentials/scripts/new-upload-keystore.sh \
+  --out certs/upload.keystore --alias upload > creds.env &&
+  .claude/skills/store-credentials/scripts/push-to-github.sh \
+    --apply --yes --from-env-file creds.env
+rm -f creds.env
+```
 
 Already have a keystore? Validate it instead:
 
@@ -99,13 +113,19 @@ Add `--check-access` (network — see Ask First) to also run fastlane's
 # Preview only — reads gh variable/secret list, writes nothing:
 .claude/skills/store-credentials/scripts/push-to-github.sh --plan
 
-# Apply from a local env file (see the script's usage comment for its
-# "<variable|secret> NAME=value" format):
+# Apply from a local env file — one entry per line, in one of two forms:
+#   <variable|secret> NAME=value
+#   <variable|secret> NAME@file=<path>
+# The @file form reads the whole file as the value, unmodified and never
+# echoed — it's the only way to carry a multi-line value (a JSON service
+# account key, a PEM), and it's what new-upload-keystore.sh's stdout is
+# shaped for (see cred-upload-keystore above).
 .claude/skills/store-credentials/scripts/push-to-github.sh \
   --apply --yes --from-env-file /path/outside/the/repo/creds.env \
   --env production
 
-# After a toggle flips true, check nothing it needs is still missing:
+# After a toggle flips true, check nothing it needs is still missing
+# (exit 0 nothing missing, 1 something missing, 3 no toggle is on):
 .claude/skills/store-credentials/scripts/push-to-github.sh --verify
 ```
 

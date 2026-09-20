@@ -9,16 +9,24 @@
 #   push-to-github.sh --verify [--env internal|beta|production] [--repo owner/name]
 #
 # --from-env-file format: one entry per line, blank lines and lines
-# starting with # ignored:
+# starting with # ignored. Two forms:
 #   <variable|secret> NAME=value
-# The leading word is the caller's *claimed* class; it is checked against
-# this script's own class table (below), which is authoritative. A mismatch
-# is refused, not silently corrected.
+#   <variable|secret> NAME@file=<path>
+# The @file form reads the whole file (read once, never echoed) as the
+# value — the only way to carry a multi-line value such as
+# PLAY_SERVICE_ACCOUNT_JSON or a PEM. Every non-comment line must contain
+# either `=` or `@file=`; a line with neither, a duplicate NAME, an unknown
+# NAME, or a NAME whose claimed class disagrees with the table below is
+# refused. The leading word is the caller's *claimed* class; it is checked
+# against this script's own class table, which is authoritative.
 #
-# Exit codes: 0 ok, 1 an apply stopped after `gh` failed on some name
-# (remaining names are left unset), 2 refused (wrong class, or a secret
-# value would have reached argv), 3 --verify found nothing missing, 64
-# usage (including --apply without --yes, and an unknown name).
+# Exit codes: 0 ok (an apply that set everything; a plan; a verify that
+# found nothing missing for an enabled toggle), 1 an apply stopped after
+# `gh` failed on some name (remaining names are left unset), or a verify
+# found something missing, 2 refused (wrong class, or the production url
+# case in sibling scripts), 3 verify found no toggle enabled - nothing to
+# verify, 64 usage (including --apply without --yes, an unknown name, a
+# duplicate name, and a malformed env-file line).
 
 set -uo pipefail
 
@@ -31,14 +39,27 @@ die_refused() { echo "FATAL: $*" >&2; exit 2; }
 VARIABLE_NAMES="IOS_BUNDLE_ID IOS_SCHEME ANDROID_PACKAGE XCODE_VERSION IOS_SIGNING_ENABLED ANDROID_SIGNING_ENABLED STORE_UPLOADS_ENABLED STORE_METADATA_SYNC_ENABLED IOS_METADATA_EDIT_LIVE PLAY_METADATA_TRACK BUILD_NUMBER_OFFSET WORKFLOWS_MACOS_RUNNER TESTFLIGHT_INTERNAL_GROUP TESTFLIGHT_EXTERNAL_GROUP PLAY_UPDATE_PRIORITY ANDROID_UPLOAD_CERT_SHA256 OTA_ENABLED EXPO_UPDATES_URL OTA_CLI_VERSION STORE_NOTES_INCLUDE_CHANGELOG RELEASE_NOTES_LLM_PROVIDER RELEASE_NOTES_LLM_MODEL OPENAI_BASE_URL EXPO_PUBLIC_API_URL EXPO_PUBLIC_APP_NAME EXPO_PUBLIC_WEB_DOMAIN EXPO_PUBLIC_ALLOW_INSECURE_WEB_STORAGE E2E_IOS"
 SECRET_NAMES="MATCH_PASSWORD MATCH_GIT_URL MATCH_GIT_BASIC_AUTHORIZATION ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64 ANDROID_UPLOAD_KEYSTORE_BASE64 ANDROID_UPLOAD_KEYSTORE_PASSWORD ANDROID_UPLOAD_KEY_ALIAS ANDROID_UPLOAD_KEY_PASSWORD PLAY_SERVICE_ACCOUNT_JSON OTA_PUBLISH_TOKEN ANTHROPIC_API_KEY OPENAI_API_KEY APP_REVIEW_EMAIL APP_REVIEW_FIRST_NAME APP_REVIEW_LAST_NAME APP_REVIEW_PHONE APP_REVIEW_DEMO_USER APP_REVIEW_DEMO_PASSWORD APP_REVIEW_NOTES"
 
-# Toggle variables --verify checks, and the names each requires once true.
-# id|needs (needs is space-separated).
+# Toggle variables --verify checks, and the names each hard-requires once
+# true. id|needs (needs is space-separated).
+#
+# STORE_UPLOADS_ENABLED's set is a superset of IOS_SIGNING_ENABLED's and
+# ANDROID_SIGNING_ENABLED's: turning uploads on implies both platforms are
+# signed (a store upload of an unsigned build makes no sense), plus
+# TESTFLIGHT_EXTERNAL_GROUP, which `promote_beta` requires outright
+# (fastlane/lanes/ios.rb, ~line 170).
 TOGGLES_TABLE="
-IOS_SIGNING_ENABLED|MATCH_PASSWORD MATCH_GIT_URL MATCH_GIT_BASIC_AUTHORIZATION ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64
+IOS_SIGNING_ENABLED|MATCH_PASSWORD MATCH_GIT_URL ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64
 ANDROID_SIGNING_ENABLED|ANDROID_UPLOAD_KEYSTORE_BASE64 ANDROID_UPLOAD_KEYSTORE_PASSWORD ANDROID_UPLOAD_KEY_ALIAS ANDROID_UPLOAD_KEY_PASSWORD
-STORE_UPLOADS_ENABLED|PLAY_SERVICE_ACCOUNT_JSON ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64
+STORE_UPLOADS_ENABLED|PLAY_SERVICE_ACCOUNT_JSON ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64 MATCH_PASSWORD MATCH_GIT_URL TESTFLIGHT_EXTERNAL_GROUP ANDROID_UPLOAD_KEYSTORE_BASE64 ANDROID_UPLOAD_KEYSTORE_PASSWORD ANDROID_UPLOAD_KEY_ALIAS ANDROID_UPLOAD_KEY_PASSWORD
 STORE_METADATA_SYNC_ENABLED|PLAY_SERVICE_ACCOUNT_JSON ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64
 OTA_ENABLED|OTA_PUBLISH_TOKEN OTA_CLI_VERSION EXPO_UPDATES_URL
+"
+
+# Soft requirements: missing is a WARN, not a failure (does not affect the
+# exit code). id|name|reason.
+WARN_TOGGLES_TABLE="
+IOS_SIGNING_ENABLED|MATCH_GIT_BASIC_AUTHORIZATION|optional (an SSH match git url needs no basic-auth header)
+ANDROID_SIGNING_ENABLED|ANDROID_UPLOAD_CERT_SHA256|unset - verify-android.sh's signature check degrades to 'skip'
 "
 
 class_of() {
@@ -108,17 +129,17 @@ GH_ENV_ARGS=()
 [ -z "$ENVIRONMENT" ] || GH_ENV_ARGS=(--env "$ENVIRONMENT")
 
 # --- read the env file, validating every name against the class table ------
-# Populated in file order: NAMES (all names seen), and two parallel maps
-# simulated with NAME=value / NAME=class strings (bash 3.2 has no assoc
-# arrays) via helper functions below.
+# Populated in file order, parallel arrays (bash 3.2 has no assoc arrays):
+# ENTRY_NAMES[i] / ENTRY_VALUE_FILES[i] (a file holding entry i's exact
+# value bytes - needed because a NAME@file= entry can be multi-line).
 ENTRY_NAMES=()
-ENTRY_VALUES_FILE=""
+ENTRY_VALUE_FILES=()
 if [ -n "$FROM_ENV_FILE" ]; then
   [ -f "$FROM_ENV_FILE" ] || die_usage "--from-env-file not found: $FROM_ENV_FILE"
-  ENTRY_VALUES_FILE="$(mktemp "${TMPDIR:-/tmp}/push-to-github.values.XXXXXX")"
-  trap 'rm -f "$ENTRY_VALUES_FILE"' EXIT
-  : >"$ENTRY_VALUES_FILE"
+  ENTRY_DIR="$(mktemp -d "${TMPDIR:-/tmp}/push-to-github.values.XXXXXX")"
+  trap 'rm -rf "$ENTRY_DIR"' EXIT
   LINE_NO=0
+  ENTRY_INDEX=0
   while IFS= read -r LINE || [ -n "$LINE" ]; do
     LINE_NO=$((LINE_NO + 1))
     case "$LINE" in
@@ -126,26 +147,49 @@ if [ -n "$FROM_ENV_FILE" ]; then
     esac
     CLAIMED_CLASS="${LINE%% *}"
     REST="${LINE#* }"
-    NAME="${REST%%=*}"
-    VALUE="${REST#*=}"
-    [ "$REST" != "$LINE" ] || die_usage "--from-env-file line $LINE_NO is malformed (want '<variable|secret> NAME=value'): $LINE"
+    [ "$REST" != "$LINE" ] || die_usage "--from-env-file line $LINE_NO is malformed (want '<variable|secret> NAME=value' or '<variable|secret> NAME@file=<path>'): $LINE"
     case "$CLAIMED_CLASS" in
       variable | secret) : ;;
       *) die_usage "--from-env-file line $LINE_NO: unknown class '$CLAIMED_CLASS' (want 'variable' or 'secret')" ;;
     esac
+
+    VALUE_FILE="$ENTRY_DIR/$ENTRY_INDEX"
+    if [[ "$REST" =~ ^([A-Za-z0-9_]+)@file=(.+)$ ]]; then
+      NAME="${BASH_REMATCH[1]}"
+      SRC_FILE="${BASH_REMATCH[2]}"
+      [ -f "$SRC_FILE" ] || die_usage "--from-env-file line $LINE_NO: @file path not found: $SRC_FILE"
+      cp "$SRC_FILE" "$VALUE_FILE"
+    elif [[ "$REST" =~ ^([A-Za-z0-9_]+)=(.*)$ ]]; then
+      NAME="${BASH_REMATCH[1]}"
+      printf '%s' "${BASH_REMATCH[2]}" >"$VALUE_FILE"
+    else
+      die_usage "--from-env-file line $LINE_NO is malformed (want '<variable|secret> NAME=value' or '<variable|secret> NAME@file=<path>'): $LINE"
+    fi
+
     ACTUAL_CLASS="$(class_of "$NAME")"
     [ -n "$ACTUAL_CLASS" ] || die_usage "--from-env-file line $LINE_NO: unknown name '$NAME'"
     [ "$ACTUAL_CLASS" = "$CLAIMED_CLASS" ] ||
       die_refused "--from-env-file line $LINE_NO: '$NAME' is a $ACTUAL_CLASS, not a $CLAIMED_CLASS"
+
+    for existing in "${ENTRY_NAMES[@]+"${ENTRY_NAMES[@]}"}"; do
+      [ "$existing" != "$NAME" ] || die_usage "--from-env-file line $LINE_NO: duplicate name '$NAME'"
+    done
+
     ENTRY_NAMES+=("$NAME")
-    printf '%s\t%s\n' "$NAME" "$VALUE" >>"$ENTRY_VALUES_FILE"
+    ENTRY_VALUE_FILES+=("$VALUE_FILE")
+    ENTRY_INDEX=$((ENTRY_INDEX + 1))
   done <"$FROM_ENV_FILE"
 fi
 
-value_for() {
-  local name="$1"
-  [ -n "$ENTRY_VALUES_FILE" ] || return 1
-  awk -F'\t' -v n="$name" '$1==n{print substr($0, length($1)+2); found=1} END{exit found?0:1}' "$ENTRY_VALUES_FILE"
+value_file_for() {
+  local name="$1" i
+  for ((i = 0; i < ${#ENTRY_NAMES[@]}; i++)); do
+    if [ "${ENTRY_NAMES[$i]}" = "$name" ]; then
+      printf '%s\n' "${ENTRY_VALUE_FILES[$i]}"
+      return 0
+    fi
+  done
+  return 1
 }
 
 has_entry() {
@@ -211,13 +255,19 @@ if [ "$MODE" = "plan" ]; then
 fi
 
 # --- --verify ----------------------------------------------------------------
+# Exit 0: at least one toggle was on and nothing it hard-requires is
+# missing. Exit 1: at least one toggle was on and something is missing.
+# Exit 3: no toggle is on - nothing to verify.
 if [ "$MODE" = "verify" ]; then
+  ANY_ENABLED=0
   ANY_MISSING=0
   VARIABLES_JSON="$(remote_variables_json)"
+
   while IFS='|' read -r toggle needs; do
     [ -n "$toggle" ] || continue
     ENABLED="$(printf '%s' "$VARIABLES_JSON" | json_value_of "$toggle")"
     [ "$ENABLED" = "true" ] || continue
+    ANY_ENABLED=1
     for name in $needs; do
       class="$(class_of "$name")"
       if ! remote_has "$class" "$name"; then
@@ -226,7 +276,17 @@ if [ "$MODE" = "verify" ]; then
       fi
     done
   done <<<"$TOGGLES_TABLE"
-  [ "$ANY_MISSING" -eq 1 ] || exit 3
+
+  while IFS='|' read -r toggle name reason; do
+    [ -n "$toggle" ] || continue
+    ENABLED="$(printf '%s' "$VARIABLES_JSON" | json_value_of "$toggle")"
+    [ "$ENABLED" = "true" ] || continue
+    class="$(class_of "$name")"
+    remote_has "$class" "$name" || echo "WARN: $name ($class) $reason"
+  done <<<"$WARN_TOGGLES_TABLE"
+
+  [ "$ANY_ENABLED" -eq 1 ] || exit 3
+  [ "$ANY_MISSING" -eq 0 ] || exit 1
   exit 0
 fi
 
@@ -236,14 +296,14 @@ fi
 
 for name in "${ENTRY_NAMES[@]}"; do
   class="$(class_of "$name")"
-  VALUE="$(value_for "$name")"
+  VALUE_FILE="$(value_file_for "$name")"
   if [ "$class" = "variable" ]; then
-    if ! printf '%s' "$VALUE" | gh variable set "$name" "${GH_REPO_ARGS[@]+"${GH_REPO_ARGS[@]}"}" --body-file - >/dev/null; then
+    if ! gh variable set "$name" "${GH_REPO_ARGS[@]+"${GH_REPO_ARGS[@]}"}" --body-file - <"$VALUE_FILE" >/dev/null; then
       echo "FATAL: gh variable set $name failed - stopping (remaining names are still unset)" >&2
       exit 1
     fi
   else
-    if ! printf '%s' "$VALUE" | gh secret set "$name" "${GH_REPO_ARGS[@]+"${GH_REPO_ARGS[@]}"}" "${GH_ENV_ARGS[@]+"${GH_ENV_ARGS[@]}"}" --body-file - >/dev/null; then
+    if ! gh secret set "$name" "${GH_REPO_ARGS[@]+"${GH_REPO_ARGS[@]}"}" "${GH_ENV_ARGS[@]+"${GH_ENV_ARGS[@]}"}" --body-file - <"$VALUE_FILE" >/dev/null; then
       echo "FATAL: gh secret set $name failed - stopping (remaining names are still unset)" >&2
       exit 1
     fi
