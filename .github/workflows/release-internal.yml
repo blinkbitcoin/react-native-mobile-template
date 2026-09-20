@@ -254,7 +254,10 @@ jobs:
     # to Apple and Google must not acquire a third submission by turning store
     # uploads on.
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && vars.HUAWEI_UPLOADS_ENABLED == 'true' }}
-    needs: [prepare, build-android]
+    # upload-android too, like the beta and production tiers: AppGallery should
+    # not receive a build Play refused, and it must never be the only store
+    # that has one.
+    needs: [prepare, build-android, upload-android]
     uses: blinkbitcoin/shared-workflows/.github/workflows/fastlane-lane.yml@v0
     permissions:
       contents: read

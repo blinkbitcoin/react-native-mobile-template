@@ -67,7 +67,7 @@ front of you rather than insisting on the wording here.
 **Console:** AppGallery Connect — https://developer.huawei.com/consumer/en/service/josp/agc/index.html
 **Click-path:** AppGallery Connect → Users and permissions → List management → User list → New → name the list → add the testers' Huawei IDs → Save (verify the wording on screen; this menu has moved before), then AppGallery Connect → app → the version's open testing page → select the list there → Save (verify on screen)
 **Enter:** a name for the list, and the testers' Huawei IDs — from the human only, never guessed and never taken from any file in this repository
-**Take away:** a saved user list, selected for the release; no secret or variable. The limits are 100 testers on an internal test version, 5,000 on an open one, and 30 lists per developer account
+**Take away:** a saved user list, selected for the release; no secret or variable. The internal tier uses the same open testing page with manual review skipped; there is no separate internal testing page. The limits are 100 testers on an internal test version, 5,000 on an open one, and 30 lists per developer account
 **Confirm:** safe — a user list invites testers and publishes nothing; it can be renamed, edited or deleted again at no cost, and selecting it on a version only decides who may install that test build
 **Browser mode:** create the list, add exactly the Huawei IDs the human gave in this turn, read the name and every ID back before Save, then select the list on the version's open testing page and read that selection back too
 **Guided mode:** print both click-paths — the list one and the version-selection one — with the list name and the IDs the human gave; the human creates the list, selects it, and reports back

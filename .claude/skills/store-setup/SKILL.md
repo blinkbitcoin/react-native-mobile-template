@@ -141,7 +141,7 @@ The 49 steps, in the order `state.sh --list-steps` prints them:
 | `cred-huawei` | credentials | `huawei-api-client`, `huawei-app-record` | Validate and push the AppGallery client id, client secret and app id |
 | `huawei-app-signing` | consoles | `huawei-app-record` | Decide about AppGallery App Signing (optional, permanent once enabled) |
 | `huawei-listing` | consoles | `huawei-app-record` | Fill in the AppGallery listing, age rating and release countries |
-| `toggle-huawei` | setup | `cred-huawei`, `huawei-listing`, `huawei-app-signing` | Turn on `HUAWEI_UPLOADS_ENABLED` |
+| `toggle-huawei` | setup | `cred-huawei`, `huawei-listing`, `huawei-app-signing` | Turn on `HUAWEI_UPLOADS_ENABLED`; a test version reaches nobody until `huawei-testers` is done too |
 | `huawei-testers` | consoles | `huawei-app-record` | Create the AppGallery test user list and select it on the version |
 
 The eight `huawei-*`/`cred-huawei`/`toggle-huawei` steps are an **optional

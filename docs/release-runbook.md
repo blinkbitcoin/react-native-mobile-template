@@ -180,6 +180,16 @@ Things worth knowing before you read a red job:
   and the submit failed, re-run the job: the lane is the whole upload-and-submit
   and Huawei rejects a duplicate version code, so a re-run either submits the
   version it already has or stops on the duplicate.
+- **Beta re-uploads the version code internal already submitted.** A release
+  is promoted only after a green internal run of the same tag, so `Promote
+  Huawei` uploads a bundle whose version code AppGallery has already seen as a
+  test version. Whether AppGallery accepts that replacement is unverified: if
+  it refuses the duplicate, `Promote Huawei` is the expected first red job on
+  a release, and if the internal test version is still under review the beta
+  lane skips instead. Either way nothing downstream waits. The fallback,
+  recorded in [ADR 0020](decisions/0020-huawei-joins-every-tier.md), is to
+  submit the already-uploaded package with the plugin's separate submit
+  action instead of re-uploading.
 - **The listing is console-only.** No metadata tree, no `sync_metadata`
   counterpart; icon, screenshots, category, age rating and release countries
   are edited in AppGallery Connect by hand.
@@ -886,5 +896,7 @@ Mobile Services equivalent for anything that depends on it at runtime.
 
 Each stub raises `UI.user_error!` pointing back at this section. Add a store the
 way Huawei was added: implement its lane and add a job to
-`release-production.yml` behind the `platforms` input and a toggle of its own —
-nothing else in the path assumes there are only two stores.
+`release-production.yml` behind the `platforms` input and a toggle of its own,
+and, if the store has test tiers, jobs in `release-internal.yml` and
+`release-beta.yml` too — nothing else in the path assumes there are only two
+stores.
