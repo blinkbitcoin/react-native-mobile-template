@@ -163,6 +163,75 @@ jobs:
       # below has a fingerprint baseline to download.
       assets-artifacts: release-meta
 
+  # ---- Huawei AppGallery (opt-in, additional store) ------------------------
+
+  # This workflow never builds, so there is no Android App Bundle among its
+  # artifacts: it lives on the `vX.Y.Z` release the job above just moved the
+  # assets onto. Stage it back into an artifact the lane job can download, the
+  # same way `release-production.yml` does for its own first upload.
+  huawei-binary:
+    name: Stage Huawei binary
+    needs: [prepare, github-release]
+    if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && vars.HUAWEI_UPLOADS_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Download the Android App Bundle from the release tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p staged
+          gh release download "$TAG" --pattern '*.aab' --dir staged
+          ls -l staged
+      - uses: actions/upload-artifact@v7
+        with:
+          name: huawei-binary
+          path: staged/*.aab
+          compression-level: 0
+          if-no-files-found: error
+
+  promote-huawei:
+    name: Promote Huawei
+    # `promote-android` too: AppGallery should not receive a beta Play refused.
+    # Nothing downstream waits for this job - the store notes, the OTA publish
+    # and the release itself are already done or independent of it.
+    needs: [prepare, promote-android, huawei-binary]
+    if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && vars.HUAWEI_UPLOADS_ENABLED == 'true' }}
+    uses: blinkbitcoin/shared-workflows/.github/workflows/fastlane-lane.yml@v0
+    permissions:
+      contents: read
+    with:
+      platform: android
+      # AppGallery has no promote endpoint: the beta tier re-uploads the bundle
+      # from the tag and submits it as an open test version, which is the same
+      # submission with manual review left on - 1 to 3 working days, up to
+      # 5,000 testers.
+      lane: promote_huawei_beta
+      runner: ubuntu-latest
+      environment: beta
+      # Every artifact of the run, not just release-meta: the lane needs the
+      # build info and the store notes from release-meta and the bundle from
+      # huawei-binary, and both land in the same assets directory.
+      artifacts: "*"
+      env-json: '{"HUAWEI_APP_ID": "${{ vars.HUAWEI_APP_ID }}", "HUAWEI_UPLOADS_ENABLED": "${{ vars.HUAWEI_UPLOADS_ENABLED }}", "HUAWEI_SUBMIT_DELAY_SECONDS": "${{ vars.HUAWEI_SUBMIT_DELAY_SECONDS }}", "HUAWEI_FEEDBACK_EMAIL": "${{ vars.HUAWEI_FEEDBACK_EMAIL }}", "HUAWEI_TEST_DAYS": "${{ vars.HUAWEI_TEST_DAYS }}"}'
+      build-env: '{"APP_VARIANT":"production"}'
+      version: ${{ needs.prepare.outputs.version }}
+      build-number: ${{ needs.prepare.outputs.build-number }}
+      ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
+      ios-scheme: ${{ vars.IOS_SCHEME }}
+      android-package: ${{ vars.ANDROID_PACKAGE }}
+      # The plugin waits for AppGallery to finish compiling the uploaded bundle
+      # before it submits it, which is minutes rather than seconds.
+      timeout-minutes: 90
+    secrets:
+      HUAWEI_CLIENT_ID: ${{ secrets.HUAWEI_CLIENT_ID }}
+      HUAWEI_CLIENT_SECRET: ${{ secrets.HUAWEI_CLIENT_SECRET }}
+
   # The store notes are what beta testers and, later, App Review actually read,
   # and until now nothing showed the operator what the pipeline would ship. The
   # runbook's override flow ("edit the `## Store notes` section of the release

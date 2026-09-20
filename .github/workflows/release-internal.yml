@@ -238,6 +238,52 @@ jobs:
     secrets:
       PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
 
+  # ---- Huawei AppGallery (opt-in, additional store) ------------------------
+
+  upload-huawei:
+    name: Upload Huawei
+    # The one queue every store-touching job in every release workflow shares,
+    # joined here per job rather than by the whole workflow (see the top of
+    # the file). A pending upload can still be evicted by the next pending
+    # store job - rare, since an upload takes minutes, and visible: this run
+    # goes red and `gh run rerun --failed` finishes it.
+    concurrency:
+      group: release
+      cancel-in-progress: false
+    # Two toggles: the shared one, and Huawei's own. A repository shipping only
+    # to Apple and Google must not acquire a third submission by turning store
+    # uploads on.
+    if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && vars.HUAWEI_UPLOADS_ENABLED == 'true' }}
+    needs: [prepare, build-android]
+    uses: blinkbitcoin/shared-workflows/.github/workflows/fastlane-lane.yml@v0
+    permissions:
+      contents: read
+    with:
+      platform: android
+      # AppGallery has one version slot and no tracks, so the internal tier is
+      # the same submission as the others with the testing flag set and manual
+      # review skipped: automated review, hours, up to 100 testers.
+      lane: upload_huawei_internal
+      runner: ubuntu-latest
+      environment: internal
+      # Every artifact of the run, not just release-meta: the lane needs the
+      # build info and the store notes as well as the Android App Bundle this
+      # run just built, and all of them land in the same assets directory.
+      artifacts: "*"
+      env-json: '{"HUAWEI_APP_ID": "${{ vars.HUAWEI_APP_ID }}", "HUAWEI_UPLOADS_ENABLED": "${{ vars.HUAWEI_UPLOADS_ENABLED }}", "HUAWEI_SUBMIT_DELAY_SECONDS": "${{ vars.HUAWEI_SUBMIT_DELAY_SECONDS }}", "HUAWEI_FEEDBACK_EMAIL": "${{ vars.HUAWEI_FEEDBACK_EMAIL }}", "HUAWEI_TEST_DAYS": "${{ vars.HUAWEI_TEST_DAYS }}"}'
+      build-env: '{"APP_VARIANT":"production"}'
+      version: ${{ needs.prepare.outputs.version }}
+      build-number: ${{ needs.prepare.outputs.build-number }}
+      ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
+      ios-scheme: ${{ vars.IOS_SCHEME }}
+      android-package: ${{ vars.ANDROID_PACKAGE }}
+      # The plugin waits for AppGallery to finish compiling the uploaded bundle
+      # before it submits it, which is minutes rather than seconds.
+      timeout-minutes: 90
+    secrets:
+      HUAWEI_CLIENT_ID: ${{ secrets.HUAWEI_CLIENT_ID }}
+      HUAWEI_CLIENT_SECRET: ${{ secrets.HUAWEI_CLIENT_SECRET }}
+
   github-prerelease:
     name: Pre-release
     # The build jobs are named directly rather than reached through the upload
@@ -249,6 +295,10 @@ jobs:
     # state) and `failure()` both miss - the first internal release shipped a
     # pre-release with no binaries that way. So both builds are required to
     # have succeeded, by name.
+    #
+    # `upload-huawei` is deliberately absent: AppGallery is an additive,
+    # opt-in third store with a review queue that is not ours, and it must
+    # never hold up or fail the pre-release this run is built around.
     needs: [prepare, build-ios, build-android, upload-ios, upload-android]
     if: ${{ !cancelled() && !failure() && needs.build-ios.result == 'success' && needs.build-android.result == 'success' }}
     uses: blinkbitcoin/shared-workflows/.github/workflows/github-release.yml@v0
