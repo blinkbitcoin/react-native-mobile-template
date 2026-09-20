@@ -1,7 +1,7 @@
 ---
 name: store-credentials
 description: Use when creating, checking or wiring store credentials for this app - an App Store Connect API key, a fastlane match repository, an Android upload keystore, a Google Play service account, the App Review contact - or when deciding which of them go to GitHub as variables versus secrets.
-allowed-tools: Bash(.claude/skills/store-credentials/scripts/*.sh *) Bash(.claude/skills/store-credentials/tests/run.sh) Bash(gh variable *) Bash(gh secret *)
+allowed-tools: Bash(gh variable:*), Bash(gh secret:*), Bash(.claude/skills/store-credentials/scripts/validate-asc-key.sh:*), Bash(.claude/skills/store-credentials/scripts/validate-keystore.sh:*), Bash(.claude/skills/store-credentials/scripts/validate-play-json.sh:*), Bash(.claude/skills/store-credentials/scripts/validate-match-repo.sh:*), Bash(.claude/skills/store-credentials/scripts/new-upload-keystore.sh:*), Bash(.claude/skills/store-credentials/scripts/push-to-github.sh:*), Bash(.claude/skills/store-credentials/tests/run.sh:*), Bash(.claude/skills/store-setup/scripts/state.sh:*)
 ---
 
 # Store Credentials
@@ -53,14 +53,23 @@ key id / issuer id look like what Apple actually issues.
 ### `cred-match` — fastlane match certificates repository
 
 ```bash
-.claude/skills/store-credentials/scripts/validate-match-repo.sh \
-  --git-url <url> [--basic-auth <base64 of user:token>]
+MATCH_GIT_BASIC_AUTHORIZATION=<base64 of user:token> \
+  .claude/skills/store-credentials/scripts/validate-match-repo.sh --git-url <url>
 ```
 
+The basic-auth header value is read from the environment
+(`MATCH_GIT_BASIC_AUTHORIZATION`, the same name the lanes use) and handed to
+git through `GIT_CONFIG_COUNT`/`GIT_CONFIG_KEY_0`/`GIT_CONFIG_VALUE_0`, so it
+never lands in git's argv or a process listing; there is no `--basic-auth`
+option (passing one is a usage error naming the environment variable
+instead). Omit it for an SSH url.
+
 Refuses (exit 2) a `--git-url` equal to `state.facts.production_match_git_url`
-— that repo is not for rehearsing against. Warns, without failing, if
-`REPO_ROOT/certs` already exists on disk from an earlier `fastlane match`
-run.
+— that repo is not for rehearsing against. That fact is written by the
+`apple-match-repo` console step (its `Then:` line runs `state.sh note
+production_match_git_url <url>`), so it is only set when the team already has
+a production match repository. Warns, without failing, if `REPO_ROOT/certs`
+already exists on disk from an earlier `fastlane match` run.
 
 ### `cred-upload-keystore` — Android upload keystore
 
@@ -83,10 +92,10 @@ pipe them straight through:
 
 ```bash
 .claude/skills/store-credentials/scripts/new-upload-keystore.sh \
-  --out certs/upload.keystore --alias upload > creds.env &&
+  --out certs/upload.keystore --alias upload > "$TMPDIR/creds.env" &&
   .claude/skills/store-credentials/scripts/push-to-github.sh \
-    --apply --yes --from-env-file creds.env
-rm -f creds.env
+    --apply --yes --from-env-file "$TMPDIR/creds.env"
+rm -f "$TMPDIR/creds.env"
 ```
 
 Already have a keystore? Validate it instead:
@@ -129,8 +138,12 @@ Add `--check-access` (network — see Ask First) to also run fastlane's
 .claude/skills/store-credentials/scripts/push-to-github.sh --verify
 ```
 
-Keep the env file outside the repository (or somewhere already
-`.gitignore`d) and delete it once `--apply` finishes.
+Keep the env file, and every path one of its `@file=` entries points at,
+outside the repository (`$TMPDIR` is the obvious home) or somewhere already
+`.gitignore`d — `push-to-github.sh` refuses (exit 2) any such path that sits
+inside a git repository without an ignore rule covering it, the same rule
+`new-upload-keystore.sh` applies to the files it writes. Delete the env file
+once `--apply` finishes.
 
 ## Variables versus Secrets
 

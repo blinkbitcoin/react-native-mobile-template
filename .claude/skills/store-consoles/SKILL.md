@@ -1,7 +1,7 @@
 ---
 name: store-consoles
 description: Use when a store setup step has to happen inside App Store Connect, the Apple Developer portal, Google Play Console or Google Cloud - registering identifiers, app records, API keys, service accounts, TestFlight groups, testing tracks, privacy labels, content rating, data safety or pricing - by driving Chrome or by handing the human an exact click-path.
-allowed-tools: Bash(.claude/skills/store-*/scripts/*.sh *) Bash(.claude/skills/store-*/tests/run.sh) Bash(gh variable *)
+allowed-tools: Bash(gh variable:*), Bash(.claude/skills/store-consoles/scripts/console-step.sh:*), Bash(.claude/skills/store-consoles/tests/run.sh:*), Bash(.claude/skills/store-setup/scripts/state.sh:*)
 ---
 
 # Store Consoles
@@ -43,11 +43,13 @@ those four blocks in `references/apple.md` and `references/google.md`.
 
 ## Procedure
 
-1. `console-step.sh <id>` — read the block: `Console:`, `URL:`,
-   `Click-path:`, `Enter:`, `Take away:`, `Confirm:`, `Browser mode:`,
-   `Guided mode:`, `Then:`, plus a `Resolved:` line when a value could be
-   looked up and a `WARNING:` line when a resolved value looks like a
-   template placeholder.
+1. `console-step.sh <id>` — read the block: `Console:`, `Click-path:`,
+   `Enter:`, `Take away:`, `Confirm:`, `Browser mode:`, `Guided mode:`,
+   `Then:`, plus a `Resolved:` line when a value could be looked up and a
+   `WARNING:` line when a resolved value looks like a template placeholder.
+   The reference files carry the url inside the `**Console:**` field (`name
+   — url`); `console-step.sh` splits it out and prints it as its own `URL:`
+   line, so there is no `URL:` field to edit in `references/*.md`.
 2. Do the step per the current mode, honouring `Confirm:` — `paid`,
    `binding`, `irreversible` and `permanent` steps always get an explicit
    yes in this turn, in every mode, per the always-confirm table in
