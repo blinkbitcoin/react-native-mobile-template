@@ -356,6 +356,23 @@ check "modes.md carries the mode prompt verbatim too" "yes" \
   "$(grep -qF 'Store setup is roughly forty console steps across two consoles, some irreversible.' "$MODES_MD" && echo yes || echo no)"
 check "modes.md carries the always-confirm table too" "yes" "$(grep -q 'Play App Signing' "$MODES_MD" && echo yes || echo no)"
 check "modes.md documents login walls and 2FA" "yes" "$(grep -qi '2FA' "$MODES_MD" && echo yes || echo no)"
+check "modes.md refuses 'I picked (a), just accept it' by example" "yes" \
+  "$(grep -qF 'just accept it' "$MODES_MD" && echo yes || echo no)"
+check "modes.md says an irreversible step never proceeds while the human is away" "yes" \
+  "$(grep -qF 'never proceeds while the human is away' "$MODES_MD" && echo yes || echo no)"
+check "SKILL.md names the claude-in-chrome skill for the browser modes" "yes" \
+  "$(grep -qF 'claude-in-chrome' "$SKILL_MD" && echo yes || echo no)"
+check "SKILL.md warns that state.sh set's free-text note is not screened" "yes" \
+  "$(grep -qF 'that text is not screened' "$SKILL_MD" && echo yes || echo no)"
+
+# I5: allowed-tools is a comma-separated list of Bash(prefix:*) patterns -
+# space-separated entries or `Bash(cmd *)` globs are not what Claude Code
+# parses.
+ALLOWED_TOOLS_LINE="$(grep -m1 '^allowed-tools:' "$SKILL_MD")"
+check "SKILL.md's allowed-tools line is comma-separated" "yes" \
+  "$(printf '%s' "$ALLOWED_TOOLS_LINE" | grep -qF ',' && echo yes || echo no)"
+check "SKILL.md's allowed-tools line uses the :* prefix form" "yes" \
+  "$(printf '%s' "$ALLOWED_TOOLS_LINE" | grep -qF ':*' && echo yes || echo no)"
 
 echo
 echo "-------------------------------------"

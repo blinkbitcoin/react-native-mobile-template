@@ -470,6 +470,8 @@ const SKIP_PREFIXES = [
   '.superpowers/',
   '.claude/skills/store-consoles/tests/',
   '.claude/skills/store-setup/tests/',
+  '.claude/skills/store-credentials/tests/',
+  '.claude/skills/store-metadata/tests/',
 ];
 // Skipped wherever they appear when walking the result.
 const SKIP_ANYWHERE = new Set(['node_modules', '.git', '.expo', '.workflows']);

@@ -4,9 +4,16 @@
 # refuse outright if the url given is the production repo recorded in
 # store-setup's state (that one is not for rehearsing against).
 #
-# Usage: validate-match-repo.sh --git-url <url> [--basic-auth <base64>]
+# Usage: validate-match-repo.sh --git-url <url>
 #
-#   STORE_SETUP_DIR / REPO_ROOT   same defaults as store-setup/scripts/state.sh
+#   MATCH_GIT_BASIC_AUTHORIZATION  optional; the base64 of `user:token` for
+#                                  an https match url, read from the
+#                                  environment and handed to git through
+#                                  GIT_CONFIG_COUNT/GIT_CONFIG_KEY_0/
+#                                  GIT_CONFIG_VALUE_0 so it never appears in
+#                                  git's argv or a process listing. There is
+#                                  deliberately no --basic-auth option.
+#   STORE_SETUP_DIR / REPO_ROOT    same defaults as store-setup/scripts/state.sh
 #
 # Exit codes: 0 reachable, 1 not reachable, 2 refused (production url), 64 usage.
 
@@ -15,7 +22,6 @@ set -uo pipefail
 die_usage() { echo "FATAL: $*" >&2; exit 64; }
 
 GIT_URL=""
-BASIC_AUTH=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -25,9 +31,7 @@ while [ $# -gt 0 ]; do
       shift 2
       ;;
     --basic-auth)
-      [ $# -ge 2 ] || die_usage "--basic-auth needs a value"
-      BASIC_AUTH="$2"
-      shift 2
+      die_usage "--basic-auth is not accepted - a credential must not reach git's argv; set MATCH_GIT_BASIC_AUTHORIZATION in the environment instead"
       ;;
     *)
       die_usage "unknown option '$1'"
@@ -59,16 +63,22 @@ try {
   fi
 fi
 
-GIT_ARGS=()
-if [ -n "$BASIC_AUTH" ]; then
-  GIT_ARGS+=(-c "http.extraHeader=Authorization: Basic $BASIC_AUTH")
-fi
-GIT_ARGS+=(ls-remote --exit-code "$GIT_URL")
-
 LS_REMOTE_ERR="$(mktemp "${TMPDIR:-/tmp}/validate-match-repo.XXXXXX")"
-trap 'rm -f "$LS_REMOTE_ERR"' EXIT
+trap 'rm -f "$LS_REMOTE_ERR"' EXIT INT TERM HUP
 
-if ! git "${GIT_ARGS[@]}" >/dev/null 2>"$LS_REMOTE_ERR"; then
+# The header value travels in the environment, not in argv: `git -c
+# http.extraHeader=...` would put the credential in every process listing.
+ls_remote() {
+  if [ -n "${MATCH_GIT_BASIC_AUTHORIZATION:-}" ]; then
+    GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.extraHeader \
+      GIT_CONFIG_VALUE_0="Authorization: Basic $MATCH_GIT_BASIC_AUTHORIZATION" \
+      git ls-remote --exit-code "$GIT_URL"
+  else
+    git ls-remote --exit-code "$GIT_URL"
+  fi
+}
+
+if ! ls_remote >/dev/null 2>"$LS_REMOTE_ERR"; then
   echo "FAIL: could not reach '$GIT_URL' - $(head -1 "$LS_REMOTE_ERR")" >&2
   exit 1
 fi

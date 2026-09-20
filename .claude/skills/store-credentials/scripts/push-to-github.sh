@@ -20,13 +20,21 @@
 # refused. The leading word is the caller's *claimed* class; it is checked
 # against this script's own class table, which is authoritative.
 #
+# Every path the caller hands over - the --from-env-file path itself and
+# every `@file=` path inside it - must be `git check-ignore`d or outside any
+# git repository, the same rule new-upload-keystore.sh applies to the files
+# it writes; anything git could track is refused (exit 2) by name.
+#
 # Exit codes: 0 ok (an apply that set everything; a plan; a verify that
 # found nothing missing for an enabled toggle), 1 an apply stopped after
-# `gh` failed on some name (remaining names are left unset), or a verify
-# found something missing, 2 refused (wrong class, or the production url
-# case in sibling scripts), 3 verify found no toggle enabled - nothing to
-# verify, 64 usage (including --apply without --yes, an unknown name, a
-# duplicate name, and a malformed env-file line).
+# `gh` failed on some name (remaining names are left unset), a verify found
+# something missing, or a `gh variable list`/`gh secret list` failed (set
+# cannot be told from missing, so neither --plan nor --verify may guess),
+# 2 refused (wrong class, or a credential path git could track), 3 an apply
+# with an env file holding no entries, or a verify that found no toggle
+# enabled - nothing to do, 64 usage (including --apply without --yes or
+# without --from-env-file, an unknown or duplicate name, a malformed
+# env-file line, and a missing --from-env-file or @file= path).
 
 set -uo pipefail
 
@@ -134,10 +142,29 @@ GH_ENV_ARGS=()
 # value bytes - needed because a NAME@file= entry can be multi-line).
 ENTRY_NAMES=()
 ENTRY_VALUE_FILES=()
+
+# Refuse any credential-carrying path git could track: it must be covered by
+# .gitignore, or sit outside a git repository altogether. Same rule as
+# new-upload-keystore.sh's --out check, for the same reason - a credential
+# committed to history is unrecoverable.
+assert_untrackable() {
+  local label="$1" path="$2" dir
+  case "$path" in
+    /*) : ;;
+    *) path="$PWD/$path" ;;
+  esac
+  dir="$(dirname "$path")"
+  while [ ! -d "$dir" ]; do dir="$(dirname "$dir")"; done
+  git -C "$dir" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
+  git -C "$dir" check-ignore -q -- "$path" ||
+    die_refused "$label ($path) is inside a git repository and not covered by .gitignore - keep credential files outside the repository (\$TMPDIR) or under an ignored path"
+}
+
 if [ -n "$FROM_ENV_FILE" ]; then
   [ -f "$FROM_ENV_FILE" ] || die_usage "--from-env-file not found: $FROM_ENV_FILE"
+  assert_untrackable "--from-env-file" "$FROM_ENV_FILE"
   ENTRY_DIR="$(mktemp -d "${TMPDIR:-/tmp}/push-to-github.values.XXXXXX")"
-  trap 'rm -rf "$ENTRY_DIR"' EXIT
+  trap 'rm -rf "$ENTRY_DIR"' EXIT INT TERM HUP
   LINE_NO=0
   ENTRY_INDEX=0
   while IFS= read -r LINE || [ -n "$LINE" ]; do
@@ -158,6 +185,7 @@ if [ -n "$FROM_ENV_FILE" ]; then
       NAME="${BASH_REMATCH[1]}"
       SRC_FILE="${BASH_REMATCH[2]}"
       [ -f "$SRC_FILE" ] || die_usage "--from-env-file line $LINE_NO: @file path not found: $SRC_FILE"
+      assert_untrackable "--from-env-file line $LINE_NO: @file path" "$SRC_FILE"
       cp "$SRC_FILE" "$VALUE_FILE"
     elif [[ "$REST" =~ ^([A-Za-z0-9_]+)=(.*)$ ]]; then
       NAME="${BASH_REMATCH[1]}"
@@ -222,24 +250,44 @@ process.stdin.on("end", () => {
 });
 ' "$1"; }
 
-remote_variables_json() { gh variable list "${GH_REPO_ARGS[@]+"${GH_REPO_ARGS[@]}"}" --json name,value 2>/dev/null; }
-remote_secrets_json() { gh secret list "${GH_REPO_ARGS[@]+"${GH_REPO_ARGS[@]}"}" "${GH_ENV_ARGS[@]+"${GH_ENV_ARGS[@]}"}" --json name 2>/dev/null; }
-
+# A failing `gh … list` is fatal, never an empty list: with no listing, a
+# name that is already set cannot be told from one that is missing, so
+# --plan would report everything missing and --verify would claim there is
+# nothing to verify. Both listings are fetched once here, in the top-level
+# shell (a `gh` failure inside a command substitution could only exit its
+# own subshell), and every later lookup reads these caches.
+VARIABLES_JSON=""
+SECRETS_JSON=""
 REMOTE_VARIABLE_NAMES_CACHE=""
 REMOTE_SECRET_NAMES_CACHE=""
+load_remote_listings() {
+  local out
+  out="$(gh variable list "${GH_REPO_ARGS[@]+"${GH_REPO_ARGS[@]}"}" --json name,value 2>/dev/null)" || {
+    echo "FATAL: gh variable list failed - cannot tell set from missing" >&2
+    exit 1
+  }
+  VARIABLES_JSON="$out"
+  out="$(gh secret list "${GH_REPO_ARGS[@]+"${GH_REPO_ARGS[@]}"}" "${GH_ENV_ARGS[@]+"${GH_ENV_ARGS[@]}"}" --json name 2>/dev/null)" || {
+    echo "FATAL: gh secret list failed - cannot tell set from missing" >&2
+    exit 1
+  }
+  SECRETS_JSON="$out"
+  REMOTE_VARIABLE_NAMES_CACHE="$(printf '%s' "$VARIABLES_JSON" | json_to_names)"$'\n'
+  REMOTE_SECRET_NAMES_CACHE="$(printf '%s' "$SECRETS_JSON" | json_to_names)"$'\n'
+}
+
 remote_has() {
   local class="$1" name="$2"
   if [ "$class" = "variable" ]; then
-    [ -n "$REMOTE_VARIABLE_NAMES_CACHE" ] || REMOTE_VARIABLE_NAMES_CACHE="$(remote_variables_json | json_to_names)"$'\n'
     printf '%s' "$REMOTE_VARIABLE_NAMES_CACHE" | grep -qx "$name"
   else
-    [ -n "$REMOTE_SECRET_NAMES_CACHE" ] || REMOTE_SECRET_NAMES_CACHE="$(remote_secrets_json | json_to_names)"$'\n'
     printf '%s' "$REMOTE_SECRET_NAMES_CACHE" | grep -qx "$name"
   fi
 }
 
 # --- --plan ------------------------------------------------------------------
 if [ "$MODE" = "plan" ]; then
+  load_remote_listings
   for name in $VARIABLE_NAMES $SECRET_NAMES; do
     class="$(class_of "$name")"
     if remote_has "$class" "$name"; then
@@ -261,7 +309,7 @@ fi
 if [ "$MODE" = "verify" ]; then
   ANY_ENABLED=0
   ANY_MISSING=0
-  VARIABLES_JSON="$(remote_variables_json)"
+  load_remote_listings
 
   while IFS='|' read -r toggle needs; do
     [ -n "$toggle" ] || continue

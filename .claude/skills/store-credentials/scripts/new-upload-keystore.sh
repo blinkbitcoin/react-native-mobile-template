@@ -123,14 +123,19 @@ export ANDROID_UPLOAD_KEYSTORE_PASSWORD ANDROID_UPLOAD_KEY_PASSWORD
 (umask 077 && printf '%s' "$ANDROID_UPLOAD_KEY_PASSWORD" >"$KEYPASS_FILE")
 
 rm -f "$OUT"
+# keytool's own output goes to a scratch directory, never next to the
+# keystore: $OUT_DIR is a repo path, and a log there is one more file the
+# .gitignore check above never cleared.
+KEYTOOL_LOG_DIR="$(mktemp -d "${TMPDIR:-/tmp}/new-upload-keystore.XXXXXX")"
+KEYTOOL_LOG="$KEYTOOL_LOG_DIR/keytool.log"
 if ! keytool -genkeypair -keyalg RSA -keysize 2048 -storetype JKS \
   -keystore "$OUT" -alias "$ALIAS" \
   -storepass:env ANDROID_UPLOAD_KEYSTORE_PASSWORD -keypass:env ANDROID_UPLOAD_KEY_PASSWORD \
-  -validity "$VALIDITY" -dname "$DNAME" >"$OUT_DIR/.new-upload-keystore.log" 2>&1; then
-  echo "FATAL: keytool -genkeypair failed - see $OUT_DIR/.new-upload-keystore.log" >&2
+  -validity "$VALIDITY" -dname "$DNAME" >"$KEYTOOL_LOG" 2>&1; then
+  echo "FATAL: keytool -genkeypair failed - see $KEYTOOL_LOG" >&2
   exit 1
 fi
-rm -f "$OUT_DIR/.new-upload-keystore.log"
+rm -rf "$KEYTOOL_LOG_DIR"
 
 LIST_OUT="$(keytool -list -v -keystore "$OUT" -alias "$ALIAS" -storepass:env ANDROID_UPLOAD_KEYSTORE_PASSWORD 2>/dev/null)"
 SHA256="$(printf '%s\n' "$LIST_OUT" | sed -nE 's/^[[:space:]]*SHA256: (.*)$/\1/p' | head -1)"

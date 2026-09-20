@@ -249,11 +249,16 @@ check_ios() {
   # review_information: all-or-nothing.
   local ri="$ios_dir/review_information"
   if [ -d "$ri" ]; then
+    # Counted against the fixed seven names, not against the files that
+    # happen to exist: with demo_password.txt deleted, counting only
+    # existing files reads six-of-six as "all filled" and lets a
+    # half-filled review contact through.
     local total=0 nonempty=0 f
     for f in first_name last_name phone_number email_address demo_user demo_password notes; do
-      [ -f "$ri/$f.txt" ] || continue
       total=$((total + 1))
-      [ -s "$ri/$f.txt" ] && nonempty=$((nonempty + 1))
+      if [ -f "$ri/$f.txt" ] && [ -s "$ri/$f.txt" ]; then
+        nonempty=$((nonempty + 1))
+      fi
     done
     if [ "$nonempty" -gt 0 ] && [ "$nonempty" -lt "$total" ]; then
       add_violation "$(rel "$ri")" "review_information is partially filled - all fields or none"

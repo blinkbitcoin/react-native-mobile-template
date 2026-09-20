@@ -64,7 +64,7 @@ exactly these fields, in this order: `Console:`, `Click-path:`, `Enter:`,
 **Confirm:** safe — an empty private repo carries no certificates yet; `fastlane match` is what makes it sensitive, and that runs under `cred-match`
 **Browser mode:** after an explicit yes, create the repository (private, empty) and report the URL
 **Guided mode:** print the exact `gh repo create <owner>/<slug>-certificates --private` line for the human to run
-**Then:** `state.sh set apple-match-repo done`; next `cred-match`
+**Then:** `state.sh note production_match_git_url <url of the PRODUCTION app's match repo, if this team has one>`; `state.sh set apple-match-repo done`; next `cred-match`
 
 ### `apple-testflight-groups` — TestFlight tester groups
 **Console:** App Store Connect — https://appstoreconnect.apple.com

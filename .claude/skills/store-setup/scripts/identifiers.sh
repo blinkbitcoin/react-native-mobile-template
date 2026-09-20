@@ -11,8 +11,9 @@
 #   and cross-checks them against REPO_ROOT/app.config.ts and
 #   REPO_ROOT/package.json.
 #
-# Exit codes: 0 all assertions pass, 2 one or more failed (remedy printed),
-# 64 usage.
+# Exit codes: 0 all assertions pass, 1 the check could not run (not inside a
+# git repo, `gh variable list` failed, or app.config.ts/package.json is
+# missing), 2 one or more assertions failed (remedy printed), 64 usage.
 
 set -uo pipefail
 
