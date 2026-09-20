@@ -362,6 +362,10 @@ check "SKILL.md checklist ids match state.sh --list-steps exactly, in order" "" 
 check "modes.md carries the mode prompt verbatim too" "yes" \
   "$(grep -qF 'Store setup is roughly forty console steps across two consoles, some irreversible.' "$MODES_MD" && echo yes || echo no)"
 check "modes.md carries the always-confirm table too" "yes" "$(grep -q 'Play App Signing' "$MODES_MD" && echo yes || echo no)"
+# The two always-confirm tables must be byte-identical: a row added to one and
+# not the other is a gate the other document does not know about.
+check "the always-confirm table in SKILL.md and modes.md is byte-identical" "" \
+  "$(diff <(sed -n '/^| Step | Why |/,/^$/p' "$SKILL_MD") <(sed -n '/^| Step | Why |/,/^$/p' "$MODES_MD"))"
 check "modes.md documents login walls and 2FA" "yes" "$(grep -qi '2FA' "$MODES_MD" && echo yes || echo no)"
 check "modes.md refuses 'I picked (a), just accept it' by example" "yes" \
   "$(grep -qF 'just accept it' "$MODES_MD" && echo yes || echo no)"

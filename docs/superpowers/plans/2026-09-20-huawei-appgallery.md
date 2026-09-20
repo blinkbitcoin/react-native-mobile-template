@@ -1,5 +1,12 @@
 # Huawei AppGallery support: lane, secrets, documentation, skills, visual guide
 
+> Superseded in four places during implementation: the optional
+> `HUAWEI_SUBMIT_DELAY_SECONDS` variable is also passed through `env-json` and
+> listed in `push-to-github.sh` (31 variables, 23 secrets, not 30/23); the
+> plugin's app-info helper can return `false` as well as `nil`, so the blank
+> check covers both; the submit delay is validated before the credential
+> pre-flight; and the lane's comments spell out "Android App Bundle".
+
 ## Context
 
 The template family releases to Apple and Google. Huawei AppGallery is today a stub: `fastlane/lanes/future.rb` has an `upload_huawei` lane that raises "Not implemented", `docs/store-accounts.md` has a "Not implemented" Huawei section, and the runbook lists Huawei under "Future stores". Jonas asked to "add huwei appstore support as well + documentation + add to the visual guide". Decisions made:

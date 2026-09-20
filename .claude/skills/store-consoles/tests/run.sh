@@ -75,7 +75,7 @@ LIST_IDS="$(FAKE_GH_VARS="$VARS_PLACEHOLDER" "$CONSOLE_STEP" --list)"
 echo
 echo "console-step.sh --list"
 
-check "--list equals the apple-*/google-* ids in state.sh --list-steps, in order" "" \
+check "--list equals the apple-*/google-*/huawei-* ids in state.sh --list-steps, in order" "" \
   "$(diff <(printf '%s\n' "$LIST_IDS") <(printf '%s\n' "$VOCABULARY_IDS"))"
 
 EXPECTED_IDS="$LIST_IDS"
@@ -201,10 +201,14 @@ check "an unknown --format exits 64" "64" "$?"
 echo
 echo "no credentials in the reference files"
 
-check "neither reference file contains 'com.example'" "no" \
-  "$(grep -ql 'com\.example' "$APPLE_MD" "$GOOGLE_MD" >/dev/null 2>&1 && echo yes || echo no)"
-check "neither reference file contains a literal password value" "no" \
-  "$(grep -qE '\bpassword: [^A-Za-z_<`]' "$APPLE_MD" "$GOOGLE_MD" >/dev/null 2>&1 && echo yes || echo no)"
+check "no reference file contains 'com.example'" "no" \
+  "$(grep -ql 'com\.example' "$APPLE_MD" "$GOOGLE_MD" "$HUAWEI_MD" >/dev/null 2>&1 && echo yes || echo no)"
+check "no reference file contains a literal password value" "no" \
+  "$(grep -qE '\bpassword: [^A-Za-z_<`]' "$APPLE_MD" "$GOOGLE_MD" "$HUAWEI_MD" >/dev/null 2>&1 && echo yes || echo no)"
+# The Huawei take-away is a pasted secret string, so the file that documents it
+# is the one most likely to gain an example value.
+check "the Huawei reference names the secret only by its variable name" "no" \
+  "$(grep -qE 'client[ _]secret: [0-9a-fA-F]{8,}' "$HUAWEI_MD" >/dev/null 2>&1 && echo yes || echo no)"
 
 echo
 echo "SKILL.md"

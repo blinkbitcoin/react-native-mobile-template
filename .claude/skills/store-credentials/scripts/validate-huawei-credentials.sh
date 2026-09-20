@@ -202,7 +202,7 @@ let body;
 try {
   body = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
 } catch (e) {
-  process.stdout.write("bad-json\t" + e.message);
+  process.stdout.write("bad-json\tthe response was not JSON"); // never e.message: it quotes the unparsed body
   process.exit(0);
 }
 const ret = body.ret || {};
@@ -266,7 +266,7 @@ let body;
 try {
   body = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
 } catch (e) {
-  process.stdout.write("bad-json\t" + e.message);
+  process.stdout.write("bad-json\tthe response was not JSON"); // never e.message: it quotes the unparsed body
   process.exit(0);
 }
 const ret = body.ret || {};
