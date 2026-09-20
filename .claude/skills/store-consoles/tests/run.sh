@@ -14,6 +14,7 @@ CONSOLE_STEP="$SKILL_DIR/scripts/console-step.sh"
 SKILL_MD="$SKILL_DIR/SKILL.md"
 APPLE_MD="$SKILL_DIR/references/apple.md"
 GOOGLE_MD="$SKILL_DIR/references/google.md"
+HUAWEI_MD="$SKILL_DIR/references/huawei.md"
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/store-consoles-tests.XXXXXX")"
 PASS=0
@@ -68,7 +69,7 @@ export STORE_SETUP_DIR="$WORK/no-state"
 # would let the two drift apart silently, which is the only way these ids can
 # go wrong.
 STATE_SH="$(cd "$SKILL_DIR/../store-setup/scripts" && pwd)/state.sh"
-VOCABULARY_IDS="$("$STATE_SH" --list-steps | grep -E '^(apple|google)-')"
+VOCABULARY_IDS="$("$STATE_SH" --list-steps | grep -E '^(apple|google|huawei)-')"
 LIST_IDS="$(FAKE_GH_VARS="$VARS_PLACEHOLDER" "$CONSOLE_STEP" --list)"
 
 echo
@@ -95,14 +96,14 @@ echo
 echo "reference headings match --list, both directions"
 
 # shellcheck disable=SC2016 # the patterns are literal regexes, not shell expansions
-HEADING_IDS="$(grep -ohE '^### `[a-z0-9-]+`' "$APPLE_MD" "$GOOGLE_MD" | sed -E 's/^### `//; s/`$//')"
+HEADING_IDS="$(grep -ohE '^### `[a-z0-9-]+`' "$APPLE_MD" "$GOOGLE_MD" "$HUAWEI_MD" | sed -E 's/^### `//; s/`$//')"
 check "every reference heading is in --list, and every --list id has a heading" "" \
   "$(diff <(printf '%s\n' "$EXPECTED_IDS") <(printf '%s\n' "$HEADING_IDS"))"
 
 echo
 echo "confirm classes"
 
-CONFIRM_CLASSES="$(grep -ohE '^\*\*Confirm:\*\* [a-z]+' "$APPLE_MD" "$GOOGLE_MD" | sed -E 's/^\*\*Confirm:\*\* //' | sort -u)"
+CONFIRM_CLASSES="$(grep -ohE '^\*\*Confirm:\*\* [a-z]+' "$APPLE_MD" "$GOOGLE_MD" "$HUAWEI_MD" | sed -E 's/^\*\*Confirm:\*\* //' | sort -u)"
 check "confirm classes are exactly safe|paid|binding|irreversible|permanent" \
   "binding
 irreversible
@@ -123,10 +124,17 @@ apple-bundle-id
 apple-asc-key
 google-account
 google-play-app-signing
-google-pricing" "$NON_SAFE_IDS"
+google-pricing
+huawei-account
+huawei-app-record
+huawei-api-client
+huawei-app-signing" "$NON_SAFE_IDS"
 
 check "google-app-record is safe, and says why in its own block" "yes" \
   "$(awk '/^### `google-app-record`/{f=1} f && /^### `/ && !/google-app-record/{exit} f' "$GOOGLE_MD" | grep -qi 'first upload' && echo yes || echo no)"
+
+check "huawei-listing is safe, and its block says the lane's submit is the public step" "yes" \
+  "$(awk '/^### `huawei-listing`/{f=1} f && /^### `/ && !/huawei-listing/{exit} f' "$HUAWEI_MD" | grep -qi 'submit' && echo yes || echo no)"
 
 echo
 echo "value resolution"

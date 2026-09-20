@@ -23,6 +23,8 @@
 | Registering an Apple bundle identifier | Cannot be deleted once an app record uses it |
 | Creating an App Store Connect API key | The `.p8` downloads exactly once |
 | Submitting for App Review, or starting a Play production rollout | Public |
+| Enrolling the app in AppGallery App Signing | Permanent for that app |
+| Entering the package name on a new AppGallery app record | Fixes what that record can ever publish |
 | `fastlane match nuke` | Never. Not with a yes. It revokes team-wide certificates. |
 
 A yes to one row is not a yes to the next.

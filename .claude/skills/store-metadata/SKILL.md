@@ -18,6 +18,11 @@ the source of truth. Nothing reaches App Store Connect or Google Play
 without `check-metadata.sh` passing first — `sync.sh` runs it itself and
 refuses to call the lane if it fails.
 
+The Huawei AppGallery listing is **console-only and outside this skill** —
+nothing under `fastlane/metadata/**` reaches AppGallery, and the
+`huawei-listing` step in `store-consoles` is where those fields are filled in
+by hand.
+
 ### What sync owns, what CD owns per version, what stays console-only
 
 See `docs/release-runbook.md` "Store listing metadata" for the full table.

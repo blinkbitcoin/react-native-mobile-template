@@ -1,7 +1,7 @@
 ---
 name: store-credentials
-description: Use when creating, checking or wiring store credentials for this app - an App Store Connect API key, a fastlane match repository, an Android upload keystore, a Google Play service account, the App Review contact - or when deciding which of them go to GitHub as variables versus secrets.
-allowed-tools: Bash(gh variable:*), Bash(gh secret:*), Bash(.claude/skills/store-credentials/scripts/validate-asc-key.sh:*), Bash(.claude/skills/store-credentials/scripts/validate-keystore.sh:*), Bash(.claude/skills/store-credentials/scripts/validate-play-json.sh:*), Bash(.claude/skills/store-credentials/scripts/validate-match-repo.sh:*), Bash(.claude/skills/store-credentials/scripts/new-upload-keystore.sh:*), Bash(.claude/skills/store-credentials/scripts/push-to-github.sh:*), Bash(.claude/skills/store-credentials/tests/run.sh:*), Bash(.claude/skills/store-setup/scripts/state.sh:*)
+description: Use when creating, checking or wiring store credentials for this app - an App Store Connect API key, a fastlane match repository, an Android upload keystore, a Google Play service account, a Huawei AppGallery Connect API client, the App Review contact - or when deciding which of them go to GitHub as variables versus secrets.
+allowed-tools: Bash(gh variable:*), Bash(gh secret:*), Bash(.claude/skills/store-credentials/scripts/validate-asc-key.sh:*), Bash(.claude/skills/store-credentials/scripts/validate-keystore.sh:*), Bash(.claude/skills/store-credentials/scripts/validate-play-json.sh:*), Bash(.claude/skills/store-credentials/scripts/validate-match-repo.sh:*), Bash(.claude/skills/store-credentials/scripts/validate-huawei-credentials.sh:*), Bash(.claude/skills/store-credentials/scripts/new-upload-keystore.sh:*), Bash(.claude/skills/store-credentials/scripts/push-to-github.sh:*), Bash(.claude/skills/store-credentials/tests/run.sh:*), Bash(.claude/skills/store-setup/scripts/state.sh:*)
 ---
 
 # Store Credentials
@@ -9,8 +9,8 @@ allowed-tools: Bash(gh variable:*), Bash(gh secret:*), Bash(.claude/skills/store
 ## Overview
 
 This skill covers the `cred-*` ids in the `store-setup` checklist:
-`cred-asc-key`, `cred-match`, `cred-upload-keystore`, `cred-play-json`, and
-`cred-push`, the step that wires everything into GitHub.
+`cred-asc-key`, `cred-match`, `cred-upload-keystore`, `cred-play-json`,
+`cred-huawei`, and `cred-push`, the step that wires everything into GitHub.
 
 **Core principle:** every credential is validated for shape on this machine
 before a macOS minute is spent, and reaches GitHub only through stdin.
@@ -24,6 +24,11 @@ stdout.
 - `validate-play-json.sh --check-access` makes a real network call (fastlane
   asks Google to validate the service account) — confirm before running it,
   or pass `--yes`.
+- `validate-huawei-credentials.sh --check-access` makes a real network call
+  (it exchanges the client id and secret for an AppGallery Connect access
+  token, and with `--app-id` also looks the app record up) — confirm before
+  running it, or pass `--yes`. Its offline checks need no confirmation and no
+  network.
 - `push-to-github.sh --apply` changes the target repository's GitHub
   variables/secrets — confirm before running it; the script itself also
   refuses to run without `--yes`.
@@ -116,6 +121,52 @@ ANDROID_UPLOAD_KEYSTORE_PASSWORD=... ANDROID_UPLOAD_KEY_PASSWORD=... \
 Add `--check-access` (network — see Ask First) to also run fastlane's
 `validate_play_store_json_key` against it.
 
+### `cred-huawei` — Huawei AppGallery Connect API client
+
+With the numeric app id the `huawei-app-record` console step recorded as
+`state.facts.huawei_app_id`:
+
+```bash
+HUAWEI_CLIENT_ID=... HUAWEI_CLIENT_SECRET=... \
+  .claude/skills/store-credentials/scripts/validate-huawei-credentials.sh \
+  --app-id <numeric app id>
+```
+
+Both halves of the pair are read from the environment only — there is no
+`--client-id` or `--client-secret` option, and passing one is a usage error
+naming the environment variables instead. Offline it checks that the client
+id is all digits (warning under 15), that the secret is hexadecimal and at
+least 32 characters, that neither is a placeholder or a copy of the other,
+that neither carries whitespace a paste picked up, and that `--app-id` is a
+numeric app id with no leading zero — which is what catches a package name
+pasted into `HUAWEI_APP_ID`. No value is ever echoed: failures report lengths
+and character classes only.
+
+Add `--check-access` (network — see Ask First) to exchange the pair for an
+access token. That call is worth making: the fastlane plugin's own
+`get_token` returns nothing on an authentication error and the upload action
+then only prints "Cannot retrieve token", so a wrong secret in CI is a green
+job that uploaded nothing. A 200 response whose body carries `ret.code != 0`
+counts as a failure here for the same reason.
+
+Then push all three names — the two secrets and the variable:
+
+```bash
+cat > "$TMPDIR/creds.env" <<'ENTRIES'
+secret HUAWEI_CLIENT_ID=<client id>
+secret HUAWEI_CLIENT_SECRET=<client secret>
+variable HUAWEI_APP_ID=<numeric app id>
+ENTRIES
+.claude/skills/store-credentials/scripts/push-to-github.sh \
+  --apply --yes --from-env-file "$TMPDIR/creds.env"
+rm -f "$TMPDIR/creds.env"
+```
+
+`HUAWEI_UPLOADS_ENABLED` is not pushed here — it is the `toggle-huawei`
+step's job, after the listing and the App Signing decision are settled, and
+`push-to-github.sh --verify` is what then checks the pair and the app id are
+all present.
+
 ### `cred-push` — wire everything into GitHub
 
 ```bash
@@ -154,7 +205,7 @@ and everything else is a secret, including all seven `APP_REVIEW_*` values
 (a reviewer demo login is a real credential, even though the lanes also
 accept it through `env-json`-style input elsewhere).
 
-| | Variables (28) | Secrets (21) |
+| | Variables (31) | Secrets (23) |
 |---|---|---|
 | Visible in logs | Yes | No (masked) |
 | Set with | `gh variable set NAME --body-file -` | `gh secret set NAME --body-file -` |
