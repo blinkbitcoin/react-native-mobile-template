@@ -166,6 +166,18 @@ out=$(STORE_SETUP_DIR="$STORE_WITH_FACT" FAKE_GH_VARS="$VARS_PLACEHOLDER" "$CONS
 check "google-play-grant prints the fact's service account email" "yes" \
   "$(printf '%s' "$out" | grep -qF 'svc@example-project.iam.gserviceaccount.com' && echo yes || echo no)"
 
+VARS_TESTFLIGHT="$WORK/vars-testflight.json"
+cat >"$VARS_TESTFLIGHT" <<'EOF'
+[{"name":"TESTFLIGHT_INTERNAL_GROUP","value":"Internal QA"},{"name":"TESTFLIGHT_EXTERNAL_GROUP","value":"Beta Testers"}]
+EOF
+out=$(FAKE_GH_VARS="$VARS_TESTFLIGHT" "$CONSOLE_STEP" apple-testflight-groups)
+check "apple-testflight-groups prints both gh variable names when set" "yes" \
+  "$(printf '%s' "$out" | grep -qF 'internal=Internal QA, external=Beta Testers' && echo yes || echo no)"
+
+out=$(FAKE_GH_VARS="$VARS_PLACEHOLDER" "$CONSOLE_STEP" apple-testflight-groups)
+check "apple-testflight-groups asks the human when neither gh variable is set" "yes" \
+  "$(printf '%s' "$out" | grep -qF 'Resolved: TESTFLIGHT_INTERNAL_GROUP/TESTFLIGHT_EXTERNAL_GROUP (gh variables) -> <ask the human>' && echo yes || echo no)"
+
 echo
 echo "credential refusal under --format json"
 
