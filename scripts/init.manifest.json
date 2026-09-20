@@ -129,7 +129,18 @@
       ".github/CODEOWNERS",
       ".github/ISSUE_TEMPLATE/*.yml",
       "deploy/ota/*",
-      "CHANGELOG.md"
+      "CHANGELOG.md",
+      ".claude/skills/README.md",
+      ".claude/skills/store-setup/SKILL.md",
+      ".claude/skills/store-setup/references/*.md",
+      ".claude/skills/store-setup/scripts/*.sh",
+      ".claude/skills/store-consoles/SKILL.md",
+      ".claude/skills/store-consoles/references/*.md",
+      ".claude/skills/store-consoles/scripts/*.sh",
+      ".claude/skills/store-credentials/SKILL.md",
+      ".claude/skills/store-credentials/scripts/*.sh",
+      ".claude/skills/store-metadata/SKILL.md",
+      ".claude/skills/store-metadata/scripts/*.sh"
     ]
   },
   "web": {

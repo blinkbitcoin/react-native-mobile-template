@@ -153,8 +153,11 @@ PKG_JSON="$REPO_ROOT/package.json"
   exit 1
 }
 PKG_NAME="$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).name || "")' "$PKG_JSON")"
+# Matched as a suffix, not the literal template default name: `make init`'s
+# token rename would otherwise rewrite the literal string here too, and this
+# check would then compare PKG_NAME against the app's own new name.
 case "$PKG_NAME" in
-  react-native-mobile-template | rn-mobile-template)
+  *-mobile-template)
     say_fail "package.json name is still the template default ('$PKG_NAME')" "make init"
     ;;
   *)
