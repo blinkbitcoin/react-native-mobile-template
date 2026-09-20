@@ -60,6 +60,8 @@ follow-up is a post-upload app-info assertion that the release state moved.
   and the toggle is the real switch.
 - **The beta tier as well** — rejected: no one has asked for a Huawei test
   track, and each extra tier is another job and another review queue to watch.
+  Revisited by [0020](0020-huawei-joins-every-tier.md) (2026-09-21): parity was
+  asked for, and AppGallery's single version slot makes a tier a submit flag.
 - **A hand-written AppGallery Publishing API client in Ruby** — rejected: more
   code to own and keep current than a pinned community plugin, for the same two
   calls. It stays the fallback if the plugin is abandoned.
