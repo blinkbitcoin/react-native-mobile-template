@@ -85,6 +85,7 @@ STUBBED_FASTLANE_ACTIONS = %i[
   setup_ci app_store_connect_api_key google_play_track_version_codes
   latest_testflight_build_number get_version_number get_build_number
   get_info_plist_value download_dsyms
+  huawei_appgallery_connect huawei_appgallery_connect_get_app_info
 ].freeze
 
 {
@@ -100,7 +101,9 @@ STUBBED_FASTLANE_ACTIONS = %i[
   latest_testflight_build_number: 0,
   get_version_number: '1.2.3',
   get_build_number: '42',
-  download_dsyms: nil
+  download_dsyms: nil,
+  huawei_appgallery_connect: nil,
+  huawei_appgallery_connect_get_app_info: { 'appName' => 'Stub' }
 }.each do |action, result|
   Object.send(:define_method, action) do |**args|
     $calls << [action, args]

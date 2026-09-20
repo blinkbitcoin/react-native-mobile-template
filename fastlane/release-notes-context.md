@@ -31,6 +31,7 @@ Other locales fall back to `en-US` on both stores until translated notes exist.
 | App Store | release notes ("What's New") | 4000 characters |
 | App Store | promotional text | 170 characters |
 | Google Play | changelog | 500 characters |
+| Huawei AppGallery | changelog | 300 characters, 10 minimum |
 
 `store_notes(limit)` truncates at a word boundary and appends
 ` [+more on GitHub]` (18 characters, reserved from the limit) when the notes are
