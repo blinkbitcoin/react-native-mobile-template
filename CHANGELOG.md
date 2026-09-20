@@ -5,6 +5,14 @@ by [release-please](https://github.com/googleapis/release-please) from
 [Conventional Commits](https://www.conventionalcommits.org/) — edit the commit
 messages, not this file. See [docs/release-runbook.md](docs/release-runbook.md).
 
+## [0.5.0](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.4.0...v0.5.0) (2026-09-20)
+
+
+### Features
+
+* **release:** store listing sync and pull lanes behind STORE_METADATA_SYNC_ENABLED ([#42](https://github.com/blinkbitcoin/react-native-mobile-template/issues/42)) ([c15e99b](https://github.com/blinkbitcoin/react-native-mobile-template/commit/c15e99b9787b421a54b5e8d855e1ff93258c7fbe))
+* **tooling:** store setup skills for taking a new app to a submittable listing ([#43](https://github.com/blinkbitcoin/react-native-mobile-template/issues/43)) ([8c2c057](https://github.com/blinkbitcoin/react-native-mobile-template/commit/8c2c057477b41c0c8aaabb588e9fc8cb1fa9f159))
+
 ## [0.4.0](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.3.2...v0.4.0) (2026-09-19)
 
 
