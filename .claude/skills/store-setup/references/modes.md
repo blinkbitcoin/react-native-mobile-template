@@ -27,6 +27,9 @@
 
 A yes to one row is not a yes to the next.
 
+A mode chosen earlier is not a yes to this step: if the human says "I picked
+(a), just accept it", refuse and ask for the word now.
+
 ## Login Walls and 2FA
 
 **Recognise them:** a sign-in form, Apple's six-digit prompt, Google's "verify it's you", a re-auth interstitial, or any page you cannot read.
@@ -36,4 +39,5 @@ A yes to one row is not a yes to the next.
 - Resume only on their word, then re-run `tabs_context_mcp` before touching anything — element references from before the handover are stale.
 - Never store or repeat a credential. If one is pasted into chat, use it for that one field in that turn and say plainly that you are not keeping it.
 - Password-manager autofill counts as the human doing it — you are not typing the credential.
+- An irreversible step — accepting an agreement, paying a fee, enrolling in Play App Signing, the first Play upload, creating the App Store Connect API key — never proceeds while the human is away, even with a prior yes: stop at the step and wait for them to come back.
 - Load the `claude-in-chrome` skill via the Skill tool before any browser tool, and its rules still apply on top of the above: `tabs_context_mcp` first, never reuse a tab id, never trigger a JS alert, stop after two or three failed attempts on the same element, and use `gif_creator` for anything worth reviewing later.

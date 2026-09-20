@@ -1,15 +1,17 @@
 ---
 name: store-metadata
 description: Use when filling or checking the store listing this app ships in fastlane/metadata - description, keywords, URLs, categories, age rating, review contact, screenshots, icon and feature graphic - or when pushing that listing to App Store Connect and Google Play with the sync_metadata lane, or seeding it from the consoles with pull_metadata.
-allowed-tools: Bash(.claude/skills/store-metadata/scripts/*.sh *) Bash(.claude/skills/store-metadata/tests/run.sh) Bash(bundle exec fastlane *)
+allowed-tools: Bash(bundle exec fastlane:*), Bash(.claude/skills/store-metadata/scripts/scaffold.sh:*), Bash(.claude/skills/store-metadata/scripts/check-metadata.sh:*), Bash(.claude/skills/store-metadata/scripts/place-images.sh:*), Bash(.claude/skills/store-metadata/scripts/age-rating.sh:*), Bash(.claude/skills/store-metadata/scripts/sync.sh:*), Bash(.claude/skills/store-metadata/tests/run.sh:*), Bash(.claude/skills/store-setup/scripts/state.sh:*)
 ---
 
 # Store Metadata
 
 ## Overview
 
-This skill covers the `meta-*` ids in the `store-setup` checklist: filling
-in, validating, and pushing the public store listing.
+This skill covers the `meta-*` ids in the `store-setup` checklist:
+`meta-scaffold`, `meta-ios-copy`, `meta-android-copy`, `meta-images`,
+`meta-age-rating`, `meta-review-info`, and `meta-sync` — filling in,
+validating, and pushing the public store listing.
 
 **Core principle:** `fastlane/metadata/**` and `fastlane/screenshots/` are
 the source of truth. Nothing reaches App Store Connect or Google Play
@@ -46,7 +48,7 @@ In short:
 STORE_METADATA_SYNC_ENABLED=true .claude/skills/store-metadata/scripts/sync.sh both --yes
 ```
 
-## Three Facts From The Runbook You Must Not Miss
+## Four Facts From The Runbook You Must Not Miss
 
 1. **A blank field cannot be pushed from the tree.** The staged copy drops
    zero-byte `.txt` files before either lane runs — `supply`/`deliver` treat
@@ -62,7 +64,13 @@ STORE_METADATA_SYNC_ENABLED=true .claude/skills/store-metadata/scripts/sync.sh b
    version; name, subtitle, keywords, the privacy URL and screenshots need a
    version in "Prepare for Submission" and never push in live mode.
 
-## After Editing The Scripts
+4. **`release_notes.txt` must be non-empty for the gate even though sync
+   never pushes it.** CD writes the release notes per version, so the file's
+   content on disk is never what ships — but `check-metadata.sh` still
+   requires it to be filled, because an empty one is the shape a
+   half-scaffolded tree has; do not relax the gate to work around it.
+
+## After Editing the Scripts
 
 Run `bash .claude/skills/store-metadata/tests/run.sh` and `make check`
 before committing. The category id list and iOS screenshot size list
@@ -85,20 +93,20 @@ hides real images from it and gets pushed as a bogus locale.
 
 ## Common Mistakes
 
-- Writing App Review contact details into `fastlane/metadata/ios/review_information/*.txt`
-  instead of the `APP_REVIEW_*` environment — those files must stay empty;
-  `review_information` is filled from the environment by the lane itself.
-- Adding `primary_category.txt` without the four sub-category files —
-  `deliver` clears any of the four that is absent, so ship all four (they
-  may be empty) or none.
-- Leaving the template's `Replace this text` placeholder in any `.txt` file
-  under `fastlane/metadata` — `check-metadata.sh` and the lane's own
-  `assert_metadata_ready!` (using the same `METADATA_PLACEHOLDER` literal
-  from `fastlane/lanes/shared.rb`) both refuse it.
-- Running `sync.sh` for real without `--dry-run` first.
+| Mistake | Consequence |
+|---|---|
+| Writing App Review contact details into `fastlane/metadata/ios/review_information/*.txt` instead of the `APP_REVIEW_*` environment | Those files must stay empty; `review_information` is filled from the environment by the lane itself, and a filled-in file is a committed reviewer credential |
+| Adding `primary_category.txt` without the four sub-category files | `deliver` clears any of the four that is absent, so ship all four (they may be empty) or none |
+| Leaving the template's `Replace this text` placeholder in any `.txt` file under `fastlane/metadata` | `check-metadata.sh` and the lane's own `assert_metadata_ready!` (the same `METADATA_PLACEHOLDER` literal from `fastlane/lanes/shared.rb`) both refuse it |
+| Running `sync.sh` for real without `--dry-run` first | The dry run is the only free rehearsal of a push that overwrites a live listing |
 
-## Red Flags
+## Red Flags — Stop
 
-**`check-metadata.sh` fails on one file and you are about to push anyway.**
-Stop. `sync.sh` will refuse on its own, but don't route around it by
-calling the `bundle exec fastlane <platform> sync_metadata` lane directly.
+- **`check-metadata.sh` fails on one file and you are about to push
+  anyway.** Stop. `sync.sh` refuses on its own, and don't route around it by
+  calling the `bundle exec fastlane <platform> sync_metadata` lane directly
+  — that lane refuses on its own too, when `STORE_METADATA_SYNC_ENABLED` is
+  off or the `Replace this text` placeholder is present, so bypassing the
+  script does not bypass the gate; and a first Play upload carrying
+  placeholder text fixes the package name forever while the listing is
+  wrong.

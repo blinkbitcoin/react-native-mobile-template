@@ -1,7 +1,7 @@
 ---
 name: store-setup
 description: Use when a newly generated app from this template needs real store accounts - taking the release pipeline from unsigned builds to a submittable App Store Connect and Google Play listing, wiring the signing and store secrets, or resuming a half-finished store setup. Also when asked to turn on IOS_SIGNING_ENABLED, ANDROID_SIGNING_ENABLED or STORE_UPLOADS_ENABLED.
-allowed-tools: Bash(gh variable *) Bash(gh secret *) Bash(gh repo view *) Bash(gh auth status) Bash(bundle exec fastlane *) Bash(.claude/skills/store-*/scripts/*.sh *) Bash(.claude/skills/store-*/tests/run.sh)
+allowed-tools: Bash(gh variable:*), Bash(gh secret:*), Bash(gh repo view:*), Bash(gh auth status), Bash(bundle exec fastlane:*), Bash(.claude/skills/store-setup/scripts/preflight.sh:*), Bash(.claude/skills/store-setup/scripts/identifiers.sh:*), Bash(.claude/skills/store-setup/scripts/state.sh:*), Bash(.claude/skills/store-setup/tests/run.sh:*)
 ---
 
 # Store Setup
@@ -66,7 +66,8 @@ A yes to one row is not a yes to the next.
 1. **Preflight and state.** Run `preflight.sh` to confirm the local tooling
    and `gh`/fastlane auth are in place, then `state.sh init` and
    `state.sh mode <guided|browser-pause|browser-full>` to record how much of
-   the browser work you are driving.
+   the browser work you are driving. In modes (a) and (c), load the
+   `claude-in-chrome` skill via the Skill tool before any browser tool.
 2. **The identifiers gate.** `identifiers.sh` must pass before any console
    work starts. Google Play refuses `com.example.*` outright, and an App
    Store Connect app record is permanent once created. The remedy for a
@@ -173,5 +174,9 @@ anything in `scripts/`, and again as part of `make check` before committing.
 - About to type `match nuke` in any form, dry-run or not
 - About to type a password, PIN or 2FA code the human did not just give you
 - About to run `state.sh note` with a value that looks like a secret
+- About to put a value in `state.sh set <id> <status> [note]`'s free-text
+  note: that text is not screened at all (only `note`'s *key* is), so never
+  put a value there — a fact goes to `state.sh note`, a credential to
+  `gh secret set`
 - About to do the first Play upload and `identifiers.sh` has not passed
 - You are about to click Accept on an agreement, pay a fee, or enrol in Play App Signing and you have not had an explicit yes in this turn
