@@ -14,6 +14,21 @@ $calls = []
 # "TestFlight already has build 42" without redefining the stub.
 $stub_results = {}
 
+# One entry per stubbed action call that carries a metadata_path: the sorted,
+# relative file list staged at call time.
+$metadata_snapshots = []
+
+# Recorded next to the arguments: a lane that stages a copy of the metadata
+# tree deletes it the moment the action returns, so the tree's *contents* at
+# call time are observable only from inside the stub.
+def snapshot_metadata!(args)
+  path = args[:metadata_path]
+  return if path.nil? || !Dir.exist?(path.to_s)
+
+  $metadata_snapshots << Dir.glob(File.join(path, '**', '*'))
+                            .map { |f| f.delete_prefix("#{path}/") }.sort
+end
+
 module UI
   class UserError < StandardError; end
 
@@ -48,6 +63,7 @@ end
 def reset_calls!
   $calls.clear
   $stub_results.clear
+  $metadata_snapshots.clear
 end
 
 def stub_result(action, value)
@@ -88,6 +104,7 @@ STUBBED_FASTLANE_ACTIONS = %i[
 }.each do |action, result|
   Object.send(:define_method, action) do |**args|
     $calls << [action, args]
+    snapshot_metadata!(args)
     $stub_results.fetch(action) { result }
   end
 end

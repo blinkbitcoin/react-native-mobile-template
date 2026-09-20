@@ -135,7 +135,11 @@ Answering "yes" keeps all of it, and `make e2e-web` keeps working.
 2. Create the `production` GitHub environment with required reviewers (see the
    same runbook) — it is what makes a store release a two-person action.
 3. Replace the placeholder assets in `assets/` and the store copy in
-   `fastlane/metadata/**`.
+   `fastlane/metadata/**`. Then set the repository variable
+   `STORE_METADATA_SYNC_ENABLED=true` and run the **Store listing** workflow
+   with `direction: push`, `dry_run: true` first — or seed the tree from an
+   existing app with `direction: pull` instead of writing the copy by hand.
+   See [Store listing metadata](release-runbook.md#store-listing-metadata).
 4. If you want over-the-air updates, follow [docs/ota.md](ota.md) and generate
    your own signing certificate per [certs/README.md](../certs/README.md); the
    committed certificate is a placeholder.

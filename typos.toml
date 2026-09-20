@@ -5,3 +5,5 @@ extend-exclude = [".workflows/", "vendor/bundle/", "pnpm-lock.yaml", "*.po", "sr
 # add false positives here, one per line, e.g. `ba = "ba"`
 unparseable = "unparseable"
 ba = "ba"
+# Ruby File::WRONLY (open flag), used for 0600 key files in fastlane/lanes/shared.rb
+WRONLY = "WRONLY"

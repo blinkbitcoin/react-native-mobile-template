@@ -23,6 +23,7 @@ checked against the repository rather than believed.
 | [0015](0015-web-on-pages.md) | The web target deploys to a Pages sub-path, with a 404 shell for deep links, tested as the same bytes | 2026-09-19 |
 | [0016](0016-job-names-by-purpose.md) | Workflow and job names say what a step is for, in store vocabulary, never a tool's | 2026-09-19 |
 | [0017](0017-build-tag-reserved-at-push.md) | The `-build.N` tag is created in Prepare at push time, while the commit is still main's tip;<br>GitHub refuses a later tag once a workflow file changed | 2026-09-19 |
+| [0018](0018-store-listing-sync-lane.md) | Additive `sync_metadata`/`pull_metadata` lanes edit the store listing outside a release,<br>gated behind `STORE_METADATA_SYNC_ENABLED`; `release_production` is unchanged | 2026-09-19 |
 
 ## Writing a new one
 

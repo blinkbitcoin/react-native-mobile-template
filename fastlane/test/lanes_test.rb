@@ -583,6 +583,28 @@ class LanesTest < Minitest::Test
     end
   end
 
+  # deliver's own exception directories, in deliver's own spelling and in the
+  # case a consumer might type: LanguageFolder#valid? downcases before it
+  # matches, so `appletv` and `Review_Information` are fine there too.
+  def test_assert_ios_metadata_dirs_accepts_locales_and_deliver_folders_in_any_case
+    Dir.mktmpdir do |dir|
+      %w[en-US review_information Review_Information appleTV appletv iMessage default fonts android].each do |name|
+        FileUtils.mkdir_p(File.join(dir, name))
+      end
+      assert_nil assert_ios_metadata_dirs!(dir)
+    end
+  end
+
+  def test_assert_ios_metadata_dirs_rejects_a_screenshots_directory
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, 'en-US'))
+      FileUtils.mkdir_p(File.join(dir, 'screenshots'))
+      err = assert_raises(UI::UserError) { assert_ios_metadata_dirs!(dir) }
+      assert_includes err.message, 'screenshots'
+      assert_includes err.message, 'fastlane/screenshots/'
+    end
+  end
+
   def test_write_release_notes_refuses_a_tree_with_no_locales
     Dir.mktmpdir do |dir|
       ENV['RELEASE_NOTES_STORE_FILE'] = write_file('Some notes.')
@@ -668,6 +690,242 @@ class LanesTest < Minitest::Test
     assert_includes assert_raises(UI::UserError) { assert_project_version!('1.2.2', '42') }.message, 'APP_VERSION'
     assert_includes assert_raises(UI::UserError) { assert_project_version!('1.2.3', '41') }.message, 'APP_BUILD_NUMBER'
   end
+
+  # ---------- store listing sync: shared helpers ----------
+
+  def test_assert_metadata_sync_enabled_accepts_common_true_values
+    %w[true 1 yes].each do |value|
+      ENV['STORE_METADATA_SYNC_ENABLED'] = value
+      assert_nil assert_metadata_sync_enabled!
+    end
+  end
+
+  def test_assert_metadata_sync_enabled_refuses_when_unset_or_false
+    [nil, 'false', '0'].each do |value|
+      value.nil? ? ENV.delete('STORE_METADATA_SYNC_ENABLED') : ENV['STORE_METADATA_SYNC_ENABLED'] = value
+      error = assert_raises(UI::UserError) { assert_metadata_sync_enabled! }
+      assert_includes error.message, 'STORE_METADATA_SYNC_ENABLED'
+      assert_includes error.message, 'docs/release-runbook.md'
+    end
+  end
+
+  def test_with_baseline_metadata_stages_a_copy_without_the_per_version_paths
+    Dir.mktmpdir do |dir|
+      source = File.join(dir, 'metadata')
+      FileUtils.mkdir_p(File.join(source, 'en-US', 'changelogs'))
+      File.write(File.join(source, 'en-US', 'description.txt'), 'A real description.')
+      File.write(File.join(source, 'en-US', 'release_notes.txt'), 'v1 notes')
+      File.write(File.join(source, 'en-US', 'changelogs', '100.txt'), 'changelog')
+      source_snapshot = Dir.glob(File.join(source, '**', '*')).sort
+
+      staged_path = nil
+      with_baseline_metadata(source) do |staged|
+        staged_path = staged
+        assert_equal 'A real description.', File.read(File.join(staged, 'en-US', 'description.txt'))
+        refute File.exist?(File.join(staged, 'en-US', 'release_notes.txt'))
+        refute Dir.exist?(File.join(staged, 'en-US', 'changelogs'))
+      end
+
+      assert_equal source_snapshot, Dir.glob(File.join(source, '**', '*')).sort
+      assert_equal 'A real description.', File.read(File.join(source, 'en-US', 'description.txt'))
+      assert_equal 'v1 notes', File.read(File.join(source, 'en-US', 'release_notes.txt'))
+      refute Dir.exist?(staged_path), 'the staged copy must not outlive the block'
+    end
+  end
+
+  def test_with_baseline_metadata_drops_zero_byte_files_from_the_staged_copy
+    Dir.mktmpdir do |dir|
+      source = File.join(dir, 'metadata')
+      FileUtils.mkdir_p(File.join(source, 'en-US'))
+      File.write(File.join(source, 'en-US', 'video.txt'), '')
+      File.write(File.join(source, 'en-US', 'title.txt'), 'App')
+      source_snapshot = Dir.glob(File.join(source, '**', '*')).sort
+
+      with_baseline_metadata(source) do |staged|
+        refute File.exist?(File.join(staged, 'en-US', 'video.txt')),
+               'a zero-byte file PATCHes an empty value and clears the console field'
+        assert_equal 'App', File.read(File.join(staged, 'en-US', 'title.txt'))
+      end
+
+      assert_equal source_snapshot, Dir.glob(File.join(source, '**', '*')).sort
+      assert File.exist?(File.join(source, 'en-US', 'video.txt')), 'only the staged copy is trimmed'
+    end
+  end
+
+  # ios_screenshots_path is anchored on root_path, which the existing paths
+  # test exercises the same way: a scratch checkout, chdir'd into.
+  def in_screenshots_root(*filenames)
+    Dir.mktmpdir do |tmp|
+      dir = File.realpath(tmp)
+      FileUtils.mkdir_p(File.join(dir, 'fastlane', 'lanes'))
+      screenshots_dir = File.join(dir, 'fastlane', 'screenshots', 'en-US')
+      FileUtils.mkdir_p(screenshots_dir)
+      filenames.each { |name| File.write(File.join(screenshots_dir, name), 'x') }
+      Dir.chdir(dir) { yield }
+    end
+  end
+
+  def test_ios_screenshots_is_false_for_an_empty_or_gitkeep_only_tree
+    in_screenshots_root { refute ios_screenshots? }
+    in_screenshots_root('.gitkeep') { refute ios_screenshots? }
+  end
+
+  def test_ios_screenshots_is_true_for_a_png_case_insensitively
+    in_screenshots_root('01.png') { assert ios_screenshots? }
+    in_screenshots_root('01.PNG') { assert ios_screenshots? }
+  end
+
+  def test_ios_app_rating_config_path_is_nil_when_absent
+    Dir.mktmpdir { |dir| assert_nil ios_app_rating_config_path(dir) }
+  end
+
+  def test_ios_app_rating_config_path_is_the_path_when_present
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, 'app_rating_config.json')
+      File.write(path, '{}')
+      assert_equal path, ios_app_rating_config_path(dir)
+    end
+  end
+
+  # google_play_track_version_codes has to answer differently per track for
+  # these tests, which $stub_results (keyed only by action name) cannot do --
+  # so the stub is swapped out directly, the same way the android halt
+  # fallback test does it.
+  def with_play_credentials
+    ENV['PLAY_SERVICE_ACCOUNT_JSON'] = '{"type":"service_account"}'
+    ENV.delete('PLAY_SERVICE_ACCOUNT_JSON_PATH')
+  end
+
+  def stub_play_track_version_codes(mapping)
+    original = Object.instance_method(:google_play_track_version_codes)
+    Object.send(:define_method, :google_play_track_version_codes) do |**args|
+      $calls << [:google_play_track_version_codes, args]
+      mapping.fetch(args[:track], [])
+    end
+    yield
+  ensure
+    Object.send(:define_method, :google_play_track_version_codes, original)
+  end
+
+  def test_play_metadata_target_returns_the_highest_code_on_production
+    ENV['ANDROID_PACKAGE'] = 'com.example.app'
+    with_play_credentials
+    ENV.delete('PLAY_METADATA_TRACK')
+    ENV.delete('DRY_RUN')
+    stub_play_track_version_codes('production' => [3, 7]) do
+      assert_equal ['production', 7], play_metadata_target
+    end
+  end
+
+  def test_play_metadata_target_falls_through_to_the_next_track_when_empty
+    ENV['ANDROID_PACKAGE'] = 'com.example.app'
+    with_play_credentials
+    ENV.delete('PLAY_METADATA_TRACK')
+    ENV.delete('DRY_RUN')
+    stub_play_track_version_codes('production' => [], 'beta' => [5]) do
+      assert_equal ['beta', 5], play_metadata_target
+    end
+  end
+
+  def test_play_metadata_target_only_asks_the_configured_track
+    ENV['ANDROID_PACKAGE'] = 'com.example.app'
+    ENV['PLAY_METADATA_TRACK'] = 'internal'
+    with_play_credentials
+    ENV.delete('DRY_RUN')
+    stub_play_track_version_codes('internal' => [9]) do
+      assert_equal ['internal', 9], play_metadata_target
+      asked = $calls.select { |name, _| name == :google_play_track_version_codes }.map { |_, args| args[:track] }
+      assert_equal ['internal'], asked
+    end
+  end
+
+  def test_play_metadata_target_raises_naming_every_track_when_all_are_empty
+    ENV['ANDROID_PACKAGE'] = 'com.example.app'
+    with_play_credentials
+    ENV.delete('PLAY_METADATA_TRACK')
+    ENV.delete('DRY_RUN')
+    stub_play_track_version_codes({}) do
+      error = assert_raises(UI::UserError) { play_metadata_target }
+      assert_includes error.message, 'production, beta, internal'
+      assert_includes error.message, 'upload_internal'
+    end
+  end
+
+  def test_play_metadata_target_falls_back_to_the_build_number_under_dry_run
+    ENV['ANDROID_PACKAGE'] = 'com.example.app'
+    with_play_credentials
+    ENV.delete('PLAY_METADATA_TRACK')
+    ENV['APP_BUILD_NUMBER'] = '42'
+    ENV['DRY_RUN'] = '1'
+    assert_equal ['production', 42], play_metadata_target
+  end
+
+  def test_with_asc_api_key_file_writes_a_0600_json_file_and_removes_it_after
+    ENV['ASC_KEY_ID'] = 'KEYID'
+    ENV['ASC_ISSUER_ID'] = 'ISSUER'
+    ENV['ASC_KEY_P8_BASE64'] = 'BASE64P8'
+    captured_path = nil
+    with_asc_api_key_file do |path|
+      captured_path = path
+      assert_equal 0o600, File.stat(path).mode & 0o777
+      key = JSON.parse(File.read(path))
+      assert_equal 'KEYID', key['key_id']
+      assert_equal 'ISSUER', key['issuer_id']
+      assert_equal 'BASE64P8', key['key']
+      assert_equal true, key['is_key_content_base64']
+      assert_equal false, key['in_house']
+    end
+    refute File.exist?(captured_path)
+  end
+
+  def test_with_play_json_key_file_yields_the_configured_path_unchanged
+    ENV.delete('PLAY_SERVICE_ACCOUNT_JSON')
+    ENV['PLAY_SERVICE_ACCOUNT_JSON_PATH'] = '/tmp/key.json'
+    with_play_json_key_file { |path| assert_equal '/tmp/key.json', path }
+  end
+
+  def test_with_play_json_key_file_writes_the_inline_json_to_a_0600_file_and_removes_it_after
+    ENV['PLAY_SERVICE_ACCOUNT_JSON'] = '{"type":"service_account"}'
+    ENV.delete('PLAY_SERVICE_ACCOUNT_JSON_PATH')
+    captured_path = nil
+    with_play_json_key_file do |path|
+      captured_path = path
+      assert_equal 0o600, File.stat(path).mode & 0o777
+      assert_equal '{"type":"service_account"}', File.read(path)
+    end
+    refute File.exist?(captured_path)
+  end
+
+  def test_warn_metadata_overwrite_names_the_path_and_points_at_git_diff
+    warn_metadata_overwrite!('fastlane/metadata/ios')
+    assert_includes UI.messages.last, 'fastlane/metadata/ios'
+    assert_includes UI.messages.last, 'git diff'
+  end
+
+  # A lane's cwd is `fastlane/`, so a repo-root-relative pathspec would match
+  # nothing there and `git status --porcelain` would exit 0 on a tree the pull
+  # had just rewritten. `-C <repo root>` plus absolute pathspecs is the fix.
+  def test_metadata_diff_commands_runs_git_from_the_repo_root_with_absolute_pathspecs
+    in_screenshots_root do
+      root = repo_root
+      ios = root_path('fastlane', 'metadata', 'ios')
+      android = root_path('fastlane', 'metadata', 'android')
+      commands = metadata_diff_commands(ios, android)
+
+      assert_equal [
+        ['git', '-C', root, 'status', '--porcelain', '--', ios, android],
+        ['git', '-C', root, '--no-pager', 'diff', '--stat', '--', ios, android]
+      ], commands
+      commands.each do |argv|
+        assert_equal '-C', argv[1]
+        assert File.absolute_path?(argv[2]), "the -C root must be absolute: #{argv[2]}"
+        argv.drop(argv.index('--') + 1).each do |pathspec|
+          assert File.absolute_path?(pathspec), "pathspec must be absolute: #{pathspec}"
+        end
+      end
+      assert_empty $calls, 'shared.rb must not run sh -- it is loaded without fastlane by the tests'
+    end
+  end
 end
 
 # Lane-level tests: the promotion logic itself, exercised through the recorded
@@ -696,6 +954,7 @@ class LaneBehaviourTest < Minitest::Test
     ANDROID_UPLOAD_KEYSTORE_PATH ANDROID_UPLOAD_KEYSTORE_PASSWORD
     ANDROID_UPLOAD_KEY_ALIAS ANDROID_UPLOAD_KEY_PASSWORD
     MATCH_GIT_URL MATCH_PASSWORD
+    STORE_METADATA_SYNC_ENABLED IOS_METADATA_EDIT_LIVE PLAY_METADATA_TRACK
   ].freeze
 
   def setup
@@ -979,6 +1238,254 @@ class LaneBehaviourTest < Minitest::Test
     end
   end
 
+  def test_ios_release_production_refuses_a_screenshots_directory
+    in_project do
+      FileUtils.mkdir_p('fastlane/metadata/ios/screenshots')
+      error = assert_raises(UI::UserError) { run_lane(:ios, :release_production) }
+      assert_includes error.message, 'screenshots'
+      refute called?(:upload_to_app_store)
+    end
+  end
+
+  # ---------- ios sync_metadata ----------
+
+  def test_ios_sync_metadata_refuses_when_disabled
+    in_project do
+      error = assert_raises(UI::UserError) { run_lane(:ios, :sync_metadata) }
+      assert_includes error.message, 'STORE_METADATA_SYNC_ENABLED'
+      refute called?(:upload_to_app_store)
+    end
+  end
+
+  def test_ios_sync_metadata_pushes_metadata_only
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    in_project do
+      run_lane(:ios, :sync_metadata)
+
+      args = args_for(:upload_to_app_store)
+      assert args[:skip_binary_upload], 'sync_metadata must never touch the binary'
+      assert args[:skip_app_version_update], 'sync_metadata must never move the version'
+      assert_equal false, args[:submit_for_review], 'deliver defaults this to true'
+      assert_equal false, args[:run_precheck_before_submit], 'deliver defaults this to true'
+      assert_equal false, args[:edit_live], 'deliver defaults this to true'
+      assert args[:force]
+      assert_equal false, args[:skip_metadata], 'deliver defaults this to true'
+      refute args.key?(:app_version)
+      refute args.key?(:automatic_release)
+      refute args.key?(:phased_release)
+      refute args.key?(:auto_release_date)
+      refute args.key?(:submission_information)
+      refute_equal root_path('fastlane', 'metadata', 'ios'), args[:metadata_path],
+                    'a staged copy must be pushed, never the working tree'
+    end
+  end
+
+  def test_ios_sync_metadata_excludes_release_notes_from_the_staged_tree
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    in_project do
+      File.write('fastlane/metadata/ios/en-US/description.txt', 'The story of this app.')
+      File.write('fastlane/metadata/ios/en-US/release_notes.txt', "What's new.")
+      run_lane(:ios, :sync_metadata)
+
+      snapshot = $metadata_snapshots.last
+      assert_includes snapshot, 'en-US/description.txt'
+      refute_includes snapshot, 'en-US/release_notes.txt'
+      assert File.exist?('fastlane/metadata/ios/en-US/release_notes.txt'),
+             'the working tree copy must survive: only the staged copy is trimmed'
+    end
+  end
+
+  def test_ios_sync_metadata_omits_review_information_when_unconfigured
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    in_project do
+      run_lane(:ios, :sync_metadata)
+
+      refute args_for(:upload_to_app_store).key?(:app_review_information)
+      refute $metadata_snapshots.last.any? { |f| f.start_with?('review_information') },
+             'an empty review_information would clear the contact already on file'
+    end
+  end
+
+  def test_ios_sync_metadata_includes_review_information_when_configured
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    ENV['APP_REVIEW_EMAIL'] = 'review@example.com'
+    in_project do
+      run_lane(:ios, :sync_metadata)
+
+      args = args_for(:upload_to_app_store)
+      assert_equal 'review@example.com', args[:app_review_information][:email_address]
+      assert $metadata_snapshots.last.any? { |f| f.start_with?('review_information') }
+    end
+  end
+
+  def test_ios_sync_metadata_live_option_edits_the_live_version_only
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    ENV['APP_REVIEW_EMAIL'] = 'review@example.com'
+    in_project do
+      run_lane(:ios, :sync_metadata, live: true)
+
+      args = args_for(:upload_to_app_store)
+      assert args[:edit_live]
+      assert args[:skip_screenshots]
+      refute args.key?(:app_review_information), 'review detail is not editable in live mode'
+      # Live mode is the path that does *not* wait: it fetches the live
+      # version first, with no retry (deliver/lib/deliver/upload_metadata.rb:107).
+      refute UI.messages.any? { |m| m.include?('20 minutes') }, UI.messages.inspect
+    end
+  end
+
+  # The default path is the slow one: with no version in "Prepare for
+  # Submission" deliver retries for about 20 minutes and then fails without
+  # writing (upload_metadata.rb:464-481, :557-560). The lane says so up front.
+  def test_ios_sync_metadata_warns_that_a_version_in_preparation_is_needed
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    in_project do
+      run_lane(:ios, :sync_metadata)
+
+      assert UI.messages.any? { |m| m.include?('20 minutes') && m.include?('IOS_METADATA_EDIT_LIVE') },
+             UI.messages.inspect
+    end
+  end
+
+  def test_ios_sync_metadata_edit_live_env_edits_the_live_version_only
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    ENV['IOS_METADATA_EDIT_LIVE'] = 'true'
+    ENV['APP_REVIEW_EMAIL'] = 'review@example.com'
+    in_project do
+      run_lane(:ios, :sync_metadata)
+
+      args = args_for(:upload_to_app_store)
+      assert args[:edit_live]
+      assert args[:skip_screenshots]
+      refute args.key?(:app_review_information)
+    end
+  end
+
+  def test_ios_sync_metadata_stages_screenshots_as_a_sibling_of_the_metadata_tree
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    in_project do |dir|
+      FileUtils.mkdir_p(File.join(dir, 'fastlane', 'screenshots', 'en-US'))
+      File.write(File.join(dir, 'fastlane', 'screenshots', 'en-US', 'home.png'), 'png')
+      run_lane(:ios, :sync_metadata)
+
+      args = args_for(:upload_to_app_store)
+      refute args[:skip_screenshots]
+      assert args[:overwrite_screenshots]
+      refute_nil args[:screenshots_path]
+      refute args[:screenshots_path].start_with?(args[:metadata_path]),
+             'screenshots is the one directory name deliver rejects under metadata_path'
+    end
+  end
+
+  def test_ios_sync_metadata_skips_screenshots_when_none_are_staged
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    in_project do
+      run_lane(:ios, :sync_metadata)
+
+      args = args_for(:upload_to_app_store)
+      assert args[:skip_screenshots]
+      refute args.key?(:screenshots_path)
+    end
+  end
+
+  def test_ios_sync_metadata_passes_app_rating_config_path_only_when_present
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    in_project do
+      run_lane(:ios, :sync_metadata)
+      refute args_for(:upload_to_app_store).key?(:app_rating_config_path)
+    end
+
+    reset_calls!
+    in_project do
+      File.write('fastlane/metadata/ios/app_rating_config.json', '{}')
+      run_lane(:ios, :sync_metadata)
+
+      args = args_for(:upload_to_app_store)
+      refute_nil args[:app_rating_config_path]
+      assert args[:app_rating_config_path].start_with?(args[:metadata_path]),
+             'the rating config must come from the staged tree, not the working tree'
+    end
+  end
+
+  def test_ios_sync_metadata_refuses_placeholder_metadata
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    in_project do
+      File.write('fastlane/metadata/ios/en-US/description.txt', 'Replace this text with the story of your own app.')
+      error = assert_raises(UI::UserError) { run_lane(:ios, :sync_metadata) }
+      assert_includes error.message, 'description.txt'
+      refute called?(:upload_to_app_store)
+    end
+  end
+
+  def test_ios_sync_metadata_refuses_a_tree_with_no_locales
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    in_project(locales: []) do
+      error = assert_raises(UI::UserError) { run_lane(:ios, :sync_metadata) }
+      assert_includes error.message, 'No locale directories'
+      refute called?(:upload_to_app_store)
+    end
+  end
+
+  def test_ios_sync_metadata_refuses_a_screenshots_directory_inside_metadata
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    in_project do
+      FileUtils.mkdir_p('fastlane/metadata/ios/screenshots')
+      error = assert_raises(UI::UserError) { run_lane(:ios, :sync_metadata) }
+      assert_includes error.message, 'screenshots'
+      refute called?(:upload_to_app_store)
+    end
+  end
+
+  # ---------- ios pull_metadata ----------
+
+  def test_ios_pull_metadata_dry_run_logs_and_makes_no_sh_call
+    ENV['DRY_RUN'] = '1'
+    in_project do
+      run_lane(:ios, :pull_metadata)
+      assert UI.messages.any? { |m| m.include?('[dry-run]') }, UI.messages.inspect
+      refute called?(:sh)
+    end
+  end
+
+  def test_ios_pull_metadata_downloads_metadata_and_screenshots_then_reports_the_diff
+    in_project do
+      run_lane(:ios, :pull_metadata)
+
+      sh_calls = $calls.select { |name, _| name == :sh }.map(&:last)
+      assert_equal 4, sh_calls.length, sh_calls.inspect
+
+      metadata_call = sh_calls[0]
+      assert_equal %w[bundle exec fastlane deliver download_metadata], metadata_call[0, 5]
+      assert_includes metadata_call, '--api_key_path'
+      assert_includes metadata_call, '--app_identifier'
+      assert_includes metadata_call, 'com.example.app'
+      # deliver's download_metadata ignores use_live_version -- it takes the
+      # latest App Store version and consults only app_version
+      # (deliver/lib/deliver/commands_generator.rb:172-200) -- so the lane must
+      # not pass an option that suggests a choice it does not make.
+      refute_includes metadata_call, '--use_live_version'
+      assert_includes metadata_call, '--metadata_path'
+      assert_includes metadata_call, root_path('fastlane', 'metadata', 'ios')
+      assert_includes metadata_call, '--force'
+
+      screenshots_call = sh_calls[1]
+      assert_equal %w[bundle exec fastlane deliver download_screenshots], screenshots_call[0, 5]
+      assert_includes screenshots_call, '--screenshots_path'
+      assert_includes screenshots_call, root_path('fastlane', 'screenshots')
+      refute_includes screenshots_call, '--use_live_version'
+
+      # The diff runs from the repo root with absolute pathspecs: the lane's
+      # own cwd is `fastlane/`, where a relative pathspec matches nothing.
+      ios = root_path('fastlane', 'metadata', 'ios')
+      shots = root_path('fastlane', 'screenshots')
+      assert_equal ['git', '-C', repo_root, 'status', '--porcelain', '--', ios, shots], sh_calls[2]
+      assert_equal ['git', '-C', repo_root, '--no-pager', 'diff', '--stat', '--', ios, shots], sh_calls[3]
+      [ios, shots].each { |path| assert File.absolute_path?(path), path }
+
+      refute sh_calls.flatten.any? { |arg| arg.to_s.include?('BASE64P8') }, 'no credential value in any argv'
+    end
+  end
+
   # ---------- ios phased ----------
 
   def test_ios_phased_drives_the_live_versions_phased_release
@@ -1084,6 +1591,102 @@ class LaneBehaviourTest < Minitest::Test
     in_project do
       run_lane(:android, :release_production)
       assert_equal '1', args_for(:upload_to_play_store)[:rollout]
+    end
+  end
+
+  # ---------- android sync_metadata ----------
+
+  def test_android_sync_metadata_refuses_when_disabled
+    in_project do
+      error = assert_raises(UI::UserError) { run_lane(:android, :sync_metadata) }
+      assert_includes error.message, 'STORE_METADATA_SYNC_ENABLED'
+      refute called?(:upload_to_play_store)
+    end
+  end
+
+  def test_android_sync_metadata_pushes_metadata_only
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    in_project do
+      File.write('fastlane/metadata/android/en-US/title.txt', 'App')
+      FileUtils.mkdir_p('fastlane/metadata/android/en-US/changelogs')
+      File.write('fastlane/metadata/android/en-US/changelogs/42.txt', 'notes')
+      stub_result(:google_play_track_version_codes, [41, 42])
+      run_lane(:android, :sync_metadata)
+
+      args = args_for(:upload_to_play_store)
+      assert args[:skip_upload_aab]
+      assert args[:skip_upload_apk]
+      assert args[:skip_upload_changelogs], "what's new belongs to release_production"
+      refute args[:skip_upload_metadata]
+      refute args[:skip_upload_images]
+      refute args[:skip_upload_screenshots]
+      refute args.key?(:track_promote_to)
+      refute args.key?(:rollout)
+      refute args.key?(:in_app_update_priority)
+      assert_equal 'production', args[:track]
+      assert_equal 42, args[:version_code]
+
+      snapshot = $metadata_snapshots.last
+      assert_includes snapshot, 'en-US/title.txt'
+      refute snapshot.any? { |f| f.start_with?('en-US/changelogs') }
+    end
+  end
+
+  # ---------- android pull_metadata ----------
+
+  def test_android_pull_metadata_dry_run_logs_and_makes_no_sh_call
+    ENV['DRY_RUN'] = '1'
+    in_project do
+      run_lane(:android, :pull_metadata)
+      assert UI.messages.any? { |m| m.include?('[dry-run]') }, UI.messages.inspect
+      refute called?(:sh)
+    end
+  end
+
+  def test_android_pull_metadata_runs_supply_init_into_a_tmpdir_then_reports_the_diff
+    in_project do
+      run_lane(:android, :pull_metadata)
+
+      sh_calls = $calls.select { |name, _| name == :sh }.map(&:last)
+      assert_equal 3, sh_calls.length, sh_calls.inspect
+
+      supply_call = sh_calls[0]
+      assert_equal %w[bundle exec fastlane supply init], supply_call[0, 5]
+      assert_includes supply_call, '--package_name'
+      assert_includes supply_call, 'com.example.app'
+      assert_includes supply_call, '--track'
+      assert_includes supply_call, 'production'
+      assert_includes supply_call, '--metadata_path'
+      assert_includes supply_call, '--json_key'
+      refute_includes supply_call, android_metadata_path,
+                       'supply init skips an existing metadata_path and downloads nothing -- it must be a tmpdir'
+
+      # From the repo root, with an absolute pathspec: a lane's cwd is
+      # `fastlane/` and a relative pathspec would match nothing there.
+      android = root_path('fastlane', 'metadata', 'android')
+      assert File.absolute_path?(android), android
+      assert_equal ['git', '-C', repo_root, 'status', '--porcelain', '--', android], sh_calls[1]
+      assert_equal ['git', '-C', repo_root, '--no-pager', 'diff', '--stat', '--', android], sh_calls[2]
+
+      refute sh_calls.flatten.any? { |arg| arg.to_s.include?('service_account') }, 'no credential value in any argv'
+    end
+  end
+
+  # ---------- sync_metadata under DRY_RUN ----------
+
+  def test_sync_metadata_dry_run_does_not_upload_or_touch_the_working_tree
+    ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+    ENV['DRY_RUN'] = '1'
+    in_project do
+      before = Dir.glob('fastlane/metadata/**/*').sort
+      run_lane(:ios, :sync_metadata)
+      run_lane(:android, :sync_metadata)
+      after = Dir.glob('fastlane/metadata/**/*').sort
+
+      refute called?(:upload_to_app_store)
+      refute called?(:upload_to_play_store)
+      assert UI.messages.any? { |m| m.include?('[dry-run]') }, UI.messages.inspect
+      assert_equal before, after
     end
   end
 
@@ -1295,6 +1898,13 @@ class LaneBehaviourTest < Minitest::Test
       ENV['APP_REVIEW_DEMO_USER'] = 'demo'
       ENV['APP_REVIEW_DEMO_PASSWORD'] = 'demopass'
       ENV['PLAY_UPDATE_PRIORITY'] = '3'
+      ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
+      # So sync_metadata records app_rating_config_path and screenshots_path
+      # too: both are conditional on the file/PNG existing, and neither
+      # option name is validated against the real action otherwise.
+      File.write(File.join(dir, 'fastlane', 'metadata', 'ios', 'app_rating_config.json'), '{}')
+      FileUtils.mkdir_p(File.join(dir, 'fastlane', 'screenshots', 'en-US'))
+      File.write(File.join(dir, 'fastlane', 'screenshots', 'en-US', '01.png'), 'x')
 
       [
         [:ios, :build, { skip_signing: 'true' }],
@@ -1302,11 +1912,14 @@ class LaneBehaviourTest < Minitest::Test
         [:ios, :upload_internal, {}],
         [:ios, :promote_beta, {}],
         [:ios, :release_production, {}],
+        [:ios, :sync_metadata, {}],
+        [:ios, :sync_metadata, { live: 'true' }],
         [:ios, :phased, { action: 'pause' }],
         [:ios, :upload_symbols, {}],
         [:android, :upload_internal, {}],
         [:android, :promote_beta, {}],
         [:android, :release_production, {}],
+        [:android, :sync_metadata, {}],
         [:android, :rollout, { percent: 50 }],
         [:android, :halt, {}]
       ].each do |platform_name, lane_name, options|
@@ -1317,6 +1930,16 @@ class LaneBehaviourTest < Minitest::Test
         $calls.each do |action, args|
           next unless STUBBED_FASTLANE_ACTIONS.include?(action)
 
+          if args.key?(:app_rating_config_path)
+            # deliver's app_rating_config_path option verifies the file exists
+            # at validation time (deliver/lib/deliver/options.rb:270), but the
+            # staged copy sync_metadata actually passed is deleted the moment
+            # the lane returns. The source file it was copied from has the
+            # same content and outlives this whole test, so swap it in here --
+            # this still validates the option name and a real JSON file, just
+            # not the exact (necessarily transient) path.
+            args = args.merge(app_rating_config_path: File.join(dir, 'fastlane', 'metadata', 'ios', 'app_rating_config.json'))
+          end
           recorded << { action: action.to_s, args: args, lane: "#{platform_name} #{lane_name}" }
         end
       end

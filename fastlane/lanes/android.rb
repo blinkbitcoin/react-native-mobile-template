@@ -327,6 +327,78 @@ platform :android do
     store_action(:upload_to_play_store, **args)
   end
 
+  desc 'Push the baseline store listing from fastlane/metadata/android to Google Play (no binary, no track change, no changelogs)'
+  lane :sync_metadata do
+    assert_metadata_sync_enabled!
+    source = android_metadata_path
+    assert_metadata_locales!(source)
+    assert_metadata_ready!(source)
+    package = ENV.fetch('ANDROID_PACKAGE')
+    track, version_code = play_metadata_target
+    UI.message("Syncing the Play listing against #{track} version code #{version_code}")
+
+    with_baseline_metadata(source) do |staged|
+      store_action(
+        :upload_to_play_store,
+        package_name: package,
+        # The track and version code that are already there, so supply can
+        # find the release its listing edit hangs off. Nothing moves: no
+        # binary is uploaded, and with no track_promote_to and no rollout
+        # supply never touches the track itself (uploader.rb:29-42).
+        track: track,
+        version_code: version_code,
+        skip_upload_aab: true,
+        skip_upload_apk: true,
+        metadata_path: staged,
+        skip_upload_metadata: false,
+        skip_upload_images: false,
+        skip_upload_screenshots: false,
+        # "What's new" is per version and belongs to release_production's
+        # write_release_notes!; the staged tree has no changelogs/ either, so
+        # this is belt and braces on purpose.
+        skip_upload_changelogs: true,
+        **play_json_key_args
+      )
+    end
+  end
+
+  desc 'Pull the Play listing, images and screenshots into the repo (overwrites local files - review the diff)'
+  lane :pull_metadata do
+    warn_metadata_overwrite!('fastlane/metadata/android')
+    package = ENV.fetch('ANDROID_PACKAGE')
+    track = ENV['PLAY_METADATA_TRACK'].to_s.strip
+    track = 'production' if track.empty?
+
+    if ENV['DRY_RUN'] == '1'
+      UI.important("[dry-run] supply init for #{package} (#{track}) into #{android_metadata_path}")
+      next
+    end
+
+    require 'tmpdir'
+    require 'fileutils'
+    # `supply init` does something worse than refuse an existing
+    # metadata_path: it prints "Metadata already exists" and returns having
+    # downloaded nothing, exit 0 (supply/lib/supply/setup.rb:6-9). Every
+    # checkout of this template has that directory, so a pull straight into
+    # the tree would report success and change nothing. Hence the staging
+    # directory, from which the tree is updated file by file - a local file
+    # supply does not know about (a locale it has never seen) is left alone.
+    Dir.mktmpdir('play-metadata-pull') do |dir|
+      staged = File.join(dir, 'android')
+      with_play_json_key_file do |key_path|
+        sh('bundle', 'exec', 'fastlane', 'supply', 'init',
+           '--package_name', package, '--track', track,
+           '--metadata_path', staged, '--json_key', key_path)
+      end
+      FileUtils.cp_r(Dir.glob(File.join(staged, '*')), android_metadata_path)
+    end
+
+    # shared.rb cannot call `sh` itself (see its header) - it only builds the
+    # argv, and it is run here. Absolute paths: the lane's cwd is `fastlane/`,
+    # not the repo root (see metadata_diff_commands).
+    metadata_diff_commands(android_metadata_path).each { |argv| sh(*argv) }
+  end
+
   desc 'Change the production staged-rollout share. Whole number = percent (percent:1 is 1%, percent:100 completes); a decimal is a fraction (percent:0.01 is 1%, percent:1.0 completes)'
   lane :rollout do |options|
     fraction = rollout_fraction(options[:percent] || ENV['PLAY_ROLLOUT'])
