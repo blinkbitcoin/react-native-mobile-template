@@ -1,6 +1,6 @@
 ---
 name: store-consoles
-description: Use when a store setup step has to happen inside App Store Connect, the Apple Developer portal, Google Play Console or Google Cloud - registering identifiers, app records, API keys, service accounts, TestFlight groups, testing tracks, privacy labels, content rating, data safety or pricing - by driving Chrome or by handing the human an exact click-path.
+description: Use when a store setup step has to happen inside App Store Connect, the Apple Developer portal, Google Play Console, Google Cloud or Huawei AppGallery Connect - registering identifiers, app records, API keys, service accounts, TestFlight groups, testing tracks, privacy labels, content rating, data safety or pricing - by driving Chrome or by handing the human an exact click-path.
 allowed-tools: Bash(gh variable:*), Bash(.claude/skills/store-consoles/scripts/console-step.sh:*), Bash(.claude/skills/store-consoles/tests/run.sh:*), Bash(.claude/skills/store-setup/scripts/state.sh:*)
 ---
 
@@ -8,13 +8,14 @@ allowed-tools: Bash(gh variable:*), Bash(.claude/skills/store-consoles/scripts/c
 
 ## Overview
 
-This skill covers the 21 `apple-*` and `google-*` ids in the `store-setup`
-checklist — everything that happens inside App Store Connect, the Apple
-Developer portal, Google Play Console or Google Cloud, rather than in this
-repository or in GitHub.
+This skill covers the 26 `apple-*`, `google-*` and `huawei-*` ids in the
+`store-setup` checklist — everything that happens inside App Store Connect,
+the Apple Developer portal, Google Play Console, Google Cloud or AppGallery
+Connect, rather than in this repository or in GitHub.
 
 **Core principle:** the reference block (`references/apple.md`,
-`references/google.md`) is the contract. `console-step.sh <id>` prints it,
+`references/google.md`, `references/huawei.md`) is the contract.
+`console-step.sh <id>` prints it,
 with `Enter:`/`Take away:` values resolved from a `gh variable`, a
 `fastlane/metadata/**` file, `state.facts.<key>`, or `package.json`'s `name`
 where a source exists. The mode picked in `store-setup` decides **who
@@ -40,6 +41,26 @@ and App Privacy labels — are mode (c) only, with every answer read back and
 an explicit yes before submit.** Modes (a) and (b) navigate to the form and
 stop; they never fill or submit it. This is called out again in each of
 those four blocks in `references/apple.md` and `references/google.md`.
+
+## Huawei AppGallery
+
+The five `huawei-*` ids are an **optional extra store** and every one of them
+hangs off `toggle-uploads`, so they are only reached once the Apple and Play
+path actually ships; a repository that does not publish on AppGallery answers
+each with `state.sh set <id> skipped`. Two of them carry the weight:
+`huawei-app-record` is where the package name is entered, which fixes what
+that record can ever publish, and `huawei-app-signing` is permanent once
+enabled — manual signing with the repository's own upload key is this
+template's default, so leaving App Signing off is the whole of that step.
+`huawei-api-client` yields a client id and client secret, the secret shown
+exactly once, so browser mode stops before Create and the human clicks it and
+pastes both into `store-credentials`' `validate-huawei-credentials.sh`;
+`--format json` is refused for that id for the same reason. The AppGallery
+listing is console-only — `store-metadata` does not cover it — and its
+age-rating questionnaire is mode (c) only, like the other four. Huawei
+reorganises these menus more often than Apple or Google do, so anything
+`references/huawei.md` could not confirm is marked "verify on screen": read
+the label in front of you rather than insisting on the wording in the block.
 
 ## Procedure
 
@@ -86,7 +107,7 @@ directories — no network, no real console. Run it after touching
 | Filling a questionnaire (content rating, data safety, target audience, App Privacy) in mode (a) or (b) | Those four are mode (c) only — navigate and stop instead |
 | Treating a resolved `IOS_BUNDLE_ID`/`ANDROID_PACKAGE` value as pre-approved | `console-step.sh` only warns on an obvious placeholder; `identifiers.sh` is the real gate, and it runs before any console work starts |
 | Typing a value `console-step.sh` printed as `<ask the human>` | That means no repo-local source exists — ask, do not guess |
-| Running `--format json` on `google-app-access` or `apple-agreements` | Refused (exit 2): their resolved values can include a demo credential or tax/banking details; use `--format text` |
+| Running `--format json` on `google-app-access`, `apple-agreements` or `huawei-api-client` | Refused (exit 2): their resolved values can include a demo credential, tax/banking details, or the AppGallery client secret; use `--format text` |
 | Skipping `state.sh note`/`state.sh set` after a step | The console has no memory of the mode or the human's earlier answers; the checklist state is the only record |
 
 ## Red Flags — Stop

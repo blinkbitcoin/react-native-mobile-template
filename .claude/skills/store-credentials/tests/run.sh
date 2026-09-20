@@ -1,5 +1,5 @@
 #!/bin/bash
-# Offline tests for the store-credentials skill: all six scripts and
+# Offline tests for the store-credentials skill: all seven scripts and
 # SKILL.md. Real openssl throughout; real keytool if it is on PATH
 # (generating an actual keystore under $WORK, and wrapped by a PATH shim
 # that logs argv - never a password value - before exec'ing the real
@@ -20,6 +20,7 @@ VALIDATE_ASC_KEY="$SKILL_DIR/scripts/validate-asc-key.sh"
 VALIDATE_KEYSTORE="$SKILL_DIR/scripts/validate-keystore.sh"
 VALIDATE_PLAY_JSON="$SKILL_DIR/scripts/validate-play-json.sh"
 VALIDATE_MATCH_REPO="$SKILL_DIR/scripts/validate-match-repo.sh"
+VALIDATE_HUAWEI="$SKILL_DIR/scripts/validate-huawei-credentials.sh"
 NEW_UPLOAD_KEYSTORE="$SKILL_DIR/scripts/new-upload-keystore.sh"
 PUSH_TO_GITHUB="$SKILL_DIR/scripts/push-to-github.sh"
 SKILL_MD="$SKILL_DIR/SKILL.md"
@@ -366,6 +367,80 @@ check "git is called with ls-remote --exit-code" "yes" \
   "$(grep -qF 'ARGV: ls-remote --exit-code' "$GIT_FAKE_ARGV_LOG" && echo yes || echo no)"
 
 echo
+echo "== validate-huawei-credentials.sh"
+
+# A curl that fails the suite if it is ever reached: every case below is
+# offline, and the --check-access case must refuse before any network call.
+CURLFAKE_DIR="$WORK/curlfake"
+mkdir -p "$CURLFAKE_DIR"
+CURL_CALLED_MARKER="$WORK/curl-was-called"
+cat >"$CURLFAKE_DIR/curl" <<'FAKE_CURL'
+#!/bin/bash
+printf 'called with: %s\n' "$*" >>"${CURL_CALLED_MARKER:?CURL_CALLED_MARKER not set}"
+exit 0
+FAKE_CURL
+chmod +x "$CURLFAKE_DIR/curl"
+
+GOOD_HUAWEI_CLIENT_ID="123456789012345678"
+GOOD_HUAWEI_CLIENT_SECRET="0123456789abcdef0123456789abcdef0123456789abcdef"
+
+out=$(HUAWEI_CLIENT_ID="$GOOD_HUAWEI_CLIENT_ID" HUAWEI_CLIENT_SECRET="$GOOD_HUAWEI_CLIENT_SECRET" \
+  "$VALIDATE_HUAWEI" --app-id 987654321 2>&1)
+rc=$?
+check "a well-formed pair with a numeric app id exits 0" "0" "$rc"
+check_not_contains "...and never echoes the client id" "$GOOD_HUAWEI_CLIENT_ID" "$out"
+check_not_contains "...and never echoes the client secret" "$GOOD_HUAWEI_CLIENT_SECRET" "$out"
+
+out=$(HUAWEI_CLIENT_SECRET="$GOOD_HUAWEI_CLIENT_SECRET" "$VALIDATE_HUAWEI" 2>&1)
+rc=$?
+check "a missing HUAWEI_CLIENT_ID exits 1" "1" "$rc"
+check_contains "...naming the environment variable" "HUAWEI_CLIENT_ID" "$out"
+
+out=$(HUAWEI_CLIENT_ID="$GOOD_HUAWEI_CLIENT_ID" "$VALIDATE_HUAWEI" 2>&1)
+check "a missing HUAWEI_CLIENT_SECRET exits 1" "1" "$?"
+
+out=$(HUAWEI_CLIENT_ID="not-a-number" HUAWEI_CLIENT_SECRET="$GOOD_HUAWEI_CLIENT_SECRET" \
+  "$VALIDATE_HUAWEI" 2>&1)
+rc=$?
+check "a non-numeric client id exits 1" "1" "$rc"
+check_contains "...saying it is not all digits" "not all digits" "$out"
+
+out=$(HUAWEI_CLIENT_ID="$GOOD_HUAWEI_CLIENT_ID" \
+  HUAWEI_CLIENT_SECRET="$(printf '0123456789abcdef0123456789abcdef\n0123456789abcdef')" \
+  "$VALIDATE_HUAWEI" 2>&1)
+rc=$?
+check "a secret with an embedded newline exits 1" "1" "$rc"
+check_contains "...saying it carries whitespace" "contains whitespace" "$out"
+
+out=$(HUAWEI_CLIENT_ID="$GOOD_HUAWEI_CLIENT_ID" HUAWEI_CLIENT_SECRET="0123456789abcdef" \
+  "$VALIDATE_HUAWEI" 2>&1)
+check "a secret under 32 characters exits 1" "1" "$?"
+
+out=$(HUAWEI_CLIENT_ID="$GOOD_HUAWEI_CLIENT_ID" HUAWEI_CLIENT_SECRET="$GOOD_HUAWEI_CLIENT_ID" \
+  "$VALIDATE_HUAWEI" 2>&1)
+check "the same value pasted into both halves exits 1" "1" "$?"
+
+out=$(HUAWEI_CLIENT_ID="$GOOD_HUAWEI_CLIENT_ID" HUAWEI_CLIENT_SECRET="$GOOD_HUAWEI_CLIENT_SECRET" \
+  "$VALIDATE_HUAWEI" --app-id com.acme.app 2>&1)
+rc=$?
+check "a package name pasted as the app id exits 1" "1" "$rc"
+check_contains "...saying it is not a numeric app id" "not a numeric app id" "$out"
+
+out=$(HUAWEI_CLIENT_ID="$GOOD_HUAWEI_CLIENT_ID" HUAWEI_CLIENT_SECRET="$GOOD_HUAWEI_CLIENT_SECRET" \
+  "$VALIDATE_HUAWEI" --client-secret "$GOOD_HUAWEI_CLIENT_SECRET" 2>&1)
+rc=$?
+check "--client-secret is a usage error" "64" "$rc"
+check_contains "...naming the environment variables instead" "HUAWEI_CLIENT_SECRET" "$out"
+
+: >"$CURL_CALLED_MARKER"
+out=$(PATH="$CURLFAKE_DIR:$PATH" CURL_CALLED_MARKER="$CURL_CALLED_MARKER" \
+  HUAWEI_CLIENT_ID="$GOOD_HUAWEI_CLIENT_ID" HUAWEI_CLIENT_SECRET="$GOOD_HUAWEI_CLIENT_SECRET" \
+  "$VALIDATE_HUAWEI" --check-access </dev/null 2>&1)
+rc=$?
+check "--check-access declined on a closed stdin exits 2" "2" "$rc"
+check "...and made no network call at all" "0" "$(wc -c <"$CURL_CALLED_MARKER" | tr -d ' ')"
+
+echo
 echo "== new-upload-keystore.sh"
 
 KEYSTORE_APP_REPO="$WORK/keystore-app-repo"
@@ -692,12 +767,12 @@ check "the script's secret names equal the runbook's secret table (union with AP
 echo
 echo "== no 'nuke' outside a 'never'-comment"
 
-EXPECTED_SCRIPTS="validate-asc-key.sh validate-keystore.sh validate-play-json.sh validate-match-repo.sh new-upload-keystore.sh push-to-github.sh"
+EXPECTED_SCRIPTS="validate-asc-key.sh validate-keystore.sh validate-play-json.sh validate-match-repo.sh validate-huawei-credentials.sh new-upload-keystore.sh push-to-github.sh"
 ALL_SCRIPTS_EXIST=1
 for name in $EXPECTED_SCRIPTS; do
   [ -f "$SKILL_DIR/scripts/$name" ] || ALL_SCRIPTS_EXIST=0
 done
-check "all six script files exist" "yes" "$([ "$ALL_SCRIPTS_EXIST" -eq 1 ] && echo yes || echo no)"
+check "all seven script files exist" "yes" "$([ "$ALL_SCRIPTS_EXIST" -eq 1 ] && echo yes || echo no)"
 
 NUKE_VIOLATIONS=0
 for f in "$SKILL_DIR"/scripts/*.sh; do
@@ -722,6 +797,7 @@ check "SKILL.md names validate-asc-key.sh" "yes" "$(grep -qF 'validate-asc-key.s
 check "SKILL.md names validate-keystore.sh" "yes" "$(grep -qF 'validate-keystore.sh' "$SKILL_MD" && echo yes || echo no)"
 check "SKILL.md names validate-play-json.sh" "yes" "$(grep -qF 'validate-play-json.sh' "$SKILL_MD" && echo yes || echo no)"
 check "SKILL.md names validate-match-repo.sh" "yes" "$(grep -qF 'validate-match-repo.sh' "$SKILL_MD" && echo yes || echo no)"
+check "SKILL.md names validate-huawei-credentials.sh" "yes" "$(grep -qF 'validate-huawei-credentials.sh' "$SKILL_MD" && echo yes || echo no)"
 check "SKILL.md names new-upload-keystore.sh" "yes" "$(grep -qF 'new-upload-keystore.sh' "$SKILL_MD" && echo yes || echo no)"
 check "SKILL.md names push-to-github.sh" "yes" "$(grep -qF 'push-to-github.sh' "$SKILL_MD" && echo yes || echo no)"
 check "SKILL.md mentions match nuke as a red flag" "yes" "$(grep -qF 'match nuke' "$SKILL_MD" && echo yes || echo no)"

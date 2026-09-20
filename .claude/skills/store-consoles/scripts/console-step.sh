@@ -1,6 +1,7 @@
 #!/bin/bash
-# Print the click-path block for one store-console step (the `apple-*` and
-# `google-*` ids from `store-setup/scripts/state.sh --list-steps`), with the
+# Print the click-path block for one store-console step (the `apple-*`,
+# `google-*` and `huawei-*` ids from `store-setup/scripts/state.sh
+# --list-steps`), with the
 # `Enter:`/`Take away:` values resolved where a repo-local source exists:
 # a `gh variable`, a `fastlane/metadata/**` file, `state.facts.<key>`, or
 # `package.json`'s `name`. Falls back to `<ask the human>` when no source is
@@ -25,9 +26,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 APPLE_REF="$SKILL_DIR/references/apple.md"
 GOOGLE_REF="$SKILL_DIR/references/google.md"
+HUAWEI_REF="$SKILL_DIR/references/huawei.md"
 
-# The 21 console ids, exactly, in this order: the interface Task 2's
+# The 26 console ids, exactly, in this order: the interface Task 2's
 # state.sh and this skill's tests both depend on. Do not reorder or rename.
+# The huawei-* ids are appended last because they are an optional extra
+# store, added after the Apple and Google vocabulary was already an
+# interface two suites diff positionally.
 STEP_IDS=(
   apple-enrolment apple-agreements apple-bundle-id apple-app-record
   apple-asc-key apple-match-repo apple-testflight-groups
@@ -36,11 +41,16 @@ STEP_IDS=(
   google-service-account google-play-grant google-tracks
   google-store-listing-fields google-content-rating google-data-safety
   google-target-audience google-app-access google-pricing
+  huawei-account huawei-app-record huawei-api-client
+  huawei-app-signing huawei-listing
 )
 
 # Ids whose resolved values may include a credential (a demo password, tax
 # or banking details) and therefore refuse a machine-readable dump of them.
-CREDENTIAL_IDS=(google-app-access apple-agreements)
+# huawei-api-client is here because its take-away *is* a credential: the
+# AppGallery Connect client secret, shown exactly once and pasted straight
+# into validate-huawei-credentials.sh.
+CREDENTIAL_IDS=(google-app-access apple-agreements huawei-api-client)
 
 is_valid_id() {
   local want="$1" id
@@ -58,6 +68,7 @@ reference_file_for() {
   case "$1" in
     apple-*) printf '%s\n' "$APPLE_REF" ;;
     google-*) printf '%s\n' "$GOOGLE_REF" ;;
+    huawei-*) printf '%s\n' "$HUAWEI_REF" ;;
     *) return 1 ;;
   esac
 }

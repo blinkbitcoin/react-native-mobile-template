@@ -3,7 +3,11 @@
 # steps that take a freshly generated app from unsigned builds to a
 # submittable App Store Connect and Google Play listing are done, which mode
 # the human picked, and the handful of account-identifying facts worth
-# remembering (never credentials — see `note` below).
+# remembering (never credentials — see `note` below). The table also carries
+# the steps of the optional extra stores, which hang off `toggle-uploads` and
+# are reached only once the Apple and Google path works; a repository that
+# does not ship on them settles those steps with
+# `state.sh set <id> skipped`.
 #
 # Usage:
 #   state.sh init [--force]
@@ -73,6 +77,13 @@ meta-sync|metadata|meta-ios-copy,meta-android-copy,meta-images,meta-age-rating,m
 first-play-upload|setup|google-play-app-signing,google-tracks,rehearse-dry-run
 toggle-uploads|setup|rehearse-dry-run,first-play-upload
 store-ready|setup|toggle-uploads,meta-sync,apple-testflight-groups,apple-privacy-labels,apple-pricing,google-content-rating,google-data-safety,google-target-audience,google-app-access,google-pricing,google-store-listing-fields,gh-environments
+huawei-account|consoles|toggle-uploads
+huawei-app-record|consoles|huawei-account
+huawei-api-client|consoles|huawei-account
+cred-huawei|credentials|huawei-api-client,huawei-app-record
+huawei-app-signing|consoles|huawei-app-record
+huawei-listing|consoles|huawei-app-record
+toggle-huawei|setup|cred-huawei,huawei-listing,huawei-app-signing
 "
 
 # Associative arrays need bash 4+, and macOS ships bash 3.2 as /bin/bash, so

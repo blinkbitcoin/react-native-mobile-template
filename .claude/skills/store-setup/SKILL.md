@@ -45,6 +45,8 @@ Modes are recorded as `state.sh mode <guided|browser-pause|browser-full>` —
 | Registering an Apple bundle identifier | Cannot be deleted once an app record uses it |
 | Creating an App Store Connect API key | The `.p8` downloads exactly once |
 | Submitting for App Review, or starting a Play production rollout | Public |
+| Enrolling the app in AppGallery App Signing | Permanent for that app |
+| Entering the package name on a new AppGallery app record | Fixes what that record can ever publish |
 | `fastlane match nuke` | Never. Not with a yes. It revokes team-wide certificates. |
 
 A yes to one row is not a yes to the next.
@@ -88,7 +90,7 @@ A yes to one row is not a yes to the next.
 
 ## The Checklist
 
-The 41 steps, in the order `state.sh --list-steps` prints them:
+The 48 steps, in the order `state.sh --list-steps` prints them:
 
 | id | owner | needs | what |
 |---|---|---|---|
@@ -133,6 +135,21 @@ The 41 steps, in the order `state.sh --list-steps` prints them:
 | `first-play-upload` | setup | `google-play-app-signing`, `google-tracks`, `rehearse-dry-run` | Do the first real Play upload (fixes `ANDROID_PACKAGE` forever) |
 | `toggle-uploads` | setup | `rehearse-dry-run`, `first-play-upload` | Turn on `STORE_UPLOADS_ENABLED` |
 | `store-ready` | setup | `toggle-uploads`, `meta-sync`, `apple-testflight-groups`, `apple-privacy-labels`, `apple-pricing`, `google-content-rating`, `google-data-safety`, `google-target-audience`, `google-app-access`, `google-pricing`, `google-store-listing-fields`, `gh-environments` | Everything needed to submit for review is in place |
+| `huawei-account` | consoles | `toggle-uploads` | Register the Huawei Developer account and pass identity verification |
+| `huawei-app-record` | consoles | `huawei-account` | Create the app record in AppGallery Connect (the package name is entered here) |
+| `huawei-api-client` | consoles | `huawei-account` | Create the AppGallery Connect API client (the client secret is shown once) |
+| `cred-huawei` | credentials | `huawei-api-client`, `huawei-app-record` | Validate and push the AppGallery client id, client secret and app id |
+| `huawei-app-signing` | consoles | `huawei-app-record` | Decide about AppGallery App Signing (optional, permanent once enabled) |
+| `huawei-listing` | consoles | `huawei-app-record` | Fill in the AppGallery listing, age rating and release countries |
+| `toggle-huawei` | setup | `cred-huawei`, `huawei-listing`, `huawei-app-signing` | Turn on `HUAWEI_UPLOADS_ENABLED` |
+
+The seven `huawei-*`/`cred-huawei`/`toggle-huawei` steps are an **optional
+extra store**, and that is why `huawei-account` needs `toggle-uploads`: the
+AppGallery block stays out of `state.sh next` until the Apple and Play path
+actually ships, and `store-ready` is reached exactly as before by a repository
+that never publishes on AppGallery. For such a repository,
+`state.sh set <id> skipped` is the right answer for each of the seven — not
+`done`, and not leaving them `todo` forever.
 
 ## State
 
