@@ -7,6 +7,7 @@
 # `platform`/`lane`/`desc` DSL that turns a lane file into callable blocks.
 require 'minitest/autorun'
 require 'tempfile'
+require 'time'
 require 'tmpdir'
 require 'fileutils'
 require 'rbconfig'
@@ -245,13 +246,16 @@ class LanesTest < Minitest::Test
   def test_dry_run_log_redacts_the_huawei_appgallery_connect_client_pair
     ENV['DRY_RUN'] = '1'
     store_action(:huawei_appgallery_connect, client_id: 'CLIENTIDVALUE', client_secret: 'CLIENTSECRETVALUE',
-                                             app_id: '123456789', apk_path: '/tmp/app-release.aab')
+                                             app_id: '123456789', apk_path: '/tmp/app-release.aab',
+                                             feedback_email: 'beta@example.com')
 
     log = UI.messages.first
     refute_includes log, 'CLIENTIDVALUE', 'the AppGallery Connect client id is half a credential pair'
     refute_includes log, 'CLIENTSECRETVALUE', log
     assert_includes log, '"app_id":"123456789"', 'the numeric app id is configuration, not a credential'
     assert_includes log, '/tmp/app-release.aab'
+    assert_includes log, '"feedback_email":"beta@example.com"',
+                    'the tester feedback address is a listing detail AppGallery shows to testers, not a credential'
   end
 
   def test_dry_run_log_redacts_unfamiliar_credential_shaped_names
@@ -971,7 +975,7 @@ class LaneBehaviourTest < Minitest::Test
     ANDROID_UPLOAD_KEY_ALIAS ANDROID_UPLOAD_KEY_PASSWORD
     MATCH_GIT_URL MATCH_PASSWORD
     STORE_METADATA_SYNC_ENABLED IOS_METADATA_EDIT_LIVE PLAY_METADATA_TRACK
-    HUAWEI_UPLOADS_ENABLED HUAWEI_SUBMIT_DELAY_SECONDS
+    HUAWEI_UPLOADS_ENABLED HUAWEI_SUBMIT_DELAY_SECONDS HUAWEI_FEEDBACK_EMAIL HUAWEI_TEST_DAYS
   ].freeze
 
   def setup
@@ -1945,26 +1949,54 @@ class LaneBehaviourTest < Minitest::Test
     end
   end
 
-  def test_android_upload_huawei_refuses_while_the_per_store_toggle_is_off
+  # All three tiers go through one lane helper, so both refusals are asserted
+  # for each of them rather than for the lane that happened to be written first.
+  HUAWEI_LANES = %i[upload_huawei upload_huawei_internal promote_huawei_beta].freeze
+
+  def assert_huawei_lane_refuses_while_the_per_store_toggle_is_off(lane_name)
     in_project do
-      error = assert_raises(UI::UserError) { run_lane(:android, :upload_huawei) }
+      error = assert_raises(UI::UserError) { run_lane(:android, lane_name) }
       assert_includes error.message, 'HUAWEI_UPLOADS_ENABLED'
       refute called?(:huawei_appgallery_connect_get_app_info)
       refute called?(:huawei_appgallery_connect)
     end
   end
 
-  def test_android_upload_huawei_names_every_missing_credential_variable
+  def assert_huawei_lane_names_every_missing_credential_variable(lane_name)
     ENV['HUAWEI_UPLOADS_ENABLED'] = 'true'
     ENV.delete('HUAWEI_CLIENT_SECRET')
     ENV['HUAWEI_APP_ID'] = '   '
     in_project do
-      error = assert_raises(UI::UserError) { run_lane(:android, :upload_huawei) }
+      error = assert_raises(UI::UserError) { run_lane(:android, lane_name) }
       assert_includes error.message, 'HUAWEI_CLIENT_SECRET'
       assert_includes error.message, 'HUAWEI_APP_ID'
       refute_includes error.message, 'HUAWEI_CLIENT_ID,', 'the variable that is set must not be named'
       refute called?(:huawei_appgallery_connect)
     end
+  end
+
+  def test_android_upload_huawei_refuses_while_the_per_store_toggle_is_off
+    assert_huawei_lane_refuses_while_the_per_store_toggle_is_off(:upload_huawei)
+  end
+
+  def test_android_upload_huawei_internal_refuses_while_the_per_store_toggle_is_off
+    assert_huawei_lane_refuses_while_the_per_store_toggle_is_off(:upload_huawei_internal)
+  end
+
+  def test_android_promote_huawei_beta_refuses_while_the_per_store_toggle_is_off
+    assert_huawei_lane_refuses_while_the_per_store_toggle_is_off(:promote_huawei_beta)
+  end
+
+  def test_android_upload_huawei_names_every_missing_credential_variable
+    assert_huawei_lane_names_every_missing_credential_variable(:upload_huawei)
+  end
+
+  def test_android_upload_huawei_internal_names_every_missing_credential_variable
+    assert_huawei_lane_names_every_missing_credential_variable(:upload_huawei_internal)
+  end
+
+  def test_android_promote_huawei_beta_names_every_missing_credential_variable
+    assert_huawei_lane_names_every_missing_credential_variable(:promote_huawei_beta)
   end
 
   def test_android_upload_huawei_honours_a_longer_submit_delay
@@ -1998,6 +2030,168 @@ class LaneBehaviourTest < Minitest::Test
       args = args_for(:huawei_appgallery_connect)
       refute args.key?(:changelog_path), 'AppGallery rejects a changelog shorter than 10 characters'
       assert_includes UI.messages.join("\n"), 'below AppGallery'
+    end
+  end
+
+  # ---------- Huawei AppGallery: the internal and beta test versions ----------
+
+  # AppGallery has one version slot and no tracks, so a tier is a flavour of
+  # the submit rather than a destination: these two keys are the whole
+  # difference between an internal test version, an open test version and a
+  # formal release.
+  def test_android_upload_huawei_internal_submits_a_test_version_free_of_manual_review
+    ENV['HUAWEI_UPLOADS_ENABLED'] = 'true'
+    in_project do
+      run_lane(:android, :upload_huawei_internal)
+
+      args = args_for(:huawei_appgallery_connect)
+      assert_equal true, args[:use_testing_version]
+      assert_equal true, args[:skip_manual_review], 'the internal tier is reviewed automatically, in hours'
+      assert_equal root_path('artifacts', 'android', 'app-release.aab'), args[:apk_path]
+      assert_equal 'huawei-client', args[:client_id]
+      assert_equal 'huawei-secret', args[:client_secret]
+      assert_equal '123456789', args[:app_id]
+      assert_equal true, args[:is_aab], 'the artifact is an Android App Bundle, not an APK'
+      assert_equal true, args[:submit_for_review]
+      assert_equal 60, args[:delay_before_submit_for_review]
+      assert_equal 'changelog.txt', File.basename(args[:changelog_path].to_s)
+      refute args.key?(:phase_wise_release), 'a staged AppGallery rollout is out of scope'
+      refute args.key?(:release_time), 'the test version opens when its window starts'
+    end
+  end
+
+  def test_android_promote_huawei_beta_submits_a_test_version_for_manual_review
+    ENV['HUAWEI_UPLOADS_ENABLED'] = 'true'
+    in_project do
+      run_lane(:android, :promote_huawei_beta)
+
+      args = args_for(:huawei_appgallery_connect)
+      assert_equal true, args[:use_testing_version]
+      assert_equal false, args[:skip_manual_review], 'open testing goes through AppGallery review'
+      assert_equal root_path('artifacts', 'android', 'app-release.aab'), args[:apk_path]
+      assert_equal true, args[:is_aab]
+      assert_equal true, args[:submit_for_review]
+      assert_equal 60, args[:delay_before_submit_for_review]
+      assert_equal 'changelog.txt', File.basename(args[:changelog_path].to_s)
+      refute args.key?(:phase_wise_release)
+      refute args.key?(:release_time)
+    end
+  end
+
+  def test_android_upload_huawei_submits_no_testing_keys_at_all
+    ENV['HUAWEI_UPLOADS_ENABLED'] = 'true'
+    ENV['HUAWEI_FEEDBACK_EMAIL'] = 'beta@example.com'
+    in_project do
+      run_lane(:android, :upload_huawei)
+
+      args = args_for(:huawei_appgallery_connect)
+      refute args.key?(:use_testing_version), 'the release tier is the same version slot with testing off'
+      refute args.key?(:skip_manual_review)
+      refute args.key?(:test_start_time)
+      refute args.key?(:test_end_time)
+      refute args.key?(:feedback_email), 'the feedback address belongs to a test version'
+    end
+  end
+
+  def test_the_tester_feedback_address_is_sent_only_once_it_is_configured
+    ENV['HUAWEI_UPLOADS_ENABLED'] = 'true'
+    in_project do
+      run_lane(:android, :upload_huawei_internal)
+      refute args_for(:huawei_appgallery_connect).key?(:feedback_email),
+             'the plugin puts the key in the request body unconditionally, so an unset address must not be passed'
+
+      reset_calls!
+      ENV['HUAWEI_FEEDBACK_EMAIL'] = 'beta@example.com'
+      run_lane(:android, :upload_huawei_internal)
+
+      assert_equal 'beta@example.com', args_for(:huawei_appgallery_connect)[:feedback_email]
+    end
+  end
+
+  # The plugin's own default window formats a *local* time with a hardcoded
+  # +0000 suffix, so it is an hour or more wrong off a non-UTC machine. The
+  # lane therefore always passes both ends of the window, computed in UTC.
+  def test_the_test_window_is_a_utc_pair_the_configured_number_of_days_apart
+    ENV['HUAWEI_UPLOADS_ENABLED'] = 'true'
+    ENV['HUAWEI_TEST_DAYS'] = '7'
+    in_project do
+      run_lane(:android, :upload_huawei_internal)
+
+      args = args_for(:huawei_appgallery_connect)
+      format = /\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+0000\z/
+      assert_match format, args[:test_start_time]
+      assert_match format, args[:test_end_time]
+      start = Time.parse(args[:test_start_time])
+      finish = Time.parse(args[:test_end_time])
+      assert_equal 7 * 24 * 60 * 60, finish - start
+      assert_in_delta Time.now.utc + 3600, start, 120, 'the window opens an hour out, in UTC'
+    end
+  end
+
+  def test_a_test_window_above_the_appgallery_ceiling_is_clamped_with_a_message
+    ENV['HUAWEI_UPLOADS_ENABLED'] = 'true'
+    ENV['HUAWEI_TEST_DAYS'] = '365'
+    in_project do
+      run_lane(:android, :upload_huawei_internal)
+
+      args = args_for(:huawei_appgallery_connect)
+      days = (Time.parse(args[:test_end_time]) - Time.parse(args[:test_start_time])) / (24 * 60 * 60)
+      assert_equal 89, days
+      assert_includes UI.messages.join("\n"), '89'
+    end
+  end
+
+  def test_a_test_window_that_is_not_a_whole_number_of_days_is_refused
+    ENV['HUAWEI_UPLOADS_ENABLED'] = 'true'
+    ENV['HUAWEI_TEST_DAYS'] = 'three weeks'
+    in_project do
+      error = assert_raises(UI::UserError) { run_lane(:android, :upload_huawei_internal) }
+      assert_includes error.message, 'HUAWEI_TEST_DAYS'
+      refute called?(:huawei_appgallery_connect)
+      # A configuration typo must not cost a real AppGallery call.
+      refute called?(:huawei_appgallery_connect_get_app_info)
+    end
+  end
+
+  # A version under review blocks the next submission on the same app, so a
+  # push landing during a beta review skips instead of failing: the review
+  # queue belongs to Huawei and must not turn main red for days.
+  def test_a_busy_version_slot_skips_the_upload_on_every_tier
+    ENV['HUAWEI_UPLOADS_ENABLED'] = 'true'
+    records = [3, 4, 5, 12, '4'].map { |state| { 'releaseState' => state } } + [{ releaseState: 4 }]
+    in_project do
+      HUAWEI_LANES.each do |lane_name|
+        records.each do |record|
+          UI.reset!
+          reset_calls!
+          stub_result(:huawei_appgallery_connect_get_app_info, record)
+
+          run_lane(:android, lane_name)
+          refute called?(:huawei_appgallery_connect), "#{lane_name} uploaded over #{record.inspect}"
+          assert_includes UI.messages.join("\n"), 'skipping the upload', "#{lane_name} over #{record.inspect}"
+        end
+      end
+    end
+  end
+
+  # Fail-open: whether a *testing* submission moves the app record into a busy
+  # state at all is unverified, so every state the lane does not recognise --
+  # and a record without the field, which is what the canned dry-run answer is
+  # -- takes the upload path.
+  def test_an_unrecognised_release_state_still_uploads_on_every_tier
+    ENV['HUAWEI_UPLOADS_ENABLED'] = 'true'
+    in_project do
+      HUAWEI_LANES.each do |lane_name|
+        [nil, 0, 7, 99, 'unknown'].each do |state|
+          UI.reset!
+          reset_calls!
+          stub_result(:huawei_appgallery_connect_get_app_info, { 'appName' => 'Stub', 'releaseState' => state })
+
+          run_lane(:android, lane_name)
+          assert called?(:huawei_appgallery_connect),
+                 "#{lane_name} withheld the upload over releaseState #{state.inspect}"
+        end
+      end
     end
   end
 
@@ -2039,6 +2233,7 @@ class LaneBehaviourTest < Minitest::Test
       ENV['PLAY_UPDATE_PRIORITY'] = '3'
       ENV['STORE_METADATA_SYNC_ENABLED'] = 'true'
       ENV['HUAWEI_UPLOADS_ENABLED'] = 'true'
+      ENV['HUAWEI_FEEDBACK_EMAIL'] = 'beta@example.com'
       # So sync_metadata records app_rating_config_path and screenshots_path
       # too: both are conditional on the file/PNG existing, and neither
       # option name is validated against the real action otherwise.
@@ -2065,7 +2260,12 @@ class LaneBehaviourTest < Minitest::Test
         # changelog_path is a plain String option with no verify block, so the
         # temporary file the lane wrote is allowed to be gone by validation time
         # (unlike deliver's app_rating_config_path below).
-        [:android, :upload_huawei, {}]
+        [:android, :upload_huawei, {}],
+        # The five testing options are reverse-engineered from the console, so
+        # the replay checking their names against the real plugin matters more
+        # here than anywhere else.
+        [:android, :upload_huawei_internal, {}],
+        [:android, :promote_huawei_beta, {}]
       ].each do |platform_name, lane_name, options|
         reset_calls!
         stub_result(:latest_testflight_build_number, 41)
