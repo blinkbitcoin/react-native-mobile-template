@@ -225,8 +225,16 @@ case "$ID" in
     [ -z "$RESOLVED_VALUE" ] || RESOLVED_VALUE="${RESOLVED_VALUE}-certificates"
     ;;
   apple-testflight-groups)
-    RESOLVED_LABEL="internal/external group names (state facts)"
-    RESOLVED_VALUE="internal=$(fact_value testflight_internal_group), external=$(fact_value testflight_external_group)"
+    RESOLVED_LABEL="TESTFLIGHT_INTERNAL_GROUP/TESTFLIGHT_EXTERNAL_GROUP (gh variables)"
+    tf_internal="$(gh_var_value TESTFLIGHT_INTERNAL_GROUP)"
+    tf_external="$(gh_var_value TESTFLIGHT_EXTERNAL_GROUP)"
+    if [ -z "$tf_internal" ] && [ -z "$tf_external" ]; then
+      RESOLVED_VALUE=""
+    else
+      [ -n "$tf_internal" ] || tf_internal="<ask the human>"
+      [ -n "$tf_external" ] || tf_external="<ask the human>"
+      RESOLVED_VALUE="internal=$tf_internal, external=$tf_external"
+    fi
     ;;
   google-app-record)
     RESOLVED_LABEL="app name (fastlane/metadata/android/en-US/title.txt)"
