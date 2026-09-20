@@ -1,10 +1,28 @@
 #!/bin/bash
 # Copy a screenshot/icon/feature-graphic file into the right place under
-# fastlane/, choosing the destination from the file's pixel dimensions.
-# Never moves the source.
+# fastlane/, choosing the destination from the file's pixel dimensions (and,
+# for Android screenshots, an explicit --kind). Never moves the source.
 #
 # Usage:
-#   place-images.sh --platform ios|android [--locale en-US] [--kind screenshot|icon|feature] [--force] [--dry-run] <file>...
+#   place-images.sh --platform ios|android [--locale en-US] \
+#     [--kind screenshot|icon|feature|phone|seven-inch|ten-inch] \
+#     [--force] [--dry-run] <file>...
+#
+# iOS images always land under fastlane/screenshots/<locale>/. Android
+# images always land under fastlane/metadata/android/<locale>/images/ -
+# never in a top-level fastlane/metadata/android/images/: supply reads
+# <locale>/images/{icon,featureGraphic}.png and
+# <locale>/images/<screenshotType>/* (supply/lib/supply/uploader.rb:286,
+# 309) and treats every directory directly under metadata/android as a
+# locale (:468), so a global images/ dir is both ignored for images and
+# pushed as a bogus locale.
+#
+# --kind chooses the Android screenshot folder explicitly
+# (phone|seven-inch|ten-inch); with no --kind, anything that isn't exactly
+# 512x512 (icon) or 1024x500 (featureGraphic) defaults to phone. Play has no
+# fixed screenshot sizes: 320-3840px per side is the whole constraint, so
+# both landscape and tall-portrait screenshots (e.g. 1080x2340) are
+# accepted.
 #
 # Exit codes: 0 ok, 1 an unrecognised size, 2 destination exists without
 # --force, 64 usage.
@@ -13,7 +31,11 @@ set -uo pipefail
 
 die_usage() { echo "FATAL: $*" >&2; exit 64; }
 
-IOS_SCREENSHOT_SIZES="1290x2796 2796x1290 1284x2778 1242x2688 1179x2556 1170x2532 1125x2436 1080x1920 2048x2732 2732x2048 1668x2388 2064x2752"
+# Every WxH pixel pair deliver's Deliver::AppScreenshot::DEVICE_RESOLUTIONS
+# table accepts - grepped from the vendored deliver/lib/deliver/
+# app_screenshot.rb the same way check-metadata.sh derives it; kept in sync
+# with that script's copy by a test that diffs both against the gem file.
+IOS_SCREENSHOT_SIZES="1024x748 1024x768 1080x2340 1125x2436 1136x600 1136x640 1170x2532 1179x2556 1206x2622 1242x2208 1242x2688 1260x2736 1280x800 1284x2778 1290x2796 1320x2868 1334x750 1440x900 1488x2266 1536x2008 1536x2048 1640x2360 1668x2224 1668x2388 1668x2420 1920x1080 2048x1496 2048x1536 2048x2732 2064x2752 2208x1242 2224x1668 2266x1488 2340x1080 2360x1640 2388x1668 2420x1668 2436x1125 2532x1170 2556x1179 2560x1600 2622x1206 2688x1242 2732x2048 2736x1260 2752x2064 2778x1284 2796x1290 2868x1320 2880x1800 312x390 368x448 3840x2160 396x484 410x502 416x496 422x514 640x1096 640x1136 640x920 640x960 750x1334 768x1004 768x1024 960x600 960x640"
 ALL_KNOWN_SIZES="$IOS_SCREENSHOT_SIZES 1024x500 512x512"
 
 PLATFORM=""
@@ -42,8 +64,8 @@ while [ $# -gt 0 ]; do
     --kind)
       [ $# -ge 2 ] || die_usage "--kind needs a value"
       case "$2" in
-        screenshot | icon | feature) : ;;
-        *) die_usage "--kind must be screenshot, icon or feature" ;;
+        screenshot | icon | feature | phone | seven-inch | ten-inch) : ;;
+        *) die_usage "--kind must be one of screenshot, icon, feature, phone, seven-inch, ten-inch" ;;
       esac
       KIND="$2"
       shift 2
@@ -94,6 +116,16 @@ get_wh() {
     return $?
   fi
   return 2
+}
+
+# Play has no fixed screenshot sizes: 320-3840px per side is the whole
+# constraint (a common tall phone shot such as 1080x2340 - ratio ~2.17:1 -
+# must still pass, so no additional aspect-ratio bound is enforced here).
+android_screenshot_legal() {
+  local w="$1" h="$2"
+  [ "$w" -ge 320 ] && [ "$w" -le 3840 ] || return 1
+  [ "$h" -ge 320 ] && [ "$h" -le 3840 ] || return 1
+  return 0
 }
 
 nearest_size() {
@@ -169,21 +201,21 @@ for src in "${FILES[@]}"; do
       dest="$dir/${seq}_${base}"
     fi
   else
-    if { [ "$KIND" = "icon" ] || { [ -z "$KIND" ] && [ "$size" = "512x512" ]; }; } && [ "$size" = "512x512" ]; then
-      dest="$REPO_ROOT/fastlane/metadata/android/images/icon.png"
-    elif { [ "$KIND" = "feature" ] || { [ -z "$KIND" ] && [ "$size" = "1024x500" ]; }; } && [ "$size" = "1024x500" ]; then
-      dest="$REPO_ROOT/fastlane/metadata/android/images/featureGraphic.png"
-    elif { [ "$KIND" = "screenshot" ] || [ -z "$KIND" ]; } && [ "$w" -ge 320 ] && [ "$w" -le 3840 ] && [ "$h" -ge 320 ] && [ "$h" -le 3840 ] && [ "$h" -ge "$w" ]; then
-      min_side="$w"
-      [ "$h" -lt "$min_side" ] && min_side="$h"
-      if [ "$min_side" -ge 1200 ]; then
-        subdir="tenInchScreenshots"
-      elif [ "$min_side" -ge 600 ]; then
-        subdir="sevenInchScreenshots"
-      else
-        subdir="phoneScreenshots"
-      fi
-      dir="$REPO_ROOT/fastlane/metadata/android/images/$subdir"
+    android_base="$REPO_ROOT/fastlane/metadata/android/$LOCALE/images"
+    if { [ "$KIND" = "icon" ] || [ -z "$KIND" ]; } && [ "$size" = "512x512" ]; then
+      dest="$android_base/icon.png"
+    elif { [ "$KIND" = "feature" ] || [ -z "$KIND" ]; } && [ "$size" = "1024x500" ]; then
+      dest="$android_base/featureGraphic.png"
+    elif [ "$KIND" = "icon" ] || [ "$KIND" = "feature" ]; then
+      : # explicit icon/feature kind but wrong size - falls through to refusal below
+    elif android_screenshot_legal "$w" "$h"; then
+      case "$KIND" in
+        seven-inch) subdir="sevenInchScreenshots" ;;
+        ten-inch) subdir="tenInchScreenshots" ;;
+        phone | screenshot | "") subdir="phoneScreenshots" ;;
+        *) subdir="phoneScreenshots" ;;
+      esac
+      dir="$android_base/$subdir"
       seq="$(next_seq "$dir")"
       dest="$dir/${seq}_${base}"
     fi

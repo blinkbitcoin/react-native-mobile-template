@@ -65,11 +65,23 @@ STORE_METADATA_SYNC_ENABLED=true .claude/skills/store-metadata/scripts/sync.sh b
 ## After Editing The Scripts
 
 Run `bash .claude/skills/store-metadata/tests/run.sh` and `make check`
-before committing. The category id list (`check-metadata.sh`) and the
-age-rating key list (`age-rating.sh`) are asserted against the vendored
-spaceship gem files by the test suite — if fastlane is upgraded and those
-gem files change shape, the tests will fail and the embedded lists need
-updating to match.
+before committing. The category id list and iOS screenshot size list
+(`check-metadata.sh`, `place-images.sh`) and the age-rating key list
+(`age-rating.sh`) are asserted against the vendored spaceship/deliver gem
+files by the test suite — if fastlane is upgraded and those gem files
+change shape, the tests will fail and the embedded lists need updating to
+match.
+
+`check-metadata.sh`'s length limits count Unicode code points, with exactly
+one trailing newline stripped (so a field saved by an editor, which appends
+a final newline, does not read as one character over) — never raw bytes,
+which would over-count anything outside ASCII.
+
+Android images (icon, feature graphic, screenshots) always live under
+`fastlane/metadata/android/<locale>/images/`, never in a top-level
+`fastlane/metadata/android/images/` — `supply` enumerates every directory
+directly under `metadata/android` as a locale, so a global `images/` both
+hides real images from it and gets pushed as a bogus locale.
 
 ## Common Mistakes
 

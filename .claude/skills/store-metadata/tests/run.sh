@@ -16,6 +16,10 @@ SKILL_MD="$SKILL_DIR/SKILL.md"
 SHARED_RB="$REPO_ROOT_OF_TEMPLATE/fastlane/lanes/shared.rb"
 AGE_RATING_GEM="$REPO_ROOT_OF_TEMPLATE/vendor/bundle/ruby/3.3.0/gems/fastlane-2.239.0/spaceship/lib/spaceship/connect_api/models/age_rating_declaration.rb"
 APP_CATEGORY_GEM="$REPO_ROOT_OF_TEMPLATE/vendor/bundle/ruby/3.3.0/gems/fastlane-2.239.0/spaceship/lib/spaceship/connect_api/models/app_category.rb"
+APP_SCREENSHOT_GEM="$REPO_ROOT_OF_TEMPLATE/vendor/bundle/ruby/3.3.0/gems/fastlane-2.239.0/deliver/lib/deliver/app_screenshot.rb"
+
+HAVE_RUBY=0
+command -v ruby >/dev/null 2>&1 && HAVE_RUBY=1
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/store-metadata-tests.XXXXXX")"
 PASS=0
@@ -128,9 +132,9 @@ fastlane/metadata/android/en-US/full_description.txt
 fastlane/metadata/android/en-US/video.txt
 fastlane/metadata/android/en-US/changelogs/default.txt
 fastlane/metadata/android/en-US/images/.gitkeep
-fastlane/metadata/android/images/phoneScreenshots/.gitkeep
-fastlane/metadata/android/images/sevenInchScreenshots/.gitkeep
-fastlane/metadata/android/images/tenInchScreenshots/.gitkeep
+fastlane/metadata/android/en-US/images/phoneScreenshots/.gitkeep
+fastlane/metadata/android/en-US/images/sevenInchScreenshots/.gitkeep
+fastlane/metadata/android/en-US/images/tenInchScreenshots/.gitkeep
 EOF
 sort "$EXPECTED_PATHS" >"$EXPECTED_PATHS.sorted"
 
@@ -162,6 +166,28 @@ check "scaffold.sh exits 2 with no fastlane/ directory" "2" "$?"
 
 # category files are not scaffolded
 check "scaffold.sh never creates primary_category.txt" "no" "$([ -f "$SCAFFOLD_WORK/fastlane/metadata/ios/primary_category.txt" ] && echo yes || echo no)"
+
+# C1: Android images are scaffolded per-locale, never as a top-level images/
+check "scaffold.sh's Android image paths sit under the locale directory" "yes" \
+  "$([ -d "$SCAFFOLD_WORK/fastlane/metadata/android/en-US/images/phoneScreenshots" ] && echo yes || echo no)"
+check "scaffold.sh never creates a top-level metadata/android/images/" "no" \
+  "$([ -d "$SCAFFOLD_WORK/fastlane/metadata/android/images" ] && echo yes || echo no)"
+
+# I4: --force never blanks a file; it only permits scaffolding onto a tree
+# that already has content.
+FORCE_SCAFFOLD_WORK="$WORK/scaffold-force"
+mkdir -p "$FORCE_SCAFFOLD_WORK/fastlane"
+REPO_ROOT="$FORCE_SCAFFOLD_WORK" "$SCAFFOLD" >/dev/null 2>&1
+printf 'My hand-written description.\n' >"$FORCE_SCAFFOLD_WORK/fastlane/metadata/ios/en-US/description.txt"
+REPO_ROOT="$FORCE_SCAFFOLD_WORK" "$SCAFFOLD" >/dev/null 2>&1
+check "scaffold.sh without --force refuses a tree that already has content" "2" "$?"
+out=$(REPO_ROOT="$FORCE_SCAFFOLD_WORK" "$SCAFFOLD" --force 2>&1)
+check "scaffold.sh --force exits 0 on a tree that already has content" "0" "$?"
+check "a filled description.txt survives scaffold.sh --force" "My hand-written description." \
+  "$(cat "$FORCE_SCAFFOLD_WORK/fastlane/metadata/ios/en-US/description.txt")"
+
+REPO_ROOT="$FORCE_SCAFFOLD_WORK" "$SCAFFOLD" --force --from-console >/dev/null 2>&1
+check "scaffold.sh --force with --from-console exits 64" "64" "$?"
 
 echo
 echo "== check-metadata.sh"
@@ -197,12 +223,68 @@ LIMIT_TREE="$WORK/limit-tree"
 setup_metadata_tree "$LIMIT_TREE"
 printf 'https://acme.example/privacy\n' >"$LIMIT_TREE/fastlane/metadata/ios/en-US/privacy_url.txt"
 printf 'A full description without placeholder text.\n' >"$LIMIT_TREE/fastlane/metadata/android/en-US/full_description.txt"
-python3 -c "import sys; sys.stdout.write('A'*30)" >"$LIMIT_TREE/fastlane/metadata/ios/en-US/name.txt"
+node -e "process.stdout.write('A'.repeat(30))" >"$LIMIT_TREE/fastlane/metadata/ios/en-US/name.txt"
 out=$(REPO_ROOT="$LIMIT_TREE" "$CHECK_METADATA" --platform ios 2>&1)
 check_not_contains "a 30-character name (at the limit) passes" "name.txt" "$out"
-python3 -c "import sys; sys.stdout.write('A'*31)" >"$LIMIT_TREE/fastlane/metadata/ios/en-US/name.txt"
+node -e "process.stdout.write('A'.repeat(31))" >"$LIMIT_TREE/fastlane/metadata/ios/en-US/name.txt"
 out=$(REPO_ROOT="$LIMIT_TREE" "$CHECK_METADATA" --platform ios 2>&1)
 check_contains "a 31-character name (over the limit) fails" "name.txt" "$out"
+
+# I1: length counts include exactly one stripped trailing newline - a field
+# saved by an editor (which appends a final newline) must not read as one
+# character over.
+node -e "process.stdout.write('A'.repeat(30) + '\n')" >"$LIMIT_TREE/fastlane/metadata/ios/en-US/name.txt"
+out=$(REPO_ROOT="$LIMIT_TREE" "$CHECK_METADATA" --platform ios 2>&1)
+check_not_contains "a 30-character name written with a trailing newline still passes" "name.txt" "$out"
+node -e "process.stdout.write('A'.repeat(31) + '\n')" >"$LIMIT_TREE/fastlane/metadata/ios/en-US/name.txt"
+out=$(REPO_ROOT="$LIMIT_TREE" "$CHECK_METADATA" --platform ios 2>&1)
+check_contains "a 31-character name written with a trailing newline still fails" "name.txt" "$out"
+
+# I2: code points are counted, not bytes - under a "C" locale a 30-character
+# name using a multi-byte character must still pass.
+node -e "process.stdout.write('é'.repeat(30) + '\n')" >"$LIMIT_TREE/fastlane/metadata/ios/en-US/name.txt"
+out=$(LC_ALL=C REPO_ROOT="$LIMIT_TREE" "$CHECK_METADATA" --platform ios 2>&1)
+check_not_contains "a 30-character 'e-acute' name passes under LC_ALL=C" "name.txt" "$out"
+node -e "process.stdout.write('A'.repeat(30))" >"$LIMIT_TREE/fastlane/metadata/ios/en-US/name.txt"
+
+# I3: a missing required file is an offender, not silently skipped.
+MISSING_TREE="$WORK/missing-tree"
+setup_metadata_tree "$MISSING_TREE"
+printf 'https://acme.example/privacy\n' >"$MISSING_TREE/fastlane/metadata/ios/en-US/privacy_url.txt"
+printf 'A full description without placeholder text.\n' >"$MISSING_TREE/fastlane/metadata/android/en-US/full_description.txt"
+rm -f "$MISSING_TREE/fastlane/metadata/ios/en-US/description.txt"
+out=$(REPO_ROOT="$MISSING_TREE" "$CHECK_METADATA" --platform ios 2>&1)
+check_contains "a deleted description.txt is reported missing" "ios/en-US/description.txt: missing" "$out"
+
+# Minors: a whitespace-only file counts as empty.
+WHITESPACE_TREE="$WORK/whitespace-tree"
+setup_metadata_tree "$WHITESPACE_TREE"
+printf 'https://acme.example/privacy\n' >"$WHITESPACE_TREE/fastlane/metadata/ios/en-US/privacy_url.txt"
+printf 'A full description without placeholder text.\n' >"$WHITESPACE_TREE/fastlane/metadata/android/en-US/full_description.txt"
+printf '   \n\t\n' >"$WHITESPACE_TREE/fastlane/metadata/ios/en-US/subtitle.txt"
+out=$(REPO_ROOT="$WHITESPACE_TREE" "$CHECK_METADATA" --platform ios 2>&1)
+check_contains "a whitespace-only subtitle.txt is reported empty" "ios/en-US/subtitle.txt: is empty" "$out"
+
+# --fix-safe: strips trailing whitespace and normalises the final newline,
+# and nothing else - a whitespace-only field stays whitespace-only (and so
+# still reads as empty) rather than being invented content.
+FIXSAFE_TREE="$WORK/fixsafe-tree"
+setup_metadata_tree "$FIXSAFE_TREE"
+printf 'https://acme.example/privacy\n' >"$FIXSAFE_TREE/fastlane/metadata/ios/en-US/privacy_url.txt"
+printf 'A full description without placeholder text.\n' >"$FIXSAFE_TREE/fastlane/metadata/android/en-US/full_description.txt"
+printf 'Acme App   \t\n\n\n' >"$FIXSAFE_TREE/fastlane/metadata/ios/en-US/name.txt"
+printf '   \n' >"$FIXSAFE_TREE/fastlane/metadata/ios/en-US/subtitle.txt"
+REPO_ROOT="$FIXSAFE_TREE" "$CHECK_METADATA" --platform ios --fix-safe >/dev/null 2>&1
+check "--fix-safe strips trailing whitespace from a field's content line" "Acme App" \
+  "$(node -e "process.stdout.write(require('fs').readFileSync(process.argv[1],'utf8').replace(/\n+$/,''))" "$FIXSAFE_TREE/fastlane/metadata/ios/en-US/name.txt")"
+FIXSAFE_NAME_FILE="$FIXSAFE_TREE/fastlane/metadata/ios/en-US/name.txt"
+check "--fix-safe normalises to exactly one trailing newline" "yes" \
+  "$(node -e "
+    const s = require('fs').readFileSync(process.argv[1], 'utf8');
+    console.log(s === 'Acme App\n' ? 'yes' : 'no');
+  " "$FIXSAFE_NAME_FILE")"
+out=$(REPO_ROOT="$FIXSAFE_TREE" "$CHECK_METADATA" --platform ios 2>&1)
+check_contains "--fix-safe leaves a whitespace-only field reading as empty" "ios/en-US/subtitle.txt: is empty" "$out"
 
 # keywords with ", " fails
 KEYWORDS_TREE="$WORK/keywords-tree"
@@ -247,18 +329,62 @@ printf 'Utilities' >"$CATEGORY_TREE/fastlane/metadata/ios/primary_category.txt"
 out=$(REPO_ROOT="$CATEGORY_TREE" "$CHECK_METADATA" --platform ios 2>&1)
 check_contains "legacy id Utilities fails too" "primary_category.txt" "$out"
 
+# C1: a stray top-level metadata/android/images/ directory fails the gate,
+# naming it.
+STRAY_IMAGES_TREE="$WORK/stray-images-tree"
+setup_metadata_tree "$STRAY_IMAGES_TREE"
+printf 'https://acme.example/privacy\n' >"$STRAY_IMAGES_TREE/fastlane/metadata/ios/en-US/privacy_url.txt"
+printf 'A full description without placeholder text.\n' >"$STRAY_IMAGES_TREE/fastlane/metadata/android/en-US/full_description.txt"
+mkdir -p "$STRAY_IMAGES_TREE/fastlane/metadata/android/images"
+: >"$STRAY_IMAGES_TREE/fastlane/metadata/android/images/.gitkeep"
+out=$(REPO_ROOT="$STRAY_IMAGES_TREE" "$CHECK_METADATA" --platform android 2>&1)
+rc=$?
+check "check-metadata.sh fails on a stray top-level android/images/ dir" "1" "$rc"
+check_contains "...naming it" "android/images: must not exist" "$out"
+
+if [ "$HAVE_IMAGE_TOOL" -eq 1 ]; then
+  # Minors: icon/featureGraphic wrong-size violations.
+  WRONGSIZE_TREE="$WORK/wrongsize-tree"
+  setup_metadata_tree "$WRONGSIZE_TREE"
+  printf 'https://acme.example/privacy\n' >"$WRONGSIZE_TREE/fastlane/metadata/ios/en-US/privacy_url.txt"
+  printf 'A full description without placeholder text.\n' >"$WRONGSIZE_TREE/fastlane/metadata/android/en-US/full_description.txt"
+  mkdir -p "$WRONGSIZE_TREE/fastlane/metadata/android/en-US/images"
+  make_png "$WRONGSIZE_TREE/fastlane/metadata/android/en-US/images/icon.png" 256 256
+  make_png "$WRONGSIZE_TREE/fastlane/metadata/android/en-US/images/featureGraphic.png" 800 400
+  out=$(REPO_ROOT="$WRONGSIZE_TREE" "$CHECK_METADATA" --platform android 2>&1)
+  check_contains "a 256x256 icon.png is a violation naming the required size" "images/icon.png: must be 512x512" "$out"
+  check_contains "an 800x400 featureGraphic.png is a violation naming the required size" "images/featureGraphic.png: must be 1024x500" "$out"
+fi
+
 echo
 echo "== place-images.sh"
+
+# C2: the embedded iOS screenshot size list equals the set of WxH pairs
+# grepped from the vendored deliver/lib/deliver/app_screenshot.rb, the same
+# way CATEGORY_IDS is checked against app_category.rb.
+GEM_IOS_SCREENSHOT_SIZES="$(grep -oE '\[[0-9]+, *[0-9]+\]' "$APP_SCREENSHOT_GEM" | sed -E 's/\[([0-9]+), *([0-9]+)\]/\1x\2/' | sort -u)"
+CHECK_METADATA_IOS_SIZES="$(sed -nE 's/^IOS_SCREENSHOT_SIZES="(.*)"$/\1/p' "$CHECK_METADATA" | tr ' ' '\n' | sort -u)"
+PLACE_IMAGES_IOS_SIZES="$(sed -nE 's/^IOS_SCREENSHOT_SIZES="(.*)"$/\1/p' "$PLACE_IMAGES" | tr ' ' '\n' | sort -u)"
+check "check-metadata.sh's iOS screenshot size list equals the vendored app_screenshot.rb sizes" "" \
+  "$(diff <(printf '%s\n' "$GEM_IOS_SCREENSHOT_SIZES") <(printf '%s\n' "$CHECK_METADATA_IOS_SIZES"))"
+check "place-images.sh's iOS screenshot size list equals check-metadata.sh's" "" \
+  "$(diff <(printf '%s\n' "$CHECK_METADATA_IOS_SIZES") <(printf '%s\n' "$PLACE_IMAGES_IOS_SIZES"))"
 
 if [ "$HAVE_IMAGE_TOOL" -eq 1 ]; then
   IMG_1290x2796="$WORK/shot-1290x2796.png"
   IMG_1024x500="$WORK/feature-1024x500.png"
   IMG_512x512="$WORK/icon-512x512.png"
-  IMG_800x600="$WORK/odd-800x600.png"
+  IMG_2868x1320="$WORK/shot-2868x1320.png"
+  IMG_1080x2340="$WORK/shot-1080x2340.png"
+  IMG_2560x1600="$WORK/shot-2560x1600.png"
+  IMG_TOO_SMALL="$WORK/shot-100x100.png"
   make_png "$IMG_1290x2796" 1290 2796
   make_png "$IMG_1024x500" 1024 500
   make_png "$IMG_512x512" 512 512
-  make_png "$IMG_800x600" 800 600
+  make_png "$IMG_2868x1320" 2868 1320
+  make_png "$IMG_1080x2340" 1080 2340
+  make_png "$IMG_2560x1600" 2560 1600
+  make_png "$IMG_TOO_SMALL" 100 100
 
   PLACE_WORK="$WORK/place-images"
   mkdir -p "$PLACE_WORK/fastlane"
@@ -267,17 +393,32 @@ if [ "$HAVE_IMAGE_TOOL" -eq 1 ]; then
   check "place-images.sh routes a 1290x2796 iOS shot to fastlane/screenshots/en-US/01_...png" "yes" \
     "$([ -f "$PLACE_WORK/fastlane/screenshots/en-US/01_shot-1290x2796.png" ] && echo yes || echo no)"
 
+  # C2: 2868x1320 (the current 6.9-inch landscape size) is accepted.
+  out=$(REPO_ROOT="$PLACE_WORK" "$PLACE_IMAGES" --platform ios "$IMG_2868x1320" 2>&1)
+  rc=$?
+  check "place-images.sh accepts an iOS 2868x1320 shot" "0" "$rc"
+
   out=$(REPO_ROOT="$PLACE_WORK" "$PLACE_IMAGES" --platform android "$IMG_1024x500" 2>&1)
-  check "place-images.sh routes a 1024x500 image to images/featureGraphic.png" "yes" \
-    "$([ -f "$PLACE_WORK/fastlane/metadata/android/images/featureGraphic.png" ] && echo yes || echo no)"
+  check "place-images.sh routes a 1024x500 image to <locale>/images/featureGraphic.png" "yes" \
+    "$([ -f "$PLACE_WORK/fastlane/metadata/android/en-US/images/featureGraphic.png" ] && echo yes || echo no)"
 
   out=$(REPO_ROOT="$PLACE_WORK" "$PLACE_IMAGES" --platform android "$IMG_512x512" 2>&1)
-  check "place-images.sh routes a 512x512 image to images/icon.png" "yes" \
-    "$([ -f "$PLACE_WORK/fastlane/metadata/android/images/icon.png" ] && echo yes || echo no)"
+  check "place-images.sh routes a 512x512 image to <locale>/images/icon.png" "yes" \
+    "$([ -f "$PLACE_WORK/fastlane/metadata/android/en-US/images/icon.png" ] && echo yes || echo no)"
 
-  out=$(REPO_ROOT="$PLACE_WORK" "$PLACE_IMAGES" --platform android "$IMG_800x600" 2>&1)
+  # C3: default kind for anything that isn't icon/feature-sized is "phone",
+  # no pixel heuristic - and landscape is accepted.
+  out=$(REPO_ROOT="$PLACE_WORK" "$PLACE_IMAGES" --platform android "$IMG_1080x2340" 2>&1)
+  check "place-images.sh routes a 1080x2340 Android shot to phoneScreenshots by default" "yes" \
+    "$([ -f "$PLACE_WORK/fastlane/metadata/android/en-US/images/phoneScreenshots/01_shot-1080x2340.png" ] && echo yes || echo no)"
+
+  out=$(REPO_ROOT="$PLACE_WORK" "$PLACE_IMAGES" --platform android --kind ten-inch "$IMG_2560x1600" 2>&1)
+  check "place-images.sh --kind ten-inch routes 2560x1600 to tenInchScreenshots" "yes" \
+    "$([ -f "$PLACE_WORK/fastlane/metadata/android/en-US/images/tenInchScreenshots/01_shot-2560x1600.png" ] && echo yes || echo no)"
+
+  out=$(REPO_ROOT="$PLACE_WORK" "$PLACE_IMAGES" --platform android "$IMG_TOO_SMALL" 2>&1)
   rc=$?
-  check "place-images.sh refuses an 800x600 image" "1" "$rc"
+  check "place-images.sh refuses a too-small 100x100 image" "1" "$rc"
   check_contains "...naming the nearest legal size" "nearest legal size" "$out"
 
   DRYRUN_WORK="$WORK/place-images-dryrun"
@@ -301,8 +442,15 @@ fi
 echo
 echo "== age-rating.sh"
 
+# The keys age-rating.sh itself claims to support - used below to build a
+# full answer set regardless of whether ruby is available to independently
+# re-derive them from the gem.
 EXPECTED_AGE_KEYS="$WORK/expected-age-keys.txt"
-ruby -e '
+"$AGE_RATING" --list-keys >"$EXPECTED_AGE_KEYS" 2>&1
+
+if [ "$HAVE_RUBY" -eq 1 ]; then
+  GEM_AGE_KEYS="$WORK/gem-age-keys.txt"
+  ruby -e '
 attrs = []
 File.readlines(ARGV[0]).each do |line|
   m = line.match(/attr_accessor :(\w+)/)
@@ -314,10 +462,11 @@ attrs.each do |a|
   camel = a.split("_").each_with_index.map { |w, i| i == 0 ? w : w.capitalize }.join
   puts camel
 end
-' "$AGE_RATING_GEM" >"$EXPECTED_AGE_KEYS"
-
-out=$("$AGE_RATING" --list-keys 2>&1)
-check "age-rating.sh --list-keys matches the gem-derived key list" "" "$(diff <(sort "$EXPECTED_AGE_KEYS") <(printf '%s\n' "$out" | sort))"
+' "$AGE_RATING_GEM" >"$GEM_AGE_KEYS"
+  check "age-rating.sh --list-keys matches the gem-derived key list" "" "$(diff <(sort "$GEM_AGE_KEYS") <(sort "$EXPECTED_AGE_KEYS"))"
+else
+  skip "age-rating.sh --list-keys vs. the gem-derived key list (no ruby on PATH)"
+fi
 
 AGE_WORK="$WORK/age-rating"
 mkdir -p "$AGE_WORK"
