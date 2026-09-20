@@ -115,7 +115,7 @@ cat >"$VARS_MISSING_SCHEME" <<'EOF'
 [{"name":"IOS_BUNDLE_ID","value":"com.acme.app"},{"name":"ANDROID_PACKAGE","value":"com.acme.app"}]
 EOF
 
-# The exact 48-id vocabulary Tasks 3, 4 and 5 depend on, in order.
+# The exact 49-id vocabulary Tasks 3, 4 and 5 depend on, in order.
 EXPECTED_STEPS="preflight
 identifiers
 apple-enrolment
@@ -163,7 +163,8 @@ huawei-api-client
 cred-huawei
 huawei-app-signing
 huawei-listing
-toggle-huawei"
+toggle-huawei
+huawei-testers"
 
 json_field() {
   # json_field <file> <js-expression-on-obj-named-s>
@@ -196,7 +197,7 @@ rc=$?
 check "init exits 0" "0" "$rc"
 check "init creates state.json" "yes" "$([ -f "$STORE_SETUP_DIR/state.json" ] && echo yes || echo no)"
 check "schema is 1" "1" "$(json_field "$STORE_SETUP_DIR/state.json" 's.schema')"
-check "every step starts todo" "48" "$(json_field "$STORE_SETUP_DIR/state.json" 'Object.values(s.steps).filter((x) => x.status === "todo").length')"
+check "every step starts todo" "49" "$(json_field "$STORE_SETUP_DIR/state.json" 'Object.values(s.steps).filter((x) => x.status === "todo").length')"
 check "state.json ends with a trailing newline" "yes" "$([ -n "$(tail -c1 "$STORE_SETUP_DIR/state.json")" ] && echo no || echo yes)"
 
 out2=$("$STATE" init)
@@ -274,7 +275,7 @@ echo "state.sh render / --list-steps"
 
 export STORE_SETUP_DIR="$WORK/store-render"
 "$STATE" init >/dev/null
-check "render lists every step exactly once" "48" "$("$STATE" render --markdown | wc -l | tr -d ' ')"
+check "render lists every step exactly once" "49" "$("$STATE" render --markdown | wc -l | tr -d ' ')"
 check "--list-steps matches the spec exactly, in order" "$EXPECTED_STEPS" "$("$STATE" --list-steps)"
 
 "$STATE" set preflight doing >/dev/null
@@ -352,7 +353,7 @@ check "SKILL.md has the always-confirm table" "yes" "$(grep -q 'Play App Signing
 check "SKILL.md prohibits match nuke" "yes" "$(grep -qi 'nuke' "$SKILL_MD" && echo yes || echo no)"
 check "SKILL.md documents state.sh next" "yes" "$(grep -q 'state.sh next' "$SKILL_MD" && echo yes || echo no)"
 # shellcheck disable=SC2016 # the pattern is a literal regex, not a shell expansion
-check "SKILL.md checklist has all 48 ids" "48" "$(grep -cE '^\| `[a-z-]+` \|' "$SKILL_MD")"
+check "SKILL.md checklist has all 49 ids" "49" "$(grep -cE '^\| `[a-z-]+` \|' "$SKILL_MD")"
 
 # shellcheck disable=SC2016 # the patterns are literal regexes, not shell expansions
 SKILL_MD_IDS="$(grep -oE '^\| `[a-z0-9-]+` \|' "$SKILL_MD" | sed -E 's/^\| `//; s/` \|$//')"

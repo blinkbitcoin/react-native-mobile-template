@@ -8,7 +8,7 @@ allowed-tools: Bash(gh variable:*), Bash(.claude/skills/store-consoles/scripts/c
 
 ## Overview
 
-This skill covers the 26 `apple-*`, `google-*` and `huawei-*` ids in the
+This skill covers the 27 `apple-*`, `google-*` and `huawei-*` ids in the
 `store-setup` checklist — everything that happens inside App Store Connect,
 the Apple Developer portal, Google Play Console, Google Cloud or AppGallery
 Connect, rather than in this repository or in GitHub.
@@ -44,7 +44,7 @@ those four blocks in `references/apple.md` and `references/google.md`.
 
 ## Huawei AppGallery
 
-The five `huawei-*` ids are an **optional extra store** and every one of them
+The six `huawei-*` ids are an **optional extra store** and every one of them
 hangs off `toggle-uploads`, so they are only reached once the Apple and Play
 path actually ships; a repository that does not publish on AppGallery answers
 each with `state.sh set <id> skipped`. Two of them carry the weight:
@@ -57,7 +57,10 @@ exactly once, so browser mode stops before Create and the human clicks it and
 pastes both into `store-credentials`' `validate-huawei-credentials.sh`;
 `--format json` is refused for that id for the same reason. The AppGallery
 listing is console-only — `store-metadata` does not cover it — and its
-age-rating questionnaire is mode (c) only, like the other four. Huawei
+age-rating questionnaire is mode (c) only, like the other four.
+`huawei-testers` is the AppGallery test user list — console-only, because
+nothing in the Publishing API manages testers, and re-selected per release
+because that is how AppGallery invites them. Huawei
 reorganises these menus more often than Apple or Google do, so anything
 `references/huawei.md` could not confirm is marked "verify on screen": read
 the label in front of you rather than insisting on the wording in the block.

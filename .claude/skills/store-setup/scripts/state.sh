@@ -84,6 +84,7 @@ cred-huawei|credentials|huawei-api-client,huawei-app-record
 huawei-app-signing|consoles|huawei-app-record
 huawei-listing|consoles|huawei-app-record
 toggle-huawei|setup|cred-huawei,huawei-listing,huawei-app-signing
+huawei-testers|consoles|huawei-app-record
 "
 
 # Associative arrays need bash 4+, and macOS ships bash 3.2 as /bin/bash, so

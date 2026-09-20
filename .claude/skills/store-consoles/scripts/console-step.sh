@@ -28,7 +28,7 @@ APPLE_REF="$SKILL_DIR/references/apple.md"
 GOOGLE_REF="$SKILL_DIR/references/google.md"
 HUAWEI_REF="$SKILL_DIR/references/huawei.md"
 
-# The 26 console ids, exactly, in this order: the interface Task 2's
+# The 27 console ids, exactly, in this order: the interface Task 2's
 # state.sh and this skill's tests both depend on. Do not reorder or rename.
 # The huawei-* ids are appended last because they are an optional extra
 # store, added after the Apple and Google vocabulary was already an
@@ -42,7 +42,7 @@ STEP_IDS=(
   google-store-listing-fields google-content-rating google-data-safety
   google-target-audience google-app-access google-pricing
   huawei-account huawei-app-record huawei-api-client
-  huawei-app-signing huawei-listing
+  huawei-app-signing huawei-listing huawei-testers
 )
 
 # Ids whose resolved values may include a credential (a demo password, tax

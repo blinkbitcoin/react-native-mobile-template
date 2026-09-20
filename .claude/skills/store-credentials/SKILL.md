@@ -205,7 +205,7 @@ and everything else is a secret, including all seven `APP_REVIEW_*` values
 (a reviewer demo login is a real credential, even though the lanes also
 accept it through `env-json`-style input elsewhere).
 
-| | Variables (31) | Secrets (23) |
+| | Variables (33) | Secrets (23) |
 |---|---|---|
 | Visible in logs | Yes | No (masked) |
 | Set with | `gh variable set NAME --body-file -` | `gh secret set NAME --body-file -` |

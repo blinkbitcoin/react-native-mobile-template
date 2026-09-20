@@ -62,3 +62,13 @@ front of you rather than insisting on the wording here.
 **Browser mode:** upload the images and fill the fields, read them back before Save; the age-rating questionnaire is mode (c) only — modes (a) and (b) get the human to the form and stop
 **Guided mode:** print the click-path, the asset sizes and the fields to fill; the human fills them and reports back
 **Then:** mode (c) answers the questionnaire only from what the human gives in this turn, reads each answer back, and waits for an explicit yes before Save; `state.sh set huawei-listing done`; next `toggle-huawei` once `cred-huawei` and `huawei-app-signing` are also done. The bundle must target Android API level 30 or higher and ship 64-bit code — the template's Android build already does both. Review takes days rather than hours; verify the current estimate on screen
+
+### `huawei-testers` — AppGallery test user list
+**Console:** AppGallery Connect — https://developer.huawei.com/consumer/en/service/josp/agc/index.html
+**Click-path:** AppGallery Connect → Users and permissions → List management → User list → New → name the list → add the testers' Huawei IDs → Save (verify the wording on screen; this menu has moved before), then AppGallery Connect → app → the version's open testing page → select the list there → Save (verify on screen)
+**Enter:** a name for the list, and the testers' Huawei IDs — from the human only, never guessed and never taken from any file in this repository
+**Take away:** a saved user list, selected for the release; no secret or variable. The limits are 100 testers on an internal test version, 5,000 on an open one, and 30 lists per developer account
+**Confirm:** safe — a user list invites testers and publishes nothing; it can be renamed, edited or deleted again at no cost, and selecting it on a version only decides who may install that test build
+**Browser mode:** create the list, add exactly the Huawei IDs the human gave in this turn, read the name and every ID back before Save, then select the list on the version's open testing page and read that selection back too
+**Guided mode:** print both click-paths — the list one and the version-selection one — with the list name and the IDs the human gave; the human creates the list, selects it, and reports back
+**Then:** `state.sh set huawei-testers done`. Nothing in the Publishing API manages testers, so this is console-only work: testers are invited **per release** and install through the AppGallery app, which means every new test version needs the list selected again on its testing page

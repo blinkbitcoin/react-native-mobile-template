@@ -136,6 +136,9 @@ check "google-app-record is safe, and says why in its own block" "yes" \
 check "huawei-listing is safe, and its block says the lane's submit is the public step" "yes" \
   "$(awk '/^### `huawei-listing`/{f=1} f && /^### `/ && !/huawei-listing/{exit} f' "$HUAWEI_MD" | grep -qi 'submit' && echo yes || echo no)"
 
+check "huawei-testers is safe, and its block says testers are invited per release" "yes" \
+  "$(awk '/^### `huawei-testers`/{f=1} f && /^### `/ && !/huawei-testers/{exit} f' "$HUAWEI_MD" | grep -qi 'invited \*\*per release\*\*' && echo yes || echo no)"
+
 echo
 echo "value resolution"
 
