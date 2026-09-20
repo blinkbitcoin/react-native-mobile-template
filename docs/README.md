@@ -16,6 +16,7 @@ all).
 | Wire a crash reporter, or find the OTA and crash-reporting overview | [ota-and-crash-reporting.md](ota-and-crash-reporting.md) |
 | Turn OTA updates on, publish a hotfix, or roll one back | [ota.md](ota.md) |
 | Get a store account, create credentials, and know what each one can reach | [store-accounts.md](store-accounts.md) |
+| Take a new app from unsigned builds to a submittable listing | [store-accounts.md](store-accounts.md) plus [`.claude/skills/store-setup/`](../.claude/skills/store-setup/) |
 | Cut a release, promote a build, halt a rollout, or rehearse a lane | [release-runbook.md](release-runbook.md) |
 | Understand what CI runs, how it maps to `make`, and where the logs are | [ci.md](ci.md) |
 | Know why a choice was made and what the alternatives were | [decisions/README.md](decisions/README.md) |

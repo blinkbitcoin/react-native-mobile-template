@@ -75,27 +75,27 @@ for identifiers, devices and certificates.
 
 ### Steps
 
-1. **Register the bundle identifier.** Developer account → Certificates,
-   Identifiers & Profiles → Identifiers → **+** → App IDs. This is
-   `IOS_BUNDLE_ID`, and it must match `ios.bundleIdentifier` in
+1. **Register the bundle identifier** (`apple-bundle-id`). Developer account →
+   Certificates, Identifiers & Profiles → Identifiers → **+** → App IDs. This
+   is `IOS_BUNDLE_ID`, and it must match `ios.bundleIdentifier` in
    `app.config.ts`.
-2. **Create the app record.** App Store Connect → Apps → **+** → New App,
-   selecting the identifier from step 1.
-3. **Create an App Store Connect API key.** Users and Access → Integrations →
-   App Store Connect API. Prefer an **individual key** issued to a user whose
-   access is limited to this one app, over a **team key** with App Manager,
-   which spans every app on the team. Apple has moved this screen more than
-   once — if the wording differs, look for the page that produces a `.p8`
-   download, an issuer ID and a key ID.
+2. **Create the app record** (`apple-app-record`). App Store Connect → Apps →
+   **+** → New App, selecting the identifier from step 1.
+3. **Create an App Store Connect API key** (`apple-asc-key`). Users and
+   Access → Integrations → App Store Connect API. Prefer an **individual
+   key** issued to a user whose access is limited to this one app, over a
+   **team key** with App Manager, which spans every app on the team. Apple
+   has moved this screen more than once — if the wording differs, look for
+   the page that produces a `.p8` download, an issuer ID and a key ID.
    The `.p8` downloads **once**; there is no second chance.
    [fastlane's notes on this API](https://docs.fastlane.tools/app-store-connect-api/)
    are the clearest write-up of the three values and how they fit together.
-4. **Set up signing.** Run `fastlane match init` against a **new, private** git
-   repository, not the one production uses. See
+4. **Set up signing** (`apple-match-repo`). Run `fastlane match init` against
+   a **new, private** git repository, not the one production uses. See
    [docs.fastlane.tools/actions/match](https://docs.fastlane.tools/actions/match/).
    The passphrase you choose becomes `MATCH_PASSWORD`.
-5. **Create a TestFlight internal group** for the build to land in, and note
-   its exact name for `TESTFLIGHT_INTERNAL_GROUP`.
+5. **Create a TestFlight internal group** (`apple-testflight-groups`) for the
+   build to land in, and note its exact name for `TESTFLIGHT_INTERNAL_GROUP`.
 
 ### What you end up with
 
@@ -124,24 +124,27 @@ check the current policy rather than taking that on trust.
 
 ### Steps
 
-1. **Create the app.** Play Console → All apps → Create app. The application
-   id is `ANDROID_PACKAGE`, and it must match `android.package` in
-   `app.config.ts`. It can never be changed after the first upload.
-2. **Generate an upload keystore**, fresh for this app — do not reuse
-   production's:
+1. **Create the app** (`google-app-record`). Play Console → All apps → Create
+   app. The application id is `ANDROID_PACKAGE`, and it must match
+   `android.package` in `app.config.ts`. It can never be changed after the
+   first upload.
+2. **Generate an upload keystore** (`cred-upload-keystore`), fresh for this
+   app — do not reuse production's:
    ```bash
    keytool -genkeypair -v -keystore upload.keystore -alias upload \
      -keyalg RSA -keysize 2048 -validity 10000
    ```
-   Then enrol in [Play App Signing](https://support.google.com/googleplay/android-developer/answer/9842756),
-   which lets Google hold the release key while you hold only the upload key.
-   Losing an upload key is recoverable; losing a release key is not.
-3. **Create a service account.** [Google Cloud console](https://console.cloud.google.com)
-   → IAM & Admin → Service Accounts → Create, then Keys → Add key → JSON.
-4. **Grant it access to this app only.** Play Console → Users and permissions →
-   Invite new users → paste the service account email → **select this app
-   rather than account-wide access**. This step is what makes the credential
-   safe to hold in a template repository.
+   Then enrol in [Play App Signing](https://support.google.com/googleplay/android-developer/answer/9842756)
+   (`google-play-app-signing`), which lets Google hold the release key while
+   you hold only the upload key. Losing an upload key is recoverable; losing
+   a release key is not.
+3. **Create a service account** (`google-service-account`).
+   [Google Cloud console](https://console.cloud.google.com) → IAM & Admin →
+   Service Accounts → Create, then Keys → Add key → JSON.
+4. **Grant it access to this app only** (`google-play-grant`). Play Console →
+   Users and permissions → Invite new users → paste the service account
+   email → **select this app rather than account-wide access**. This step is
+   what makes the credential safe to hold in a template repository.
    [Play Developer API getting started](https://developers.google.com/android-publisher/getting_started)
    covers the pairing of the two consoles.
 
@@ -231,3 +234,29 @@ service account needs the **Manage store presence** permission in Play
 Console → Users and permissions, not just release access. See
 [Store listing metadata](release-runbook.md#store-listing-metadata) for what
 those lanes do.
+
+## Doing this with an agent
+
+`.claude/skills/store-setup/` drives the whole checklist above end to end —
+`store-consoles` for the console work, `store-credentials` for turning what
+you get into GitHub secrets and variables, and `store-metadata` for the
+`fastlane/metadata/**` copy and images. It starts by asking you to pick a
+mode: guided (it tells you what to click, you do it), browser-pause (it
+drives the browser and hands back only for sign-in, 2FA, the one-time `.p8`
+download and anything that costs money or binds you legally), or browser-full
+(as browser-pause, plus it accepts agreements and submits questionnaires from
+answers you give it). The checklist is resumable — `state.sh next` picks up
+wherever the last session (or the last person) left off, and it can hand off
+mid-flight with a rendered Markdown summary.
+
+Regardless of mode, it always stops for an explicit yes on: the Apple
+Developer Program fee or the Play registration fee, accepting any agreement
+or submitting tax or banking details, enrolling in Play App Signing, the
+first Play upload, registering an Apple bundle identifier, creating an App
+Store Connect API key, submitting for App Review or starting a Play
+production rollout — and it never runs `fastlane match nuke`, in any mode,
+with or without a yes.
+
+This page stays the source of truth for what each credential *is* and where
+it comes from; the skill is the source of truth for the order to do it in and
+how to get there.

@@ -389,6 +389,11 @@ Why a variable rather than detecting the secrets: GitHub's `secrets` context is
 not available in a job-level `if:`, so a job cannot ask whether its own
 credentials exist.
 
+`.claude/skills/store-setup/` enforces that order as three checklist steps —
+`toggle-signing`, then `rehearse-dry-run`, then `toggle-uploads` — so signing
+can never be turned on ahead of its credentials, nor uploads ahead of a
+passing dry run.
+
 ## Variables and secrets
 
 Where each value comes from — which console, which page, and what it can
@@ -443,6 +448,10 @@ anyone who can see the run. Credentials go in `secrets:` instead.
 and package name, which would then disagree with the `IOS_BUNDLE_ID` /
 `ANDROID_PACKAGE` the lanes assert.
 
+`.claude/skills/store-credentials/scripts/push-to-github.sh --plan` prints
+`unchanged` / `set` / `missing` for every variable above, without writing
+anything.
+
 Repository / environment **secrets**. Scope the store credentials to the
 `internal`, `beta` and `production` environments rather than the repository when
 you want a reviewer between a token and production.
@@ -465,6 +474,10 @@ you want a reviewer between a token and production.
 | `APP_REVIEW_EMAIL`, `APP_REVIEW_FIRST_NAME`, `APP_REVIEW_LAST_NAME`, `APP_REVIEW_PHONE` | iOS `promote_beta` and `release_production` lanes | The contact Apple reaches for review questions |
 | `APP_REVIEW_DEMO_USER`, `APP_REVIEW_DEMO_PASSWORD` | same | A working login for the reviewer; omit both if the app needs no account |
 | `APP_REVIEW_NOTES` | same | Free-text notes for the reviewer |
+
+`.claude/skills/store-credentials/scripts/push-to-github.sh --plan` covers
+the secrets above too, reporting the same three statuses per name without
+ever printing a value.
 
 The seven `APP_REVIEW_*` values are **secrets, not `build-env` or `env-json`
 values**: a reviewer demo login is a real credential and both of those inputs are
