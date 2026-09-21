@@ -65,6 +65,10 @@ export function stripRepoReferences(raw) {
   // `[WIP]`) lose their punctuation but keep their words. The suffix in
   // TRUNCATION_SUFFIX is added after this runs, so it stays the only pair of
   // square brackets that can reach a store.
+  // A nested tag such as `<scr<b>ipt>` survives this pass as `<script>`, which
+  // is what CodeQL warns about, but the next line deletes every `<` and `>`
+  // and the result is plain text for a store listing, never HTML.
+  // codeql[js/incomplete-multi-character-sanitization]
   text = text.replace(/<\/?[a-z][^>]*>/gi, '');
   text = text.replace(/[*_`[\]<>]/g, '');
   return text;
