@@ -46,8 +46,8 @@ flowchart TB
   subgraph internal["CD / Internal"]
     direction TB
     iprep["Prepare<br/>reserves vX.Y.Z-build.N"] --> ibuild["Build iOS<br/>Build Android"]
-    ibuild --> iup["TestFlight internal<br/>Play internal<br/>AppGallery test version"]
-    iup --> ipre["vX.Y.Z-build.N pre-release<br/>with every artifact"]
+    ibuild -->|"STORE_UPLOADS_ENABLED"| iup["TestFlight internal<br/>Play internal<br/>AppGallery test version"]
+    ibuild --> ipre["vX.Y.Z-build.N pre-release<br/>with every artifact"]
     ipre -->|"OTA_ENABLED"| iota["OTA internal"]
   end
 
