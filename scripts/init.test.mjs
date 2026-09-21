@@ -14,7 +14,6 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
-  statSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -587,15 +586,14 @@ function runInit(root, args) {
 /** Walk the tree and return [relative path, contents] for every text file. */
 function textFiles(root, rel = '') {
   const out = [];
-  for (const entry of readdirSync(path.join(root, rel))) {
-    if (SKIP_ANYWHERE.has(entry)) continue;
-    const next = rel ? `${rel}/${entry}` : entry;
+  for (const entry of readdirSync(path.join(root, rel), { withFileTypes: true })) {
+    if (SKIP_ANYWHERE.has(entry.name)) continue;
+    const next = rel ? `${rel}/${entry.name}` : entry.name;
     if (SKIP_SCAN_AT_ROOT.has(next)) continue;
-    const full = path.join(root, next);
-    if (statSync(full).isDirectory()) {
+    if (entry.isDirectory()) {
       out.push(...textFiles(root, next));
-    } else if (!BINARY.test(entry)) {
-      out.push([next, readFileSync(full, 'utf8')]);
+    } else if (!BINARY.test(entry.name)) {
+      out.push([next, readFileSync(path.join(root, next), 'utf8')]);
     }
   }
   return out;
@@ -699,18 +697,28 @@ describe('init --yes --no-web', () => {
       .map(([rel]) => rel);
     assert.deepEqual(offenders, []);
     // The three links a new contributor sees first, all live.
+    // Literal substrings, not regexes: a regex shaped like a host is read by
+    // CodeQL as an unanchored URL check, and these are content assertions.
     const config = readFileSync(path.join(root, '.github/ISSUE_TEMPLATE/config.yml'), 'utf8');
-    assert.match(config, /github\.com\/acme-inc\/acme-wallet\/security\/policy/);
-    assert.match(config, /github\.com\/acme-inc\/acme-wallet\/blob\/main\/CONTRIBUTING\.md/);
-    assert.match(
-      readFileSync(path.join(root, '.github/ISSUE_TEMPLATE/bug_report.yml'), 'utf8'),
-      /github\.com\/acme-inc\/acme-wallet\/blob\/main\/SECURITY\.md/,
+    assert.ok(
+      config.includes('github.com/acme-inc/acme-wallet/security/policy'),
+      'config.yml: security policy link',
+    );
+    assert.ok(
+      config.includes('github.com/acme-inc/acme-wallet/blob/main/CONTRIBUTING.md'),
+      'config.yml: contributing link',
+    );
+    const bugReport = readFileSync(
+      path.join(root, '.github/ISSUE_TEMPLATE/bug_report.yml'),
+      'utf8',
+    );
+    assert.ok(
+      bugReport.includes('github.com/acme-inc/acme-wallet/blob/main/SECURITY.md'),
+      'bug_report.yml: security link',
     );
     // The reusable-workflow repo keeps its owner.
-    assert.match(
-      readFileSync(path.join(root, '.github/workflows/ci.yml'), 'utf8'),
-      /blinkbitcoin\/shared-workflows/,
-    );
+    const ci = readFileSync(path.join(root, '.github/workflows/ci.yml'), 'utf8');
+    assert.ok(ci.includes('blinkbitcoin/shared-workflows'), 'ci.yml: workflows repo owner');
   });
 
   // The commit-msg hook rejects `web` afterwards, so a doc that still lists it
