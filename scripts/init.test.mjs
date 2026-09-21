@@ -759,12 +759,12 @@ describe('init --yes --no-web', () => {
   // goes with its marker block.)
   test('rewrites every workflow-file count in docs/ci.md, not just the first', () => {
     const ci = readFileSync(path.join(root, 'docs/ci.md'), 'utf8');
-    assert.doesNotMatch(ci, /\b[Ee]leven\b/);
-    assert.match(ci, /Ten files, in two groups: four that run on every change/);
-    assert.match(ci, /the ten files in/);
-    assert.match(ci, /Two of the ten are the exception/);
-    assert.match(ci, /Eight of the ten files carry/);
-    assert.match(ci, /`release-production\.yml` alone has nine\./);
+    assert.doesNotMatch(ci, /\b[Tt]welve\b/);
+    assert.match(ci, /Eleven files, in two groups: four that run on every change/);
+    assert.match(ci, /the eleven files in/);
+    assert.match(ci, /Two of the eleven are the exception/);
+    assert.match(ci, /Nine of the eleven files carry/);
+    assert.match(ci, /`release-production\.yml` alone has ten\./);
   });
 
   test('replaced the placeholders with the answers', () => {

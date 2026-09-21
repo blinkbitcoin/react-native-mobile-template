@@ -295,6 +295,42 @@ public to anyone who can read the run.
 The full list, with which workflow reads each, is in
 [release-runbook.md](release-runbook.md#variables-and-secrets).
 
+The path each credential takes, from the console page it is created on to the
+lane that reads it:
+
+```mermaid
+flowchart LR
+  c1["App Store Connect<br/>API key"] -->|"validate-asc-key.sh"| push
+  c2["Play service<br/>account JSON"] -->|"validate-play-json.sh"| push
+  c3["Android upload<br/>keystore"] -->|"validate-keystore.sh"| push
+  c4["match certificate<br/>repository"] -->|"validate-match-repo.sh"| push
+  c5["AppGallery Connect<br/>API client"] -->|"validate-huawei-credentials.sh"| push
+
+  push["push-to-github.sh --apply<br/>values on stdin only"]
+
+  push -->|"gh secret set"| s1["ASC_KEY_ID<br/>ASC_ISSUER_ID<br/>ASC_KEY_P8_BASE64"]
+  push -->|"gh secret set"| s2["PLAY_SERVICE_ACCOUNT_JSON"]
+  push -->|"gh secret set"| s3["ANDROID_UPLOAD_KEYSTORE_BASE64<br/>and three passwords"]
+  push -->|"gh secret set"| s4["MATCH_PASSWORD, MATCH_GIT_URL,<br/>MATCH_GIT_BASIC_AUTHORIZATION"]
+  push -->|"gh secret set"| s5["HUAWEI_CLIENT_ID<br/>HUAWEI_CLIENT_SECRET"]
+  push -->|"gh variable set"| v1["HUAWEI_APP_ID<br/>(repository scope only)"]
+
+  s1 -->|"secrets: on fastlane-lane<br/>and expo-build-ios"| l1["ios upload_internal, promote_beta,<br/>release_production, sync_metadata"]
+  s2 -->|"secrets:, then a 600 file"| l2["android upload_internal, promote_beta,<br/>release_production, sync_metadata"]
+  s3 -->|"secrets: on expo-build-android,<br/>then a 600 file"| l3["android build"]
+  s4 -->|"secrets: on expo-build-ios"| l4["ios build (match)"]
+  s5 -->|"secrets:, in the lane step's env"| l5["upload_huawei_internal,<br/>promote_huawei_beta, upload_huawei"]
+  v1 -->|"env-json on the Huawei jobs"| l5
+```
+
+Two things the picture is precise about. **Secrets can be scoped to an
+environment, variables cannot**: `push-to-github.sh --env internal|beta|production`
+passes `--env` to `gh secret set` only, so every variable is repository-wide
+and readable in any run, which is why an identifier like `HUAWEI_APP_ID` is a
+variable and the client pair beside it is not. And **no value ever reaches
+`gh` as an argument**: the script feeds each one through `--body-file -` on
+stdin, so it never lands in argv, in a log line or in the shell history.
+
 **Store listing sync.** `PLAY_SERVICE_ACCOUNT_JSON` above is also what
 `android sync_metadata` / `pull_metadata` use to edit the Play listing, so the
 service account needs the **Manage store presence** permission in Play

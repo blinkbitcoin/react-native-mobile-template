@@ -7,6 +7,23 @@ Agent skills that ship with this template, each under its own subdirectory. The 
 - **store-credentials**: Creates and shape-validates every credential locally (the ASC API key, the match repo, the Android upload keystore, the Play service account JSON, the AppGallery Connect API client), then pushes each one to GitHub through stdin.
 - **store-metadata**: Fills `fastlane/metadata`, places the images, writes the age-rating answers, and runs the `sync_metadata` lane. Apple and Google only — the AppGallery listing is console-only.
 
+How they hand off. The checklist in `.store-setup/state.json` is the shared
+thread: every skill reads the next step from it and records the result back,
+which is what makes the whole run resumable and handed over mid-flight.
+
+```mermaid
+flowchart LR
+  setup["store-setup<br/>mode, identifiers gate"] -->|"the next console step"| consoles["store-consoles<br/>click-paths per step"]
+  consoles -->|"what the console handed back"| creds["store-credentials<br/>validate, then push"]
+  creds -->|"secrets and variables set"| meta["store-metadata<br/>fill, check, sync_metadata lane"]
+
+  state[("state.sh<br/>.store-setup/state.json")]
+  setup <-->|"state.sh next, set"| state
+  consoles <-->|"state.sh set"| state
+  creds <-->|"state.sh note, set"| state
+  meta <-->|"state.sh set, render"| state
+```
+
 Each skill may have tests under `<skill>/tests/run.sh`. Run all tests offline with:
 
 ```bash

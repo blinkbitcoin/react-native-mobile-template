@@ -2,14 +2,14 @@
 
 This repo runs almost no CI logic of its own. Nearly every job lives in
 [`blinkbitcoin/shared-workflows`](https://github.com/blinkbitcoin/shared-workflows)
-and the eleven files in `.github/workflows/` are thin callers that pick inputs.
-Two of the eleven are the exception and are described below. The workflows repo's
+and the twelve files in `.github/workflows/` are thin callers that pick inputs.
+Two of the twelve are the exception and are described below. The workflows repo's
 `docs/consumer-guide.md` is the contract; this page is the template's half of
 it.
 
 ## The callers
 
-Eleven files, in two groups: five that run on every change, and six that make
+Twelve files, in two groups: five that run on every change, and seven that make
 releases. The release group is documented in
 [release-runbook.md](release-runbook.md) and [ota.md](ota.md); the table below
 is the inventory.
@@ -36,22 +36,38 @@ flowchart TD
     direction LR
     prep["Prepare<br/>(waits for green CI)"] --> builds["Build iOS<br/>Build Android"]
     builds --> up["Upload iOS<br/>Upload Android"]
+    up -->|"needs Upload Android"| uphuawei["Upload Huawei"]
     up --> pre["Pre-release"]
   end
 
   rp -->|"merge the release PR"| tag["tag vX.Y.Z<br/>release published"]
-  tag --> beta
+  tag -->|"dispatches with tag"| beta
 
   subgraph beta["CD / Beta"]
     direction LR
     bprep["Prepare"] --> promote["Promote iOS<br/>Promote Android"] --> brel["Release"]
+    brel -->|"downloads *.aab from the tag"| bbin["Stage Huawei binary"]
+    bbin --> bhuawei["Promote Huawei"]
   end
 
-  beta -->|"workflow_dispatch"| prod
+  internal -.->|"workflow_run: Internal green"| retry["CD / Beta Retry"]
+  retry -.->|"gh run rerun --failed"| beta
+
+  beta -->|"workflow_dispatch<br/>tag + action"| prod
 
   subgraph prod["CD / Production"]
     direction LR
     rel["Release iOS<br/>Release Android"] --> roll["Phased / Rollout"] --> done["Complete or Halt"]
+    pbin["Stage Huawei binary"] -->|"downloads *.aab from the tag"| phuawei["Release Huawei"]
+    rel --> phuawei
+  end
+
+  listing["workflow_dispatch<br/>direction + platforms"] --> sm
+
+  subgraph sm["Store listing"]
+    direction LR
+    smios["Push/Pull iOS listing"]
+    smandroid["Push/Pull Android listing"]
   end
 
   pre -.->|"OTA_ENABLED"| ota["OTA publish"]
@@ -63,6 +79,35 @@ Two edges are worth reading twice. `Prepare` in **CD / Internal** waits for CI
 to conclude green for the same commit, so a red `main` never reaches a build or
 a store. And `E2E` sits behind `Unit`, so a failed unit run never pays for a
 twenty-minute Android suite or a macOS runner.
+
+The Huawei AppGallery jobs hang off the Google Play ones on purpose: each of
+them `needs` its tier's Android store job, so AppGallery never receives a
+bundle Play refused and is never the only store holding one. Internal uploads
+the bundle this run just built. Beta and production have no bundle in the run
+at all, so `Stage Huawei binary` downloads the `*.aab` back off the release tag
+with `gh release download` and re-uploads it as an artifact the lane then
+reads — AppGallery has no promote endpoint, so every tier is a fresh upload
+with different submission flags. All five Huawei jobs are behind
+`HUAWEI_UPLOADS_ENABLED` on top of `STORE_UPLOADS_ENABLED`.
+
+**CD / Beta Retry** is not in the release chain; it is the repair for one
+timing hole. A beta run refuses to promote until that commit's internal run is
+green, and `release-please` dispatches beta exactly once, so a beta dispatched
+while internal is still building (or red) fails at the gate with nothing left
+to re-trigger it. `release-retry.yml` listens for `workflow_run` on a completed
+**CD / Internal** for `main`, and when the conclusion is `success` it finds a
+concluded-but-not-successful `release-beta.yml` run for the same head commit
+and does `gh run rerun --failed` on it — only the jobs that failed, so nothing
+promotes twice. It matches on the internal run's head commit, so if another
+commit lands on `main` in between, nothing matches and the retry no-ops.
+
+**Store listing** (`store-metadata.yml`) is a manual dispatch that is not part
+of a release at all: two jobs, iOS and Android, both on the `production`
+environment and therefore behind its reviewers, running `sync_metadata` (push)
+or `pull_metadata` (pull) against `fastlane/metadata/**`. It uploads no binary,
+moves no track and writes no version's release notes. It shares the `release`
+concurrency group with the promoting workflows, so a listing edit and a store
+submission are never open against the same app at once.
 
 ### Everyday CI
 
@@ -127,6 +172,7 @@ break. The expensive half, the native matrix, still skips.
 | `release-production.yml` | `workflow_dispatch` (`tag`, `action`) | `expo-prepare.yml`, `fastlane-lane.yml`, `github-release.yml`, `expo-ota-publish.yml`, `web.yml` | `action` selects release, rollout, halt, resume or complete |
 | `release-retry.yml` | `workflow_run` on a completed `CD / Internal` (its display name) for `main` | nothing: it re-runs a failed beta run with `gh` | Closes the hole where the beta dispatch arrives once, before internal is green |
 | `ota-hotfix.yml` | `workflow_dispatch` (`channel`, `ref`, rollout) | `expo-ota-publish.yml` | JavaScript-only fixes. The fingerprint gate rejects anything native |
+| `store-metadata.yml` | `workflow_dispatch` (`direction`, `platforms`, `dry_run`) | `fastlane-lane.yml` (twice: iOS and Android) | The store *page*, not a release: `sync_metadata` pushes `fastlane/metadata/**`<br>to App Store Connect and Play, `pull_metadata` reports what they hold. Both<br>jobs run on the `production` environment, behind its reviewers, and are gated<br>on `STORE_METADATA_SYNC_ENABLED` |
 
 On a repo that never turns OTA on, the store path still works: only the `ota-*`
 jobs are skipped, through `if: vars.OTA_ENABLED == 'true'`, and `ota-hotfix.yml`
@@ -328,8 +374,8 @@ so the default `GITHUB_TOKEN` can push to it.
 ## Pinning and bumping the workflows version
 
 Every `uses:` that points at the workflows repo is pinned to the moving major
-tag. Nine of the eleven files carry at least one, and several carry many:
-`release-production.yml` alone has ten. `release-please.yml` and
+tag. Ten of the twelve files carry at least one, and several carry many:
+`release-production.yml` alone has eleven. `release-please.yml` and
 `release-retry.yml` call no reusable workflow at all.
 
 ```yaml

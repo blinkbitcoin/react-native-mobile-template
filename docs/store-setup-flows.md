@@ -165,4 +165,5 @@ The developer picks one mode at the start. The gates in ochre above are the same
 - `store-setup` owns the mode choice, the 49-step checklist (eight of them the optional Huawei block) in `.store-setup/state.json`, and the identifiers gate that refuses `com.example.*`.
 - `store-consoles` owns the 27 console-only steps above as reference blocks, one per step, with the click-path and the confirm class.
 - `store-credentials` owns the local validators and `push-to-github.sh`; values reach GitHub only on stdin.
+- `.github/workflows/store-metadata.yml` is the dispatchable workflow behind the `store-metadata` skill: it runs the same `sync_metadata` and `pull_metadata` lanes from Actions, on the `production` environment and behind its reviewers.
 - `store-metadata` owns the listing files and the `sync_metadata` lane; not used by the template repository itself, whose listing stays placeholder for adopters. The Huawei listing is console-only and outside this skill.

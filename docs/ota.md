@@ -9,6 +9,35 @@ Related: [release-runbook.md](release-runbook.md) (the store path),
 [../certs/README.md](../certs/README.md) (code-signing keys),
 [../deploy/ota/README.md](../deploy/ota/README.md) (the server).
 
+## The flow
+
+Every publish — the three release tiers and a hotfix — is the same pipeline
+with a different channel and a different fingerprint baseline:
+
+```mermaid
+flowchart TB
+  ti["CD / Internal<br/>channel internal"] -->|"the vX.Y.Z-build.N pre-release"| base
+  tb["CD / Beta<br/>channel beta"] -->|"the vX.Y.Z release"| base
+  tp["CD / Production<br/>channel production"] -->|"the dispatched tag"| base
+  th["CD / OTA Hotfix<br/>dispatched channel"] -->|"baseline_tag, or the latest release"| base
+  rollback["rollback"] -->|"last good commit, or rollBackToEmbedded"| th
+
+  base["baseline.sh downloads<br/>build-info.json from that release"] -->|"fingerprint.ios, fingerprint.android"| gate{"fingerprint gate"}
+  commit["the commit being published"] -->|"@expo/fingerprint"| gate
+
+  gate -->|"mismatch: the native layer moved"| refuse["refuse to publish;<br/>cut a store build instead"]
+  gate -->|"match, per platform"| export["export.sh<br/>bundle + source maps"]
+  export -->|"eoas publish --branch,<br/>--rollout-percentage"| server["the update server"]
+  server -->|"smoke.sh asks for the manifest"| smoke["runtime version =<br/>the iOS fingerprint"]
+  server -->|"on the next launch"| app["the installed binary<br/>on that channel"]
+```
+
+The gate runs **before** the export, so an update that cannot be served never
+gets built. The rest of this page is the detail behind each box: the channel
+per tier under [The channel model](#the-channel-model), the comparison itself
+under [The fingerprint gate](#the-fingerprint-gate), and the two dispatched
+paths under [Hotfix](#hotfix) and [Rollback](#rollback).
+
 ## The toggle
 
 One variable, read in three places:
