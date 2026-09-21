@@ -1,0 +1,848 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Store Setup Flows</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --ground: #f6f5f1;
+    --surface: #fbfaf7;
+    --ink: #1c1f24;
+    --muted: #5f6570;
+    --rule: #d9d6ce;
+    --apple: #3f4f7a;
+    --apple-fill: #e6eaf4;
+    --google: #2f7a52;
+    --google-fill: #e3f0e8;
+    --huawei: #a3402e;
+    --huawei-fill: #f6e3de;
+    --gate: #b5711c;
+    --gate-fill: #f8ecd9;
+    --lane: #edebe5;
+    --code-bg: #ecebe6;
+    --pipe-fill: #ecebe6;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #15171b;
+      --surface: #1c1f25;
+      --ink: #e7e5df;
+      --muted: #a2a7b0;
+      --rule: #343841;
+      --apple: #9fb1e3;
+      --apple-fill: #26304a;
+      --google: #7fc9a0;
+      --google-fill: #1f3a2c;
+      --huawei: #e8907d;
+      --huawei-fill: #452420;
+      --gate: #e0a24d;
+      --gate-fill: #3f2f17;
+      --lane: #1f2228;
+      --code-bg: #262a31;
+      --pipe-fill: #262a31;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #15171b;
+    --surface: #1c1f25;
+    --ink: #e7e5df;
+    --muted: #a2a7b0;
+    --rule: #343841;
+    --apple: #9fb1e3;
+    --apple-fill: #26304a;
+    --google: #7fc9a0;
+    --google-fill: #1f3a2c;
+    --huawei: #e8907d;
+    --huawei-fill: #452420;
+    --gate: #e0a24d;
+    --gate-fill: #3f2f17;
+    --lane: #1f2228;
+    --code-bg: #262a31;
+    --pipe-fill: #262a31;
+    color-scheme: dark;
+  }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+  }
+  main { max-width: 1080px; margin: 0 auto; padding: 40px 24px 72px; }
+  h1, h2, h3 {
+    font-family: "IBM Plex Sans Condensed", "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+    font-weight: 600; letter-spacing: 0.005em; text-wrap: balance; margin: 0;
+  }
+  h1 { font-size: 34px; line-height: 1.1; }
+  h2 { font-size: 22px; margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--rule); }
+  h3 { font-size: 16px; margin-top: 24px; }
+  p { max-width: 68ch; margin: 10px 0 0; }
+  .lede { color: var(--muted); font-size: 16px; }
+  .eyebrow { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  code, .mono { font-family: "IBM Plex Mono", "SFMono-Regular", Menlo, monospace; font-size: 0.92em; }
+  code { background: var(--code-bg); padding: 1px 5px; border-radius: 3px; }
+  figure { margin: 22px 0 0; }
+  .frame { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 14px; }
+  svg { display: block; max-width: 100%; height: auto; color: var(--ink); font-family: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; }
+  figcaption { color: var(--muted); font-size: 14px; margin-top: 10px; max-width: 80ch; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px 26px; margin-top: 18px; font-size: 13px; color: var(--muted); align-items: center; }
+  .legend span { display: inline-flex; align-items: center; gap: 8px; }
+  .sw { width: 22px; height: 14px; border-radius: 3px; border: 1.5px solid; display: inline-block; }
+  .sw.apple { background: var(--apple-fill); border-color: var(--apple); }
+  .sw.google { background: var(--google-fill); border-color: var(--google); }
+  .sw.huawei { background: var(--huawei-fill); border-color: var(--huawei); }
+  .sw.gate { background: var(--gate-fill); border-color: var(--gate); border-width: 2px; }
+  .sw.pipe { background: var(--pipe-fill); border-color: var(--muted); }
+  .sw.dash { border-style: dashed; border-color: var(--muted); background: transparent; }
+  table { border-collapse: collapse; width: 100%; margin-top: 18px; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { font-weight: 500; color: var(--muted); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; }
+  td.who { font-family: "IBM Plex Mono", Menlo, monospace; font-size: 13px; white-space: nowrap; }
+  .human { color: var(--gate); font-weight: 500; }
+  .agent { color: var(--apple); }
+  .wrap { overflow-x: auto; }
+  .screens { display: grid; grid-template-columns: repeat(auto-fit, minmax(440px, 1fr)); gap: 18px; margin-top: 18px; }
+  .screen { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 12px; }
+  .screen figcaption { margin-top: 8px; font-size: 13px; }
+  .screen h3 { margin: 0 0 8px; font-size: 15px; }
+  .note { font-size: 13px; color: var(--muted); max-width: 80ch; margin-top: 10px; }
+  ul { padding-left: 20px; margin: 10px 0 0; max-width: 72ch; }
+  li { margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<main>
+  <div class="eyebrow">react-native-mobile-template · store setup skills · 2026-09-20</div>
+  <h1>Store Setup Flows</h1>
+  <p class="lede">How a new application built from the template reaches App Store Connect, Google Play and, optionally, Huawei AppGallery: the setup steps on each store, who performs each one, where the agent must stop for a yes, and the delivery pipeline that runs once the credentials exist.</p>
+
+  <div class="legend">
+    <span><i class="sw apple"></i> Apple step</span>
+    <span><i class="sw google"></i> Google step</span>
+    <span><i class="sw huawei"></i> Huawei step (optional store)</span>
+    <span><i class="sw gate"></i> irreversible, paid or permanent: explicit yes every time</span>
+    <span><i class="sw dash"></i> only the human can do it</span>
+    <span><i class="sw pipe"></i> pipeline job</span>
+  </div>
+
+  <h2>Apple: App Store Connect</h2>
+  <figure>
+    <div class="frame">
+      <svg viewBox="0 0 1160 430" role="img" aria-label="Apple setup flow across four lanes: the human enrols, accepts agreements and downloads the API key; the agent registers the bundle identifier, creates the application record, the key, the TestFlight groups and the App Privacy answers; local scripts validate the key and set up match; GitHub receives the secrets and variables. Bundle identifier and API key are gated.">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <!-- lanes -->
+        <g font-size="12" fill="currentColor">
+          <rect x="0" y="30" width="1160" height="90" style="fill:var(--lane)" opacity="0.6"/>
+          <rect x="0" y="230" width="1160" height="90" style="fill:var(--lane)" opacity="0.6"/>
+          <text x="10" y="50" font-weight="500">Human</text>
+          <text x="10" y="150" font-weight="500">Agent in Chrome</text>
+          <text x="10" y="250" font-weight="500">Local scripts</text>
+          <text x="10" y="350" font-weight="500">GitHub repository</text>
+        </g>
+        <!-- Human lane nodes -->
+        <g font-size="12" fill="currentColor" text-anchor="middle">
+          <rect x="120" y="55" width="150" height="46" rx="4" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="2" stroke-dasharray="5 3"/>
+          <text x="195" y="74">Enrol in the program</text><text x="195" y="90">99 USD per year</text>
+          <rect x="300" y="55" width="160" height="46" rx="4" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="2" stroke-dasharray="5 3"/>
+          <text x="380" y="74">Agreements, tax,</text><text x="380" y="90">banking</text>
+          <rect x="690" y="55" width="160" height="46" rx="4" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="2" stroke-dasharray="5 3"/>
+          <text x="770" y="74">Click Generate,</text><text x="770" y="90">download the .p8 once</text>
+          <rect x="960" y="55" width="180" height="46" rx="4" style="fill:var(--surface);stroke:currentColor" stroke-width="1.2" stroke-dasharray="5 3"/>
+          <text x="1050" y="74">Answer App Privacy,</text><text x="1050" y="90">pricing and territories</text>
+        </g>
+        <!-- Agent lane nodes -->
+        <g font-size="12" fill="currentColor" text-anchor="middle">
+          <rect x="300" y="155" width="160" height="46" rx="4" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="2"/>
+          <text x="380" y="174">Register bundle identifier</text><text x="380" y="190" class="mono" font-family="IBM Plex Mono, Menlo, monospace" font-size="11">com.blinkbitcoin.…</text>
+          <rect x="495" y="155" width="160" height="46" rx="4" style="fill:var(--apple-fill);stroke:var(--apple)" stroke-width="1.5"/>
+          <text x="575" y="174">Create application</text><text x="575" y="190">record</text>
+          <rect x="690" y="155" width="160" height="46" rx="4" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="2"/>
+          <text x="770" y="174">App Store Connect API key</text><text x="770" y="190">scoped to this application</text>
+          <rect x="885" y="155" width="150" height="46" rx="4" style="fill:var(--apple-fill);stroke:var(--apple)" stroke-width="1.5"/>
+          <text x="960" y="174">TestFlight groups</text><text x="960" y="190">internal and external</text>
+        </g>
+        <!-- Local lane nodes -->
+        <g font-size="12" fill="currentColor" text-anchor="middle">
+          <rect x="690" y="255" width="160" height="46" rx="4" style="fill:var(--surface);stroke:currentColor" stroke-width="1.2"/>
+          <text x="770" y="274">validate-asc-key.sh</text><text x="770" y="290">key id, issuer, P-256 key</text>
+          <rect x="495" y="255" width="160" height="46" rx="4" style="fill:var(--surface);stroke:currentColor" stroke-width="1.2"/>
+          <text x="575" y="274">fastlane match</text><text x="575" y="290">new private repository</text>
+        </g>
+        <!-- GitHub lane nodes -->
+        <g font-size="12" fill="currentColor" text-anchor="middle">
+          <rect x="690" y="355" width="160" height="46" rx="4" style="fill:var(--surface);stroke:currentColor" stroke-width="1.2"/>
+          <text x="770" y="374">gh secret set</text><text x="770" y="390" font-family="IBM Plex Mono, Menlo, monospace" font-size="11">ASC_* MATCH_*</text>
+          <rect x="885" y="355" width="150" height="46" rx="4" style="fill:var(--surface);stroke:currentColor" stroke-width="1.2"/>
+          <text x="960" y="374">gh variable set</text><text x="960" y="390" font-family="IBM Plex Mono, Menlo, monospace" font-size="11">TESTFLIGHT_*</text>
+        </g>
+        <!-- arrows -->
+        <g fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#ah)">
+          <path d="M270 78 H300"/>
+          <path d="M380 101 V155"/>
+          <path d="M460 178 H495"/>
+          <path d="M655 178 H690"/>
+          <path d="M770 155 V101"/>
+          <path d="M770 201 V255"/>
+          <path d="M770 301 V355"/>
+          <path d="M575 201 V255"/>
+          <path d="M655 278 H690"/>
+          <path d="M655 178 C 700 178, 780 140, 885 178"/>
+          <path d="M960 201 V355"/>
+          <path d="M1035 178 C 1080 178, 1050 120, 1050 101"/>
+        </g>
+        <!-- arrow labels -->
+        <g font-size="11" style="fill:var(--muted)">
+          <text x="386" y="132">yes, then submit</text>
+          <text x="776" y="132">stop before Generate</text>
+          <text x="776" y="232">.p8 from Downloads</text>
+          <text x="776" y="332">stdin only</text>
+          <text x="581" y="232">certificates, own repository</text>
+          <text x="966" y="232">group names</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>Apple setup. The agent fills every form; the two ochre gates (bundle identifier, API key) wait for a yes because neither can be undone, and the key download is the human's because the file downloads exactly once. Enrolment and agreements are never the agent's.</figcaption>
+  </figure>
+
+  <h2>Google: Play Console</h2>
+  <figure>
+    <div class="frame">
+      <svg viewBox="0 0 1160 430" role="img" aria-label="Google setup flow across four lanes: the human registers and answers the policy questionnaires; the agent creates the application, enrols in Play App Signing, creates the service account and grants it this application only, and sets up the internal track; local scripts create the upload keystore and validate the credentials; GitHub receives the secrets. Play App Signing is gated and permanent.">
+        <defs>
+          <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <g font-size="12" fill="currentColor">
+          <rect x="0" y="30" width="1160" height="90" style="fill:var(--lane)" opacity="0.6"/>
+          <rect x="0" y="230" width="1160" height="90" style="fill:var(--lane)" opacity="0.6"/>
+          <text x="10" y="50" font-weight="500">Human</text>
+          <text x="10" y="150" font-weight="500">Agent in Chrome</text>
+          <text x="10" y="250" font-weight="500">Local scripts</text>
+          <text x="10" y="350" font-weight="500">GitHub repository</text>
+        </g>
+        <g font-size="12" fill="currentColor" text-anchor="middle">
+          <rect x="120" y="55" width="150" height="46" rx="4" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="2" stroke-dasharray="5 3"/>
+          <text x="195" y="74">Register developer</text><text x="195" y="90">account, 25 USD once</text>
+          <rect x="960" y="55" width="180" height="46" rx="4" style="fill:var(--surface);stroke:currentColor" stroke-width="1.2" stroke-dasharray="5 3"/>
+          <text x="1050" y="74">Content rating, data safety,</text><text x="1050" y="90">audience, access, pricing</text>
+        </g>
+        <g font-size="12" fill="currentColor" text-anchor="middle">
+          <rect x="300" y="155" width="150" height="46" rx="4" style="fill:var(--google-fill);stroke:var(--google)" stroke-width="1.5"/>
+          <text x="375" y="174">Create application</text><text x="375" y="190">package set by first upload</text>
+          <rect x="485" y="155" width="160" height="46" rx="4" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="2"/>
+          <text x="565" y="174">Enrol in Play App Signing</text><text x="565" y="190">permanent for this application</text>
+          <rect x="680" y="155" width="160" height="46" rx="4" style="fill:var(--google-fill);stroke:var(--google)" stroke-width="1.5"/>
+          <text x="760" y="174">Service account,</text><text x="760" y="190">grant this application only</text>
+          <rect x="875" y="155" width="150" height="46" rx="4" style="fill:var(--google-fill);stroke:var(--google)" stroke-width="1.5"/>
+          <text x="950" y="174">Internal testing track</text><text x="950" y="190">and testers</text>
+        </g>
+        <g font-size="12" fill="currentColor" text-anchor="middle">
+          <rect x="300" y="255" width="150" height="46" rx="4" style="fill:var(--surface);stroke:currentColor" stroke-width="1.2"/>
+          <text x="375" y="274">new-upload-keystore.sh</text><text x="375" y="290">ignored path, env passwords</text>
+          <rect x="680" y="255" width="160" height="46" rx="4" style="fill:var(--surface);stroke:currentColor" stroke-width="1.2"/>
+          <text x="760" y="274">validate-play-json.sh</text><text x="760" y="290">service account, scope</text>
+        </g>
+        <g font-size="12" fill="currentColor" text-anchor="middle">
+          <rect x="485" y="355" width="160" height="46" rx="4" style="fill:var(--surface);stroke:currentColor" stroke-width="1.2"/>
+          <text x="565" y="374">gh secret set</text><text x="565" y="390" font-family="IBM Plex Mono, Menlo, monospace" font-size="11">ANDROID_UPLOAD_*</text>
+          <rect x="680" y="355" width="160" height="46" rx="4" style="fill:var(--surface);stroke:currentColor" stroke-width="1.2"/>
+          <text x="760" y="374">gh secret set</text><text x="760" y="390" font-family="IBM Plex Mono, Menlo, monospace" font-size="11">PLAY_SERVICE_ACCOUNT_JSON</text>
+        </g>
+        <g fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#ag)">
+          <path d="M270 78 C 285 78, 290 140, 300 178"/>
+          <path d="M450 178 H485"/>
+          <path d="M375 255 V201"/>
+          <path d="M450 278 C 470 278, 500 230, 500 201"/>
+          <path d="M565 201 V355"/>
+          <path d="M645 178 H680"/>
+          <path d="M760 201 V255"/>
+          <path d="M760 301 V355"/>
+          <path d="M840 178 H875"/>
+          <path d="M1025 178 C 1060 178, 1050 120, 1050 101"/>
+        </g>
+        <g font-size="11" style="fill:var(--muted)">
+          <text x="380" y="232">upload certificate</text>
+          <text x="571" y="232">yes, then enrol</text>
+          <text x="766" y="232">the JSON key file</text>
+          <text x="766" y="332">stdin only</text>
+          <text x="1031" y="132">mode (c) only, read back</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>Google setup. Play App Signing is the one permanent gate; the per-application grant is read back on screen before submit because account-wide access would reach every Blink application. The policy questionnaires are filled only in mode (c), from answers given in that turn.</figcaption>
+  </figure>
+
+  <h2>Huawei: AppGallery Connect</h2>
+  <p class="note">Optional third store. The block only opens once uploads to App Store Connect and Google Play work, and every step of it can be marked skipped for an application that does not ship on AppGallery. The pipeline uploads the signed Android bundle and submits it on every tier; the listing, the age rating, the countries and the test user lists stay in the console.</p>
+  <figure>
+    <div class="frame">
+      <svg viewBox="0 0 1200 430" role="img" aria-label="Huawei setup flow across four lanes: the human registers a developer account and passes identity verification; the agent creates the application record, optionally enables App Signing, creates the Connect API client, fills the listing and age rating, and creates the test user list; the local validator checks the client id and secret; GitHub receives the two secrets and the two variables. App Signing is gated and permanent; the API client secret is shown once; testers are invited per release.">
+        <defs>
+          <marker id="aw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <g font-size="12" fill="currentColor">
+          <rect x="0" y="30" width="1200" height="90" style="fill:var(--lane)" opacity="0.6"/>
+          <rect x="0" y="230" width="1200" height="90" style="fill:var(--lane)" opacity="0.6"/>
+          <text x="10" y="50" font-weight="500">Human</text>
+          <text x="10" y="150" font-weight="500">Agent in Chrome</text>
+          <text x="10" y="250" font-weight="500">Local scripts</text>
+          <text x="10" y="350" font-weight="500">GitHub repository</text>
+        </g>
+        <g font-size="12" fill="currentColor" text-anchor="middle">
+          <rect x="120" y="55" width="150" height="46" rx="4" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="2" stroke-dasharray="5 3"/>
+          <text x="195" y="74">Developer account,</text><text x="195" y="90">identity verification, days</text>
+          <rect x="680" y="55" width="160" height="46" rx="4" style="fill:var(--surface);stroke:currentColor" stroke-width="1.2" stroke-dasharray="5 3"/>
+          <text x="760" y="74">Click Create, copy the</text><text x="760" y="90">client id and secret once</text>
+          <rect x="960" y="55" width="180" height="46" rx="4" style="fill:var(--surface);stroke:currentColor" stroke-width="1.2" stroke-dasharray="5 3"/>
+          <text x="1050" y="74">Age rating questionnaire,</text><text x="1050" y="90">countries, pricing</text>
+        </g>
+        <g font-size="12" fill="currentColor" text-anchor="middle">
+          <rect x="300" y="155" width="150" height="46" rx="4" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="2"/>
+          <text x="375" y="174">Create application record</text><text x="375" y="190">package name entered here</text>
+          <rect x="485" y="155" width="160" height="46" rx="4" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="2"/>
+          <text x="565" y="174">Enable App Signing, optional</text><text x="565" y="190">permanent for this application</text>
+          <rect x="680" y="155" width="160" height="46" rx="4" style="fill:var(--huawei-fill);stroke:var(--huawei)" stroke-width="1.5"/>
+          <text x="760" y="174">Connect API client,</text><text x="760" y="190">team level, roles only</text>
+          <rect x="875" y="155" width="150" height="46" rx="4" style="fill:var(--huawei-fill);stroke:var(--huawei)" stroke-width="1.5"/>
+          <text x="950" y="174">Listing: icon, screenshots,</text><text x="950" y="190">privacy policy, category</text>
+          <rect x="1045" y="155" width="145" height="46" rx="4" style="fill:var(--huawei-fill);stroke:var(--huawei)" stroke-width="1.5"/>
+          <text x="1117" y="174">Test user list,</text><text x="1117" y="190">testers by Huawei ID</text>
+        </g>
+        <g font-size="12" fill="currentColor" text-anchor="middle">
+          <rect x="665" y="255" width="190" height="46" rx="4" style="fill:var(--surface);stroke:currentColor" stroke-width="1.2"/>
+          <text x="760" y="274">validate-huawei-credentials.sh</text><text x="760" y="290">shape offline, token check asks</text>
+        </g>
+        <g font-size="12" fill="currentColor" text-anchor="middle">
+          <rect x="300" y="355" width="150" height="46" rx="4" style="fill:var(--surface);stroke:currentColor" stroke-width="1.2"/>
+          <text x="375" y="374">gh variable set</text><text x="375" y="390" font-family="IBM Plex Mono, Menlo, monospace" font-size="11">HUAWEI_APP_ID</text>
+          <rect x="665" y="355" width="190" height="46" rx="4" style="fill:var(--surface);stroke:currentColor" stroke-width="1.2"/>
+          <text x="760" y="374">gh secret set</text><text x="760" y="390" font-family="IBM Plex Mono, Menlo, monospace" font-size="11">HUAWEI_CLIENT_ID, _SECRET</text>
+          <rect x="875" y="355" width="150" height="46" rx="4" style="fill:var(--surface);stroke:currentColor" stroke-width="1.2"/>
+          <text x="950" y="374">gh variable set</text><text x="950" y="390" font-family="IBM Plex Mono, Menlo, monospace" font-size="11">HUAWEI_UPLOADS_ENABLED</text>
+        </g>
+        <g fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#aw)">
+          <path d="M270 78 C 285 78, 290 140, 300 178"/>
+          <path d="M450 178 H485"/>
+          <path d="M375 201 V355"/>
+          <path d="M645 178 H680"/>
+          <path d="M760 155 V101"/>
+          <path d="M760 201 V255"/>
+          <path d="M760 301 V355"/>
+          <path d="M840 178 H875"/>
+          <path d="M950 201 V355"/>
+          <path d="M1025 178 C 1060 178, 1050 120, 1050 101"/>
+          <path d="M1025 178 H1045"/>
+        </g>
+        <g font-size="11" style="fill:var(--muted)">
+          <text x="380" y="232">numeric app id, from App information</text>
+          <text x="571" y="232">yes first; manual signing is the default</text>
+          <text x="766" y="132">stops before Create</text>
+          <text x="766" y="332">stdin only</text>
+          <text x="956" y="332">last, after a dry run</text>
+          <text x="1031" y="132">mode (c) only, read back</text>
+          <text x="1050" y="222">invited per release</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>Huawei setup. App Signing is the permanent gate and is optional: the pipeline signs with the repository's own upload key, so the default is to leave it off. The Connect API client is created at team level and scoped by role, and its secret is shown exactly once; the agent stops before Create and the human pastes both strings into the validator. Nothing in the listing is synced by the pipeline, and testers live on console user lists that must be invited again for each testing version.</figcaption>
+  </figure>
+
+  <h2>Delivery once the credentials exist</h2>
+  <figure>
+    <div class="frame">
+      <svg viewBox="0 0 1160 470" role="img" aria-label="Delivery pipeline: a push to main runs CI, Prepare reserves the build tag and waits for green, iOS and Android build and verify, both upload to the internal tracks and publish a pre-release; a release promotes to TestFlight external and Play beta; production sits behind the environment reviewers and is never approved on the template. Huawei AppGallery is an opt-in third store on all three tiers: every push uploads a test version free of manual review, a release re-uploads the bundle from the tag into open testing with manual review, and the production dispatch submits the formal release. AppGallery has one version slot, so each tier replaces the last, and its review queue can skip an upload but never fail the rows above.">
+        <defs>
+          <marker id="ap" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <g font-size="12" fill="currentColor" text-anchor="middle">
+          <rect x="20" y="95" width="110" height="46" rx="4" style="fill:var(--pipe-fill);stroke:currentColor" stroke-width="1.2"/>
+          <text x="75" y="114">Push to main</text><text x="75" y="130">or release merge</text>
+          <rect x="165" y="95" width="120" height="46" rx="4" style="fill:var(--pipe-fill);stroke:currentColor" stroke-width="1.2"/>
+          <text x="225" y="114">CI</text><text x="225" y="130">checks, unit, E2E</text>
+          <rect x="320" y="95" width="130" height="46" rx="4" style="fill:var(--pipe-fill);stroke:currentColor" stroke-width="1.2"/>
+          <text x="385" y="114">Prepare</text><text x="385" y="130">reserve tag, wait green</text>
+          <rect x="485" y="40" width="130" height="46" rx="4" style="fill:var(--apple-fill);stroke:var(--apple)" stroke-width="1.5"/>
+          <text x="550" y="59">Build iOS, verify</text><text x="550" y="75">signed with match</text>
+          <rect x="485" y="150" width="130" height="46" rx="4" style="fill:var(--google-fill);stroke:var(--google)" stroke-width="1.5"/>
+          <text x="550" y="169">Build Android, verify</text><text x="550" y="185">signed with upload key</text>
+          <rect x="650" y="40" width="130" height="46" rx="4" style="fill:var(--apple-fill);stroke:var(--apple)" stroke-width="1.5"/>
+          <text x="715" y="59">TestFlight internal</text><text x="715" y="75">no review</text>
+          <rect x="650" y="150" width="130" height="46" rx="4" style="fill:var(--google-fill);stroke:var(--google)" stroke-width="1.5"/>
+          <text x="715" y="169">Play internal track</text><text x="715" y="185">no review</text>
+          <rect x="815" y="95" width="120" height="46" rx="4" style="fill:var(--pipe-fill);stroke:currentColor" stroke-width="1.2"/>
+          <text x="875" y="114">Pre-release</text><text x="875" y="130" font-family="IBM Plex Mono, Menlo, monospace" font-size="11">vX.Y.Z-build.N</text>
+          <rect x="970" y="40" width="170" height="46" rx="4" style="fill:var(--apple-fill);stroke:var(--apple)" stroke-width="1.5"/>
+          <text x="1055" y="59">TestFlight external</text><text x="1055" y="75">Beta App Review, once</text>
+          <rect x="970" y="150" width="170" height="46" rx="4" style="fill:var(--google-fill);stroke:var(--google)" stroke-width="1.5"/>
+          <text x="1055" y="169">Play beta track</text><text x="1055" y="185">no review</text>
+          <rect x="640" y="230" width="150" height="46" rx="4" style="fill:var(--huawei-fill);stroke:var(--huawei)" stroke-width="1.5" stroke-dasharray="5 3"/>
+          <text x="715" y="249">AppGallery test version</text><text x="715" y="265">no manual review, hours</text>
+          <rect x="970" y="230" width="170" height="46" rx="4" style="fill:var(--huawei-fill);stroke:var(--huawei)" stroke-width="1.5" stroke-dasharray="5 3"/>
+          <text x="1055" y="249">AppGallery open testing</text><text x="1055" y="265">manual review, 1 to 3 days</text>
+          <rect x="740" y="320" width="400" height="46" rx="4" style="fill:var(--huawei-fill);stroke:var(--huawei)" stroke-width="1.5" stroke-dasharray="5 3"/>
+          <text x="940" y="339">AppGallery formal release: upload from the tag, submit for review</text><text x="940" y="355">opt-in via HUAWEI_UPLOADS_ENABLED; review takes days</text>
+          <rect x="740" y="400" width="400" height="46" rx="4" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="2" stroke-dasharray="5 3"/>
+          <text x="940" y="419">Production: App Review and Play production rollout</text><text x="940" y="435">behind the environment's reviewers; never approved on the template</text>
+        </g>
+        <g fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#ap)">
+          <path d="M130 118 H165"/>
+          <path d="M285 118 H320"/>
+          <path d="M450 118 C 465 118, 470 63, 485 63"/>
+          <path d="M450 118 C 465 118, 470 173, 485 173"/>
+          <path d="M615 63 H650"/>
+          <path d="M615 173 H650"/>
+          <path d="M780 63 C 795 63, 800 118, 815 118"/>
+          <path d="M780 173 C 795 173, 800 118, 815 118"/>
+          <path d="M935 118 C 950 118, 955 63, 970 63"/>
+          <path d="M935 118 C 950 118, 955 173, 970 173"/>
+          <path d="M615 173 C 630 173, 625 253, 640 253" stroke-dasharray="4 3"/>
+          <path d="M935 118 C 950 118, 955 253, 970 253" stroke-dasharray="4 3"/>
+          <path d="M760 276 V320" stroke-dasharray="4 3"/>
+          <path d="M1055 276 V320" stroke-dasharray="4 3"/>
+          <path d="M1140 173 H1150 V423 H1140" stroke-dasharray="4 3"/>
+        </g>
+        <g font-size="11" style="fill:var(--muted)">
+          <text x="140" y="108">every push</text>
+          <text x="820" y="160">promote on release</text>
+          <text x="985" y="222">re-uploaded from the tag</text>
+          <text x="640" y="292">never blocking the rows above</text>
+          <text x="768" y="312">one version slot: each tier replaces the last</text>
+          <text x="985" y="392">manual dispatch only</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>What the credentials unlock. Every push to main becomes a signed internal build on both stores and a pre-release; a release promotes the same binaries to beta. The template repository stops there: its production environment exists so the flow is real, and is never approved. Huawei AppGallery rides along on all three tiers as an opt-in third store with a single version slot: each tier re-uploads the same signed bundle and submits it in a different flavour, and a version under review makes the next push skip its upload rather than fail. Nothing above the Huawei band waits for it.</figcaption>
+  </figure>
+
+
+  <h2>Conceptual screens</h2>
+  <p class="note">Schematic renderings of the console screens the agent walks through, in the order the reference blocks use them. They show which fields are filled, with what, and where the ochre button means the human clicks. Layouts are conceptual and unbranded; both consoles reorganise their pages, and the click-path in each reference block is the source of truth when a screen differs.</p>
+  <h3>App Store Connect and the developer portal</h3>
+  <div class="screens">
+<figure class="screen"><h3>Register the bundle identifier</h3><svg viewBox="0 0 520 330" role="img" aria-label="Conceptual screen: Register the bundle identifier. Developer portal, Identifiers. The agent selects App IDs, fills the description and the explicit bundle identifier, reviews capabilities, and stops before Register: the identifier cannot be deleted once an application record uses it.">
+<rect x="1" y="1" width="518" height="328" rx="6" style="fill:var(--ground);stroke:currentColor" stroke-width="1.2"/>
+<rect x="1" y="1" width="518" height="34" rx="6" style="fill:var(--lane)"/>
+<text x="16" y="23" font-size="12" fill="currentColor" font-weight="500">Certificates, Identifiers &amp; Profiles  ›  Identifiers  ›  Register a new identifier</text>
+<rect x="1" y="35" width="150" height="294" style="fill:var(--lane)" opacity="0.7"/>
+<text x="16" y="60" font-size="11.5" style="fill:var(--muted)">Certificates</text>
+<rect x="8" y="71" width="136" height="22" rx="3" style="fill:var(--apple-fill);stroke:var(--apple)" stroke-width="1"/>
+<text x="16" y="86" font-size="11.5" fill="currentColor" font-weight="500">Identifiers</text>
+<text x="16" y="112" font-size="11.5" style="fill:var(--muted)">Devices</text>
+<text x="16" y="138" font-size="11.5" style="fill:var(--muted)">Profiles</text>
+<text x="16" y="164" font-size="11.5" style="fill:var(--muted)">Keys</text>
+<text x="16" y="190" font-size="11.5" style="fill:var(--muted)">Services</text>
+<text x="170" y="62" font-size="11" style="fill:var(--muted)">Platform</text>
+<rect x="170" y="68" width="12" height="12" rx="2" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<path d="M172 74 l3 3 l6 -7" fill="none" stroke="currentColor" stroke-width="1.5"/>
+<text x="190" y="78" font-size="11.5" fill="currentColor">iOS, iPadOS, macOS, tvOS, visionOS, watchOS</text>
+<text x="170" y="94" font-size="11" style="fill:var(--muted)">Description</text>
+<rect x="170" y="99" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="115" font-size="11.5" fill="currentColor">React Native Mobile Template</text>
+<text x="170" y="134" font-size="11" style="fill:var(--muted)">Bundle ID (explicit)</text>
+<rect x="170" y="139" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="155" font-size="11.5" fill="currentColor" font-family="IBM Plex Mono, Menlo, monospace">com.blinkbitcoin.reactnativemobiletemplate</text>
+<text x="170" y="174" font-size="11" style="fill:var(--muted)">Capabilities</text>
+<rect x="170" y="179" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="178" y="195" font-size="11.5" fill="currentColor">Push Notifications (leave unchecked until needed)</text>
+<rect x="170" y="282" width="140" height="32" rx="3" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="1"/>
+<text x="176" y="295" font-size="11" fill="currentColor">agent fills the form</text>
+<text x="176" y="309" font-size="11" fill="currentColor">yes before Register</text>
+<rect x="380" y="284" width="120" height="28" rx="4" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="2" stroke-dasharray="5 3"/>
+<text x="440" y="302" font-size="12" text-anchor="middle" font-weight="500" fill="currentColor">Register</text>
+</svg><figcaption>Developer portal, Identifiers. The agent selects App IDs, fills the description and the explicit bundle identifier, reviews capabilities, and stops before Register: the identifier cannot be deleted once an application record uses it.</figcaption></figure>
+<figure class="screen"><h3>Create the application record</h3><svg viewBox="0 0 520 330" role="img" aria-label="Conceptual screen: Create the application record. App Store Connect, Apps, New App. The agent picks the platform, enters the name from the metadata file, the primary language, the bundle identifier registered a step earlier, and the SKU; additive, no gate.">
+<rect x="1" y="1" width="518" height="328" rx="6" style="fill:var(--ground);stroke:currentColor" stroke-width="1.2"/>
+<rect x="1" y="1" width="518" height="34" rx="6" style="fill:var(--lane)"/>
+<text x="16" y="23" font-size="12" fill="currentColor" font-weight="500">App Store Connect  ›  Apps  ›  New App</text>
+<rect x="1" y="35" width="150" height="294" style="fill:var(--lane)" opacity="0.7"/>
+<rect x="8" y="45" width="136" height="22" rx="3" style="fill:var(--apple-fill);stroke:var(--apple)" stroke-width="1"/>
+<text x="16" y="60" font-size="11.5" fill="currentColor" font-weight="500">Apps</text>
+<text x="16" y="86" font-size="11.5" style="fill:var(--muted)">Analytics</text>
+<text x="16" y="112" font-size="11.5" style="fill:var(--muted)">Trends</text>
+<text x="16" y="138" font-size="11.5" style="fill:var(--muted)">Reports</text>
+<text x="16" y="164" font-size="11.5" style="fill:var(--muted)">Users and Access</text>
+<text x="16" y="190" font-size="11.5" style="fill:var(--muted)">Business</text>
+<text x="170" y="62" font-size="11" style="fill:var(--muted)">Platforms</text>
+<rect x="170" y="68" width="12" height="12" rx="2" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<path d="M172 74 l3 3 l6 -7" fill="none" stroke="currentColor" stroke-width="1.5"/>
+<text x="190" y="78" font-size="11.5" fill="currentColor">iOS</text>
+<text x="170" y="94" font-size="11" style="fill:var(--muted)">Name</text>
+<rect x="170" y="99" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="115" font-size="11.5" fill="currentColor">RN Mobile Template</text>
+<text x="170" y="134" font-size="11" style="fill:var(--muted)">Primary Language</text>
+<rect x="170" y="139" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="155" font-size="11.5" fill="currentColor">English (U.S.)</text>
+<path d="M488 148 l4 5 l4 -5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+<text x="170" y="174" font-size="11" style="fill:var(--muted)">Bundle ID</text>
+<rect x="170" y="179" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="195" font-size="11.5" fill="currentColor">com.blinkbitcoin.reactnativemobiletemplate</text>
+<path d="M488 188 l4 5 l4 -5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+<text x="170" y="214" font-size="11" style="fill:var(--muted)">SKU</text>
+<rect x="170" y="219" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="235" font-size="11.5" fill="currentColor" font-family="IBM Plex Mono, Menlo, monospace">react-native-mobile-template</text>
+<rect x="170" y="289" width="159" height="18" rx="3" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="1"/>
+<text x="176" y="302" font-size="11" fill="currentColor">agent fills and submits</text>
+<rect x="380" y="284" width="120" height="28" rx="4" style="fill:var(--apple);stroke:var(--apple)" stroke-width="1"/>
+<text x="440" y="302" font-size="12" text-anchor="middle" font-weight="500" style="fill:var(--surface)">Create</text>
+</svg><figcaption>App Store Connect, Apps, New App. The agent picks the platform, enters the name from the metadata file, the primary language, the bundle identifier registered a step earlier, and the SKU; additive, no gate.</figcaption></figure>
+<figure class="screen"><h3>Generate the API key</h3><svg viewBox="0 0 520 330" role="img" aria-label="Conceptual screen: Generate the API key. Users and Access, Integrations, App Store Connect API. The agent names the key and limits access to this application; the human clicks Generate and the .p8 downloads exactly once. The Key ID and Issuer ID on the next screen become two secrets.">
+<rect x="1" y="1" width="518" height="328" rx="6" style="fill:var(--ground);stroke:currentColor" stroke-width="1.2"/>
+<rect x="1" y="1" width="518" height="34" rx="6" style="fill:var(--lane)"/>
+<text x="16" y="23" font-size="12" fill="currentColor" font-weight="500">Users and Access  ›  Integrations  ›  App Store Connect API  ›  Individual keys</text>
+<rect x="1" y="35" width="150" height="294" style="fill:var(--lane)" opacity="0.7"/>
+<text x="16" y="60" font-size="11.5" style="fill:var(--muted)">People</text>
+<text x="16" y="86" font-size="11.5" style="fill:var(--muted)">Sandbox</text>
+<text x="16" y="112" font-size="11.5" style="fill:var(--muted)">Integrations</text>
+<rect x="8" y="123" width="136" height="22" rx="3" style="fill:var(--apple-fill);stroke:var(--apple)" stroke-width="1"/>
+<text x="16" y="138" font-size="11.5" fill="currentColor" font-weight="500">App Store Connect API</text>
+<text x="16" y="164" font-size="11.5" style="fill:var(--muted)">In-App Purchase</text>
+<text x="16" y="190" font-size="11.5" style="fill:var(--muted)">Shared Secret</text>
+<text x="170" y="62" font-size="11" style="fill:var(--muted)">Name</text>
+<rect x="170" y="67" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="83" font-size="11.5" fill="currentColor" font-family="IBM Plex Mono, Menlo, monospace">react-native-mobile-template-ci</text>
+<text x="170" y="102" font-size="11" style="fill:var(--muted)">Access</text>
+<rect x="170" y="107" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="123" font-size="11.5" fill="currentColor">App Manager</text>
+<path d="M488 116 l4 5 l4 -5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+<text x="170" y="142" font-size="11" style="fill:var(--muted)">Apps</text>
+<rect x="170" y="147" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="163" font-size="11.5" fill="currentColor">This application only</text>
+<path d="M488 156 l4 5 l4 -5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+<text x="170" y="182" font-size="11" style="fill:var(--muted)">Key ID / Issuer ID</text>
+<rect x="170" y="187" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="178" y="203" font-size="11.5" fill="currentColor">shown after Generate: ASC_KEY_ID, ASC_ISSUER_ID</text>
+<rect x="170" y="282" width="185" height="32" rx="3" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="1"/>
+<text x="176" y="295" font-size="11" fill="currentColor">human clicks Generate</text>
+<text x="176" y="309" font-size="11" fill="currentColor">then downloads the .p8 once</text>
+<rect x="380" y="284" width="120" height="28" rx="4" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="2" stroke-dasharray="5 3"/>
+<text x="440" y="302" font-size="12" text-anchor="middle" font-weight="500" fill="currentColor">Generate</text>
+</svg><figcaption>Users and Access, Integrations, App Store Connect API. The agent names the key and limits access to this application; the human clicks Generate and the .p8 downloads exactly once. The Key ID and Issuer ID on the next screen become two secrets.</figcaption></figure>
+<figure class="screen"><h3>TestFlight groups</h3><svg viewBox="0 0 520 330" role="img" aria-label="Conceptual screen: TestFlight groups. The application's TestFlight tab. The agent creates the internal group, then the external group and adds the testers the human names. The two group names become repository variables; external testing needs one Beta App Review.">
+<rect x="1" y="1" width="518" height="328" rx="6" style="fill:var(--ground);stroke:currentColor" stroke-width="1.2"/>
+<rect x="1" y="1" width="518" height="34" rx="6" style="fill:var(--lane)"/>
+<text x="16" y="23" font-size="12" fill="currentColor" font-weight="500">App  ›  TestFlight  ›  Internal Testing  ›  New group</text>
+<rect x="1" y="35" width="150" height="294" style="fill:var(--lane)" opacity="0.7"/>
+<text x="16" y="60" font-size="11.5" style="fill:var(--muted)">iOS Builds</text>
+<rect x="8" y="71" width="136" height="22" rx="3" style="fill:var(--apple-fill);stroke:var(--apple)" stroke-width="1"/>
+<text x="16" y="86" font-size="11.5" fill="currentColor" font-weight="500">Internal Testing</text>
+<text x="16" y="112" font-size="11.5" style="fill:var(--muted)">External Testing</text>
+<text x="16" y="138" font-size="11.5" style="fill:var(--muted)">Test Information</text>
+<text x="16" y="164" font-size="11.5" style="fill:var(--muted)">Beta App Review</text>
+<text x="170" y="62" font-size="11" style="fill:var(--muted)">Group name</text>
+<rect x="170" y="67" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="83" font-size="11.5" fill="currentColor">Internal</text>
+<text x="170" y="102" font-size="11" style="fill:var(--muted)">Testers</text>
+<rect x="170" y="107" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="178" y="123" font-size="11.5" fill="currentColor">add by email or from the team</text>
+<text x="170" y="142" font-size="11" style="fill:var(--muted)">Automatic distribution</text>
+<rect x="170" y="148" width="12" height="12" rx="2" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<path d="M172 154 l3 3 l6 -7" fill="none" stroke="currentColor" stroke-width="1.5"/>
+<text x="190" y="158" font-size="11.5" fill="currentColor">enable for new builds</text>
+<text x="170" y="174" font-size="11" style="fill:var(--muted)">Then</text>
+<rect x="170" y="179" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="195" font-size="11.5" fill="currentColor" font-family="IBM Plex Mono, Menlo, monospace">gh variable set TESTFLIGHT_INTERNAL_GROUP</text>
+<rect x="170" y="282" width="159" height="32" rx="3" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="1"/>
+<text x="176" y="295" font-size="11" fill="currentColor">agent creates the group</text>
+<text x="176" y="309" font-size="11" fill="currentColor">names become variables</text>
+<rect x="380" y="284" width="120" height="28" rx="4" style="fill:var(--apple);stroke:var(--apple)" stroke-width="1"/>
+<text x="440" y="302" font-size="12" text-anchor="middle" font-weight="500" style="fill:var(--surface)">Create</text>
+</svg><figcaption>The application's TestFlight tab. The agent creates the internal group, then the external group and adds the testers the human names. The two group names become repository variables; external testing needs one Beta App Review.</figcaption></figure>
+  </div>
+  <h3>Google Play Console and Google Cloud</h3>
+  <div class="screens">
+<figure class="screen"><h3>Create the application</h3><svg viewBox="0 0 520 330" role="img" aria-label="Conceptual screen: Create the application. Play Console, All apps, Create app. Name from the metadata title, default language, app or game, free or paid, and the two declarations. The package name is not entered here: the first upload fixes it forever.">
+<rect x="1" y="1" width="518" height="328" rx="6" style="fill:var(--ground);stroke:currentColor" stroke-width="1.2"/>
+<rect x="1" y="1" width="518" height="34" rx="6" style="fill:var(--lane)"/>
+<text x="16" y="23" font-size="12" fill="currentColor" font-weight="500">Play Console  ›  All apps  ›  Create app</text>
+<rect x="1" y="35" width="150" height="294" style="fill:var(--lane)" opacity="0.7"/>
+<rect x="8" y="45" width="136" height="22" rx="3" style="fill:var(--google-fill);stroke:var(--google)" stroke-width="1"/>
+<text x="16" y="60" font-size="11.5" fill="currentColor" font-weight="500">All apps</text>
+<text x="16" y="86" font-size="11.5" style="fill:var(--muted)">Users and permissions</text>
+<text x="16" y="112" font-size="11.5" style="fill:var(--muted)">Setup</text>
+<text x="16" y="138" font-size="11.5" style="fill:var(--muted)">Policy status</text>
+<text x="16" y="164" font-size="11.5" style="fill:var(--muted)">Download reports</text>
+<text x="170" y="62" font-size="11" style="fill:var(--muted)">App name</text>
+<rect x="170" y="67" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="83" font-size="11.5" fill="currentColor">RN Mobile Template</text>
+<text x="170" y="102" font-size="11" style="fill:var(--muted)">Default language</text>
+<rect x="170" y="107" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="123" font-size="11.5" fill="currentColor">English (United States)</text>
+<path d="M488 116 l4 5 l4 -5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+<text x="170" y="142" font-size="11" style="fill:var(--muted)">App or game</text>
+<rect x="170" y="147" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="163" font-size="11.5" fill="currentColor">App</text>
+<path d="M488 156 l4 5 l4 -5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+<text x="170" y="182" font-size="11" style="fill:var(--muted)">Free or paid</text>
+<rect x="170" y="187" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="203" font-size="11.5" fill="currentColor">Free (cannot change to paid later)</text>
+<path d="M488 196 l4 5 l4 -5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+<text x="170" y="222" font-size="11" style="fill:var(--muted)">Declarations</text>
+<rect x="170" y="228" width="12" height="12" rx="2" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<path d="M172 234 l3 3 l6 -7" fill="none" stroke="currentColor" stroke-width="1.5"/>
+<text x="190" y="238" font-size="11.5" fill="currentColor">Developer Program Policies, US export laws</text>
+<rect x="170" y="289" width="159" height="18" rx="3" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="1"/>
+<text x="176" y="302" font-size="11" fill="currentColor">agent fills and submits</text>
+<rect x="380" y="284" width="120" height="28" rx="4" style="fill:var(--google);stroke:var(--google)" stroke-width="1"/>
+<text x="440" y="302" font-size="12" text-anchor="middle" font-weight="500" style="fill:var(--surface)">Create app</text>
+</svg><figcaption>Play Console, All apps, Create app. Name from the metadata title, default language, app or game, free or paid, and the two declarations. The package name is not entered here: the first upload fixes it forever.</figcaption></figure>
+<figure class="screen"><h3>Enrol in Play App Signing</h3><svg viewBox="0 0 520 330" role="img" aria-label="Conceptual screen: Enrol in Play App Signing. Test and release, Setup, App integrity, App signing. The agent chooses the Google-generated key and uploads the certificate exported from the local upload keystore; permanent for this application, so it waits for a yes.">
+<rect x="1" y="1" width="518" height="328" rx="6" style="fill:var(--ground);stroke:currentColor" stroke-width="1.2"/>
+<rect x="1" y="1" width="518" height="34" rx="6" style="fill:var(--lane)"/>
+<text x="16" y="23" font-size="12" fill="currentColor" font-weight="500">App  ›  Test and release  ›  Setup  ›  App integrity  ›  App signing</text>
+<rect x="1" y="35" width="150" height="294" style="fill:var(--lane)" opacity="0.7"/>
+<text x="16" y="60" font-size="11.5" style="fill:var(--muted)">Releases overview</text>
+<text x="16" y="86" font-size="11.5" style="fill:var(--muted)">Production</text>
+<text x="16" y="112" font-size="11.5" style="fill:var(--muted)">Testing</text>
+<text x="16" y="138" font-size="11.5" style="fill:var(--muted)">Setup</text>
+<rect x="8" y="149" width="136" height="22" rx="3" style="fill:var(--google-fill);stroke:var(--google)" stroke-width="1"/>
+<text x="16" y="164" font-size="11.5" fill="currentColor" font-weight="500">App integrity</text>
+<text x="16" y="190" font-size="11.5" style="fill:var(--muted)">Advanced settings</text>
+<text x="170" y="62" font-size="11" style="fill:var(--muted)">Signing key</text>
+<rect x="170" y="67" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="83" font-size="11.5" fill="currentColor">Use a Google-generated key</text>
+<path d="M488 76 l4 5 l4 -5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+<text x="170" y="102" font-size="11" style="fill:var(--muted)">Upload key certificate</text>
+<rect x="170" y="107" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="178" y="123" font-size="11.5" fill="currentColor">upload.pem, exported from certs/upload.keystore</text>
+<text x="170" y="142" font-size="11" style="fill:var(--muted)">Upload key fingerprint</text>
+<rect x="170" y="147" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="178" y="163" font-size="11.5" fill="currentColor">SHA-256 shown after enrolment: ANDROID_UPLOAD_CERT_SHA256</text>
+<rect x="170" y="282" width="178" height="32" rx="3" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="1"/>
+<text x="176" y="295" font-size="11" fill="currentColor">agent fills the form</text>
+<text x="176" y="309" font-size="11" fill="currentColor">yes before Save: permanent</text>
+<rect x="380" y="284" width="120" height="28" rx="4" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="2" stroke-dasharray="5 3"/>
+<text x="440" y="302" font-size="12" text-anchor="middle" font-weight="500" fill="currentColor">Save</text>
+</svg><figcaption>Test and release, Setup, App integrity, App signing. The agent chooses the Google-generated key and uploads the certificate exported from the local upload keystore; permanent for this application, so it waits for a yes.</figcaption></figure>
+<figure class="screen"><h3>Service account and per-application grant</h3><svg viewBox="0 0 520 330" role="img" aria-label="Conceptual screen: Service account and per-application grant. Two consoles. Google Cloud: IAM and Admin, Service Accounts, create, then Keys, Add key, JSON. Play Console: Users and permissions, Invite new users, paste the account email, select this application only, tick the release and store-presence permissions. The agent reads the app-scope choice back before Invite.">
+<rect x="1" y="1" width="518" height="328" rx="6" style="fill:var(--ground);stroke:currentColor" stroke-width="1.2"/>
+<rect x="1" y="1" width="518" height="34" rx="6" style="fill:var(--lane)"/>
+<text x="16" y="23" font-size="12" fill="currentColor" font-weight="500">Play Console  ›  Users and permissions  ›  Invite new users  ›  App permissions</text>
+<rect x="1" y="35" width="150" height="294" style="fill:var(--lane)" opacity="0.7"/>
+<text x="16" y="60" font-size="11.5" style="fill:var(--muted)">Account permissions</text>
+<rect x="8" y="71" width="136" height="22" rx="3" style="fill:var(--google-fill);stroke:var(--google)" stroke-width="1"/>
+<text x="16" y="86" font-size="11.5" fill="currentColor" font-weight="500">App permissions</text>
+<text x="16" y="112" font-size="11.5" style="fill:var(--muted)">Users and permissions</text>
+<text x="16" y="138" font-size="11.5" style="fill:var(--muted)">Invite new users</text>
+<text x="170" y="62" font-size="11" style="fill:var(--muted)">Email address</text>
+<rect x="170" y="67" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="83" font-size="11.5" fill="currentColor" font-family="IBM Plex Mono, Menlo, monospace">react-native-mobile-template-publisher@…iam.gserviceaccount.com</text>
+<text x="170" y="102" font-size="11" style="fill:var(--muted)">Access</text>
+<rect x="170" y="107" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="123" font-size="11.5" fill="currentColor">This application only, never account-wide</text>
+<path d="M488 116 l4 5 l4 -5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+<text x="170" y="142" font-size="11" style="fill:var(--muted)">Permissions</text>
+<rect x="170" y="148" width="12" height="12" rx="2" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<path d="M172 154 l3 3 l6 -7" fill="none" stroke="currentColor" stroke-width="1.5"/>
+<text x="190" y="158" font-size="11.5" fill="currentColor">Release to testing tracks, Release to production, Manage store presence</text>
+<text x="170" y="174" font-size="11" style="fill:var(--muted)">Then</text>
+<rect x="170" y="179" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="195" font-size="11.5" fill="currentColor" font-family="IBM Plex Mono, Menlo, monospace">validate-play-json.sh --check-access</text>
+<rect x="170" y="282" width="178" height="32" rx="3" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="1"/>
+<text x="176" y="295" font-size="11" fill="currentColor">agent reads the scope back</text>
+<text x="176" y="309" font-size="11" fill="currentColor">yes before Invite</text>
+<rect x="380" y="284" width="120" height="28" rx="4" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="2" stroke-dasharray="5 3"/>
+<text x="440" y="302" font-size="12" text-anchor="middle" font-weight="500" fill="currentColor">Invite user</text>
+</svg><figcaption>Two consoles. Google Cloud: IAM and Admin, Service Accounts, create, then Keys, Add key, JSON. Play Console: Users and permissions, Invite new users, paste the account email, select this application only, tick the release and store-presence permissions. The agent reads the app-scope choice back before Invite.</figcaption></figure>
+<figure class="screen"><h3>Internal testing track and testers</h3><svg viewBox="0 0 520 330" role="img" aria-label="Conceptual screen: Internal testing track and testers. Test and release, Testing, Internal testing. The agent creates the tester email list from the addresses the human gives and leaves the release itself to the pipeline: the first upload is the delivery workflow's job and is gated.">
+<rect x="1" y="1" width="518" height="328" rx="6" style="fill:var(--ground);stroke:currentColor" stroke-width="1.2"/>
+<rect x="1" y="1" width="518" height="34" rx="6" style="fill:var(--lane)"/>
+<text x="16" y="23" font-size="12" fill="currentColor" font-weight="500">App  ›  Test and release  ›  Testing  ›  Internal testing  ›  Testers</text>
+<rect x="1" y="35" width="150" height="294" style="fill:var(--lane)" opacity="0.7"/>
+<text x="16" y="60" font-size="11.5" style="fill:var(--muted)">Releases overview</text>
+<text x="16" y="86" font-size="11.5" style="fill:var(--muted)">Production</text>
+<text x="16" y="112" font-size="11.5" style="fill:var(--muted)">Testing</text>
+<rect x="8" y="123" width="136" height="22" rx="3" style="fill:var(--google-fill);stroke:var(--google)" stroke-width="1"/>
+<text x="16" y="138" font-size="11.5" fill="currentColor" font-weight="500">Internal testing</text>
+<text x="16" y="164" font-size="11.5" style="fill:var(--muted)">Closed testing</text>
+<text x="16" y="190" font-size="11.5" style="fill:var(--muted)">Open testing</text>
+<text x="170" y="62" font-size="11" style="fill:var(--muted)">Email list name</text>
+<rect x="170" y="67" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="83" font-size="11.5" fill="currentColor">Internal testers</text>
+<text x="170" y="102" font-size="11" style="fill:var(--muted)">Add email addresses</text>
+<rect x="170" y="107" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="178" y="123" font-size="11.5" fill="currentColor">from the human, comma separated</text>
+<text x="170" y="142" font-size="11" style="fill:var(--muted)">Feedback URL or email</text>
+<rect x="170" y="147" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="178" y="163" font-size="11.5" fill="currentColor">optional</text>
+<text x="170" y="182" font-size="11" style="fill:var(--muted)">Release</text>
+<rect x="170" y="187" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="178" y="203" font-size="11.5" fill="currentColor">created by the pipeline on the first push</text>
+<rect x="170" y="289" width="185" height="18" rx="3" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="1"/>
+<text x="176" y="302" font-size="11" fill="currentColor">agent creates the list only</text>
+<rect x="380" y="284" width="120" height="28" rx="4" style="fill:var(--google);stroke:var(--google)" stroke-width="1"/>
+<text x="440" y="302" font-size="12" text-anchor="middle" font-weight="500" style="fill:var(--surface)">Save changes</text>
+</svg><figcaption>Test and release, Testing, Internal testing. The agent creates the tester email list from the addresses the human gives and leaves the release itself to the pipeline: the first upload is the delivery workflow's job and is gated.</figcaption></figure>
+  </div>
+  <h3>AppGallery Connect</h3>
+  <div class="screens">
+<figure class="screen"><h3>Create the application record</h3><svg viewBox="0 0 520 330" role="img" aria-label="Conceptual screen: Create the application record. AppGallery Connect, My apps, New. The agent enters the name from the metadata title, the default language, the category and the package name; the package name fixes what this record can ever publish, so it waits for a yes. The numeric App ID appears under App information afterwards and becomes a repository variable.">
+<rect x="1" y="1" width="518" height="328" rx="6" style="fill:var(--ground);stroke:currentColor" stroke-width="1.2"/>
+<rect x="1" y="1" width="518" height="34" rx="6" style="fill:var(--lane)"/>
+<text x="16" y="23" font-size="12" fill="currentColor" font-weight="500">AppGallery Connect  &#8250;  My apps  &#8250;  New</text>
+<rect x="1" y="35" width="150" height="294" style="fill:var(--lane)" opacity="0.7"/>
+<text x="16" y="60" font-size="11.5" style="fill:var(--muted)">My projects</text>
+<rect x="8" y="71" width="136" height="22" rx="3" style="fill:var(--huawei-fill);stroke:var(--huawei)" stroke-width="1"/>
+<text x="16" y="86" font-size="11.5" fill="currentColor" font-weight="500">My apps</text>
+<text x="16" y="112" font-size="11.5" style="fill:var(--muted)">Users and permissions</text>
+<text x="16" y="138" font-size="11.5" style="fill:var(--muted)">Reports</text>
+<text x="16" y="164" font-size="11.5" style="fill:var(--muted)">Services</text>
+<text x="170" y="62" font-size="11" style="fill:var(--muted)">Name</text>
+<rect x="170" y="67" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="83" font-size="11.5" fill="currentColor">RN Mobile Template</text>
+<text x="170" y="102" font-size="11" style="fill:var(--muted)">Default language</text>
+<rect x="170" y="107" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="123" font-size="11.5" fill="currentColor">English</text>
+<path d="M488 116 l4 5 l4 -5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+<text x="170" y="142" font-size="11" style="fill:var(--muted)">Category</text>
+<rect x="170" y="147" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="163" font-size="11.5" fill="currentColor">Tools</text>
+<path d="M488 156 l4 5 l4 -5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+<text x="170" y="182" font-size="11" style="fill:var(--muted)">Package name</text>
+<rect x="170" y="187" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="203" font-size="11.5" fill="currentColor" font-family="IBM Plex Mono, Menlo, monospace">com.blinkbitcoin.reactnativemobiletemplate</text>
+<text x="170" y="222" font-size="11" style="fill:var(--muted)">App ID (shown after Create)</text>
+<rect x="170" y="227" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="178" y="243" font-size="11.5" fill="currentColor">numeric, becomes HUAWEI_APP_ID</text>
+<rect x="170" y="282" width="150" height="32" rx="3" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="1"/>
+<text x="176" y="295" font-size="11" fill="currentColor">agent fills the form</text>
+<text x="176" y="309" font-size="11" fill="currentColor">yes before Create</text>
+<rect x="380" y="284" width="120" height="28" rx="4" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="2" stroke-dasharray="5 3"/>
+<text x="440" y="302" font-size="12" text-anchor="middle" font-weight="500" fill="currentColor">Create</text>
+</svg><figcaption>AppGallery Connect, My apps, New. The package name is entered here and fixes what the record can publish, so the agent reads the form back and waits for a yes. The numeric App ID appears afterwards under App information and becomes the repository variable, not a secret.</figcaption></figure>
+<figure class="screen"><h3>Create the Connect API client</h3><svg viewBox="0 0 520 330" role="img" aria-label="Conceptual screen: Create the Connect API client. Users and permissions, API key, Connect API. The agent names the client, keeps Project at N/A so the client is team level, and limits the roles; the human clicks Create because the client secret is shown exactly once. Both strings go to the local validator and then to GitHub on stdin.">
+<rect x="1" y="1" width="518" height="328" rx="6" style="fill:var(--ground);stroke:currentColor" stroke-width="1.2"/>
+<rect x="1" y="1" width="518" height="34" rx="6" style="fill:var(--lane)"/>
+<text x="16" y="23" font-size="12" fill="currentColor" font-weight="500">AppGallery Connect  &#8250;  Users and permissions  ›  API key  ›  Connect API</text>
+<rect x="1" y="35" width="150" height="294" style="fill:var(--lane)" opacity="0.7"/>
+<text x="16" y="60" font-size="11.5" style="fill:var(--muted)">My projects</text>
+<text x="16" y="86" font-size="11.5" style="fill:var(--muted)">My apps</text>
+<rect x="8" y="97" width="136" height="22" rx="3" style="fill:var(--huawei-fill);stroke:var(--huawei)" stroke-width="1"/>
+<text x="16" y="112" font-size="11.5" fill="currentColor" font-weight="500">Users and permissions</text>
+<text x="16" y="138" font-size="11.5" style="fill:var(--muted)">Reports</text>
+<text x="16" y="164" font-size="11.5" style="fill:var(--muted)">Services</text>
+<text x="170" y="62" font-size="11" style="fill:var(--muted)">Name</text>
+<rect x="170" y="67" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="83" font-size="11.5" fill="currentColor">react-native-mobile-template release</text>
+<text x="170" y="102" font-size="11" style="fill:var(--muted)">Project</text>
+<rect x="170" y="107" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="123" font-size="11.5" fill="currentColor">N/A (team level)</text>
+<path d="M488 116 l4 5 l4 -5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+<text x="170" y="142" font-size="11" style="fill:var(--muted)">Roles</text>
+<rect x="170" y="147" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="163" font-size="11.5" fill="currentColor">App administrator for this app</text>
+<path d="M488 156 l4 5 l4 -5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+<text x="170" y="182" font-size="11" style="fill:var(--muted)">Client ID (shown once)</text>
+<rect x="170" y="187" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="178" y="203" font-size="11.5" fill="currentColor">becomes HUAWEI_CLIENT_ID</text>
+<text x="170" y="222" font-size="11" style="fill:var(--muted)">Client Secret (shown once)</text>
+<rect x="170" y="227" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="178" y="243" font-size="11.5" fill="currentColor">becomes HUAWEI_CLIENT_SECRET, paste to the validator</text>
+<rect x="170" y="282" width="150" height="32" rx="3" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="1"/>
+<text x="176" y="295" font-size="11" fill="currentColor">agent fills the form</text>
+<text x="176" y="309" font-size="11" fill="currentColor">human clicks Create</text>
+<rect x="380" y="284" width="120" height="28" rx="4" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="2" stroke-dasharray="5 3"/>
+<text x="440" y="302" font-size="12" text-anchor="middle" font-weight="500" fill="currentColor">Create</text>
+</svg><figcaption>Users and permissions, API key, Connect API. The agent names the client, keeps Project at N/A so it is team level, and limits the roles; the human clicks Create because the secret is shown exactly once. Both strings go to the validator and then to GitHub on stdin, never to a file in the repository.</figcaption></figure>
+<figure class="screen"><h3>Enable App Signing (optional)</h3><svg viewBox="0 0 520 330" role="img" aria-label="Conceptual screen: Enable App Signing (optional). My apps, Services, App Signing. Optional and permanent: once enabled Huawei re-signs every bundle for this application. The template signs with its own upload key, so the default is to leave this off; the agent only proceeds on a yes.">
+<rect x="1" y="1" width="518" height="328" rx="6" style="fill:var(--ground);stroke:currentColor" stroke-width="1.2"/>
+<rect x="1" y="1" width="518" height="34" rx="6" style="fill:var(--lane)"/>
+<text x="16" y="23" font-size="12" fill="currentColor" font-weight="500">AppGallery Connect  &#8250;  My apps  &#8250;  Services  &#8250;  App Signing</text>
+<rect x="1" y="35" width="150" height="294" style="fill:var(--lane)" opacity="0.7"/>
+<text x="16" y="60" font-size="11.5" style="fill:var(--muted)">My projects</text>
+<rect x="8" y="71" width="136" height="22" rx="3" style="fill:var(--huawei-fill);stroke:var(--huawei)" stroke-width="1"/>
+<text x="16" y="86" font-size="11.5" fill="currentColor" font-weight="500">My apps</text>
+<text x="16" y="112" font-size="11.5" style="fill:var(--muted)">Users and permissions</text>
+<text x="16" y="138" font-size="11.5" style="fill:var(--muted)">Reports</text>
+<text x="16" y="164" font-size="11.5" style="fill:var(--muted)">Services</text>
+<text x="170" y="62" font-size="11" style="fill:var(--muted)">Signing mode</text>
+<rect x="170" y="67" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="83" font-size="11.5" fill="currentColor">Managed by AppGallery (permanent once enabled)</text>
+<path d="M488 76 l4 5 l4 -5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+<text x="170" y="102" font-size="11" style="fill:var(--muted)">Upload key certificate</text>
+<rect x="170" y="107" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="123" font-size="11.5" fill="currentColor">exported from the local upload keystore</text>
+<text x="170" y="142" font-size="11" style="fill:var(--muted)">Default for this template</text>
+<rect x="170" y="147" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="178" y="163" font-size="11.5" fill="currentColor">manual signing with the repository upload key</text>
+<rect x="170" y="282" width="150" height="32" rx="3" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="1"/>
+<text x="176" y="295" font-size="11" fill="currentColor">agent fills the form</text>
+<text x="176" y="309" font-size="11" fill="currentColor">yes before Enable</text>
+<rect x="380" y="284" width="120" height="28" rx="4" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="2" stroke-dasharray="5 3"/>
+<text x="440" y="302" font-size="12" text-anchor="middle" font-weight="500" fill="currentColor">Enable</text>
+</svg><figcaption>My apps, Services, App Signing. Optional and permanent once enabled: Huawei re-signs every bundle. The template signs with its own upload key, so the default is to leave this off, and the agent proceeds only on a yes given in that turn.</figcaption></figure>
+<figure class="screen"><h3>Submit the uploaded version for release</h3><svg viewBox="0 0 520 330" role="img" aria-label="Conceptual screen: Submit the uploaded version for release. My apps, Distribute, Version information. What the upload_huawei lane does on the production dispatch: the same signed bundle, the release notes and a submit for review. This screen is where a human checks the state afterwards; the lane does the clicking.">
+<rect x="1" y="1" width="518" height="328" rx="6" style="fill:var(--ground);stroke:currentColor" stroke-width="1.2"/>
+<rect x="1" y="1" width="518" height="34" rx="6" style="fill:var(--lane)"/>
+<text x="16" y="23" font-size="12" fill="currentColor" font-weight="500">AppGallery Connect  &#8250;  My apps  &#8250;  Distribute  &#8250;  Version information</text>
+<rect x="1" y="35" width="150" height="294" style="fill:var(--lane)" opacity="0.7"/>
+<text x="16" y="60" font-size="11.5" style="fill:var(--muted)">My projects</text>
+<rect x="8" y="71" width="136" height="22" rx="3" style="fill:var(--huawei-fill);stroke:var(--huawei)" stroke-width="1"/>
+<text x="16" y="86" font-size="11.5" fill="currentColor" font-weight="500">My apps</text>
+<text x="16" y="112" font-size="11.5" style="fill:var(--muted)">Users and permissions</text>
+<text x="16" y="138" font-size="11.5" style="fill:var(--muted)">Reports</text>
+<text x="16" y="164" font-size="11.5" style="fill:var(--muted)">Services</text>
+<text x="170" y="62" font-size="11" style="fill:var(--muted)">Uploaded by the pipeline</text>
+<rect x="170" y="67" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="83" font-size="11.5" fill="currentColor" font-family="IBM Plex Mono, Menlo, monospace">app-release.aab from the release tag</text>
+<text x="170" y="102" font-size="11" style="fill:var(--muted)">Release notes</text>
+<rect x="170" y="107" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="123" font-size="11.5" fill="currentColor">from the release, 10 to 300 characters</text>
+<text x="170" y="142" font-size="11" style="fill:var(--muted)">Countries and regions</text>
+<rect x="170" y="147" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1"/>
+<text x="178" y="163" font-size="11.5" fill="currentColor">from the listing step</text>
+<path d="M488 156 l4 5 l4 -5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+<text x="170" y="182" font-size="11" style="fill:var(--muted)">Review</text>
+<rect x="170" y="187" width="330" height="24" rx="3" style="fill:var(--surface);stroke:currentColor" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="178" y="203" font-size="11.5" fill="currentColor">manual and automated, days</text>
+<rect x="170" y="282" width="150" height="32" rx="3" style="fill:var(--gate-fill);stroke:var(--gate)" stroke-width="1"/>
+<text x="176" y="295" font-size="11" fill="currentColor">done by upload_huawei</text>
+<text x="176" y="309" font-size="11" fill="currentColor">nothing to click here</text>
+<rect x="380" y="284" width="120" height="28" rx="4" style="fill:var(--huawei);stroke:var(--huawei)" stroke-width="1"/>
+<text x="440" y="302" font-size="12" text-anchor="middle" font-weight="500" style="fill:var(--surface)">Submit</text>
+</svg><figcaption>My apps, Distribute, Version information. This is what the upload_huawei lane does on the production dispatch: the same signed bundle, the release notes, and a submit for review. A human comes here only to check the review state afterwards.</figcaption></figure>
+  </div>
+  <h2>Who does what, by mode</h2>
+  <p>The developer picks one mode at the start. The gates in ochre above are the same in every mode: each waits for the word "yes" in the current turn, and a yes to one step is never a yes to the next.</p>
+  <div class="wrap">
+  <table>
+    <thead><tr><th>Kind of step</th><th>(a) Browser, pausing</th><th>(b) Guided</th><th>(c) Browser, end to end</th></tr></thead>
+    <tbody>
+      <tr><td>Navigate and fill forms</td><td class="who agent">agent</td><td class="who human">human, values supplied</td><td class="who agent">agent</td></tr>
+      <tr><td>Read the form back, then submit</td><td class="who agent">agent, after a yes</td><td class="who human">human</td><td class="who agent">agent, after a yes</td></tr>
+      <tr><td>Sign in, two-factor codes</td><td class="who human">human</td><td class="who human">human</td><td class="who human">human</td></tr>
+      <tr><td>Download the API key file</td><td class="who human">human</td><td class="who human">human</td><td class="who human">human</td></tr>
+      <tr><td>Agreements, tax, banking, payment</td><td class="who human">human</td><td class="who human">human</td><td class="who agent">agent accepts agreements, after a yes; never pays</td></tr>
+      <tr><td>Policy questionnaires</td><td class="who human">human</td><td class="who human">human</td><td class="who agent">agent, from answers given in that turn, read back</td></tr>
+      <tr><td>Play App Signing, Huawei App Signing, first Play upload</td><td class="who agent">agent, after a yes</td><td class="who human">human</td><td class="who agent">agent, after a yes</td></tr>
+      <tr><td>Huawei API client creation</td><td class="who agent">agent fills, human clicks Create</td><td class="who human">human</td><td class="who agent">agent fills, human clicks Create</td></tr>
+      <tr><td>Test user list and invitations</td><td class="who agent">agent fills, human confirms</td><td class="who human">human</td><td class="who agent">agent fills, human confirms</td></tr>
+      <tr><td>Validate credentials, push secrets</td><td class="who agent">scripts</td><td class="who agent">scripts</td><td class="who agent">scripts</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Where each part lives</h3>
+  <ul>
+    <li><code>store-setup</code> owns the mode choice, the 49-step checklist (eight of them the optional Huawei block) in <code>.store-setup/state.json</code>, and the identifiers gate that refuses <code>com.example.*</code>.</li>
+    <li><code>store-consoles</code> owns the 27 console-only steps above as reference blocks, one per step, with the click-path and the confirm class.</li>
+    <li><code>store-credentials</code> owns the local validators and <code>push-to-github.sh</code>; values reach GitHub only on stdin.</li>
+    <li><code>store-metadata</code> owns the listing files and the <code>sync_metadata</code> lane; not used by the template repository itself, whose listing stays placeholder for adopters. The Huawei listing is console-only and outside this skill.</li>
+  </ul>
+</main>
+</body>
+</html>

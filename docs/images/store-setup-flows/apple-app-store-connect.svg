@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="430" color="#1c1f24" font-family="IBM Plex Sans, Helvetica Neue, Arial, sans-serif" viewBox="0 0 1160 430" role="img" aria-label="Apple setup flow across four lanes: the human enrols, accepts agreements and downloads the API key; the agent registers the bundle identifier, creates the application record, the key, the TestFlight groups and the App Privacy answers; local scripts validate the key and set up match; GitHub receives the secrets and variables. Bundle identifier and API key are gated.">
+<rect width="100%" height="100%" fill="#f6f5f1"/>
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <!-- lanes -->
+        <g font-size="12" fill="currentColor">
+          <rect x="0" y="30" width="1160" height="90" style="fill:#edebe5" opacity="0.6"/>
+          <rect x="0" y="230" width="1160" height="90" style="fill:#edebe5" opacity="0.6"/>
+          <text x="10" y="50" font-weight="500">Human</text>
+          <text x="10" y="150" font-weight="500">Agent in Chrome</text>
+          <text x="10" y="250" font-weight="500">Local scripts</text>
+          <text x="10" y="350" font-weight="500">GitHub repository</text>
+        </g>
+        <!-- Human lane nodes -->
+        <g font-size="12" fill="currentColor" text-anchor="middle">
+          <rect x="120" y="55" width="150" height="46" rx="4" style="fill:#f8ecd9;stroke:#b5711c" stroke-width="2" stroke-dasharray="5 3"/>
+          <text x="195" y="74">Enrol in the program</text><text x="195" y="90">99 USD per year</text>
+          <rect x="300" y="55" width="160" height="46" rx="4" style="fill:#f8ecd9;stroke:#b5711c" stroke-width="2" stroke-dasharray="5 3"/>
+          <text x="380" y="74">Agreements, tax,</text><text x="380" y="90">banking</text>
+          <rect x="690" y="55" width="160" height="46" rx="4" style="fill:#f8ecd9;stroke:#b5711c" stroke-width="2" stroke-dasharray="5 3"/>
+          <text x="770" y="74">Click Generate,</text><text x="770" y="90">download the .p8 once</text>
+          <rect x="960" y="55" width="180" height="46" rx="4" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1.2" stroke-dasharray="5 3"/>
+          <text x="1050" y="74">Answer App Privacy,</text><text x="1050" y="90">pricing and territories</text>
+        </g>
+        <!-- Agent lane nodes -->
+        <g font-size="12" fill="currentColor" text-anchor="middle">
+          <rect x="300" y="155" width="160" height="46" rx="4" style="fill:#f8ecd9;stroke:#b5711c" stroke-width="2"/>
+          <text x="380" y="174">Register bundle identifier</text><text x="380" y="190" class="mono" font-family="IBM Plex Mono, Menlo, monospace" font-size="11">com.blinkbitcoin.…</text>
+          <rect x="495" y="155" width="160" height="46" rx="4" style="fill:#e6eaf4;stroke:#3f4f7a" stroke-width="1.5"/>
+          <text x="575" y="174">Create application</text><text x="575" y="190">record</text>
+          <rect x="690" y="155" width="160" height="46" rx="4" style="fill:#f8ecd9;stroke:#b5711c" stroke-width="2"/>
+          <text x="770" y="174">App Store Connect API key</text><text x="770" y="190">scoped to this application</text>
+          <rect x="885" y="155" width="150" height="46" rx="4" style="fill:#e6eaf4;stroke:#3f4f7a" stroke-width="1.5"/>
+          <text x="960" y="174">TestFlight groups</text><text x="960" y="190">internal and external</text>
+        </g>
+        <!-- Local lane nodes -->
+        <g font-size="12" fill="currentColor" text-anchor="middle">
+          <rect x="690" y="255" width="160" height="46" rx="4" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1.2"/>
+          <text x="770" y="274">validate-asc-key.sh</text><text x="770" y="290">key id, issuer, P-256 key</text>
+          <rect x="495" y="255" width="160" height="46" rx="4" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1.2"/>
+          <text x="575" y="274">fastlane match</text><text x="575" y="290">new private repository</text>
+        </g>
+        <!-- GitHub lane nodes -->
+        <g font-size="12" fill="currentColor" text-anchor="middle">
+          <rect x="690" y="355" width="160" height="46" rx="4" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1.2"/>
+          <text x="770" y="374">gh secret set</text><text x="770" y="390" font-family="IBM Plex Mono, Menlo, monospace" font-size="11">ASC_* MATCH_*</text>
+          <rect x="885" y="355" width="150" height="46" rx="4" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1.2"/>
+          <text x="960" y="374">gh variable set</text><text x="960" y="390" font-family="IBM Plex Mono, Menlo, monospace" font-size="11">TESTFLIGHT_*</text>
+        </g>
+        <!-- arrows -->
+        <g fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#ah)">
+          <path d="M270 78 H300"/>
+          <path d="M380 101 V155"/>
+          <path d="M460 178 H495"/>
+          <path d="M655 178 H690"/>
+          <path d="M770 155 V101"/>
+          <path d="M770 201 V255"/>
+          <path d="M770 301 V355"/>
+          <path d="M575 201 V255"/>
+          <path d="M655 278 H690"/>
+          <path d="M655 178 C 700 178, 780 140, 885 178"/>
+          <path d="M960 201 V355"/>
+          <path d="M1035 178 C 1080 178, 1050 120, 1050 101"/>
+        </g>
+        <!-- arrow labels -->
+        <g font-size="11" style="fill:#5f6570">
+          <text x="386" y="132">yes, then submit</text>
+          <text x="776" y="132">stop before Generate</text>
+          <text x="776" y="232">.p8 from Downloads</text>
+          <text x="776" y="332">stdin only</text>
+          <text x="581" y="232">certificates, own repository</text>
+          <text x="966" y="232">group names</text>
+        </g>
+      </svg>

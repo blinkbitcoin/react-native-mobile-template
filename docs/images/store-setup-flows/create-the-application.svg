@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="330" color="#1c1f24" font-family="IBM Plex Sans, Helvetica Neue, Arial, sans-serif" viewBox="0 0 520 330" role="img" aria-label="Conceptual screen: Create the application. Play Console, All apps, Create app. Name from the metadata title, default language, app or game, free or paid, and the two declarations. The package name is not entered here: the first upload fixes it forever.">
+<rect width="100%" height="100%" fill="#f6f5f1"/>
+<rect x="1" y="1" width="518" height="328" rx="6" style="fill:#f6f5f1;stroke:currentColor" stroke-width="1.2"/>
+<rect x="1" y="1" width="518" height="34" rx="6" style="fill:#edebe5"/>
+<text x="16" y="23" font-size="12" fill="currentColor" font-weight="500">Play Console  ›  All apps  ›  Create app</text>
+<rect x="1" y="35" width="150" height="294" style="fill:#edebe5" opacity="0.7"/>
+<rect x="8" y="45" width="136" height="22" rx="3" style="fill:#e3f0e8;stroke:#2f7a52" stroke-width="1"/>
+<text x="16" y="60" font-size="11.5" fill="currentColor" font-weight="500">All apps</text>
+<text x="16" y="86" font-size="11.5" style="fill:#5f6570">Users and permissions</text>
+<text x="16" y="112" font-size="11.5" style="fill:#5f6570">Setup</text>
+<text x="16" y="138" font-size="11.5" style="fill:#5f6570">Policy status</text>
+<text x="16" y="164" font-size="11.5" style="fill:#5f6570">Download reports</text>
+<text x="170" y="62" font-size="11" style="fill:#5f6570">App name</text>
+<rect x="170" y="67" width="330" height="24" rx="3" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1"/>
+<text x="178" y="83" font-size="11.5" fill="currentColor">RN Mobile Template</text>
+<text x="170" y="102" font-size="11" style="fill:#5f6570">Default language</text>
+<rect x="170" y="107" width="330" height="24" rx="3" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1"/>
+<text x="178" y="123" font-size="11.5" fill="currentColor">English (United States)</text>
+<path d="M488 116 l4 5 l4 -5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+<text x="170" y="142" font-size="11" style="fill:#5f6570">App or game</text>
+<rect x="170" y="147" width="330" height="24" rx="3" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1"/>
+<text x="178" y="163" font-size="11.5" fill="currentColor">App</text>
+<path d="M488 156 l4 5 l4 -5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+<text x="170" y="182" font-size="11" style="fill:#5f6570">Free or paid</text>
+<rect x="170" y="187" width="330" height="24" rx="3" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1"/>
+<text x="178" y="203" font-size="11.5" fill="currentColor">Free (cannot change to paid later)</text>
+<path d="M488 196 l4 5 l4 -5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+<text x="170" y="222" font-size="11" style="fill:#5f6570">Declarations</text>
+<rect x="170" y="228" width="12" height="12" rx="2" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1"/>
+<path d="M172 234 l3 3 l6 -7" fill="none" stroke="currentColor" stroke-width="1.5"/>
+<text x="190" y="238" font-size="11.5" fill="currentColor">Developer Program Policies, US export laws</text>
+<rect x="170" y="289" width="159" height="18" rx="3" style="fill:#f8ecd9;stroke:#b5711c" stroke-width="1"/>
+<text x="176" y="302" font-size="11" fill="currentColor">agent fills and submits</text>
+<rect x="380" y="284" width="120" height="28" rx="4" style="fill:#2f7a52;stroke:#2f7a52" stroke-width="1"/>
+<text x="440" y="302" font-size="12" text-anchor="middle" font-weight="500" style="fill:#fbfaf7">Create app</text>
+</svg>

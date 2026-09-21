@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="330" color="#1c1f24" font-family="IBM Plex Sans, Helvetica Neue, Arial, sans-serif" viewBox="0 0 520 330" role="img" aria-label="Conceptual screen: TestFlight groups. The application's TestFlight tab. The agent creates the internal group, then the external group and adds the testers the human names. The two group names become repository variables; external testing needs one Beta App Review.">
+<rect width="100%" height="100%" fill="#f6f5f1"/>
+<rect x="1" y="1" width="518" height="328" rx="6" style="fill:#f6f5f1;stroke:currentColor" stroke-width="1.2"/>
+<rect x="1" y="1" width="518" height="34" rx="6" style="fill:#edebe5"/>
+<text x="16" y="23" font-size="12" fill="currentColor" font-weight="500">App  ›  TestFlight  ›  Internal Testing  ›  New group</text>
+<rect x="1" y="35" width="150" height="294" style="fill:#edebe5" opacity="0.7"/>
+<text x="16" y="60" font-size="11.5" style="fill:#5f6570">iOS Builds</text>
+<rect x="8" y="71" width="136" height="22" rx="3" style="fill:#e6eaf4;stroke:#3f4f7a" stroke-width="1"/>
+<text x="16" y="86" font-size="11.5" fill="currentColor" font-weight="500">Internal Testing</text>
+<text x="16" y="112" font-size="11.5" style="fill:#5f6570">External Testing</text>
+<text x="16" y="138" font-size="11.5" style="fill:#5f6570">Test Information</text>
+<text x="16" y="164" font-size="11.5" style="fill:#5f6570">Beta App Review</text>
+<text x="170" y="62" font-size="11" style="fill:#5f6570">Group name</text>
+<rect x="170" y="67" width="330" height="24" rx="3" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1"/>
+<text x="178" y="83" font-size="11.5" fill="currentColor">Internal</text>
+<text x="170" y="102" font-size="11" style="fill:#5f6570">Testers</text>
+<rect x="170" y="107" width="330" height="24" rx="3" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="178" y="123" font-size="11.5" fill="currentColor">add by email or from the team</text>
+<text x="170" y="142" font-size="11" style="fill:#5f6570">Automatic distribution</text>
+<rect x="170" y="148" width="12" height="12" rx="2" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1"/>
+<path d="M172 154 l3 3 l6 -7" fill="none" stroke="currentColor" stroke-width="1.5"/>
+<text x="190" y="158" font-size="11.5" fill="currentColor">enable for new builds</text>
+<text x="170" y="174" font-size="11" style="fill:#5f6570">Then</text>
+<rect x="170" y="179" width="330" height="24" rx="3" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1"/>
+<text x="178" y="195" font-size="11.5" fill="currentColor" font-family="IBM Plex Mono, Menlo, monospace">gh variable set TESTFLIGHT_INTERNAL_GROUP</text>
+<rect x="170" y="282" width="159" height="32" rx="3" style="fill:#f8ecd9;stroke:#b5711c" stroke-width="1"/>
+<text x="176" y="295" font-size="11" fill="currentColor">agent creates the group</text>
+<text x="176" y="309" font-size="11" fill="currentColor">names become variables</text>
+<rect x="380" y="284" width="120" height="28" rx="4" style="fill:#3f4f7a;stroke:#3f4f7a" stroke-width="1"/>
+<text x="440" y="302" font-size="12" text-anchor="middle" font-weight="500" style="fill:#fbfaf7">Create</text>
+</svg>

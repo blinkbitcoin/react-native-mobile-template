@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="330" color="#1c1f24" font-family="IBM Plex Sans, Helvetica Neue, Arial, sans-serif" viewBox="0 0 520 330" role="img" aria-label="Conceptual screen: Submit the uploaded version for release. My apps, Distribute, Version information. What the upload_huawei lane does on the production dispatch: the same signed bundle, the release notes and a submit for review. This screen is where a human checks the state afterwards; the lane does the clicking.">
+<rect width="100%" height="100%" fill="#f6f5f1"/>
+<rect x="1" y="1" width="518" height="328" rx="6" style="fill:#f6f5f1;stroke:currentColor" stroke-width="1.2"/>
+<rect x="1" y="1" width="518" height="34" rx="6" style="fill:#edebe5"/>
+<text x="16" y="23" font-size="12" fill="currentColor" font-weight="500">AppGallery Connect  &#8250;  My apps  &#8250;  Distribute  &#8250;  Version information</text>
+<rect x="1" y="35" width="150" height="294" style="fill:#edebe5" opacity="0.7"/>
+<text x="16" y="60" font-size="11.5" style="fill:#5f6570">My projects</text>
+<rect x="8" y="71" width="136" height="22" rx="3" style="fill:#f6e3de;stroke:#a3402e" stroke-width="1"/>
+<text x="16" y="86" font-size="11.5" fill="currentColor" font-weight="500">My apps</text>
+<text x="16" y="112" font-size="11.5" style="fill:#5f6570">Users and permissions</text>
+<text x="16" y="138" font-size="11.5" style="fill:#5f6570">Reports</text>
+<text x="16" y="164" font-size="11.5" style="fill:#5f6570">Services</text>
+<text x="170" y="62" font-size="11" style="fill:#5f6570">Uploaded by the pipeline</text>
+<rect x="170" y="67" width="330" height="24" rx="3" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1"/>
+<text x="178" y="83" font-size="11.5" fill="currentColor" font-family="IBM Plex Mono, Menlo, monospace">app-release.aab from the release tag</text>
+<text x="170" y="102" font-size="11" style="fill:#5f6570">Release notes</text>
+<rect x="170" y="107" width="330" height="24" rx="3" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1"/>
+<text x="178" y="123" font-size="11.5" fill="currentColor">from the release, 10 to 300 characters</text>
+<text x="170" y="142" font-size="11" style="fill:#5f6570">Countries and regions</text>
+<rect x="170" y="147" width="330" height="24" rx="3" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1"/>
+<text x="178" y="163" font-size="11.5" fill="currentColor">from the listing step</text>
+<path d="M488 156 l4 5 l4 -5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+<text x="170" y="182" font-size="11" style="fill:#5f6570">Review</text>
+<rect x="170" y="187" width="330" height="24" rx="3" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="178" y="203" font-size="11.5" fill="currentColor">manual and automated, days</text>
+<rect x="170" y="282" width="150" height="32" rx="3" style="fill:#f8ecd9;stroke:#b5711c" stroke-width="1"/>
+<text x="176" y="295" font-size="11" fill="currentColor">done by upload_huawei</text>
+<text x="176" y="309" font-size="11" fill="currentColor">nothing to click here</text>
+<rect x="380" y="284" width="120" height="28" rx="4" style="fill:#a3402e;stroke:#a3402e" stroke-width="1"/>
+<text x="440" y="302" font-size="12" text-anchor="middle" font-weight="500" style="fill:#fbfaf7">Submit</text>
+</svg>

@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="430" color="#1c1f24" font-family="IBM Plex Sans, Helvetica Neue, Arial, sans-serif" viewBox="0 0 1200 430" role="img" aria-label="Huawei setup flow across four lanes: the human registers a developer account and passes identity verification; the agent creates the application record, optionally enables App Signing, creates the Connect API client, fills the listing and age rating, and creates the test user list; the local validator checks the client id and secret; GitHub receives the two secrets and the two variables. App Signing is gated and permanent; the API client secret is shown once; testers are invited per release.">
+<rect width="100%" height="100%" fill="#f6f5f1"/>
+        <defs>
+          <marker id="aw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <g font-size="12" fill="currentColor">
+          <rect x="0" y="30" width="1200" height="90" style="fill:#edebe5" opacity="0.6"/>
+          <rect x="0" y="230" width="1200" height="90" style="fill:#edebe5" opacity="0.6"/>
+          <text x="10" y="50" font-weight="500">Human</text>
+          <text x="10" y="150" font-weight="500">Agent in Chrome</text>
+          <text x="10" y="250" font-weight="500">Local scripts</text>
+          <text x="10" y="350" font-weight="500">GitHub repository</text>
+        </g>
+        <g font-size="12" fill="currentColor" text-anchor="middle">
+          <rect x="120" y="55" width="150" height="46" rx="4" style="fill:#f8ecd9;stroke:#b5711c" stroke-width="2" stroke-dasharray="5 3"/>
+          <text x="195" y="74">Developer account,</text><text x="195" y="90">identity verification, days</text>
+          <rect x="680" y="55" width="160" height="46" rx="4" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1.2" stroke-dasharray="5 3"/>
+          <text x="760" y="74">Click Create, copy the</text><text x="760" y="90">client id and secret once</text>
+          <rect x="960" y="55" width="180" height="46" rx="4" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1.2" stroke-dasharray="5 3"/>
+          <text x="1050" y="74">Age rating questionnaire,</text><text x="1050" y="90">countries, pricing</text>
+        </g>
+        <g font-size="12" fill="currentColor" text-anchor="middle">
+          <rect x="300" y="155" width="150" height="46" rx="4" style="fill:#f8ecd9;stroke:#b5711c" stroke-width="2"/>
+          <text x="375" y="174">Create application record</text><text x="375" y="190">package name entered here</text>
+          <rect x="485" y="155" width="160" height="46" rx="4" style="fill:#f8ecd9;stroke:#b5711c" stroke-width="2"/>
+          <text x="565" y="174">Enable App Signing, optional</text><text x="565" y="190">permanent for this application</text>
+          <rect x="680" y="155" width="160" height="46" rx="4" style="fill:#f6e3de;stroke:#a3402e" stroke-width="1.5"/>
+          <text x="760" y="174">Connect API client,</text><text x="760" y="190">team level, roles only</text>
+          <rect x="875" y="155" width="150" height="46" rx="4" style="fill:#f6e3de;stroke:#a3402e" stroke-width="1.5"/>
+          <text x="950" y="174">Listing: icon, screenshots,</text><text x="950" y="190">privacy policy, category</text>
+          <rect x="1045" y="155" width="145" height="46" rx="4" style="fill:#f6e3de;stroke:#a3402e" stroke-width="1.5"/>
+          <text x="1117" y="174">Test user list,</text><text x="1117" y="190">testers by Huawei ID</text>
+        </g>
+        <g font-size="12" fill="currentColor" text-anchor="middle">
+          <rect x="665" y="255" width="190" height="46" rx="4" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1.2"/>
+          <text x="760" y="274">validate-huawei-credentials.sh</text><text x="760" y="290">shape offline, token check asks</text>
+        </g>
+        <g font-size="12" fill="currentColor" text-anchor="middle">
+          <rect x="300" y="355" width="150" height="46" rx="4" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1.2"/>
+          <text x="375" y="374">gh variable set</text><text x="375" y="390" font-family="IBM Plex Mono, Menlo, monospace" font-size="11">HUAWEI_APP_ID</text>
+          <rect x="665" y="355" width="190" height="46" rx="4" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1.2"/>
+          <text x="760" y="374">gh secret set</text><text x="760" y="390" font-family="IBM Plex Mono, Menlo, monospace" font-size="11">HUAWEI_CLIENT_ID, _SECRET</text>
+          <rect x="875" y="355" width="150" height="46" rx="4" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1.2"/>
+          <text x="950" y="374">gh variable set</text><text x="950" y="390" font-family="IBM Plex Mono, Menlo, monospace" font-size="11">HUAWEI_UPLOADS_ENABLED</text>
+        </g>
+        <g fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#aw)">
+          <path d="M270 78 C 285 78, 290 140, 300 178"/>
+          <path d="M450 178 H485"/>
+          <path d="M375 201 V355"/>
+          <path d="M645 178 H680"/>
+          <path d="M760 155 V101"/>
+          <path d="M760 201 V255"/>
+          <path d="M760 301 V355"/>
+          <path d="M840 178 H875"/>
+          <path d="M950 201 V355"/>
+          <path d="M1025 178 C 1060 178, 1050 120, 1050 101"/>
+          <path d="M1025 178 H1045"/>
+        </g>
+        <g font-size="11" style="fill:#5f6570">
+          <text x="380" y="232">numeric app id, from App information</text>
+          <text x="571" y="232">yes first; manual signing is the default</text>
+          <text x="766" y="132">stops before Create</text>
+          <text x="766" y="332">stdin only</text>
+          <text x="956" y="332">last, after a dry run</text>
+          <text x="1031" y="132">mode (c) only, read back</text>
+          <text x="1050" y="222">invited per release</text>
+        </g>
+      </svg>

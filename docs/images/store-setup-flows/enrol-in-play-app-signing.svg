@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="330" color="#1c1f24" font-family="IBM Plex Sans, Helvetica Neue, Arial, sans-serif" viewBox="0 0 520 330" role="img" aria-label="Conceptual screen: Enrol in Play App Signing. Test and release, Setup, App integrity, App signing. The agent chooses the Google-generated key and uploads the certificate exported from the local upload keystore; permanent for this application, so it waits for a yes.">
+<rect width="100%" height="100%" fill="#f6f5f1"/>
+<rect x="1" y="1" width="518" height="328" rx="6" style="fill:#f6f5f1;stroke:currentColor" stroke-width="1.2"/>
+<rect x="1" y="1" width="518" height="34" rx="6" style="fill:#edebe5"/>
+<text x="16" y="23" font-size="12" fill="currentColor" font-weight="500">App  ›  Test and release  ›  Setup  ›  App integrity  ›  App signing</text>
+<rect x="1" y="35" width="150" height="294" style="fill:#edebe5" opacity="0.7"/>
+<text x="16" y="60" font-size="11.5" style="fill:#5f6570">Releases overview</text>
+<text x="16" y="86" font-size="11.5" style="fill:#5f6570">Production</text>
+<text x="16" y="112" font-size="11.5" style="fill:#5f6570">Testing</text>
+<text x="16" y="138" font-size="11.5" style="fill:#5f6570">Setup</text>
+<rect x="8" y="149" width="136" height="22" rx="3" style="fill:#e3f0e8;stroke:#2f7a52" stroke-width="1"/>
+<text x="16" y="164" font-size="11.5" fill="currentColor" font-weight="500">App integrity</text>
+<text x="16" y="190" font-size="11.5" style="fill:#5f6570">Advanced settings</text>
+<text x="170" y="62" font-size="11" style="fill:#5f6570">Signing key</text>
+<rect x="170" y="67" width="330" height="24" rx="3" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1"/>
+<text x="178" y="83" font-size="11.5" fill="currentColor">Use a Google-generated key</text>
+<path d="M488 76 l4 5 l4 -5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+<text x="170" y="102" font-size="11" style="fill:#5f6570">Upload key certificate</text>
+<rect x="170" y="107" width="330" height="24" rx="3" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="178" y="123" font-size="11.5" fill="currentColor">upload.pem, exported from certs/upload.keystore</text>
+<text x="170" y="142" font-size="11" style="fill:#5f6570">Upload key fingerprint</text>
+<rect x="170" y="147" width="330" height="24" rx="3" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="178" y="163" font-size="11.5" fill="currentColor">SHA-256 shown after enrolment: ANDROID_UPLOAD_CERT_SHA256</text>
+<rect x="170" y="282" width="178" height="32" rx="3" style="fill:#f8ecd9;stroke:#b5711c" stroke-width="1"/>
+<text x="176" y="295" font-size="11" fill="currentColor">agent fills the form</text>
+<text x="176" y="309" font-size="11" fill="currentColor">yes before Save: permanent</text>
+<rect x="380" y="284" width="120" height="28" rx="4" style="fill:#f8ecd9;stroke:#b5711c" stroke-width="2" stroke-dasharray="5 3"/>
+<text x="440" y="302" font-size="12" text-anchor="middle" font-weight="500" fill="currentColor">Save</text>
+</svg>

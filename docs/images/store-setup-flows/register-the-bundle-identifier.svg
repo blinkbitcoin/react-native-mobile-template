@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="330" color="#1c1f24" font-family="IBM Plex Sans, Helvetica Neue, Arial, sans-serif" viewBox="0 0 520 330" role="img" aria-label="Conceptual screen: Register the bundle identifier. Developer portal, Identifiers. The agent selects App IDs, fills the description and the explicit bundle identifier, reviews capabilities, and stops before Register: the identifier cannot be deleted once an application record uses it.">
+<rect width="100%" height="100%" fill="#f6f5f1"/>
+<rect x="1" y="1" width="518" height="328" rx="6" style="fill:#f6f5f1;stroke:currentColor" stroke-width="1.2"/>
+<rect x="1" y="1" width="518" height="34" rx="6" style="fill:#edebe5"/>
+<text x="16" y="23" font-size="12" fill="currentColor" font-weight="500">Certificates, Identifiers &amp; Profiles  ›  Identifiers  ›  Register a new identifier</text>
+<rect x="1" y="35" width="150" height="294" style="fill:#edebe5" opacity="0.7"/>
+<text x="16" y="60" font-size="11.5" style="fill:#5f6570">Certificates</text>
+<rect x="8" y="71" width="136" height="22" rx="3" style="fill:#e6eaf4;stroke:#3f4f7a" stroke-width="1"/>
+<text x="16" y="86" font-size="11.5" fill="currentColor" font-weight="500">Identifiers</text>
+<text x="16" y="112" font-size="11.5" style="fill:#5f6570">Devices</text>
+<text x="16" y="138" font-size="11.5" style="fill:#5f6570">Profiles</text>
+<text x="16" y="164" font-size="11.5" style="fill:#5f6570">Keys</text>
+<text x="16" y="190" font-size="11.5" style="fill:#5f6570">Services</text>
+<text x="170" y="62" font-size="11" style="fill:#5f6570">Platform</text>
+<rect x="170" y="68" width="12" height="12" rx="2" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1"/>
+<path d="M172 74 l3 3 l6 -7" fill="none" stroke="currentColor" stroke-width="1.5"/>
+<text x="190" y="78" font-size="11.5" fill="currentColor">iOS, iPadOS, macOS, tvOS, visionOS, watchOS</text>
+<text x="170" y="94" font-size="11" style="fill:#5f6570">Description</text>
+<rect x="170" y="99" width="330" height="24" rx="3" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1"/>
+<text x="178" y="115" font-size="11.5" fill="currentColor">React Native Mobile Template</text>
+<text x="170" y="134" font-size="11" style="fill:#5f6570">Bundle ID (explicit)</text>
+<rect x="170" y="139" width="330" height="24" rx="3" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1"/>
+<text x="178" y="155" font-size="11.5" fill="currentColor" font-family="IBM Plex Mono, Menlo, monospace">com.blinkbitcoin.reactnativemobiletemplate</text>
+<text x="170" y="174" font-size="11" style="fill:#5f6570">Capabilities</text>
+<rect x="170" y="179" width="330" height="24" rx="3" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="178" y="195" font-size="11.5" fill="currentColor">Push Notifications (leave unchecked until needed)</text>
+<rect x="170" y="282" width="140" height="32" rx="3" style="fill:#f8ecd9;stroke:#b5711c" stroke-width="1"/>
+<text x="176" y="295" font-size="11" fill="currentColor">agent fills the form</text>
+<text x="176" y="309" font-size="11" fill="currentColor">yes before Register</text>
+<rect x="380" y="284" width="120" height="28" rx="4" style="fill:#f8ecd9;stroke:#b5711c" stroke-width="2" stroke-dasharray="5 3"/>
+<text x="440" y="302" font-size="12" text-anchor="middle" font-weight="500" fill="currentColor">Register</text>
+</svg>
