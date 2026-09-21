@@ -31,6 +31,58 @@ run is green (`require-green-workflow: release-internal.yml`).
 
 ## The six steps
 
+The whole chain, with what triggers each hop and what each stage produces. Two
+workflows run off the same push to `main` — `release-internal` builds, and
+`release-please` maintains the release PR — and everything after the tag is a
+dispatch, because a workflow cannot trigger a workflow through its own
+`GITHUB_TOKEN` (see [Why the hop is a dispatch](#why-the-hop-is-a-dispatch)).
+
+```mermaid
+flowchart TB
+  push["push to main"] -->|"same push"| ci["CI"]
+  push -->|"same push"| rp["release-please"]
+  push -->|"same push"| internal
+
+  subgraph internal["CD / Internal"]
+    direction TB
+    iprep["Prepare<br/>reserves vX.Y.Z-build.N"] --> ibuild["Build iOS<br/>Build Android"]
+    ibuild -->|"STORE_UPLOADS_ENABLED"| iup["TestFlight internal<br/>Play internal<br/>AppGallery test version"]
+    ibuild --> ipre["vX.Y.Z-build.N pre-release<br/>with every artifact"]
+    ipre -->|"OTA_ENABLED"| iota["OTA internal"]
+  end
+
+  ci -.->|"green for this commit"| iprep
+  rp --> pr["release PR<br/>chore(main): release X.Y.Z"]
+  pr -->|"squash merge"| cut["release-please tags vX.Y.Z<br/>and publishes the release"]
+  cut -->|"dispatches with tag"| beta
+
+  subgraph beta["CD / Beta"]
+    direction TB
+    bprep["Prepare<br/>waits for internal green"] --> bpromote["TestFlight external<br/>Play open beta<br/>AppGallery open testing"]
+    bpromote --> bmove["moves the pre-release assets<br/>onto vX.Y.Z"]
+    bmove -->|"OTA_ENABLED"| bota["OTA beta"]
+  end
+
+  internal -.->|"workflow_run: Internal green"| retry["CD / Beta Retry"]
+  retry -.->|"gh run rerun --failed"| bprep
+
+  beta -->|"soak, then workflow_dispatch<br/>tag + action"| prod
+
+  subgraph prod["CD / Production"]
+    direction TB
+    pgate["production environment<br/>required reviewers"] --> prel["App Store<br/>Play<br/>AppGallery"]
+    prel --> pramp["phased / rollout,<br/>then halt, resume or complete"]
+    prel -->|"OTA_ENABLED"| pota["OTA production"]
+    prel --> pweb["Web deploy"]
+  end
+```
+
+The dotted edges are the two gates and the one repair. `Prepare` in **CD /
+Internal** blocks until CI concludes green for the same commit; `Prepare` in
+**CD / Beta** blocks until that commit's internal run is green, dispatching one
+itself if none exists; and **CD / Beta Retry** re-runs a beta run that failed
+that second gate, the moment internal for the same commit turns green.
+
 ### 1. Merge PRs to main
 
 `release-internal.yml` runs on every push: it resolves the version and build
@@ -491,6 +543,41 @@ environment in this workflow family, and it **refuses** a key that reads as a
 credential (anything ending in `_KEY`, `_TOKEN`, `_PASSWORD`, `_PASSPHRASE`,
 `_SECRET`, `_CREDENTIAL(S)`): a workflow input is unmasked and readable by
 anyone who can see the run. Credentials go in `secrets:` instead.
+
+Four channels, and which one a value takes is decided by what the value *is*,
+not by where it is needed:
+
+```mermaid
+flowchart LR
+  var["repository or<br/>environment variable"] -->|"build-env input"| bev["build-env.sh"]
+  var -->|"env-json input"| ejs["env-json.sh"]
+  sec["repository or<br/>environment secret"] -->|"secrets: on the<br/>reusable workflow"| dec["decode-secrets.sh"]
+  sec -->|"secrets: on the<br/>reusable workflow"| step["the lane step's env"]
+
+  bev -->|"env-validate.mjs<br/>refuses credential names"| genv["GITHUB_ENV"]
+  ejs -->|"the same validator"| genv
+  dec -->|"600 file in a 700 directory,<br/>its path in GITHUB_ENV"| genv
+  genv --> lane["the fastlane lane"]
+  step --> lane
+
+  lane -->|"DRY_RUN=1"| dry["store_action logs the call<br/>and returns canned data"]
+  lane -->|"otherwise"| api["the store API"]
+```
+
+Both input channels are unmasked workflow inputs, printed in the run, and both
+go through the same `scripts/lib/env-validate.mjs`: a key that reads like a
+credential (`*_KEY`, `*_TOKEN`, `*_PASSWORD`, `*_PASSPHRASE`, `*_SECRET`,
+`*_CREDENTIAL(S)`) is refused outright rather than published. `env-json`
+additionally allows lower-case keys, because fastlane's own option names are
+lower-case; that is the only difference between the two. A base64 secret
+(`ASC_KEY_P8_BASE64`, `ANDROID_UPLOAD_KEYSTORE_BASE64`) and the raw
+`PLAY_SERVICE_ACCOUNT_JSON` are materialised as `600` files whose paths are
+published, while everything else simply lands in the lane step's environment.
+`DRY_RUN=1` short-circuits the last hop only: every lane reaches the outside
+world through `store_action`, which under a dry run logs the call with
+credential-shaped arguments redacted and returns canned data, so the whole
+lane still walks end to end
+(see [Rehearsing lanes locally](#rehearsing-lanes-locally-dry_run1)).
 
 | Variable | Used by | Value / how to obtain |
 | --- | --- | --- |

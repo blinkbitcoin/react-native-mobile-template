@@ -28,6 +28,15 @@ troubleshooting.
 - Rebase on `main` rather than merging it back in; the branch history is
   discarded by the squash merge anyway.
 
+One branch, one pull request is the default. When a change genuinely needs
+several dependent pull requests — a refactor the feature on top of it cannot
+be reviewed without — build the stack with `gh stack` (the
+[`github/gh-stack`](https://github.com/github/gh-stack) command-line
+extension), never by hand-stacking branches and rebasing each one yourself.
+The extension owns the base branches, the rebase order and the cross-links in
+the pull request bodies; doing that manually is where a force-push loses a
+review, and where two branches quietly end up based on the same stale commit.
+
 ## Commits and PR titles
 
 Conventional Commits with a closed scope list, enforced by `commitlint` in the
