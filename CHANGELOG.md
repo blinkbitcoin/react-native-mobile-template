@@ -5,6 +5,18 @@ by [release-please](https://github.com/googleapis/release-please) from
 [Conventional Commits](https://www.conventionalcommits.org/) — edit the commit
 messages, not this file. See [docs/release-runbook.md](docs/release-runbook.md).
 
+## [0.6.0](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.5.0...v0.6.0) (2026-09-21)
+
+
+### Features
+
+* **release:** run Huawei AppGallery on the internal and beta tiers as well ([#46](https://github.com/blinkbitcoin/react-native-mobile-template/issues/46)) ([a869246](https://github.com/blinkbitcoin/react-native-mobile-template/commit/a869246f32b39b7c0ca30bb65f796956fd0d54e4))
+
+
+### Bug Fixes
+
+* **tooling:** rename the store setup flows guide on make init ([#50](https://github.com/blinkbitcoin/react-native-mobile-template/issues/50)) ([ef04752](https://github.com/blinkbitcoin/react-native-mobile-template/commit/ef047528f4671f9548f030d35980b96e681923b6))
+
 ## [0.5.0](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.4.0...v0.5.0) (2026-09-20)
 
 
