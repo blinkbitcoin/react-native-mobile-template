@@ -26,7 +26,11 @@ cd "$(dirname "$0")/.."
 # which is the least-effort route on a machine that already has gh.
 if command -v codeql > /dev/null 2>&1; then
   CODEQL=(codeql)
-elif command -v gh > /dev/null 2>&1 && gh extension list 2> /dev/null | grep -q 'gh codeql'; then
+# The extension list is captured, not piped into `grep -q`: under `pipefail`
+# grep closing the pipe early makes gh exit 141 (SIGPIPE), the pipeline fails
+# and an installed extension is reported missing. That is why this route never
+# worked before 2026-09-21.
+elif command -v gh > /dev/null 2>&1 && [[ "$(gh extension list 2> /dev/null)" == *'gh codeql'* ]]; then
   CODEQL=(gh codeql)
 else
   cat >&2 <<'EOF'
@@ -119,19 +123,16 @@ done < <(yaml_list packs)
 # a local database holds the files a CI one holds. A fresh CI checkout simply
 # lacks most of these (prebuild output, the web export, coverage, the gems);
 # locally they are usually all sitting right there.
+# One filter per entry, exactly as written: a directory pattern excludes its
+# whole subtree on its own, and a trailing `/**` is rejected by the extractor
+# ("Illegal use of '**' in exclude path"), which is what made `database create`
+# fail on every run before 2026-09-21.
 filters=()
 while IFS= read -r p; do
   [ -n "$p" ] || continue
   filters+=("exclude:$p")
-  # A directory also needs the subtree; a file-shaped pattern does not, and
-  # `exclude:.../messages.ts/**` can never match anything. The leading-dot test
-  # keeps `.workflows` and `.codeql` on the directory side.
-  case "${p##*/}" in
-    ?*.?*) ;;
-    *) filters+=("exclude:$p/**") ;;
-  esac
 done < <(yaml_list paths-ignore)
-filters+=("exclude:$OUT" "exclude:$OUT/**")
+filters+=("exclude:$OUT")
 LGTM_INDEX_FILTERS=$(printf '%s\n' "${filters[@]}")
 export LGTM_INDEX_FILTERS
 

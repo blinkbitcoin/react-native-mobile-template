@@ -65,11 +65,18 @@ export function stripRepoReferences(raw) {
   // `[WIP]`) lose their punctuation but keep their words. The suffix in
   // TRUNCATION_SUFFIX is added after this runs, so it stays the only pair of
   // square brackets that can reach a store.
-  // A nested tag such as `<scr<b>ipt>` survives this pass as `<script>`, which
-  // is what CodeQL warns about, but the next line deletes every `<` and `>`
-  // and the result is plain text for a store listing, never HTML.
-  // codeql[js/incomplete-multi-character-sanitization]
-  text = text.replace(/<\/?[a-z][^>]*>/gi, '');
+  //
+  // Stripped until nothing changes, not once: a tag broken open by another tag
+  // (`<scr<b>ipt>`) closes up into a new tag after one pass, which is the
+  // js/incomplete-multi-character-sanitization finding. The bracket strip
+  // below would take that apart anyway, but the loop is what CodeQL reads, and
+  // an inline `// codeql[...]` marker cannot close the alert: GitHub ignores the
+  // suppression the CLI records (esign, .github/codeql/codeql-config.yml).
+  let previous;
+  do {
+    previous = text;
+    text = text.replace(/<\/?[a-z][^>]*>/gi, '');
+  } while (text !== previous);
   text = text.replace(/[*_`[\]<>]/g, '');
   return text;
 }

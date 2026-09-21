@@ -440,9 +440,9 @@ test('bracket tags, html and ticket keys never survive cleanText', () => {
   assert.equal(cleanText('fix: crash on launch [ios]'), 'Fix: crash on launch ios.');
   assert.equal(parseCommits(['fix: crash on launch [ios]'])[0].text, 'Crash on launch ios.');
   assert.equal(parseCommits(['feat: new tab bar [WIP] <b>x</b>'])[0].text, 'New tab bar WIP x.');
-  // A tag broken open by another tag is the case CodeQL flags on the tag
-  // strip: whatever that pass leaves, the bracket strip takes apart, so no `<`
-  // or `>` ever reaches a store.
+  // A tag broken open by another tag: the tag strip runs to a fixpoint, and
+  // the bracket strip takes apart whatever is left, so no `<` or `>` ever
+  // reaches a store.
   assert.equal(parseCommits(['feat: x <scr<b>ipt>alert(1)</script>'])[0].text, 'X iptalert(1).');
   assert.equal(parseCommits(['fix: JIRA-123 handle retry'])[0].text, 'Handle retry.');
 });
