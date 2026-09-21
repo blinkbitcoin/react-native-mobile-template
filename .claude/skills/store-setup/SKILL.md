@@ -88,6 +88,12 @@ A yes to one row is not a yes to the next.
 5. **Handover.** `state.sh render --markdown` produces the checklist to paste
    into a PR description or hand to whoever picks this up next.
 
+## Worked Example
+
+[`references/walkthrough.md`](references/walkthrough.md) is a conceptual
+transcript of one full run in mode (a) — every script call in order, every
+handover, and every read-back before an irreversible step.
+
 ## The Checklist
 
 The 49 steps, in the order `state.sh --list-steps` prints them:

@@ -7,6 +7,9 @@ Agent skills that ship with this template, each under its own subdirectory. The 
 - **store-credentials**: Creates and shape-validates every credential locally (the ASC API key, the match repo, the Android upload keystore, the Play service account JSON, the AppGallery Connect API client), then pushes each one to GitHub through stdin.
 - **store-metadata**: Fills `fastlane/metadata`, places the images, writes the age-rating answers, and runs the `sync_metadata` lane. Apple and Google only — the AppGallery listing is console-only.
 
+A worked example of the whole run, mode (a) start to finish, is
+[`store-setup/references/walkthrough.md`](store-setup/references/walkthrough.md).
+
 How they hand off. The checklist in `.store-setup/state.json` is the shared
 thread: every skill reads the next step from it and records the result back,
 which is what makes the whole run resumable and handed over mid-flight.

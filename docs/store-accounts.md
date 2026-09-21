@@ -360,6 +360,11 @@ Store Connect API key, submitting for App Review or starting a Play
 production rollout — and it never runs `fastlane match nuke`, in any mode,
 with or without a yes.
 
+For what a whole run actually looks like, read
+`.claude/skills/store-setup/references/walkthrough.md`: a conceptual transcript
+of one session in browser-pause mode, from the identifiers gate to a
+submittable listing.
+
 This page stays the source of truth for what each credential *is* and where
 it comes from; the skill is the source of truth for the order to do it in and
 how to get there.
