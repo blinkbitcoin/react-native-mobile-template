@@ -53,15 +53,23 @@ function parseJobs(file) {
 
 const WORKFLOWS = {
   'release-internal.yml': {
-    storeJobs: ['upload-ios', 'upload-android'],
+    storeJobs: ['upload-ios', 'upload-android', 'upload-huawei'],
     releaseJobs: ['github-prerelease'],
   },
   'release-beta.yml': {
-    storeJobs: ['promote-ios', 'promote-android'],
+    storeJobs: ['promote-ios', 'promote-android', 'huawei-binary', 'promote-huawei'],
     releaseJobs: ['github-release'],
   },
   'release-production.yml': {
-    storeJobs: ['ios-release', 'android-release', 'ios-phased', 'android-rollout', 'android-halt'],
+    storeJobs: [
+      'ios-release',
+      'android-release',
+      'ios-phased',
+      'android-rollout',
+      'android-halt',
+      'huawei-binary',
+      'huawei-release',
+    ],
     releaseJobs: ['github-release'],
   },
 };
@@ -147,7 +155,7 @@ describe('the internal release queues per commit; only its store jobs share the 
       .filter(([, body]) => /^ {4}concurrency:\n {6}group: release\n/m.test(body))
       .map(([id]) => id)
       .sort();
-    assert.deepEqual(queued, ['ota-internal', 'upload-android', 'upload-ios']);
+    assert.deepEqual(queued, ['ota-internal', 'upload-android', 'upload-huawei', 'upload-ios']);
   });
 });
 
