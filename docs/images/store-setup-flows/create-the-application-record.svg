@@ -24,7 +24,7 @@
 <path d="M488 148 l4 5 l4 -5" fill="none" stroke="currentColor" stroke-width="1.2"/>
 <text x="170" y="174" font-size="11" style="fill:#5f6570">Bundle ID</text>
 <rect x="170" y="179" width="330" height="24" rx="3" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1"/>
-<text x="178" y="195" font-size="11.5" fill="currentColor">com.blinkbitcoin.reactnativemobiletemplate</text>
+<text x="178" y="195" font-size="11.5" fill="currentColor">com.example.rnmt</text>
 <path d="M488 188 l4 5 l4 -5" fill="none" stroke="currentColor" stroke-width="1.2"/>
 <text x="170" y="214" font-size="11" style="fill:#5f6570">SKU</text>
 <rect x="170" y="219" width="330" height="24" rx="3" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1"/>
