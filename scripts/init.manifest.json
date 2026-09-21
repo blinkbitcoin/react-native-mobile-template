@@ -125,6 +125,8 @@
       "*.md",
       "docs/*.md",
       "docs/decisions/*.md",
+      "docs/store-setup-flows.html",
+      "docs/images/store-setup-flows/*.svg",
       ".github/*.md",
       ".github/CODEOWNERS",
       ".github/ISSUE_TEMPLATE/*.yml",
