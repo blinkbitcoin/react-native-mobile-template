@@ -5,6 +5,13 @@ by [release-please](https://github.com/googleapis/release-please) from
 [Conventional Commits](https://www.conventionalcommits.org/) — edit the commit
 messages, not this file. See [docs/release-runbook.md](docs/release-runbook.md).
 
+## [0.6.2](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.6.1...v0.6.2) (2026-09-21)
+
+
+### Bug Fixes
+
+* **tooling:** close the last CodeQL alert in code, and make the local gate run ([#54](https://github.com/blinkbitcoin/react-native-mobile-template/issues/54)) ([2e9fea1](https://github.com/blinkbitcoin/react-native-mobile-template/commit/2e9fea1906aa162abaed36cecfed455429f81034))
+
 ## [0.6.1](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.6.0...v0.6.1) (2026-09-21)
 
 
