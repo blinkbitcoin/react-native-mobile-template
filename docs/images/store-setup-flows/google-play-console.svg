@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="430" color="#1c1f24" font-family="IBM Plex Sans, Helvetica Neue, Arial, sans-serif" viewBox="0 0 1160 430" role="img" aria-label="Google setup flow across four lanes: the human registers and answers the policy questionnaires; the agent creates the application, enrols in Play App Signing, creates the service account and grants it this application only, and sets up the internal track; local scripts create the upload keystore and validate the credentials; GitHub receives the secrets. Play App Signing is gated and permanent.">
+<rect width="100%" height="100%" fill="#f6f5f1"/>
+        <defs>
+          <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <g font-size="12" fill="currentColor">
+          <rect x="0" y="30" width="1160" height="90" style="fill:#edebe5" opacity="0.6"/>
+          <rect x="0" y="230" width="1160" height="90" style="fill:#edebe5" opacity="0.6"/>
+          <text x="10" y="50" font-weight="500">Human</text>
+          <text x="10" y="150" font-weight="500">Agent in Chrome</text>
+          <text x="10" y="250" font-weight="500">Local scripts</text>
+          <text x="10" y="350" font-weight="500">GitHub repository</text>
+        </g>
+        <g font-size="12" fill="currentColor" text-anchor="middle">
+          <rect x="120" y="55" width="150" height="46" rx="4" style="fill:#f8ecd9;stroke:#b5711c" stroke-width="2" stroke-dasharray="5 3"/>
+          <text x="195" y="74">Register developer</text><text x="195" y="90">account, 25 USD once</text>
+          <rect x="960" y="55" width="180" height="46" rx="4" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1.2" stroke-dasharray="5 3"/>
+          <text x="1050" y="74">Content rating, data safety,</text><text x="1050" y="90">audience, access, pricing</text>
+        </g>
+        <g font-size="12" fill="currentColor" text-anchor="middle">
+          <rect x="300" y="155" width="150" height="46" rx="4" style="fill:#e3f0e8;stroke:#2f7a52" stroke-width="1.5"/>
+          <text x="375" y="174">Create application</text><text x="375" y="190">package set by first upload</text>
+          <rect x="485" y="155" width="160" height="46" rx="4" style="fill:#f8ecd9;stroke:#b5711c" stroke-width="2"/>
+          <text x="565" y="174">Enrol in Play App Signing</text><text x="565" y="190">permanent for this application</text>
+          <rect x="680" y="155" width="160" height="46" rx="4" style="fill:#e3f0e8;stroke:#2f7a52" stroke-width="1.5"/>
+          <text x="760" y="174">Service account,</text><text x="760" y="190">grant this application only</text>
+          <rect x="875" y="155" width="150" height="46" rx="4" style="fill:#e3f0e8;stroke:#2f7a52" stroke-width="1.5"/>
+          <text x="950" y="174">Internal testing track</text><text x="950" y="190">and testers</text>
+        </g>
+        <g font-size="12" fill="currentColor" text-anchor="middle">
+          <rect x="300" y="255" width="150" height="46" rx="4" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1.2"/>
+          <text x="375" y="274">new-upload-keystore.sh</text><text x="375" y="290">ignored path, env passwords</text>
+          <rect x="680" y="255" width="160" height="46" rx="4" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1.2"/>
+          <text x="760" y="274">validate-play-json.sh</text><text x="760" y="290">service account, scope</text>
+        </g>
+        <g font-size="12" fill="currentColor" text-anchor="middle">
+          <rect x="485" y="355" width="160" height="46" rx="4" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1.2"/>
+          <text x="565" y="374">gh secret set</text><text x="565" y="390" font-family="IBM Plex Mono, Menlo, monospace" font-size="11">ANDROID_UPLOAD_*</text>
+          <rect x="680" y="355" width="160" height="46" rx="4" style="fill:#fbfaf7;stroke:currentColor" stroke-width="1.2"/>
+          <text x="760" y="374">gh secret set</text><text x="760" y="390" font-family="IBM Plex Mono, Menlo, monospace" font-size="11">PLAY_SERVICE_ACCOUNT_JSON</text>
+        </g>
+        <g fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#ag)">
+          <path d="M270 78 C 285 78, 290 140, 300 178"/>
+          <path d="M450 178 H485"/>
+          <path d="M375 255 V201"/>
+          <path d="M450 278 C 470 278, 500 230, 500 201"/>
+          <path d="M565 201 V355"/>
+          <path d="M645 178 H680"/>
+          <path d="M760 201 V255"/>
+          <path d="M760 301 V355"/>
+          <path d="M840 178 H875"/>
+          <path d="M1025 178 C 1060 178, 1050 120, 1050 101"/>
+        </g>
+        <g font-size="11" style="fill:#5f6570">
+          <text x="380" y="232">upload certificate</text>
+          <text x="571" y="232">yes, then enrol</text>
+          <text x="766" y="232">the JSON key file</text>
+          <text x="766" y="332">stdin only</text>
+          <text x="1031" y="132">mode (c) only, read back</text>
+        </g>
+      </svg>

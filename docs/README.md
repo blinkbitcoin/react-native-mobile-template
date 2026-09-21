@@ -17,6 +17,7 @@ all).
 | Turn OTA updates on, publish a hotfix, or roll one back | [ota.md](ota.md) |
 | Get a store account, create credentials, and know what each one can reach | [store-accounts.md](store-accounts.md) |
 | Take a new app from unsigned builds to a submittable listing | [store-accounts.md](store-accounts.md) plus [`.claude/skills/store-setup/`](../.claude/skills/store-setup/) |
+| See the store setup and delivery flows as diagrams | [store-setup-flows.md](store-setup-flows.md) |
 | Cut a release, promote a build, halt a rollout, or rehearse a lane | [release-runbook.md](release-runbook.md) |
 | Understand what CI runs, how it maps to `make`, and where the logs are | [ci.md](ci.md) |
 | Know why a choice was made and what the alternatives were | [decisions/README.md](decisions/README.md) |
@@ -34,6 +35,7 @@ all).
 | [ota-and-crash-reporting.md](ota-and-crash-reporting.md) | The `CrashReporter` adapter slot, Sentry and Crashlytics recipes, where dSYMs live, pointer to the OTA doc |
 | [ota.md](ota.md) | The `OTA_ENABLED` toggle, code signing, the update server, the channel model, the fingerprint gate, hotfix and rollback |
 | [store-accounts.md](store-accounts.md) | Apple, Google, Huawei and Samsung: account signup, which credential to create,<br>what each one can reach, and the repo secret it becomes |
+| [store-setup-flows.md](store-setup-flows.md) | Swimlanes for the three stores, the three-tier delivery pipeline, conceptual console screens<br>and the mode matrix; the same page with both themes is [store-setup-flows.html](store-setup-flows.html) |
 | [release-runbook.md](release-runbook.md) | The six steps of a release, versions and build numbers, store notes, secrets, environments, verification gates, `DRY_RUN=1` |
 | [ci.md](ci.md) | The workflow callers, how CI maps to `make`, the dev-client launch mechanism, forensics artifacts, workflow pinning |
 | [decisions/README.md](decisions/README.md) | The ADR index: one short record per locked decision |
