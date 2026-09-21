@@ -79,6 +79,15 @@
       {
         "path": ".github/ISSUE_TEMPLATE/config.yml",
         "replace": [["github.com/blinkbitcoin/", "github.com/{{owner}}/", "+"]]
+      },
+      {
+        "path": ".claude/skills/store-setup/references/walkthrough.md",
+        "$comment": "The worked session uses a sample app under this owner as its example: the repository name, the identifier and the `make init` answer each spell the owner out, and none of them is a token the blanket pass would catch.",
+        "replace": [
+          ["blinkbitcoin/hello-world", "{{owner}}/hello-world", "+"],
+          ["com.blinkbitcoin.helloworld", "com.{{owner}}.helloworld", "+"],
+          ["--owners blinkbitcoin", "--owners {{owner}}", "+"]
+        ]
       }
     ],
     "$comment2": "Ordered, longest-first token replacements applied to every path/glob below. Bare `rnmt` runs last, after every qualified form has already been rewritten.",
