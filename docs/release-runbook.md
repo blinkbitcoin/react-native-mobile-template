@@ -36,7 +36,10 @@ run is green (`require-green-workflow: release-internal.yml`).
 `release-internal.yml` runs on every push: it resolves the version and build
 number, builds and signs both platforms, uploads to TestFlight internal and the
 Play internal track, creates a `vX.Y.Z-build.N` GitHub pre-release with every
-artifact, and (if OTA is on) publishes to the `internal` channel.
+artifact, and (if OTA is on) publishes to the `internal` channel. When Huawei
+AppGallery is turned on, the same bundle also goes there as a test version with
+manual review skipped — automated review, hours rather than days, up to 100
+testers (see [Huawei AppGallery](#huawei-appgallery)).
 
 Smoke the build on TestFlight internal / Play internal. Nothing further is
 automatic.
@@ -78,7 +81,10 @@ cancelled or failed, it dispatches one at the tag itself and waits for that
 is "too early": the pipeline builds what it needs. Then it promotes to the TestFlight external group
 and the Play open beta track, moves the `vX.Y.Z-build.N` pre-release's assets
 onto the `vX.Y.Z` release (and deletes the pre-release and its tag afterwards),
-and publishes OTA `beta`.
+and publishes OTA `beta`. When Huawei AppGallery is turned on, the bundle is
+re-uploaded from the tag and submitted to open testing with manual review left
+on — 1 to 3 working days, up to 5,000 testers — and nothing downstream waits
+for it (see [Huawei AppGallery](#huawei-appgallery)).
 
 The assets are **moved, not rebuilt**. A rebuild from the same source is a
 different binary with a different signature and a different native fingerprint,
@@ -120,36 +126,75 @@ before any store job starts. It then:
 
 #### Huawei AppGallery
 
-Off unless the repository variable `HUAWEI_UPLOADS_ENABLED` is `true`, and only
-on the **release** tier — there is no internal or beta Huawei job. Credentials
-and the console steps that produce them are in
-[store-accounts.md](store-accounts.md#huawei-appgallery).
+Off unless the repository variable `HUAWEI_UPLOADS_ENABLED` is `true`, on top of
+`STORE_UPLOADS_ENABLED`. With both on, AppGallery is on all three tiers, the
+same way Apple and Google are. Credentials and the console steps that produce
+them are in [store-accounts.md](store-accounts.md#huawei-appgallery).
 
-Two jobs run it. Huawei is the one store whose production dispatch is its
-**first** upload rather than the promotion of a binary it already holds, so
-`Stage Huawei binary` downloads the signed `.aab` back off the release tag into
-an artifact, and `Release Huawei` runs `fastlane android upload_huawei` against
-it. "No bundle on the tag" therefore means the beta promote never ran for this
-tag: re-run [step 3](#3-beta-promotes-itself) and dispatch production again.
+| Tier | Workflow | Jobs | Lane | What AppGallery does | Review |
+| --- | --- | --- | --- | --- | --- |
+| internal | `release-internal.yml` | `Upload Huawei` | `upload_huawei_internal` | Test version, manual review<br>skipped, up to 100 testers | Automated,<br>hours |
+| beta | `release-beta.yml` | `Stage Huawei binary`,<br>`Promote Huawei` | `promote_huawei_beta` | Test version, open testing<br>with review, up to 5,000 testers | Manual,<br>1 to 3 days |
+| release | `release-production.yml` | `Stage Huawei binary`,<br>`Release Huawei` | `upload_huawei` | The formal release, testing<br>flag off | Manual,<br>days |
+
+**One version slot.** AppGallery has no tracks. A tier is a flavour of the
+submit, not a destination: the same version record is submitted with the testing
+flag on and manual review skipped (internal), with the testing flag on and
+review left on (beta), or with the testing flag off (release). There is no
+promote endpoint either, so each tier **re-uploads** the bundle rather than
+moving one AppGallery already holds — the beta and release tiers stage it back
+off the release tag with `Stage Huawei binary`, because neither workflow builds.
+"No bundle on the tag" therefore means the beta promote never ran for that tag:
+re-run [step 3](#3-beta-promotes-itself) and dispatch again.
+
+**A version under review blocks the next push.** One slot means one submission
+at a time. The lane asks the app record for its `releaseState` before it uploads
+and, when AppGallery says it is releasing, under review, pending update review
+or under pre-review, skips the upload with a message naming the state instead of
+going red. So during a beta review `Upload Huawei` on every push is green and
+does nothing; the next push after the console clears it uploads again. The check
+is deliberately fail-open — an absent or unrecognised state takes the upload
+path — so it can withhold an upload but never invent a failure.
+
+**Testers are console user lists.** Nothing in the API manages them. AppGallery
+Connect → Users and permissions → List management → User list (verify the wording
+on screen; it has moved before), create a list of testers by Huawei ID, and
+select it on the version's testing page. Testers are invited **per release** and
+install through the AppGallery app, so a new test version needs the list
+selected again. `.claude/skills/store-consoles/` walks it as the
+`huawei-testers` step.
 
 Things worth knowing before you read a red job:
 
-- **A failed Huawei job never blocks the rest.** `Release` (marking the tag
-  latest), the OTA publish and the web deploy do not wait for it. AppGallery is
-  additive, and a slow third-party store must not hold up the release.
+- **A failed Huawei job never blocks the rest.** The pre-release, the GitHub
+  release, the store notes, the OTA publish and the web deploy do not wait for
+  any Huawei job on any tier. AppGallery is additive, and a slow third-party
+  store must not hold up the pipeline.
 - **The lane pre-flights the credentials.** It asks AppGallery Connect for the
   app record before any binary moves, because the plugin's token helper returns
   nothing on a bad client id or secret and its upload action treats that as a
   no-op — a green job that uploaded nothing. A wrong or revoked pair therefore
-  fails fast, naming `HUAWEI_APP_ID`.
+  fails fast, naming `HUAWEI_APP_ID`. The pair has to be readable from the
+  `internal` and `beta` environments as well as `production`.
 - **Submit happens after the upload, and separately.** If the upload succeeded
-  and the submit failed, re-run the `Release Huawei` job: `upload_huawei` is the
-  whole lane and Huawei rejects a duplicate version code, so a re-run either
-  submits the version it already has or stops on the duplicate.
+  and the submit failed, re-run the job: the lane is the whole upload-and-submit
+  and Huawei rejects a duplicate version code, so a re-run either submits the
+  version it already has or stops on the duplicate.
+- **Beta re-uploads the version code internal already submitted.** A release
+  is promoted only after a green internal run of the same tag, so `Promote
+  Huawei` uploads a bundle whose version code AppGallery has already seen as a
+  test version. Whether AppGallery accepts that replacement is unverified: if
+  it refuses the duplicate, `Promote Huawei` is the expected first red job on
+  a release, and if the internal test version is still under review the beta
+  lane skips instead. Either way nothing downstream waits. The fallback,
+  recorded in [ADR 0020](decisions/0020-huawei-joins-every-tier.md), is to
+  submit the already-uploaded package with the plugin's separate submit
+  action instead of re-uploading.
 - **The listing is console-only.** No metadata tree, no `sync_metadata`
   counterpart; icon, screenshots, category, age rating and release countries
   are edited in AppGallery Connect by hand.
-- **Review takes days.** Nothing in the pipeline polls it; watch the console.
+- **Review takes days on the beta and release tiers.** Nothing in the pipeline
+  polls it; watch the console.
 
 ### 6. Ramp, then close
 
@@ -456,9 +501,11 @@ anyone who can see the run. Credentials go in `secrets:` instead.
 | `IOS_SIGNING_ENABLED` | repo variable; `build-ios` in `release-internal` | `true` signs and exports an `.ipa`.<br>Unset archives unsigned, which needs no Apple account |
 | `ANDROID_SIGNING_ENABLED` | repo variable; `build-android` in `release-internal` | `true` signs with the upload keystore.<br>Unset falls back to the debug keystore, which needs no Play account |
 | `STORE_UPLOADS_ENABLED` | repo variable; every store job in all three release workflows | `true` turns on TestFlight and Play uploads.<br>Unset means off, and the store credentials below<br>are only needed once it is on — see<br>[Before you have store accounts](#before-you-have-store-accounts) |
-| `HUAWEI_UPLOADS_ENABLED` | repo variable; both Huawei jobs in `release-production.yml`<br>and the `upload_huawei` lane via `env-json` | `true` turns on the Huawei AppGallery upload,<br>on top of `STORE_UPLOADS_ENABLED`. Unset means off<br>and neither job runs — see [Huawei AppGallery](#huawei-appgallery) |
-| `HUAWEI_APP_ID` | `android upload_huawei` via `env-json` | The numeric app id under the AppGallery Connect<br>app record's information page. An identifier, not a<br>credential, so it is a variable and appears in the log |
-| `HUAWEI_SUBMIT_DELAY_SECONDS` | `android upload_huawei` via `env-json` | Optional. Whole seconds to wait between the upload<br>and the submit; default `60`. Raise it if AppGallery<br>refuses the submit because the bundle is still compiling |
+| `HUAWEI_UPLOADS_ENABLED` | repo variable; every Huawei job in all three release<br>workflows and the three Huawei lanes via `env-json` | `true` turns on the Huawei AppGallery upload,<br>on top of `STORE_UPLOADS_ENABLED`. Unset means off<br>and no Huawei job runs — see [Huawei AppGallery](#huawei-appgallery) |
+| `HUAWEI_APP_ID` | every Huawei job in all three release workflows,<br>via `env-json` | The numeric app id under the AppGallery Connect<br>app record's information page. An identifier, not a<br>credential, so it is a variable and appears in the log |
+| `HUAWEI_SUBMIT_DELAY_SECONDS` | the three Huawei lanes via `env-json` | Optional. Whole seconds to wait between the upload<br>and the submit; default `60`. Raise it if AppGallery<br>refuses the submit because the bundle is still compiling |
+| `HUAWEI_FEEDBACK_EMAIL` | `android upload_huawei_internal` and<br>`android promote_huawei_beta` via `env-json` | Optional. The address AppGallery shows testers for<br>feedback; omitted from the submit when unset. It is an<br>unmasked workflow input, acceptable because AppGallery<br>publishes it to testers anyway — move it to `secrets:`<br>on the two jobs if you would rather it stayed out of logs |
+| `HUAWEI_TEST_DAYS` | `android upload_huawei_internal` and<br>`android promote_huawei_beta` via `env-json` | Optional. Length of the test window in days; default<br>`80`. AppGallery refuses more than 90, so the lane caps<br>it at `89` and says so |
 | `STORE_METADATA_SYNC_ENABLED` | repo variable; both jobs in `store-metadata.yml`<br>and the `sync_metadata` lanes | `true` lets a lane write the public store page.<br>Unset means off and the lane refuses |
 | `IOS_METADATA_EDIT_LIVE` | `ios sync_metadata` via `env-json` | `true` edits the live version's editable subset<br>when no version is in preparation.<br>`pull_metadata` ignores it: `deliver`'s<br>download always takes the latest version |
 | `PLAY_METADATA_TRACK` | `android sync_metadata` / `pull_metadata` via `env-json` | Track whose release the listing edit rides on;<br>default first of `production`, `beta`, `internal`<br>with one |
@@ -508,8 +555,8 @@ you want a reviewer between a token and production.
 | `ANDROID_UPLOAD_KEY_ALIAS` | Android build | Key alias inside the keystore |
 | `ANDROID_UPLOAD_KEY_PASSWORD` | Android build | Password of that key |
 | `PLAY_SERVICE_ACCOUNT_JSON` | Android build and every Android lane | Google Cloud → service account → JSON key, then grant it release permissions in Play Console → Users and permissions |
-| `HUAWEI_CLIENT_ID` | Release / Huawei | AppGallery Connect → Users and permissions → API key → Connect API → Create; the client id half of the pair |
-| `HUAWEI_CLIENT_SECRET` | Release / Huawei | Same page, the client secret half. It is shown exactly once |
+| `HUAWEI_CLIENT_ID` | every Huawei lane job: internal, beta and release | AppGallery Connect → Users and permissions → API key → Connect API → Create; the client id half of the pair |
+| `HUAWEI_CLIENT_SECRET` | same three jobs | Same page, the client secret half. It is shown exactly once |
 | `OTA_PUBLISH_TOKEN` | every `ota-*` job | One of the update server's `EOO_TOKENS`; scope per environment |
 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | `expo-prepare` (`notes.mjs`) | Only needed when `RELEASE_NOTES_LLM_PROVIDER` selects that provider. The notes fall back to deterministic prose without them |
 | `APP_REVIEW_EMAIL`, `APP_REVIEW_FIRST_NAME`, `APP_REVIEW_LAST_NAME`, `APP_REVIEW_PHONE` | iOS `promote_beta` and `release_production` lanes | The contact Apple reaches for review questions |
@@ -783,8 +830,23 @@ bundle exec fastlane android rollout percent:50
 
 # Huawei AppGallery: its own toggle, and the credentials are dummies too.
 export HUAWEI_CLIENT_ID=DUMMY HUAWEI_CLIENT_SECRET=DUMMY HUAWEI_APP_ID=123456789
-DRY_RUN=1 HUAWEI_UPLOADS_ENABLED=true bundle exec fastlane android upload_huawei
+export HUAWEI_UPLOADS_ENABLED=true
+# The internal tier: use_testing_version true, skip_manual_review true, and an
+# 80-day window as test_start_time / test_end_time in the +0000 format.
+# HUAWEI_FEEDBACK_EMAIL is in the submit only when you export it.
+DRY_RUN=1 bundle exec fastlane android upload_huawei_internal
+# The beta tier: the same body with skip_manual_review false.
+DRY_RUN=1 bundle exec fastlane android promote_huawei_beta
+# The release tier: neither key - the formal release.
+DRY_RUN=1 bundle exec fastlane android upload_huawei
+# HUAWEI_TEST_DAYS=365 gives an 89-day window and a message saying so.
+DRY_RUN=1 HUAWEI_TEST_DAYS=365 bundle exec fastlane android upload_huawei_internal
 ```
+
+The canned app record the Huawei lanes get under `DRY_RUN=1` carries no
+`releaseState`, and the under-review check is fail-open, so a rehearsal always
+takes the upload path — the "already has a version under review, skipping the
+upload" message can only be seen against a real app record.
 
 One thing to expect. Under `DRY_RUN=1` the lanes do **not** write into
 `fastlane/metadata/`: the release notes and `changelogs/<versionCode>.txt` a real
@@ -834,5 +896,7 @@ Mobile Services equivalent for anything that depends on it at runtime.
 
 Each stub raises `UI.user_error!` pointing back at this section. Add a store the
 way Huawei was added: implement its lane and add a job to
-`release-production.yml` behind the `platforms` input and a toggle of its own —
-nothing else in the path assumes there are only two stores.
+`release-production.yml` behind the `platforms` input and a toggle of its own,
+and, if the store has test tiers, jobs in `release-internal.yml` and
+`release-beta.yml` too — nothing else in the path assumes there are only two
+stores.

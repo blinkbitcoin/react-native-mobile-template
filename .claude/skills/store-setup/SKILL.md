@@ -90,7 +90,7 @@ A yes to one row is not a yes to the next.
 
 ## The Checklist
 
-The 48 steps, in the order `state.sh --list-steps` prints them:
+The 49 steps, in the order `state.sh --list-steps` prints them:
 
 | id | owner | needs | what |
 |---|---|---|---|
@@ -141,15 +141,19 @@ The 48 steps, in the order `state.sh --list-steps` prints them:
 | `cred-huawei` | credentials | `huawei-api-client`, `huawei-app-record` | Validate and push the AppGallery client id, client secret and app id |
 | `huawei-app-signing` | consoles | `huawei-app-record` | Decide about AppGallery App Signing (optional, permanent once enabled) |
 | `huawei-listing` | consoles | `huawei-app-record` | Fill in the AppGallery listing, age rating and release countries |
-| `toggle-huawei` | setup | `cred-huawei`, `huawei-listing`, `huawei-app-signing` | Turn on `HUAWEI_UPLOADS_ENABLED` |
+| `toggle-huawei` | setup | `cred-huawei`, `huawei-listing`, `huawei-app-signing` | Turn on `HUAWEI_UPLOADS_ENABLED`; a test version reaches nobody until `huawei-testers` is done too |
+| `huawei-testers` | consoles | `huawei-app-record` | Create the AppGallery test user list and select it on the version |
 
-The seven `huawei-*`/`cred-huawei`/`toggle-huawei` steps are an **optional
+The eight `huawei-*`/`cred-huawei`/`toggle-huawei` steps are an **optional
 extra store**, and that is why `huawei-account` needs `toggle-uploads`: the
 AppGallery block stays out of `state.sh next` until the Apple and Play path
 actually ships, and `store-ready` is reached exactly as before by a repository
 that never publishes on AppGallery. For such a repository,
-`state.sh set <id> skipped` is the right answer for each of the seven — not
-`done`, and not leaving them `todo` forever.
+`state.sh set <id> skipped` is the right answer for each of the eight — not
+`done`, and not leaving them `todo` forever. `huawei-testers` is the one that
+comes back: an AppGallery test user list has to be selected **per testing
+version**, so every internal or open test build needs its testers invited
+again.
 
 ## State
 

@@ -25,6 +25,7 @@ checked against the repository rather than believed.
 | [0017](0017-build-tag-reserved-at-push.md) | The `-build.N` tag is created in Prepare at push time, while the commit is still main's tip;<br>GitHub refuses a later tag once a workflow file changed | 2026-09-19 |
 | [0018](0018-store-listing-sync-lane.md) | Additive `sync_metadata`/`pull_metadata` lanes edit the store listing outside a release,<br>gated behind `STORE_METADATA_SYNC_ENABLED`; `release_production` is unchanged | 2026-09-19 |
 | [0019](0019-huawei-appgallery-release-lane.md) | Huawei AppGallery joins at the release tier as an additive `upload_huawei` lane behind<br>`HUAWEI_UPLOADS_ENABLED`; the binary only, the listing stays console-only | 2026-09-20 |
+| [0020](0020-huawei-joins-every-tier.md) | AppGallery runs on the internal, beta and release tiers behind the same toggle;<br>one version slot makes a tier a submit flag, and a busy slot skips rather than fails | 2026-09-21 |
 
 ## Writing a new one
 
