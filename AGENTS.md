@@ -75,11 +75,12 @@ Every row is a make target; nothing here is run through pnpm directly.
 | `make spell` | Spell-check with typos |
 | `make check-gen` | Generated-file drift (i18n, codegen) |
 | `make check-deps` | SDK drift, audit, lockfile provenance, licenses |
-| `make check-ci` | actionlint (workflows) + shellcheck (scripts) |
+| `make check-ci` | actionlint + zizmor (workflows) + shellcheck (scripts) |
 | `make check-docs` | Docs freshness, this file's command table vs the Makefile, table widths, mermaid blocks |
-| `make check-skills` | The offline test suite of every skill under `.claude/skills/` (part of `make check`) |
+| `make check-skills` | Only the offline skill tests under `.claude/skills/` (part of `make check-release`, which CI runs) |
 | `make check-prebuild` | Prebuild both platforms in a temp dir, assert plugin output |
-| `make check-release` | Ruby syntax + fastlane lane parse + lane unit tests |
+| `make check-release` | Ruby syntax + fastlane lane parse + lane unit tests + skill tests |
+| `make check-secrets` | gitleaks over the whole git history; allowlisted test data in `.gitleaks.toml` |
 | `make bundle-secrets-check` | Export the bundle, assert no non-public keys leaked |
 | `make codeql` | CodeQL with the same config CI uses (needs a CodeQL CLI; not in `make check`) |
 
@@ -88,7 +89,7 @@ Every row is a make target; nothing here is run through pnpm directly.
 | `make test` | Unit tests + code checks |
 | `make unit` | Unit + component tests |
 | `make test-scripts` | `node:test` for `scripts/**/*.test.mjs` |
-| `make coverage` | Tests with the coverage thresholds CI enforces |
+| `make coverage` | Tests with the coverage thresholds and the empty-row check CI enforces |
 | `make badges` | Render the CI badges into `coverage/badge/` (after `make coverage`) |
 | `make e2e-ios` | Maestro flows on iOS (needs mock-api, start, ios) |
 | `make e2e-android` | Maestro flows on Android (needs mock-api, start, android) |
@@ -184,8 +185,8 @@ Coverage (`jest.config.ts`) is 100% lines, branches, functions and statements,
 globally. New code needs a test in the same commit. A file with nothing to
 assert goes in `coveragePathIgnorePatterns` **with a one-line reason**; an entry
 without one is not mergeable, and a native module's TS wrapper does not qualify
-just because the native half is Swift/Kotlin. `make coverage` also fails on any
-file with zero statements (`scripts/check-coverage-empty.mjs`), so a re-export
+just because the native half is Swift/Kotlin. `make coverage` (and CI, through
+`test:coverage`) also fails on any file with zero statements (`scripts/check-coverage-empty.mjs`), so a re-export
 barrel cannot lift the number while testing nothing. See `docs/testing.md`.
 
 ## CI, release and troubleshooting

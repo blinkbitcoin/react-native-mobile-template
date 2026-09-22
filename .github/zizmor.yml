@@ -1,0 +1,16 @@
+# zizmor policy. `make check-ci` (and so CI's Tooling job) runs zizmor offline
+# at --min-severity medium over .github.
+rules:
+  # Tags, not commit SHAs: the shared workflows are called at the moving `@v0`
+  # tag by design, and every other action is held to the same rule so there is
+  # one policy to reason about. Dependabot moves the tags. Same policy as
+  # shared-workflows' .github/zizmor.yml.
+  unpinned-uses:
+    disable: true
+  dangerous-triggers:
+    ignore:
+      # workflow_run is dangerous when the triggered run checks out and runs
+      # code from an untrusted (fork) head. This one is filtered to main, checks
+      # nothing out, and only asks the API to re-run a beta run for the same
+      # commit.
+      - release-retry.yml

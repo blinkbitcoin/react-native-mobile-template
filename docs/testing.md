@@ -112,7 +112,8 @@ A re-export barrel or a type-only module has zero statements. istanbul prints
 it as 0% in every column while the totals stay at 100%, so it is a silent way
 to add an untested file without moving the number.
 
-`make coverage` runs `scripts/check-coverage-empty.mjs` after Jest. It reads
+`test:coverage` runs `scripts/check-coverage-empty.mjs` after Jest, so `make coverage` and
+CI's Unit job both make the check. It reads
 `coverage/coverage-summary.json` — which is why `json-summary` is in
 `coverageReporters` — and fails naming any file with `statements.total === 0`.
 The fix is always the same: ignore the file with a reason, or give it code

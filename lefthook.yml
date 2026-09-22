@@ -38,6 +38,9 @@ pre-commit:
       # activated (an editor's git integration, a plain terminal) would
       # otherwise fail the commit with "command not found".
       run: mise exec -- typos --force-exclude {staged_files}
+    gitleaks:
+      # The staged diff only; `make check-secrets` and CI read the whole history.
+      run: mise exec -- gitleaks git --pre-commit --staged --redact --no-banner .
 commit-msg:
   commands:
     commitlint:

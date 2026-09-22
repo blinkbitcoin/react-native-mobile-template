@@ -21,6 +21,8 @@ has not been told to trust.
 | actionlint | 1.7.12 | `make check-ci` |
 | shellcheck | 0.11.0 | `make check-ci` |
 | typos | 1.50.1 | `make spell` |
+| zizmor | 1.30.1 | `make check-ci` |
+| gitleaks | 8.30.1 | `make check-secrets`, the pre-commit hook |
 
 `typos` is pinned rather than `latest` so this repo and
 `shared-workflows` can never disagree about what counts as a typo.
@@ -183,7 +185,7 @@ that half.)
 
 | Hook | Runs |
 | --- | --- |
-| `pre-commit` | Biome check with `--write` on staged files, ESLint on staged `src/**/*.{ts,tsx}`, typos on staged files |
+| `pre-commit` | Biome check with `--write` on staged files, ESLint on staged `src/**/*.{ts,tsx}`, typos on staged files,<br>gitleaks on the staged diff |
 | `commit-msg` | commitlint on the message |
 | `pre-push` | `pnpm typecheck`, `pnpm knip`, and Jest limited to what changed since `origin/main` |
 | `post-merge`, `post-checkout` | Reinstall dependencies when the lockfile changed between the two revisions |
