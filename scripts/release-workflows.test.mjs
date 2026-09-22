@@ -222,7 +222,7 @@ describe('release-please.yml chains the release by dispatch', () => {
   test('a created or updated release PR gets a CI run', () => {
     assert.match(
       code,
-      /prs_created == 'true'[\s\S]*?gh workflow run ci\.yml [^\n]*--ref "\$branch"/,
+      /prs_created == 'true'[\s\S]*?gh workflow run ci\.yml [^\n]*--ref "\$BRANCH"/,
       'no CI dispatch gated on prs_created',
     );
     // Parsed in the shell on purpose: `fromJSON()` in `env:` is validated even
@@ -231,6 +231,78 @@ describe('release-please.yml chains the release by dispatch', () => {
     assert.doesNotMatch(code, /fromJSON\(steps\.release\.outputs\.pr\)/);
     assert.match(code, /PR_JSON: \$\{\{ steps\.release\.outputs\.pr \}\}/);
     assert.match(code, /jq -r '\.headBranchName \/\/ empty'/);
+  });
+
+  test('the release PR number and branch are parsed once, in the shell, as job outputs', () => {
+    assert.match(code, /jq -r '\.number \/\/ empty'/, 'the PR number is not parsed');
+    assert.match(code, /pr-number: \$\{\{ steps\.pr\.outputs\.number \}\}/);
+    assert.match(code, /pr-branch: \$\{\{ steps\.pr\.outputs\.branch \}\}/);
+  });
+
+  test('a second job drafts the store notes into the release PR through shared-workflows', () => {
+    const job =
+      /store-notes:\n\s+name: Store Notes\n\s+needs: release-please\n[\s\S]*?uses: [^\n]*\/shared-workflows\/\.github\/workflows\/release-pr-notes\.yml@v0/;
+    assert.match(code, job, 'no store-notes job calling release-pr-notes.yml');
+    assert.match(code, /if: \$\{\{ needs\.release-please\.outputs\.pr-number != '' \}\}/);
+    assert.match(code, /pull-requests: write/);
+    assert.match(code, /pr-number: \$\{\{ needs\.release-please\.outputs\.pr-number \}\}/);
+    assert.match(code, /ref: \$\{\{ needs\.release-please\.outputs\.pr-branch \}\}/);
+    for (const name of [
+      'STORE_NOTES_INCLUDE_CHANGELOG',
+      'RELEASE_NOTES_LLM_PROVIDER',
+      'RELEASE_NOTES_LLM_MODEL',
+      'OPENAI_BASE_URL',
+    ]) {
+      assert.match(
+        code,
+        new RegExp(`"${name}":"\\$\\{\\{ vars\\.${name} \\}\\}"`),
+        `${name} not in build-env`,
+      );
+    }
+    for (const key of ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY']) {
+      assert.match(
+        code,
+        new RegExp(`${key}: \\$\\{\\{ secrets\\.${key} \\}\\}`),
+        `${key} not passed`,
+      );
+    }
+  });
+
+  test('the section title the release PR gets is the one beta appends', () => {
+    const beta = readFileSync(path.join(dir, 'release-beta.yml'), 'utf8');
+    const title = /append-title: (.+)/.exec(beta)?.[1];
+    assert.equal(title, 'Store notes');
+    // The shared workflow defaults to the same title; passing none keeps them equal.
+    assert.doesNotMatch(code, /section-title:/);
+  });
+
+  test('the LLM runs only in the release PR job, never in a CD lane', () => {
+    for (const file of ['release-internal.yml', 'release-beta.yml', 'release-production.yml']) {
+      const text = readFileSync(path.join(dir, file), 'utf8')
+        .split('\n')
+        .filter((l) => !l.trimStart().startsWith('#'))
+        .join('\n');
+      for (const name of [
+        'RELEASE_NOTES_LLM_PROVIDER',
+        'RELEASE_NOTES_LLM_MODEL',
+        'OPENAI_BASE_URL',
+        'ANTHROPIC_API_KEY',
+        'OPENAI_API_KEY',
+      ]) {
+        assert.doesNotMatch(text, new RegExp(name), `${file} still carries ${name}`);
+      }
+      // Internal still generates notes from commits; beta and production copy
+      // the reviewed section verbatim, so only internal may append the changelog.
+      if (file === 'release-internal.yml') {
+        assert.match(text, /STORE_NOTES_INCLUDE_CHANGELOG/);
+      } else {
+        assert.doesNotMatch(
+          text,
+          /STORE_NOTES_INCLUDE_CHANGELOG/,
+          `${file} still appends the changelog`,
+        );
+      }
+    }
   });
 
   test('nothing downstream waits on a release event, and no App token remains', () => {

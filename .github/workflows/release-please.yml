@@ -41,6 +41,10 @@ jobs:
     outputs:
       release-created: ${{ steps.release.outputs.release_created }}
       tag-name: ${{ steps.release.outputs.tag_name }}
+      # Empty on a push that opens or updates no release PR; the store-notes
+      # job below is gated on it.
+      pr-number: ${{ steps.pr.outputs.number }}
+      pr-branch: ${{ steps.pr.outputs.branch }}
     steps:
       # Manifest mode only. `release-type`, `package-name`,
       # `include-component-in-tag`, `bump-minor-pre-major` and
@@ -75,25 +79,70 @@ jobs:
           REPO: ${{ github.repository }}
           TAG: ${{ steps.release.outputs.tag_name }}
         run: gh workflow run web.yml --repo "$REPO" --ref "$TAG" -f "deploy=true"
+      # The PR's number and branch are read from the `pr` output in the shell,
+      # not with `fromJSON()` in `env:`: the runner validates a step's `env`
+      # expressions even when its `if` is false, and `fromJSON('')` is a
+      # template error - which failed this job on the first push that produced
+      # no release PR. Parsed once, here, for the CI dispatch below and for the
+      # store-notes job's `needs` outputs.
+      - name: Read the release PR
+        id: pr
+        if: ${{ steps.release.outputs.prs_created == 'true' }}
+        env:
+          PR_JSON: ${{ steps.release.outputs.pr }}
+        run: |
+          number="$(jq -r '.number // empty' <<<"$PR_JSON")"
+          branch="$(jq -r '.headBranchName // empty' <<<"$PR_JSON")"
+          if [ -z "$number" ] || [ -z "$branch" ]; then
+            echo "release-please reported a PR but its 'pr' output lacks number or headBranchName" >&2
+            exit 1
+          fi
+          printf 'number=%s\nbranch=%s\n' "$number" "$branch" >> "$GITHUB_OUTPUT"
       # The release PR is bot-authored, so its own `pull_request` runs wait for
       # a human to approve them and are marked failed when the PR merges. This
       # is the run that counts. It is a full CI run, E2E included, once per
-      # update of the release PR - free on a public repository; a private
-      # consumer that finds it too much can drop this one step.
-      # The PR's branch is read from the `pr` output in the shell, not with
-      # `fromJSON()` in `env:`: the runner validates a step's `env` expressions
-      # even when its `if` is false, and `fromJSON('')` is a template error -
-      # which failed this job on the first push that produced no release PR.
+      # update of the release PR - and the store-notes job below makes that
+      # every push to main, since release-please rewrites a PR whose body it
+      # did not write itself. Free on a public repository; a private consumer
+      # that finds it too much can drop this one step.
       - name: Run CI on the release PR
         if: ${{ steps.release.outputs.prs_created == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-          PR_JSON: ${{ steps.release.outputs.pr }}
-        run: |
-          branch="$(jq -r '.headBranchName // empty' <<<"$PR_JSON")"
-          if [ -z "$branch" ]; then
-            echo "release-please reported a PR but its 'pr' output has no headBranchName" >&2
-            exit 1
-          fi
-          gh workflow run ci.yml --repo "$REPO" --ref "$branch"
+          BRANCH: ${{ steps.pr.outputs.branch }}
+        run: gh workflow run ci.yml --repo "$REPO" --ref "$BRANCH"
+
+  # The store release notes, drafted once into the release PR body for a human
+  # to review with the version bump. release-please carries the section into
+  # the GitHub release body on merge, and beta and production read it back
+  # verbatim (expo-prepare with release-tag), so this is the only job in the
+  # repository that may call an LLM - internal builds keep the free
+  # deterministic notes from commits. Its own job, after the dispatches above:
+  # a red draft never withholds a release, and `gh run rerun --failed` re-drafts.
+  # A hand edit to the section in the PR lasts until the next push to main;
+  # edit release-notes.prompt.md instead, or the release body after merging.
+  store-notes:
+    name: Store Notes
+    needs: release-please
+    if: ${{ needs.release-please.outputs.pr-number != '' }}
+    uses: blinkbitcoin/shared-workflows/.github/workflows/release-pr-notes.yml@v0
+    permissions:
+      contents: read
+      pull-requests: write
+    with:
+      pr-number: ${{ needs.release-please.outputs.pr-number }}
+      # The release branch, so the prompt template and the generator under
+      # release are the ones that draft.
+      ref: ${{ needs.release-please.outputs.pr-branch }}
+      # Non-secret only (see the build-env note in release-internal.yml); the
+      # two keys travel as secrets below and are only needed when the provider
+      # variable selects them.
+      build-env: >-
+        {"STORE_NOTES_INCLUDE_CHANGELOG":"${{ vars.STORE_NOTES_INCLUDE_CHANGELOG }}",
+        "RELEASE_NOTES_LLM_PROVIDER":"${{ vars.RELEASE_NOTES_LLM_PROVIDER }}",
+        "RELEASE_NOTES_LLM_MODEL":"${{ vars.RELEASE_NOTES_LLM_MODEL }}",
+        "OPENAI_BASE_URL":"${{ vars.OPENAI_BASE_URL }}"}
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

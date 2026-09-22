@@ -333,7 +333,9 @@ export async function buildNotes({
     if (rewritten) byLocale = rewritten;
   }
 
-  if (includeChangelog) {
+  // A verbatim section is final: it is the reviewed text the release PR
+  // carried, and the changelog was appended where that text was generated.
+  if (includeChangelog && !verbatim) {
     const changelog = renderChangelog(items);
     if (changelog) {
       byLocale = Object.fromEntries(

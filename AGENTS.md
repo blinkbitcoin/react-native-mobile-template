@@ -97,7 +97,7 @@ Every row is a make target; nothing here is run through pnpm directly.
 | Release | |
 |---|---|
 | `make version` | Print what CI would build for HEAD |
-| `make release-notes` | Preview store notes for HEAD (`TAG=vX.Y.Z` uses that release body) |
+| `make release-notes` | Preview store notes for HEAD (`TAG=vX.Y.Z` uses that release body, `PR=N` that release PR's body) |
 | `make verify-ios` | Verify a built .app/.ipa/.xcarchive (`ARTIFACT=...`) |
 | `make verify-android` | Verify AAB+APK (`AAB=... APK=...`) |
 
@@ -149,8 +149,10 @@ Every row is a make target; nothing here is run through pnpm directly.
   ci release deps deps-dev docs e2e web`. Squash merges take the PR title as the
   commit message, so the PR title is linted too.
 - **Releases are release-please's job.** Merge (squash) the release PR; never
-  `sed` a version into `package.json`, `app.config.ts` or the manifest. Store
-  notes prose is edited in the release body, then previewed with
+  `sed` a version into `package.json`, `app.config.ts` or the manifest. The
+  store notes are drafted into the release PR body by `release-please.yml`
+  from `release-notes.prompt.md`; to change them, edit the prompt (the next
+  push regenerates) or the release body after merging, then preview with
   `make release-notes` — see `docs/release-runbook.md`.
 - **No vague abbreviations, anywhere a human reads.** Write the word:
   identifiers, organisation, credentials, repository, configuration,
