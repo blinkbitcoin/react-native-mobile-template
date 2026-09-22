@@ -115,7 +115,6 @@
       "fastlane/metadata/android/en-US/title.txt",
       "fastlane/metadata/ios/en-US/description.txt",
       "fastlane/metadata/ios/en-US/name.txt",
-      "fastlane/release-notes-context.md",
       "modules/hello-native/ios/HelloNative.podspec",
       "package.json",
       "plugins/with-android-release-signing.ts",

@@ -354,6 +354,13 @@ error, unparseable JSON, a missing locale, a leaked commit hash — is a warning
 and a fall back to the deterministic prose. A release never fails because a
 model was unavailable.
 
+The whole system prompt is `release-notes.prompt.md` at the repository root:
+product, audience, tone, locales, the store limits and the output rules. Edit
+that file to change how the notes read; the generator only fills in
+`{{locales}}` and `{{limit}}`, and an unknown placeholder fails the run rather
+than reaching the model. The validator that checks the model's answer is not
+part of the prompt and cannot be relaxed from it.
+
 | Name | Kind | Meaning |
 | --- | --- | --- |
 | `RELEASE_NOTES_LLM_PROVIDER` | repo variable | `anthropic` or `openai`; anything else disables the pass |

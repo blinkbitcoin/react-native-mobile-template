@@ -29,7 +29,8 @@ const BULLET = '• ';
 const USER_VISIBLE_MARKER = /\s*\[user-visible\]\s*/i;
 
 const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
-const CONTEXT_FILE = path.join(repoRoot, 'fastlane', 'release-notes-context.md');
+/** The system prompt template for the optional LLM pass, versioned at the repo root. */
+export const PROMPT_FILE = path.join(repoRoot, 'release-notes.prompt.md');
 const IOS_METADATA_DIR = path.join(repoRoot, 'fastlane', 'metadata', 'ios');
 
 const TYPE_GROUPS = { feat: 'New', fix: 'Fixed', perf: 'Improved', refactor: 'Improved' };
@@ -58,7 +59,7 @@ export function stripRepoReferences(raw) {
   text = text.replace(/\s*\((?:#\d+|[0-9a-f]{7,40})\)/gi, '');
   text = text.replace(/\s*#\d+/g, '');
   text = text.replace(/\s*\b(?=[0-9a-f]{7,40}\b)[0-9a-f]*\d[0-9a-f]*\b/gi, '');
-  // Ticket keys (JIRA-123, ENG-7), banned by fastlane/release-notes-context.md.
+  // Ticket keys (JIRA-123, ENG-7), banned by release-notes.prompt.md.
   text = text.replace(/\b[A-Z][A-Z0-9]+-\d+\b[:\s]*/g, '');
   text = text.replace(USER_VISIBLE_MARKER, ' ');
   // Html tags go whole; emphasis, code spans and bracket tags (`[ios]`,
@@ -270,6 +271,11 @@ export function renderChangelog(items) {
   return lines.length ? ['Changelog', ...lines].join('\n') : '';
 }
 
+/** The prompt template, or '' when the file is gone (the LLM pass then declines). */
+export function loadPrompt(file = PROMPT_FILE) {
+  return existsSync(file) ? readFileSync(file, 'utf8') : '';
+}
+
 /** Locale directories under fastlane/metadata/ios (`review_information` is not one). */
 export function discoverLocales(dir = IOS_METADATA_DIR) {
   if (!existsSync(dir)) return ['en-US'];
@@ -305,7 +311,7 @@ export async function buildNotes({
   includeChangelog = false,
   provider,
   model,
-  context,
+  prompt,
   fetchImpl,
   rewrite = rewriteNotes,
 }) {
@@ -313,7 +319,7 @@ export async function buildNotes({
   let byLocale = Object.fromEntries(locales.map((locale) => [locale, verbatim || prose]));
 
   if (!verbatim && provider && provider !== 'none') {
-    const rewritten = await rewrite({ items, context, locales, provider, model, fetchImpl });
+    const rewritten = await rewrite({ items, prompt, locales, provider, model, fetchImpl });
     if (rewritten) byLocale = rewritten;
   }
 
@@ -427,7 +433,6 @@ export async function main(argv, { cwd = process.cwd() } = {}) {
     items = parseCommits(commitSubjects(options.range));
   }
 
-  const context = existsSync(CONTEXT_FILE) ? readFileSync(CONTEXT_FILE, 'utf8') : '';
   const byLocale = await buildNotes({
     items,
     locales,
@@ -435,7 +440,7 @@ export async function main(argv, { cwd = process.cwd() } = {}) {
     includeChangelog: options.includeChangelog,
     provider: process.env.RELEASE_NOTES_LLM_PROVIDER,
     model: process.env.RELEASE_NOTES_LLM_MODEL,
-    context,
+    prompt: loadPrompt(),
   });
   const notes = toStoreNotes(byLocale);
   const primary = notes['en-US'] ? 'en-US' : locales[0];

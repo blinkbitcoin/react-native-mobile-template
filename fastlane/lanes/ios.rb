@@ -11,7 +11,7 @@
 # in shared.rb): the files under metadata/ios/review_information/ are blank on
 # purpose, and deliver would otherwise upload those blanks and clear the App
 # Review contact, demo account and notes.
-# App Store Connect's own caps, counted in characters (see release-notes-context.md).
+# App Store Connect's own caps, counted in characters (see release-notes.prompt.md).
 TESTFLIGHT_NOTES_LIMIT = 4000
 APP_STORE_NOTES_LIMIT = 4000
 
