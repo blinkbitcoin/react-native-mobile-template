@@ -412,6 +412,68 @@ test('a hand-written "## Store notes" override is cleaned, not trusted', () => {
   assert.doesNotMatch(cleaned, /[#[\]*`<>]|https?:/);
 });
 
+// ---------- store notes on the release PR: markers and rules ----------
+
+test('a section appended by the shared workflow ends at its end marker', () => {
+  // The exact shape release-beta leaves behind: the shared append mode wraps
+  // the section in HTML-comment markers, and production reads it back.
+  const body = [
+    '## [0.6.1](https://example.com/compare/v0.6.0...v0.6.1) (2026-09-21)',
+    '',
+    '### Bug Fixes',
+    '',
+    '* fix one',
+    '',
+    '<!-- workflows:append:Store notes -->',
+    '## Store notes',
+    '',
+    'Fixed',
+    '• Close the alerts.',
+    '<!-- /workflows:append:Store notes -->',
+  ].join('\n');
+  const cleaned = cleanSection(extractStoreSection(body));
+  assert.equal(cleaned, 'Fixed\n• Close the alerts.');
+  assert.doesNotMatch(cleaned, /!--/);
+});
+
+test('a section inside a release PR body ends at the footer rule', () => {
+  const body = [
+    ':robot: I have created a release *beep* *boop*',
+    '---',
+    '',
+    '## [0.6.1](https://example.com/compare/v0.6.0...v0.6.1) (2026-09-21)',
+    '',
+    '<!-- workflows:append:Store notes -->',
+    '## Store notes',
+    '',
+    'Fixed',
+    '• Close the alerts.',
+    '<!-- /workflows:append:Store notes -->',
+    '',
+    '---',
+    'This PR was generated with Release Please.',
+  ].join('\n');
+  assert.equal(cleanSection(extractStoreSection(body)), 'Fixed\n• Close the alerts.');
+});
+
+test('a comment line inside a section is dropped, not shipped', () => {
+  const body = ['## Store notes', '', 'New', '<!-- a note to self -->', '• Thing.'].join('\n');
+  assert.equal(cleanSection(extractStoreSection(body)), 'New\n• Thing.');
+});
+
+test('a rewrite carrying a rule line or html is rejected', () => {
+  const cases = [
+    ['Fixed\n---\nMore', /contains a horizontal rule/],
+    ['<details>hidden</details>', /contains html/],
+    ['Fixed <!-- x --> things', /contains html/],
+  ];
+  for (const [text, expected] of cases) {
+    const result = validate(JSON.stringify({ 'en-US': text }), ['en-US']);
+    assert.equal(result.notes, undefined, text);
+    assert.match(result.error, expected);
+  }
+});
+
 test('the cli sends --body-section through the same filter', () => {
   const dir = tempDir();
   const file = path.join(dir, 'body.md');

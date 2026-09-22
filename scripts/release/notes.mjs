@@ -222,14 +222,26 @@ export function commitSubjects(range, cwd = repoRoot) {
   return log ? log.split('\n') : [];
 }
 
-/** The `## Store notes` section of a release body, or '' when there is none. */
+/**
+ * The `## Store notes` section of a release body, or '' when there is none.
+ *
+ * The section ends at the next heading or at a horizontal rule, and HTML
+ * comment lines are dropped: the shared workflow wraps the section it appends
+ * in `<!-- workflows:append:... -->` markers, and a release PR body closes its
+ * content with `---` before release-please's footer. Neither is prose, and a
+ * marker that reaches `cleanSection` loses its angle brackets and ships as a
+ * literal `!-- ... --` line.
+ */
 export function extractStoreSection(markdown) {
   const lines = String(markdown).split('\n');
   const start = lines.findIndex((line) => /^#{2,4}\s+store notes\s*$/i.test(line));
   if (start === -1) return '';
   const rest = lines.slice(start + 1);
-  const end = rest.findIndex((line) => /^#{1,4}\s+\S/.test(line));
-  return (end === -1 ? rest : rest.slice(0, end)).join('\n').trim();
+  const end = rest.findIndex((line) => /^#{1,4}\s+\S|^\s*-{3,}\s*$/.test(line));
+  return (end === -1 ? rest : rest.slice(0, end))
+    .filter((line) => !/^\s*<!--.*-->\s*$/.test(line))
+    .join('\n')
+    .trim();
 }
 
 // ---------- rendering ----------

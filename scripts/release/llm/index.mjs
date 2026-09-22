@@ -65,6 +65,11 @@ function violations(text) {
     found.push('contains a domain');
   }
   if (/(?:^|\n)\s*[*-]\s|\*\*|__/.test(text)) found.push('contains markdown');
+  // A line of dashes is where release-please splits a PR body into the release
+  // notes, and any tag (a `<details>` block, a comment) is parsed by GitHub or
+  // by the shared workflow rather than read by a person.
+  if (/^\s*-{3,}\s*$/m.test(text)) found.push('contains a horizontal rule');
+  if (/<[a-z!/]/i.test(text)) found.push('contains html');
   if (/\b(?=[0-9a-f]{7,40}\b)[0-9a-f]*\d[0-9a-f]*\b/i.test(text)) found.push('contains a hash');
   if (text.length > TESTFLIGHT_LIMIT) found.push(`longer than ${TESTFLIGHT_LIMIT} characters`);
   return found;
