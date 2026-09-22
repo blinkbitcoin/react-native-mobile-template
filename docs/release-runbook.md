@@ -119,9 +119,15 @@ every time it creates or updates the PR, and that run - a full one, E2E
 included - is the one to read. A private consumer that finds a full run per
 release-PR update too expensive drops that single step in `release-please.yml`.
 
-Optionally edit the release's `## Store notes` section first — see
-[Store notes](#store-notes). The section is read at promotion time, not at
-release time, so editing it before step 3 finishes is safe.
+The PR body carries a `## Store notes` section: the prose the stores will
+get, drafted by the `Store Notes` job of `release-please.yml` from the
+changelog the PR carries (and rewritten by the optional LLM pass when one is
+configured). **Review it with the version bump** — see
+[Store notes](#store-notes). To change it, edit `release-notes.prompt.md` and
+the next push to `main` regenerates it; a hand edit to the section in the PR
+lasts only until that next push, because release-please rewrites the whole
+body. After merging, the section is in the release body, and editing it there
+before step 3's Prepare reads it is still an override.
 
 ### 3. Beta promotes itself
 
@@ -309,19 +315,39 @@ and takes Play to 100%. `action: halt` stops both. See
 
 ## Store notes
 
-`scripts/release/notes.mjs` renders the notes both stores get. The deterministic
-renderer always runs: it strips links, PR references, commit hashes and ticket
-keys, groups changes into New / Improved / Fixed and truncates at a word
-boundary to 4000 characters (TestFlight, App Store) or 500 (Play). Output is
-`store-notes.json` + `notes-store.txt`, attached to the release; the lanes read
-those files, so beta and production never disagree about the text.
+`scripts/release/notes.mjs` renders the notes every store gets. The
+deterministic renderer always runs: it strips links, PR references, commit
+hashes and ticket keys, groups changes into New / Improved / Fixed and
+truncates at a word boundary to 4000 characters (TestFlight, App Store), 500
+(Play) or 300 (AppGallery). Output is `store-notes.json` + `notes-store.txt`;
+the lanes read those files.
 
-Preview locally with `make release-notes` (or `make release-notes TAG=vX.Y.Z`).
+Where the text comes from differs per tier, and that is the design:
 
-**Human override.** Add or edit a `## Store notes` section in the GitHub release
-body before promoting. Its line structure is kept as written; it still goes
-through the same hygiene filter, so a link or a `#123` in it is removed rather
-than shipped.
+| Tier | Source | Generated or copied |
+| --- | --- | --- |
+| Internal (every push to `main`) | Commit subjects since the last tag | Generated, deterministic only; the LLM never runs here |
+| The release PR | The changelog the PR carries | Generated once, by `Store Notes` in `release-please.yml`; the LLM pass runs here when configured. **This is the review point** |
+| Beta and production | The `## Store notes` section of the release body | Copied verbatim; nothing is regenerated, so both tiers ship the reviewed text |
+
+release-please builds the release body from the PR body, so the section a
+human reviewed in the PR is the section beta and production read. The
+`Store Notes` job is its own job after the beta and web dispatches: a red
+draft never withholds a release, and `gh run rerun --failed` re-drafts.
+
+Two costs that come with drafting into the PR: every push to `main` now
+rewrites the release PR (release-please skips its update only on a body it
+wrote itself) and re-dispatches CI on it; and a hand edit to the section in
+the PR lasts until that next push.
+
+Preview locally with `make release-notes` (`TAG=vX.Y.Z` renders that release's
+body, `PR=N` that release PR's body).
+
+**Human override.** Edit the `## Store notes` section in the GitHub release
+body after merging and before beta's Prepare reads it, or before dispatching
+production. Its line structure is kept as written; it still goes through the
+same hygiene filter, so a link, a `#123` or a marker line in it is removed
+rather than shipped.
 
 `release-beta` writes that section itself after promoting (`github-release` in
 `append` mode, marker-delimited and idempotent), so the release body always
@@ -346,8 +372,9 @@ locale back to the single-locale fallback and throws the LLM pass away.
 **Audience split.** Store notes are prose for end users; the grouped technical
 changelog with PR links stays on GitHub (release body + `CHANGELOG.md`). Set the
 repo variable `STORE_NOTES_INCLUDE_CHANGELOG=true` to append the changelog after
-the prose, truncated to the store limits. It reaches `notes.mjs` through
-`expo-prepare`'s `build-env`.
+the prose, truncated to the store limits. It is applied where notes are
+generated (internal, and the release PR draft) and never where they are
+copied: a verbatim section is final.
 
 **Optional LLM pass**, off unless configured. Every failure — no key, an HTTP
 error, unparseable JSON, a missing locale, a leaked commit hash — is a warning
@@ -368,9 +395,10 @@ part of the prompt and cannot be relaxed from it.
 | `OPENAI_BASE_URL` | repo variable | OpenAI-compatible endpoint |
 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | **secret** | Key for the chosen provider |
 
-The three variables reach `notes.mjs` through `expo-prepare`'s `build-env`; the
-two keys are declared secrets on `expo-prepare.yml`, because `build-env` is a
-workflow input and would publish them in the run's parameters.
+The three variables reach `notes.mjs` through the `Store Notes` job's
+`build-env`; the two keys are declared secrets on `release-pr-notes.yml`,
+because `build-env` is a workflow input and would publish them in the run's
+parameters. No CD lane receives them: the LLM runs in that one job.
 
 ## Store listing metadata
 
@@ -612,10 +640,10 @@ lane still walks end to end
 | `OTA_ENABLED` | `app.config.ts` at build time (via `build-env`) and the `if:` on every `ota-*` job | `true` to turn OTA on; see [ota.md](ota.md) |
 | `EXPO_UPDATES_URL` | `app.config.ts` at build time (via `build-env`) and the OTA manifest smoke check | Public origin of the update server |
 | `OTA_CLI_VERSION` | `expo-ota-publish` | Exact `eoas` version; the publish script refuses to run unpinned |
-| `STORE_NOTES_INCLUDE_CHANGELOG` | `notes.mjs` in `expo-prepare` (via `build-env`) | `true` appends the changelog to the store notes |
-| `RELEASE_NOTES_LLM_PROVIDER` | `notes.mjs` (via `build-env`) | `anthropic` or `openai`; anything else disables the optional LLM pass |
-| `RELEASE_NOTES_LLM_MODEL` | `notes.mjs` (via `build-env`) | Model override for that provider |
-| `OPENAI_BASE_URL` | `notes.mjs` (via `build-env`) | OpenAI-compatible endpoint |
+| `STORE_NOTES_INCLUDE_CHANGELOG` | `notes.mjs` in internal's `expo-prepare` and in `Store Notes` (via `build-env`) | `true` appends the changelog where notes are generated |
+| `RELEASE_NOTES_LLM_PROVIDER` | `notes.mjs` in `Store Notes` (via `build-env`) | `anthropic` or `openai`; anything else disables the optional LLM pass |
+| `RELEASE_NOTES_LLM_MODEL` | `notes.mjs` in `Store Notes` (via `build-env`) | Model override for that provider |
+| `OPENAI_BASE_URL` | `notes.mjs` in `Store Notes` (via `build-env`) | OpenAI-compatible endpoint |
 | `EXPO_PUBLIC_API_URL` | the bundle, through `src/config/env.ts` (via `build-env`) | **Required for a CI build**: `env.ts` validates it as a URL and the app fails to start without it |
 | `EXPO_PUBLIC_APP_NAME` | same | **Required for a CI build** (non-empty string) |
 | `EXPO_PUBLIC_WEB_DOMAIN` | same, plus `app.config.ts` universal links | Your web domain; empty disables the associated-domain / intent-filter entries |
@@ -652,7 +680,7 @@ you want a reviewer between a token and production.
 | `HUAWEI_CLIENT_ID` | every Huawei lane job: internal, beta and release | AppGallery Connect → Users and permissions → API key → Connect API → Create; the client id half of the pair |
 | `HUAWEI_CLIENT_SECRET` | same three jobs | Same page, the client secret half. It is shown exactly once |
 | `OTA_PUBLISH_TOKEN` | every `ota-*` job | One of the update server's `EOO_TOKENS`; scope per environment |
-| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | `expo-prepare` (`notes.mjs`) | Only needed when `RELEASE_NOTES_LLM_PROVIDER` selects that provider. The notes fall back to deterministic prose without them |
+| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | `Store Notes` in `release-please.yml` (`notes.mjs`) | Only needed when `RELEASE_NOTES_LLM_PROVIDER` selects that provider. The notes fall back to deterministic prose without them |
 | `APP_REVIEW_EMAIL`, `APP_REVIEW_FIRST_NAME`, `APP_REVIEW_LAST_NAME`, `APP_REVIEW_PHONE` | iOS `promote_beta` and `release_production` lanes | The contact Apple reaches for review questions |
 | `APP_REVIEW_DEMO_USER`, `APP_REVIEW_DEMO_PASSWORD` | same | A working login for the reviewer; omit both if the app needs no account |
 | `APP_REVIEW_NOTES` | same | Free-text notes for the reviewer |
