@@ -70,7 +70,7 @@ verify-android: ## Verify AAB+APK (AAB=... APK=... [ARGS=--cert-sha256 X])
 	@[ -n "$(AAB)" ] && [ -n "$(APK)" ] || { echo "usage: make verify-android AAB=artifacts/android/app-release.aab APK=artifacts/android/app-universal.apk"; exit 2; }
 	bash scripts/release/verify-android.sh "$(AAB)" "$(APK)" $(ARGS)
 
-release-notes: ## Preview store notes for HEAD (TAG=vX.Y.Z uses that release body via gh)
+release-notes: ## Preview store notes for HEAD (TAG=vX.Y.Z uses that release body, PR=N that release PR's body)
 	@set -euo pipefail; \
 	if [ -n "$(TAG)" ]; then \
 		body="$$(mktemp)"; \
@@ -78,6 +78,13 @@ release-notes: ## Preview store notes for HEAD (TAG=vX.Y.Z uses that release bod
 		gh release view "$(TAG)" --json body -q .body > "$$body" \
 			|| { echo "gh release view $(TAG) failed" >&2; exit 1; }; \
 		[ -s "$$body" ] || { echo "empty release body for $(TAG)" >&2; exit 1; }; \
+		node scripts/release/notes.mjs --from-body "$$body" --body-section --out -; \
+	elif [ -n "$(PR)" ]; then \
+		body="$$(mktemp)"; \
+		trap 'rm -f "$$body"' EXIT; \
+		gh pr view "$(PR)" --json body -q .body > "$$body" \
+			|| { echo "gh pr view $(PR) failed" >&2; exit 1; }; \
+		[ -s "$$body" ] || { echo "empty body for PR $(PR)" >&2; exit 1; }; \
 		node scripts/release/notes.mjs --from-body "$$body" --body-section --out -; \
 	else \
 		node scripts/release/notes.mjs --from-commits --out -; \

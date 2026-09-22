@@ -71,17 +71,10 @@ jobs:
         {"APP_VARIANT":"production",
         "OTA_ENABLED":"${{ vars.OTA_ENABLED }}",
         "EXPO_UPDATES_URL":"${{ vars.EXPO_UPDATES_URL }}",
-        "STORE_NOTES_INCLUDE_CHANGELOG":"${{ vars.STORE_NOTES_INCLUDE_CHANGELOG }}",
-        "RELEASE_NOTES_LLM_PROVIDER":"${{ vars.RELEASE_NOTES_LLM_PROVIDER }}",
-        "RELEASE_NOTES_LLM_MODEL":"${{ vars.RELEASE_NOTES_LLM_MODEL }}",
-        "OPENAI_BASE_URL":"${{ vars.OPENAI_BASE_URL }}",
         "EXPO_PUBLIC_API_URL":"${{ vars.EXPO_PUBLIC_API_URL }}",
         "EXPO_PUBLIC_APP_NAME":"${{ vars.EXPO_PUBLIC_APP_NAME }}",
         "EXPO_PUBLIC_WEB_DOMAIN":"${{ vars.EXPO_PUBLIC_WEB_DOMAIN }}",
         "EXPO_PUBLIC_ALLOW_INSECURE_WEB_STORAGE":"${{ vars.EXPO_PUBLIC_ALLOW_INSECURE_WEB_STORAGE || 'false' }}"}
-    secrets:
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
   # ---- action=release -------------------------------------------------------
 

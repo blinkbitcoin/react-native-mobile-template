@@ -25,6 +25,9 @@ Conventional commits in, one release PR out; merging it is the only human step.
   truncated at word boundaries (4000 TestFlight, 500 Play), optionally
   rewritten by a validated LLM pass (`RELEASE_NOTES_LLM_PROVIDER` = `anthropic`
   or `openai`), falling back to it; `STORE_NOTES_INCLUDE_CHANGELOG` appends.
+  *Refined 2026-09-22 by [0021](0021-store-notes-drafted-on-the-release-pr.md):
+  the LLM pass moved from build time to the release PR, and the prompt to
+  `release-notes.prompt.md`.*
 
 ## Consequences
 

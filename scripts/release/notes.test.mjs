@@ -192,6 +192,17 @@ test('a "## Store notes" section is used verbatim when asked for', async () => {
   assert.equal(extractStoreSection('### Features\n\n* something'), '');
 });
 
+test('a verbatim section is final: the changelog is never appended to it', async () => {
+  const items = parseBody(body);
+  const notes = await buildNotes({
+    items,
+    locales: ['en-US'],
+    verbatim: 'Reviewed prose.',
+    includeChangelog: true,
+  });
+  assert.equal(notes['en-US'], 'Reviewed prose.');
+});
+
 test('--include-changelog appends the full grouped list, chores included', async () => {
   const items = parseBody(body);
   const changelog = renderChangelog(items);

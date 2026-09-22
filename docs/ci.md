@@ -29,7 +29,7 @@ flowchart TD
     checks["Checks"] --> unit["Unit"] --> e2e["E2E"] --> badges["Badges"]
   end
 
-  CI -->|"push to main"| rp["CD / Release<br/>(release-please)"]
+  CI -->|"push to main"| rp["CD / Release<br/>(release-please, then Store Notes<br/>drafted into the release PR)"]
   CI -->|"push to main"| internal
 
   subgraph internal["CD / Internal"]
@@ -166,7 +166,7 @@ break. The expensive half, the native matrix, still skips.
 
 | File | Trigger | Calls | Notes |
 | --- | --- | --- | --- |
-| `release-please.yml` | `push` to `main` (all paths), `workflow_dispatch` | `googleapis/release-please-action@v5` | Keeps one release PR open and dispatches `ci.yml` on its branch.<br>On a cut release, dispatches `release-beta.yml` and `web.yml` at the tag.<br>Calls no reusable workflow from the workflows repo |
+| `release-please.yml` | `push` to `main` (all paths), `workflow_dispatch` | `googleapis/release-please-action@v5`, `release-pr-notes.yml` | Keeps one release PR open, dispatches `ci.yml` on its branch and drafts the<br>`## Store notes` section into its body (the only job that may call an LLM).<br>On a cut release, dispatches `release-beta.yml` and `web.yml` at the tag |
 | `release-internal.yml` | `push` to `main` (skipping `docs/**`, `**.md`), `workflow_dispatch` | `expo-prepare.yml`, `expo-build-ios.yml`, `expo-build-android.yml`,<br>`fastlane-lane.yml`, `github-release.yml`, `expo-ota-publish.yml` | The only workflow that builds binaries |
 | `release-beta.yml` | `workflow_dispatch` (`tag`), from `release-please.yml` or by hand | `expo-prepare.yml`, `fastlane-lane.yml`, `github-release.yml`, `expo-ota-publish.yml` | Promotes the binary internal already built and tested. Never builds |
 | `release-production.yml` | `workflow_dispatch` (`tag`, `action`) | `expo-prepare.yml`, `fastlane-lane.yml`, `github-release.yml`, `expo-ota-publish.yml`, `web.yml` | `action` selects release, rollout, halt, resume or complete |
