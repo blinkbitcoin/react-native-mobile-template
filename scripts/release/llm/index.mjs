@@ -11,23 +11,22 @@ import * as openai from './openai.mjs';
 const PROVIDERS = { anthropic, openai };
 const KEY_ENV = { anthropic: 'ANTHROPIC_API_KEY', openai: 'OPENAI_API_KEY' };
 /** The tightest limit the text must fit before per-store cuts are applied. */
-const TESTFLIGHT_LIMIT = 4000;
+export const TESTFLIGHT_LIMIT = 4000;
 
-const JSON_INSTRUCTIONS = `
-## Output format
+/** The template placeholders `release-notes.prompt.md` may use, and their values. */
+const PLACEHOLDER = /\{\{(\w+)\}\}/g;
 
-Reply with a single JSON object and nothing else. No markdown, no code fence,
-no commentary. One key per requested locale, each value the complete release
-notes for that locale as plain text:
-
-{"en-US": "..."}
-
-Hard rules for every value:
-- Plain text only. No markdown, no headings, no links, no "#" characters.
-- No commit hashes, no PR or issue numbers, no ticket keys, no scopes.
-- At most ${TESTFLIGHT_LIMIT} characters.
-- Never invent a change that is not in the input.
-`.trim();
+/**
+ * The prompt template with its placeholders filled in. An unknown placeholder
+ * throws: a typo in the template would otherwise reach the model as literal
+ * braces and pass every check.
+ */
+export function renderPrompt(template, values) {
+  return String(template).replace(PLACEHOLDER, (_, key) => {
+    if (!Object.hasOwn(values, key)) throw new Error(`unknown placeholder {{${key}}} in prompt`);
+    return String(values[key]);
+  });
+}
 
 /**
  * Enough output tokens for every requested locale to reach the TestFlight cap.
@@ -65,6 +64,11 @@ function violations(text) {
     found.push('contains a domain');
   }
   if (/(?:^|\n)\s*[*-]\s|\*\*|__/.test(text)) found.push('contains markdown');
+  // A line of dashes is where release-please splits a PR body into the release
+  // notes, and any tag (a `<details>` block, a comment) is parsed by GitHub or
+  // by the shared workflow rather than read by a person.
+  if (/^\s*-{3,}\s*$/m.test(text)) found.push('contains a horizontal rule');
+  if (/<[a-z!/]/i.test(text)) found.push('contains html');
   if (/\b(?=[0-9a-f]{7,40}\b)[0-9a-f]*\d[0-9a-f]*\b/i.test(text)) found.push('contains a hash');
   if (text.length > TESTFLIGHT_LIMIT) found.push(`longer than ${TESTFLIGHT_LIMIT} characters`);
   return found;
@@ -95,8 +99,9 @@ export function validate(raw, locales) {
 /**
  * Rewritten notes per locale, or null when the rewrite cannot be trusted.
  * `provider` is `anthropic`, `openai`, or anything else (meaning: don't).
+ * `prompt` is the whole system prompt as a template (release-notes.prompt.md).
  */
-export async function rewriteNotes({ items, context, locales, provider, model, fetchImpl }) {
+export async function rewriteNotes({ items, prompt, locales, provider, model, fetchImpl }) {
   const adapter = PROVIDERS[provider];
   if (!adapter) return null;
 
@@ -105,7 +110,14 @@ export async function rewriteNotes({ items, context, locales, provider, model, f
     return null;
   }
 
-  const system = [context?.trim(), JSON_INSTRUCTIONS].filter(Boolean).join('\n\n');
+  if (!prompt?.trim()) {
+    console.warn('release notes: release-notes.prompt.md is missing, keeping the generated notes');
+    return null;
+  }
+  const system = renderPrompt(prompt.trim(), {
+    locales: locales.join(', '),
+    limit: TESTFLIGHT_LIMIT,
+  });
   let raw;
   try {
     raw = await adapter.complete({

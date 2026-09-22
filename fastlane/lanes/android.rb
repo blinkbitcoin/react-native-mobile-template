@@ -4,7 +4,7 @@
 # shared.rb, so DRY_RUN=1 walks a whole release without touching a store.
 #
 # Play metadata lives in fastlane/metadata/android/, which is supply's default.
-# Play's "What's new" cap, counted in characters (see release-notes-context.md).
+# Play's "What's new" cap, counted in characters (see release-notes.prompt.md).
 PLAY_NOTES_LIMIT = 500
 # arm only: Play has not accepted x86 for phones in years, and dropping the
 # other ABIs roughly halves the AAB and the build time.

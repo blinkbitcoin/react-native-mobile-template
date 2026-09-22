@@ -6,7 +6,13 @@ import path from 'node:path';
 import { after, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import * as anthropic from './llm/anthropic.mjs';
-import { maxTokensFor, rewriteNotes, validate } from './llm/index.mjs';
+import {
+  maxTokensFor,
+  renderPrompt,
+  rewriteNotes,
+  TESTFLIGHT_LIMIT,
+  validate,
+} from './llm/index.mjs';
 import * as openai from './llm/openai.mjs';
 import {
   buildNotes,
@@ -16,6 +22,7 @@ import {
   discoverLocales,
   extractStoreSection,
   limitText,
+  loadPrompt,
   parseArgs,
   parseBody,
   parseCommits,
@@ -255,7 +262,7 @@ test('a valid rewrite replaces the deterministic prose', async () => {
     withFetch(stubFetch(JSON.parse(fixture('anthropic-response.json')), []), () =>
       rewriteNotes({
         items: parseBody(body),
-        context: '# context',
+        prompt: 'Write for {{locales}} within {{limit}} characters.',
         locales: ['en-US'],
         provider: 'anthropic',
       }),
@@ -269,7 +276,7 @@ test('a rewrite that is not strict JSON is rejected and falls back', async () =>
   const notes = await withEnv({ ANTHROPIC_API_KEY: 'sk-ant-test' }, () =>
     withFetch(stubFetch(JSON.parse(fixture('anthropic-invalid-response.json')), []), () =>
       withWarnings(warnings, () =>
-        rewriteNotes({ items: [], context: '', locales: ['en-US'], provider: 'anthropic' }),
+        rewriteNotes({ items: [], prompt: 'p', locales: ['en-US'], provider: 'anthropic' }),
       ),
     ),
   );
@@ -291,7 +298,7 @@ test('markdown, hashes and a missing locale each reject the whole rewrite', asyn
     const notes = await withEnv({ ANTHROPIC_API_KEY: 'sk-ant-test' }, () =>
       withFetch(stubFetch({ content: [{ type: 'text', text: payload }] }, []), () =>
         withWarnings(warnings, () =>
-          rewriteNotes({ items: [], context: '', locales, provider: 'anthropic' }),
+          rewriteNotes({ items: [], prompt: 'p', locales, provider: 'anthropic' }),
         ),
       ),
     );
@@ -304,7 +311,7 @@ test('a missing api key warns and falls back instead of throwing', async () => {
   const warnings = [];
   const notes = await withEnv({ ANTHROPIC_API_KEY: '' }, () =>
     withWarnings(warnings, () =>
-      rewriteNotes({ items: [], context: '', locales: ['en-US'], provider: 'anthropic' }),
+      rewriteNotes({ items: [], prompt: 'p', locales: ['en-US'], provider: 'anthropic' }),
     ),
   );
   assert.equal(notes, null);
@@ -316,7 +323,7 @@ test('an http failure warns and falls back', async () => {
   const notes = await withEnv({ OPENAI_API_KEY: 'sk-test' }, () =>
     withFetch(stubFetch({}, [], false), () =>
       withWarnings(warnings, () =>
-        rewriteNotes({ items: [], context: '', locales: ['en-US'], provider: 'openai' }),
+        rewriteNotes({ items: [], prompt: 'p', locales: ['en-US'], provider: 'openai' }),
       ),
     ),
   );
@@ -329,7 +336,7 @@ test('no provider means no network call at all', async () => {
     () => {
       throw new Error('fetch must not be called');
     },
-    () => rewriteNotes({ items: [], context: '', locales: ['en-US'], provider: 'none' }),
+    () => rewriteNotes({ items: [], prompt: 'p', locales: ['en-US'], provider: 'none' }),
   );
   assert.equal(notes, null);
 });
@@ -412,6 +419,68 @@ test('a hand-written "## Store notes" override is cleaned, not trusted', () => {
   assert.doesNotMatch(cleaned, /[#[\]*`<>]|https?:/);
 });
 
+// ---------- store notes on the release PR: markers and rules ----------
+
+test('a section appended by the shared workflow ends at its end marker', () => {
+  // The exact shape release-beta leaves behind: the shared append mode wraps
+  // the section in HTML-comment markers, and production reads it back.
+  const body = [
+    '## [0.6.1](https://example.com/compare/v0.6.0...v0.6.1) (2026-09-21)',
+    '',
+    '### Bug Fixes',
+    '',
+    '* fix one',
+    '',
+    '<!-- workflows:append:Store notes -->',
+    '## Store notes',
+    '',
+    'Fixed',
+    '• Close the alerts.',
+    '<!-- /workflows:append:Store notes -->',
+  ].join('\n');
+  const cleaned = cleanSection(extractStoreSection(body));
+  assert.equal(cleaned, 'Fixed\n• Close the alerts.');
+  assert.doesNotMatch(cleaned, /!--/);
+});
+
+test('a section inside a release PR body ends at the footer rule', () => {
+  const body = [
+    ':robot: I have created a release *beep* *boop*',
+    '---',
+    '',
+    '## [0.6.1](https://example.com/compare/v0.6.0...v0.6.1) (2026-09-21)',
+    '',
+    '<!-- workflows:append:Store notes -->',
+    '## Store notes',
+    '',
+    'Fixed',
+    '• Close the alerts.',
+    '<!-- /workflows:append:Store notes -->',
+    '',
+    '---',
+    'This PR was generated with Release Please.',
+  ].join('\n');
+  assert.equal(cleanSection(extractStoreSection(body)), 'Fixed\n• Close the alerts.');
+});
+
+test('a comment line inside a section is dropped, not shipped', () => {
+  const body = ['## Store notes', '', 'New', '<!-- a note to self -->', '• Thing.'].join('\n');
+  assert.equal(cleanSection(extractStoreSection(body)), 'New\n• Thing.');
+});
+
+test('a rewrite carrying a rule line or html is rejected', () => {
+  const cases = [
+    ['Fixed\n---\nMore', /contains a horizontal rule/],
+    ['<details>hidden</details>', /contains html/],
+    ['Fixed <!-- x --> things', /contains html/],
+  ];
+  for (const [text, expected] of cases) {
+    const result = validate(JSON.stringify({ 'en-US': text }), ['en-US']);
+    assert.equal(result.notes, undefined, text);
+    assert.match(result.error, expected);
+  }
+});
+
 test('the cli sends --body-section through the same filter', () => {
   const dir = tempDir();
   const file = path.join(dir, 'body.md');
@@ -488,11 +557,67 @@ test('the output budget grows with the number of locales', () => {
   assert.equal(maxTokensFor(new Array(20).fill('x')), 8192);
 });
 
+// ---------- the prompt template at the repo root ----------
+
+test('the prompt template is rendered with the locales and the limit', () => {
+  const rendered = renderPrompt('Locales: {{locales}}. At most {{limit}} characters.', {
+    locales: 'en-US, sv-SE',
+    limit: 4000,
+  });
+  assert.equal(rendered, 'Locales: en-US, sv-SE. At most 4000 characters.');
+  assert.throws(
+    () => renderPrompt('{{nope}}', { locales: 'en-US', limit: 1 }),
+    /unknown placeholder/,
+  );
+});
+
+test('the rendered template is the whole system prompt the adapter receives', async () => {
+  const calls = [];
+  await withEnv({ ANTHROPIC_API_KEY: 'sk-ant-test' }, () =>
+    withFetch(stubFetch(JSON.parse(fixture('anthropic-response.json')), calls), () =>
+      rewriteNotes({
+        items: [],
+        prompt: 'Rules for {{locales}}, {{limit}} max.',
+        locales: ['en-US', 'sv-SE'],
+        provider: 'anthropic',
+      }),
+    ),
+  );
+  assert.equal(
+    JSON.parse(calls[0].init.body).system,
+    `Rules for en-US, sv-SE, ${TESTFLIGHT_LIMIT} max.`,
+  );
+});
+
+test('a missing prompt template means no rewrite, with a warning', async () => {
+  const calls = [];
+  const warnings = [];
+  const notes = await withEnv({ ANTHROPIC_API_KEY: 'sk-ant-test' }, () =>
+    withFetch(stubFetch({}, calls), () =>
+      withWarnings(warnings, () =>
+        rewriteNotes({ items: [], prompt: '', locales: ['en-US'], provider: 'anthropic' }),
+      ),
+    ),
+  );
+  assert.equal(notes, null);
+  assert.equal(calls.length, 0);
+  assert.match(warnings.join('\n'), /release-notes\.prompt\.md/);
+});
+
+test('the shipped prompt template renders and states the output contract', () => {
+  const template = loadPrompt();
+  assert.match(template, /\{\{locales\}\}/);
+  const rendered = renderPrompt(template, { locales: 'en-US', limit: TESTFLIGHT_LIMIT });
+  assert.match(rendered, /\{"en-US": "\.\.\."\}/);
+  assert.match(rendered, new RegExp(`At most ${TESTFLIGHT_LIMIT} characters`));
+  assert.doesNotMatch(rendered, /\{\{/);
+});
+
 test('the budget reaches the adapter as max_tokens', async () => {
   const calls = [];
   await withEnv({ ANTHROPIC_API_KEY: 'sk-ant-test' }, () =>
     withFetch(stubFetch(JSON.parse(fixture('anthropic-response.json')), calls), () =>
-      rewriteNotes({ items: [], context: '', locales: ['en-US', 'sv-SE'], provider: 'anthropic' }),
+      rewriteNotes({ items: [], prompt: 'p', locales: ['en-US', 'sv-SE'], provider: 'anthropic' }),
     ),
   );
   assert.equal(JSON.parse(calls[0].init.body).max_tokens, maxTokensFor(['en-US', 'sv-SE']));

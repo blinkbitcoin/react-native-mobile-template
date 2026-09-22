@@ -29,7 +29,8 @@ const BULLET = '• ';
 const USER_VISIBLE_MARKER = /\s*\[user-visible\]\s*/i;
 
 const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
-const CONTEXT_FILE = path.join(repoRoot, 'fastlane', 'release-notes-context.md');
+/** The system prompt template for the optional LLM pass, versioned at the repo root. */
+export const PROMPT_FILE = path.join(repoRoot, 'release-notes.prompt.md');
 const IOS_METADATA_DIR = path.join(repoRoot, 'fastlane', 'metadata', 'ios');
 
 const TYPE_GROUPS = { feat: 'New', fix: 'Fixed', perf: 'Improved', refactor: 'Improved' };
@@ -58,7 +59,7 @@ export function stripRepoReferences(raw) {
   text = text.replace(/\s*\((?:#\d+|[0-9a-f]{7,40})\)/gi, '');
   text = text.replace(/\s*#\d+/g, '');
   text = text.replace(/\s*\b(?=[0-9a-f]{7,40}\b)[0-9a-f]*\d[0-9a-f]*\b/gi, '');
-  // Ticket keys (JIRA-123, ENG-7), banned by fastlane/release-notes-context.md.
+  // Ticket keys (JIRA-123, ENG-7), banned by release-notes.prompt.md.
   text = text.replace(/\b[A-Z][A-Z0-9]+-\d+\b[:\s]*/g, '');
   text = text.replace(USER_VISIBLE_MARKER, ' ');
   // Html tags go whole; emphasis, code spans and bracket tags (`[ios]`,
@@ -222,14 +223,36 @@ export function commitSubjects(range, cwd = repoRoot) {
   return log ? log.split('\n') : [];
 }
 
-/** The `## Store notes` section of a release body, or '' when there is none. */
+/**
+ * The `## Store notes` section of a release body, or '' when there is none.
+ *
+ * The section ends at the next heading or at a horizontal rule, and HTML
+ * comment lines are dropped: the shared workflow wraps the section it appends
+ * in `<!-- workflows:append:... -->` markers, and a release PR body closes its
+ * content with `---` before release-please's footer. Neither is prose, and a
+ * marker that reaches `cleanSection` loses its angle brackets and ships as a
+ * literal `!-- ... --` line.
+ */
+/**
+ * A line that is one whole HTML comment. String tests rather than a regex on
+ * purpose: the input is one line, so a comment cannot span lines here, and a
+ * `<!--.*-->` pattern is what CodeQL's js/bad-tag-filter flags regardless.
+ */
+function isCommentLine(line) {
+  const text = line.trim();
+  return text.startsWith('<!--') && text.endsWith('-->');
+}
+
 export function extractStoreSection(markdown) {
   const lines = String(markdown).split('\n');
   const start = lines.findIndex((line) => /^#{2,4}\s+store notes\s*$/i.test(line));
   if (start === -1) return '';
   const rest = lines.slice(start + 1);
-  const end = rest.findIndex((line) => /^#{1,4}\s+\S/.test(line));
-  return (end === -1 ? rest : rest.slice(0, end)).join('\n').trim();
+  const end = rest.findIndex((line) => /^#{1,4}\s+\S|^\s*-{3,}\s*$/.test(line));
+  return (end === -1 ? rest : rest.slice(0, end))
+    .filter((line) => !isCommentLine(line))
+    .join('\n')
+    .trim();
 }
 
 // ---------- rendering ----------
@@ -256,6 +279,11 @@ export function renderChangelog(items) {
     if (texts.length) lines.push(`${group}: ${texts.join(' ')}`);
   }
   return lines.length ? ['Changelog', ...lines].join('\n') : '';
+}
+
+/** The prompt template, or '' when the file is gone (the LLM pass then declines). */
+export function loadPrompt(file = PROMPT_FILE) {
+  return existsSync(file) ? readFileSync(file, 'utf8') : '';
 }
 
 /** Locale directories under fastlane/metadata/ios (`review_information` is not one). */
@@ -293,7 +321,7 @@ export async function buildNotes({
   includeChangelog = false,
   provider,
   model,
-  context,
+  prompt,
   fetchImpl,
   rewrite = rewriteNotes,
 }) {
@@ -301,7 +329,7 @@ export async function buildNotes({
   let byLocale = Object.fromEntries(locales.map((locale) => [locale, verbatim || prose]));
 
   if (!verbatim && provider && provider !== 'none') {
-    const rewritten = await rewrite({ items, context, locales, provider, model, fetchImpl });
+    const rewritten = await rewrite({ items, prompt, locales, provider, model, fetchImpl });
     if (rewritten) byLocale = rewritten;
   }
 
@@ -415,7 +443,6 @@ export async function main(argv, { cwd = process.cwd() } = {}) {
     items = parseCommits(commitSubjects(options.range));
   }
 
-  const context = existsSync(CONTEXT_FILE) ? readFileSync(CONTEXT_FILE, 'utf8') : '';
   const byLocale = await buildNotes({
     items,
     locales,
@@ -423,7 +450,7 @@ export async function main(argv, { cwd = process.cwd() } = {}) {
     includeChangelog: options.includeChangelog,
     provider: process.env.RELEASE_NOTES_LLM_PROVIDER,
     model: process.env.RELEASE_NOTES_LLM_MODEL,
-    context,
+    prompt: loadPrompt(),
   });
   const notes = toStoreNotes(byLocale);
   const primary = notes['en-US'] ? 'en-US' : locales[0];
