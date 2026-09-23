@@ -654,7 +654,7 @@ test('locales come from the ios metadata directories, ignoring the non-locales',
 });
 
 test('NOTES_LOCALES is honoured, below --locales and above discovery', () => {
-  // expo-prepare exports it for its `notes-locales` input; before this the
+  // build-prepare exports it for its `notes-locales` input; before this the
   // input was plumbed through the whole workflow and then ignored.
   const flag = { locales: ['sv-SE'] };
   const none = { locales: [] };

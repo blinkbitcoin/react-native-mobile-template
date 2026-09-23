@@ -1,5 +1,5 @@
 name: CD / Beta
-# Dispatched by release-please.yml the moment it cuts the `vX.Y.Z` release
+# Dispatched by cd-release.yml the moment it cuts the `vX.Y.Z` release
 # (not `release: published`: a release created with GITHUB_TOKEN never fires
 # that). It never builds: it waits for that exact commit's `release-internal`
 # run to be green and then promotes the binary that run already uploaded, so
@@ -25,7 +25,7 @@ concurrency:
 jobs:
   prepare:
     name: Prepare
-    uses: blinkbitcoin/shared-workflows/.github/workflows/expo-prepare.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/build-prepare.yml@v0
     permissions:
       contents: read
       # `require-green-workflow` runs `gh run list` against the gated workflow,
@@ -42,7 +42,7 @@ jobs:
       stage: beta
       build-number-offset: ${{ fromJSON(vars.BUILD_NUMBER_OFFSET || '1000') }}
       # A promotion must never ship a binary whose own build never went green.
-      require-green-workflow: release-internal.yml
+      require-green-workflow: cd-internal.yml
       # ...and a release must never wait for a human either. When that build is
       # missing, cancelled or failed - lost to a queue eviction, a flaky runner -
       # the gate dispatches release-internal at this tag once and waits for it.
@@ -63,7 +63,7 @@ jobs:
     # credentials still runs everything that does not need one.
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' }}
     needs: prepare
-    uses: blinkbitcoin/shared-workflows/.github/workflows/fastlane-lane.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@v0
     permissions:
       contents: read
     with:
@@ -103,7 +103,7 @@ jobs:
     # credentials still runs everything that does not need one.
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' }}
     needs: prepare
-    uses: blinkbitcoin/shared-workflows/.github/workflows/fastlane-lane.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@v0
     permissions:
       contents: read
     with:
@@ -128,7 +128,7 @@ jobs:
     # uses a status function.
     needs: [prepare, promote-ios, promote-android]
     if: ${{ !cancelled() && !failure() }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/github-release.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-github-release.yml@v0
     permissions:
       contents: write
     with:
@@ -161,7 +161,7 @@ jobs:
   # This workflow never builds, so there is no Android App Bundle among its
   # artifacts: it lives on the `vX.Y.Z` release the job above just moved the
   # assets onto. Stage it back into an artifact the lane job can download, the
-  # same way `release-production.yml` does for its own first upload.
+  # same way `cd-production.yml` does for its own first upload.
   huawei-binary:
     name: Stage Huawei binary
     needs: [prepare, github-release]
@@ -195,7 +195,7 @@ jobs:
     # and the release itself are already done or independent of it.
     needs: [prepare, promote-android, huawei-binary]
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && vars.HUAWEI_UPLOADS_ENABLED == 'true' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/fastlane-lane.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@v0
     permissions:
       contents: read
     with:
@@ -231,7 +231,7 @@ jobs:
   # body") also expected a section that was never written.
   #
   # The section is re-uploaded under a name that is deliberately *not* one of
-  # github-release's fixed asset globs: `append` uploads whatever of that set is
+  # publish-github-release's fixed asset globs: `append` uploads whatever of that set is
   # in the download directory and regenerates SHA256SUMS over it, so handing it
   # `release-meta` here would replace the checksums of the promoted binaries
   # with the checksums of four metadata files.
@@ -259,7 +259,7 @@ jobs:
   store-notes:
     name: Attach store notes
     needs: [prepare, store-notes-section]
-    uses: blinkbitcoin/shared-workflows/.github/workflows/github-release.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-github-release.yml@v0
     permissions:
       contents: write
     with:
@@ -274,7 +274,7 @@ jobs:
     name: OTA
     needs: [prepare, github-release]
     if: ${{ vars.OTA_ENABLED == 'true' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/expo-ota-publish.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-ota.yml@v0
     permissions:
       contents: read
     with:

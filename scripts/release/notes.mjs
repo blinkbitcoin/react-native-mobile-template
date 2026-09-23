@@ -406,7 +406,7 @@ export function parseArgs(argv) {
  * The locales to emit notes for, most specific source first:
  *
  *   1. `--locales a,b`
- *   2. `$NOTES_LOCALES` — what the reusable `expo-prepare` workflow exports for
+ *   2. `$NOTES_LOCALES` — what the reusable `build-prepare` workflow exports for
  *      its `notes-locales` input. Reading it here is what makes that input do
  *      something; it was plumbed through and silently ignored.
  *   3. the locale directories under fastlane/metadata/ios, which are the ones

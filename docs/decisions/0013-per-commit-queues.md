@@ -22,10 +22,10 @@ Nothing that runs on a push to `main` shares a queue with anything else.
 
 - `.github/workflows/ci.yml` — group `ci-<ref>` on a branch (newest push
   cancels), `ci-refs/heads/main-<sha>` on `main`.
-- `.github/workflows/release-internal.yml` — group `release-internal-<sha>`.
+- `.github/workflows/cd-internal.yml` — group `release-internal-<sha>`.
   Its store-touching jobs — `upload-ios`, `upload-android`, `ota-internal` —
   join the `release` queue individually, at job level.
-- `release-beta.yml`, `release-production.yml`, `ota-hotfix.yml` — keep the
+- `cd-beta.yml`, `cd-production.yml`, `cd-ota-hotfix.yml` — keep the
   shared `release` queue: they promote, and are dispatched by a person or by
   release-please, never in bursts.
 - `scripts/release-workflows.test.mjs` — pins which group each carries.

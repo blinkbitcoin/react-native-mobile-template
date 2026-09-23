@@ -166,7 +166,7 @@
       "scripts/e2e/serve-dist.mjs",
       "scripts/e2e/serve-dist.test.mjs",
       "scripts/e2e/web.sh",
-      ".github/workflows/web.yml",
+      ".github/workflows/ci-web.yml",
       "docs/web-files.txt",
       "docs/decisions/0006-web-opt-in.md",
       "docs/decisions/0015-web-on-pages.md"
@@ -187,7 +187,7 @@
         "marker": "init:web"
       },
       {
-        "path": ".github/workflows/release-production.yml",
+        "path": ".github/workflows/cd-production.yml",
         "marker": "init:web"
       }
     ],
@@ -345,7 +345,7 @@
             "Twelve files, in two groups: five that run on every change, and seven that make\nreleases.",
             "Eleven files, in two groups: four that run on every change, and seven that make\nreleases."
           ],
-          ["`expo-ota-publish.yml`, `web.yml`", "`expo-ota-publish.yml`"],
+          ["`publish-ota.yml`, `build-web.yml`", "`publish-ota.yml`"],
           [
             "Two script-contract details are load-bearing:",
             "One script-contract detail is load-bearing:"
@@ -353,11 +353,11 @@
           ["the twelve files in", "the eleven files in"],
           ["Two of the twelve are the exception", "Two of the eleven are the exception"],
           ["Ten of the twelve files carry", "Nine of the eleven files carry"],
-          ["`release-production.yml` alone has eleven.", "`release-production.yml` alone has ten."]
+          ["`cd-production.yml` alone has eleven.", "`cd-production.yml` alone has ten."]
         ]
       },
       {
-        "path": ".github/workflows/release-production.yml",
+        "path": ".github/workflows/cd-production.yml",
         "$comment": "The job goes with the marker block; these two comments advertise it and actionlint cannot see comments.",
         "replace": [
           ["publish OTA production, deploy web", "publish OTA production"],
@@ -383,7 +383,7 @@
       "globs": ["*.md", "docs/*.md", "docs/decisions/*.md", ".github/*.md"],
       "lines": [
         "^\\s*\\|.*`make (web|build-web|e2e-web)`",
-        "^\\s*\\|\\s*`web\\.yml`",
+        "^\\s*\\|\\s*`(ci-web|build-web)\\.yml`",
         "^\\s*\\|.*`e2e/web/?`",
         "^\\s*\\|\\s*`playwright-report`",
         "^\\s*\\|\\s*`github-pages`",

@@ -4,7 +4,7 @@ on:
     branches: [main]
     # No paths-ignore: it would be a second, narrower docs rule that already
     # disagrees with the classifier's (it misses LICENSE and the issue/PR
-    # templates). checks.yml's `changes` job is the single source - it
+    # templates). check-code.yml's `changes` job is the single source - it
     # classifies pushes too, so a docs-only merge still skips unit and e2e.
   pull_request:
     types: [opened, synchronize, reopened, labeled]
@@ -24,7 +24,7 @@ concurrency:
 jobs:
   checks:
     name: Checks
-    uses: blinkbitcoin/shared-workflows/.github/workflows/checks.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/check-code.yml@v0
     with:
       # Runs `pnpm check:release` (= `make check-release`): Ruby syntax, a
       # fastlane lane parse and the lane unit tests. Needs Ruby, which is why
@@ -40,7 +40,7 @@ jobs:
     name: Unit
     needs: checks
     if: ${{ needs.checks.outputs.docs-only != 'true' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/unit.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/check-unit.yml@v0
   e2e:
     name: E2E
     # `unit` as well as `checks`, so a failed unit run never reaches E2E. On a
@@ -49,7 +49,7 @@ jobs:
     # times the rate when iOS is on - to learn what unit already knew.
     needs: [checks, unit]
     if: ${{ needs.checks.outputs.docs-only != 'true' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/e2e.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/check-e2e.yml@v0
     with:
       # This repo is public, so standard runners - macOS included - are free
       # and E2E_IOS is set to true: there is no reason to skip the coverage.
@@ -60,7 +60,7 @@ jobs:
       ios: ${{ vars.E2E_IOS == 'true' || contains(github.event.pull_request.labels.*.name, 'e2e:ios') }}
       macos-runner: ${{ vars.WORKFLOWS_MACOS_RUNNER || 'macos-26' }}
       # Android only. The iOS suite runs a Release build below, which embeds the
-      # bundle and has no dev launcher, so e2e.yml forces dev-client off there.
+      # bundle and has no dev launcher, so check-e2e.yml forces dev-client off there.
       dev-client: true
       # Release, because the Debug/dev-client path never ran twice in a row on a
       # runner. It needed Metro up, a deep link delivered, an iOS "Open in
@@ -91,7 +91,7 @@ jobs:
     # always(), so a red Unit still gets a red badge. A cancelled upstream job
     # says nothing about the branch, and a docs-only change never ran the jobs
     # the badges describe - in both cases the published badges stay as they are.
-    # badges.yml itself also skips release events and fork PRs (no push token).
+    # publish-badges.yml itself also skips release events and fork PRs (no push token).
     if: >-
       always() &&
       needs.checks.result != 'cancelled' &&
@@ -100,7 +100,7 @@ jobs:
       needs.checks.outputs.docs-only != 'true'
     permissions:
       contents: write # publish-badges.sh pushes the gh-pages branch
-    uses: blinkbitcoin/shared-workflows/.github/workflows/badges.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-badges.yml@v0
     with:
       unit-result: ${{ needs.unit.result }}
       e2e-result: ${{ needs.e2e.result }}

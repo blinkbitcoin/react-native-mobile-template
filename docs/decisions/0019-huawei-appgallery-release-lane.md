@@ -27,7 +27,7 @@ toggle of its own.
 - `assert_huawei_uploads_enabled!` requires `HUAWEI_UPLOADS_ENABLED=true` on top
   of `STORE_UPLOADS_ENABLED`: a repository shipping only to Apple and Google
   must not acquire a third submission by setting the shared toggle.
-- `.github/workflows/release-production.yml` — `huawei-binary` and
+- `.github/workflows/cd-production.yml` — `huawei-binary` and
   `huawei-release`, on `action=release` only and deliberately outside
   `github-release`'s `needs`, so a slow third-party store cannot hold up marking
   the release latest, the update publish or the web deploy.

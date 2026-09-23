@@ -182,7 +182,7 @@ ci: check coverage test-scripts ## Everything CI runs except E2E (which needs a 
 
 # Deliberately NOT in `make check`: the first run downloads and compiles a query
 # pack (minutes) and every run needs a CodeQL CLI, which no other gate does.
-# CI runs the same queries through .github/workflows/codeql.yml.
+# CI runs the same queries through .github/workflows/ci-codeql.yml.
 codeql: ## CodeQL locally with the same config CI uses (needs a CodeQL CLI)
 	bash scripts/codeql-local.sh
 

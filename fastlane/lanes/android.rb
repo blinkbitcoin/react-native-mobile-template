@@ -211,7 +211,7 @@ platform :android do
     # skips its signing checks because an unsigned archive has nothing to check,
     # while an unsigned Android build still produces a debug-signed APK, so this
     # asserts that identity. CI already passes skip_signing to this lane
-    # (shared-workflows' expo-build-android.yml); until now it was ignored.
+    # (shared-workflows' build-android.yml); until now it was ignored.
     args = ['bash', script, aab, apk]
     args << '--expect-debug-signing' if truthy?(options[:skip_signing])
 

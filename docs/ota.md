@@ -46,13 +46,13 @@ One variable, read in three places:
 | --- | --- |
 | `app.config.ts` | `updates: { enabled: false }` — no URL, no certificate, no update check is compiled into the binary |
 | `.github/workflows/release-{internal,beta,production}.yml` | the `ota-*` job is skipped (`if: vars.OTA_ENABLED == 'true'`) |
-| `.github/workflows/ota-hotfix.yml` | the publish job is skipped |
+| `.github/workflows/cd-ota-hotfix.yml` | the publish job is skipped |
 
 The build-time value comes from the `OTA_ENABLED` environment variable. A GitHub
 repository *variable* is never automatically an environment variable, so the
 release callers forward it (and `EXPO_UPDATES_URL`) explicitly through the
-`build-env` input on `expo-prepare.yml` / `expo-build-ios.yml` /
-`expo-build-android.yml`:
+`build-env` input on `build-prepare.yml` / `build-ios.yml` /
+`build-android.yml`:
 
 ```yaml
       build-env: >-
@@ -67,7 +67,7 @@ which no installed app ever receives an update. Both names are non-secret, which
 is what makes `build-env` the right channel; it refuses anything that reads as a
 credential.
 
-The reusable `expo-ota-publish.yml` has its own `ota-enabled` master switch too,
+The reusable `publish-ota.yml` has its own `ota-enabled` master switch too,
 so the caller also passes `ota-enabled: ${{ vars.OTA_ENABLED == 'true' }}` and
 the job is skipped twice over — belt and braces on the one setting that cannot
 be undone.
@@ -120,7 +120,7 @@ checked against the upstream README on first deploy.
 
 Scope `OTA_PUBLISH_TOKEN` per GitHub Environment (`internal`, `beta`,
 `production`) so a leaked internal token cannot publish to production. The
-callers pass `environment:` to `expo-ota-publish.yml` for exactly that reason.
+callers pass `environment:` to `publish-ota.yml` for exactly that reason.
 
 `EXPO_UPDATES_URL` does double duty: besides being compiled into the binary,
 every caller passes it as `manifest-url` so that after each publish
@@ -128,7 +128,7 @@ the workflow fetches the manifest a client would fetch, with the same `expo-*`
 headers, and fails when it does not come back. A publish that "succeeded" but
 serves nothing is otherwise indistinguishable from a working one until a user
 opens the app. The check defaults to the iOS platform, so the callers pair it
-with `runtime-version: ${{ needs.prepare.outputs.fp-ios }}`. `ota-hotfix.yml`
+with `runtime-version: ${{ needs.prepare.outputs.fp-ios }}`. `cd-ota-hotfix.yml`
 has no prepare job, but it does resolve a baseline release — and that release's
 `build-info.json` carries the `fingerprint.ios` of the binary currently
 installed on the channel, which is exactly the runtime version to ask for. Its
@@ -137,7 +137,7 @@ likely to be made under pressure) is checked like every other. When the baseline
 carries no fingerprint, the smoke check is skipped rather than failing a good
 publish on a missing header.
 
-`ota-hotfix.yml`'s `baseline` job carries the same `vars.OTA_ENABLED == 'true'`
+`cd-ota-hotfix.yml`'s `baseline` job carries the same `vars.OTA_ENABLED == 'true'`
 condition as its `publish` job: on a repo with OTA off a dispatch would
 otherwise burn a runner and fail with "no baseline release found", which reads
 as a hotfix problem rather than "OTA is not enabled here".
@@ -187,10 +187,10 @@ would pass unconditionally. What each caller points `baseline-tag` at:
 
 | Caller | Channel | `baseline-tag` |
 | --- | --- | --- |
-| `release-internal.yml` | `internal` | the `vX.Y.Z-build.N` pre-release this run just created |
-| `release-beta.yml` | `beta` | the `vX.Y.Z` release being promoted |
-| `release-production.yml` | `production` | the dispatched `tag` |
-| `ota-hotfix.yml` | dispatched | the `baseline_tag` input, or the latest non-prerelease when empty |
+| `cd-internal.yml` | `internal` | the `vX.Y.Z-build.N` pre-release this run just created |
+| `cd-beta.yml` | `beta` | the `vX.Y.Z` release being promoted |
+| `cd-production.yml` | `production` | the dispatched `tag` |
+| `cd-ota-hotfix.yml` | dispatched | the `baseline_tag` input, or the latest non-prerelease when empty |
 
 A missing tag, a missing release or a release with no `build-info.json` asset is
 fatal, by design.
@@ -218,7 +218,7 @@ supersedes the bad update:
 | --- | --- |
 | Bad update, good previous JS | Publish the previous commit to the same channel at 100% (`ota-hotfix` with `ref` = the last good sha) |
 | Bad update, want the store binary's own bundle back | `rollBackToEmbedded` directive on the channel, or `eoas rollback` — both leave the installed binary running its baked-in JS |
-| Bad **native** build | OTA cannot help. Halt the store rollout (`release-production.yml` with `action: halt`) and ship a new build |
+| Bad **native** build | OTA cannot help. Halt the store rollout (`cd-production.yml` with `action: halt`) and ship a new build |
 
 Rolling back is a publish like any other: it passes the same fingerprint gate,
 and the client only picks it up on its next launch.

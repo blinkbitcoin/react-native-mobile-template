@@ -21,8 +21,8 @@ Run AppGallery on all three tiers, behind `HUAWEI_UPLOADS_ENABLED` as before.
 - `fastlane/lanes/huawei.rb` — one `huawei_upload!` helper with three submit
   flavours; the lanes are `upload_huawei_internal`, `promote_huawei_beta` and
   the unchanged `upload_huawei`.
-- `.github/workflows/release-internal.yml` — `upload-huawei` after
-  `upload-android`; `release-beta.yml` — `huawei-binary` and `promote-huawei`
+- `.github/workflows/cd-internal.yml` — `upload-huawei` after
+  `upload-android`; `cd-beta.yml` — `huawei-binary` and `promote-huawei`
   after `github-release`. Every one of them stays outside every downstream
   `needs`, so a third-party review queue can never gate main or a release.
 - Each tier **re-uploads**: AppGallery has no promote endpoint, and the beta

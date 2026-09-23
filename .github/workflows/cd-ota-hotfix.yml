@@ -1,7 +1,7 @@
 name: CD / OTA Hotfix
 # A JS-only fix, shipped to an already-installed binary without a store review.
 # Only for changes that do not move the native fingerprint: the gate in
-# `expo-ota-publish.yml` compares this commit's fingerprints against the
+# `publish-ota.yml` compares this commit's fingerprints against the
 # baseline release's `build-info.json` and dies on any mismatch, because an
 # update whose JS expects a native module the installed binary lacks crashes on
 # launch for every user on the channel and cannot be recalled.
@@ -93,7 +93,7 @@ jobs:
     name: Publish
     needs: baseline
     if: ${{ vars.OTA_ENABLED == 'true' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/expo-ota-publish.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-ota.yml@v0
     permissions:
       contents: read
     with:

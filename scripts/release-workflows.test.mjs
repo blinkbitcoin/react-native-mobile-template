@@ -52,15 +52,15 @@ function parseJobs(file) {
 }
 
 const WORKFLOWS = {
-  'release-internal.yml': {
+  'cd-internal.yml': {
     storeJobs: ['upload-ios', 'upload-android', 'upload-huawei'],
     releaseJobs: ['github-prerelease'],
   },
-  'release-beta.yml': {
+  'cd-beta.yml': {
     storeJobs: ['promote-ios', 'promote-android', 'huawei-binary', 'promote-huawei'],
     releaseJobs: ['github-release'],
   },
-  'release-production.yml': {
+  'cd-production.yml': {
     storeJobs: [
       'ios-release',
       'android-release',
@@ -74,7 +74,7 @@ const WORKFLOWS = {
   },
 };
 
-// release-please.yml chains everything after the cut release by dispatch. It
+// cd-release.yml chains everything after the cut release by dispatch. It
 // has to: the PR, tag and release are created with GITHUB_TOKEN, and GitHub
 // never starts a workflow from an event that token caused - except for
 // `workflow_dispatch`. A `release: published` trigger anywhere downstream is a
@@ -124,8 +124,8 @@ describe('the internal release queues per commit; only its store jobs share the 
   const topGroup = (text) =>
     text.match(/^concurrency:\n(?: {2}[^\n]*\n)*? {2}group: ([^\n]+)/m)?.[1];
 
-  test('release-internal.yml is keyed on the commit', () => {
-    assert.match(topGroup(strip('release-internal.yml')) ?? '', /github\.sha/);
+  test('cd-internal.yml is keyed on the commit', () => {
+    assert.match(topGroup(strip('cd-internal.yml')) ?? '', /github\.sha/);
   });
 
   test('CI on main is keyed on the commit too, so a merge never evicts the previous one', () => {
@@ -135,13 +135,13 @@ describe('the internal release queues per commit; only its store jobs share the 
   });
 
   test('the promoting workflows still share the literal release queue', () => {
-    for (const file of ['release-beta.yml', 'release-production.yml', 'ota-hotfix.yml']) {
+    for (const file of ['cd-beta.yml', 'cd-production.yml', 'cd-ota-hotfix.yml']) {
       assert.equal(topGroup(strip(file)), 'release', `${file} left the release queue`);
     }
   });
 
   test('exactly the store-touching internal jobs join the release queue, per job', () => {
-    const text = strip('release-internal.yml');
+    const text = strip('cd-internal.yml');
     const jobs = {};
     let current = null;
     for (const line of text.split('\n')) {
@@ -164,14 +164,14 @@ describe('the internal release queues per commit; only its store jobs share the 
 // the calling job. Without both, a release merged at the wrong moment waits
 // for a human - which is what happened on v0.2.3, v0.2.4 and v0.2.5.
 describe('the beta gate dispatches the build it is missing', () => {
-  const text = readFileSync(path.join(root, '.github/workflows/release-beta.yml'), 'utf8')
+  const text = readFileSync(path.join(root, '.github/workflows/cd-beta.yml'), 'utf8')
     .split('\n')
     .filter((l) => !l.trimStart().startsWith('#'))
     .join('\n');
   const prepare = text.slice(text.indexOf('\n  prepare:'), text.indexOf('\n  promote-ios:'));
 
   test('prepare asks the gate to dispatch, at the release tag', () => {
-    assert.match(prepare, /require-green-workflow: release-internal\.yml/);
+    assert.match(prepare, /require-green-workflow: cd-internal\.yml/);
     assert.match(prepare, /require-green-dispatch: true/);
     assert.match(prepare, /release-tag: \$\{\{ inputs\.tag \}\}/);
   });
@@ -179,7 +179,7 @@ describe('the beta gate dispatches the build it is missing', () => {
   test('the internal release reserves its build tag at push time, with contents: write', () => {
     // GitHub refuses GITHUB_TOKEN a new tag on a commit whose workflow files
     // differ from main's tip; an hour after the push that is often the case.
-    const internal = readFileSync(path.join(root, '.github/workflows/release-internal.yml'), 'utf8')
+    const internal = readFileSync(path.join(root, '.github/workflows/cd-internal.yml'), 'utf8')
       .split('\n')
       .filter((l) => !l.trimStart().startsWith('#'))
       .join('\n');
@@ -196,27 +196,27 @@ describe('the beta gate dispatches the build it is missing', () => {
   });
 });
 
-describe('release-please.yml chains the release by dispatch', () => {
+describe('cd-release.yml chains the release by dispatch', () => {
   const dir = path.join(root, '.github/workflows');
-  const rp = readFileSync(path.join(dir, 'release-please.yml'), 'utf8');
+  const rp = readFileSync(path.join(dir, 'cd-release.yml'), 'utf8');
   const code = rp
     .split('\n')
     .filter((l) => !l.trimStart().startsWith('#'))
     .join('\n');
 
   test('the job may write to the Actions API', () => {
-    assert.match(code, /^\s+actions: write$/m, 'release-please.yml lacks actions: write');
+    assert.match(code, /^\s+actions: write$/m, 'cd-release.yml lacks actions: write');
   });
 
   test('a cut release dispatches release-beta and web at the tag', () => {
-    for (const wf of ['release-beta.yml', 'web.yml']) {
+    for (const wf of ['cd-beta.yml', 'ci-web.yml']) {
       const step = new RegExp(
         `release_created == 'true'[\\s\\S]*?gh workflow run ${wf.replace('.', '\\.')} [^\n]*--ref "\\$TAG"`,
       );
       assert.match(code, step, `no dispatch of ${wf} gated on release_created`);
     }
-    assert.match(code, /gh workflow run release-beta\.yml [^\n]*-f "tag=\$TAG"/);
-    assert.match(code, /gh workflow run web\.yml [^\n]*-f "deploy=true"/);
+    assert.match(code, /gh workflow run cd-beta\.yml [^\n]*-f "tag=\$TAG"/);
+    assert.match(code, /gh workflow run ci-web\.yml [^\n]*-f "deploy=true"/);
   });
 
   test('a created or updated release PR gets a CI run', () => {
@@ -241,8 +241,8 @@ describe('release-please.yml chains the release by dispatch', () => {
 
   test('a second job drafts the store notes into the release PR through shared-workflows', () => {
     const job =
-      /store-notes:\n\s+name: Store Notes\n\s+needs: release-please\n[\s\S]*?uses: [^\n]*\/shared-workflows\/\.github\/workflows\/release-pr-notes\.yml@v0/;
-    assert.match(code, job, 'no store-notes job calling release-pr-notes.yml');
+      /store-notes:\n\s+name: Store Notes\n\s+needs: release-please\n[\s\S]*?uses: [^\n]*\/shared-workflows\/\.github\/workflows\/pr-release-notes\.yml@v0/;
+    assert.match(code, job, 'no store-notes job calling pr-release-notes.yml');
     assert.match(code, /if: \$\{\{ needs\.release-please\.outputs\.pr-number != '' \}\}/);
     assert.match(code, /pull-requests: write/);
     assert.match(code, /pr-number: \$\{\{ needs\.release-please\.outputs\.pr-number \}\}/);
@@ -269,7 +269,7 @@ describe('release-please.yml chains the release by dispatch', () => {
   });
 
   test('the section title the release PR gets is the one beta appends', () => {
-    const beta = readFileSync(path.join(dir, 'release-beta.yml'), 'utf8');
+    const beta = readFileSync(path.join(dir, 'cd-beta.yml'), 'utf8');
     const title = /append-title: (.+)/.exec(beta)?.[1];
     assert.equal(title, 'Store notes');
     // The shared workflow defaults to the same title; passing none keeps them equal.
@@ -277,7 +277,7 @@ describe('release-please.yml chains the release by dispatch', () => {
   });
 
   test('the LLM runs only in the release PR job, never in a CD lane', () => {
-    for (const file of ['release-internal.yml', 'release-beta.yml', 'release-production.yml']) {
+    for (const file of ['cd-internal.yml', 'cd-beta.yml', 'cd-production.yml']) {
       const text = readFileSync(path.join(dir, file), 'utf8')
         .split('\n')
         .filter((l) => !l.trimStart().startsWith('#'))
@@ -293,7 +293,7 @@ describe('release-please.yml chains the release by dispatch', () => {
       }
       // Internal still generates notes from commits; beta and production copy
       // the reviewed section verbatim, so only internal may append the changelog.
-      if (file === 'release-internal.yml') {
+      if (file === 'cd-internal.yml') {
         assert.match(text, /STORE_NOTES_INCLUDE_CHANGELOG/);
       } else {
         assert.doesNotMatch(
@@ -306,7 +306,7 @@ describe('release-please.yml chains the release by dispatch', () => {
   });
 
   test('nothing downstream waits on a release event, and no App token remains', () => {
-    for (const file of ['release-beta.yml', 'web.yml']) {
+    for (const file of ['cd-beta.yml', 'ci-web.yml']) {
       const text = readFileSync(path.join(dir, file), 'utf8')
         .split('\n')
         .filter((l) => !l.trimStart().startsWith('#'))
@@ -314,14 +314,14 @@ describe('release-please.yml chains the release by dispatch', () => {
       assert.doesNotMatch(text, /^\s+release:\s*$/m, `${file} still triggers on release:`);
       assert.match(text, /^\s+workflow_dispatch:\s*$/m, `${file} cannot be dispatched`);
     }
-    const beta = readFileSync(path.join(dir, 'release-beta.yml'), 'utf8');
+    const beta = readFileSync(path.join(dir, 'cd-beta.yml'), 'utf8');
     assert.match(beta, /tag:\n\s+description:[^\n]*\n\s+type: string\n\s+required: true/);
     for (const file of [
-      'release-please.yml',
-      'release-internal.yml',
-      'release-beta.yml',
-      'release-production.yml',
-      'web.yml',
+      'cd-release.yml',
+      'cd-internal.yml',
+      'cd-beta.yml',
+      'cd-production.yml',
+      'ci-web.yml',
     ]) {
       const text = readFileSync(path.join(dir, file), 'utf8');
       assert.doesNotMatch(
@@ -385,7 +385,7 @@ describe('the release path without a store account', () => {
       test('signing is derived so that uploading implies something to upload', () => {
         // Only release-internal builds; beta and production promote what it
         // produced, so they have no signing inputs to derive.
-        if (file !== 'release-internal.yml') return;
+        if (file !== 'cd-internal.yml') return;
         for (const [job, input, variable] of [
           ['build-ios', 'ios-signing', 'IOS_SIGNING_ENABLED'],
           ['build-android', 'android-signing', 'ANDROID_SIGNING_ENABLED'],

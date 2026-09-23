@@ -110,7 +110,7 @@ test suite uses).
 The web target is opt-in. Answering "no" deletes the files listed in
 `docs/web-files.txt` (`assets/favicon.png`, `e2e/web/`, `playwright.config.ts`,
 `src/app/+html.tsx`, `src/features/settings/NativeDemoCard.web.tsx`) plus
-`scripts/e2e/web.sh`, `.github/workflows/web.yml` and the web ADR; drops the
+`scripts/e2e/web.sh`, `.github/workflows/ci-web.yml` and the web ADR; drops the
 `web`, `build:web` and `test:e2e:web` package scripts, the `web`, `build-web`
 and `e2e-web` make targets, the `react-dom`, `react-native-web`,
 `@expo/metro-runtime` and `@playwright/test` dependencies, the commitlint `web`
@@ -118,7 +118,7 @@ scope — from `commitlint.config.mjs` and from the four places the enum is
 spelled out for readers (`AGENTS.md`, `CONTRIBUTING.md`, `docs/quality.md`,
 `.github/PULL_REQUEST_TEMPLATE.md`) — and `knip.json`'s `playwright` plugin; and
 removes the marker-delimited web blocks from `app.config.ts`, `metro.config.js`
-and `.github/workflows/release-production.yml`, the web rows from the docs, the
+and `.github/workflows/cd-production.yml`, the web rows from the docs, the
 `react-dom` ignore from `.github/dependabot.yml`, the `Web` platform option from
 the bug-report issue template, and the web-variant case from
 `src/features/settings/NativeDemoCard.test.tsx`.
@@ -140,7 +140,7 @@ Answering "yes" keeps all of it, and `make e2e-web` keeps working.
 3. Replace the placeholder assets in `assets/` and the store copy in
    `fastlane/metadata/**`; `.claude/skills/store-metadata/scripts/check-metadata.sh`
    tells you what is still a placeholder. Then set the repository variable
-   `STORE_METADATA_SYNC_ENABLED=true` and run the **Store listing** workflow
+   `STORE_METADATA_SYNC_ENABLED=true` and run the **CD / Store listing** workflow
    with `direction: push`, `dry_run: true` first — or seed the tree from an
    existing app with `direction: pull` instead of writing the copy by hand.
    See [Store listing metadata](release-runbook.md#store-listing-metadata).

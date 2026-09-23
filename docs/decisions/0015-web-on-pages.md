@@ -18,7 +18,7 @@ saw that because a dev export points at the mock.
 Deploy under the sub-path, and test exactly the bytes that deploy.
 
 - `app.config.ts` — `EXPO_PUBLIC_BASE_URL` becomes `experiments.baseUrl`;
-  `.github/workflows/web.yml` sets it to `/<repo>` on a deploy (empty with a
+  `.github/workflows/ci-web.yml` sets it to `/<repo>` on a deploy (empty with a
   custom domain, and on PR exports).
 - `scripts/build-web.sh` — the export, then `+not-found.html` copied to
   `404.html`: Pages serves it for any unknown path and the router boots from

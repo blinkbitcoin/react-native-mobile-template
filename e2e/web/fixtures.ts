@@ -7,7 +7,7 @@ export { expect } from '@playwright/test';
  * whatever host the bundle was built for.
  *
  * A dev export bakes `.env.development`'s API URL, which already is the mock.
- * A production export - the one `web.yml` deploys to Pages - bakes
+ * A production export - the one `ci-web.yml` deploys to Pages - bakes
  * `.env.production`'s, a real (or, in this template, placeholder) host that no
  * test can reach. The first production run at v0.2.3 rendered "Something went
  * wrong" for exactly that reason. Rebuilding the export for the test would

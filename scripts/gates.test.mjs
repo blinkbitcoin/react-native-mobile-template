@@ -22,7 +22,7 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const read = (rel) => readFileSync(path.join(root, rel), 'utf8');
 const pkg = JSON.parse(read('package.json'));
 
-// Every script name shared-workflows' checks.yml and unit.yml ask this
+// Every script name shared-workflows' check-code.yml and check-unit.yml ask this
 // consumer for. Adding a CI step that calls a script we do not ship fails the
 // step with "consumer package.json has no ... script"; this list is the local
 // half of that contract, so the failure arrives in a unit test instead.

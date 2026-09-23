@@ -1,6 +1,6 @@
 // This repo ships its own copies of two release scripts that shared-workflows
 // also ships: `resolve-version.sh` (run locally by `make version`, while
-// expo-prepare.yml runs the shared copy in CI) and `build-info.sh` (the local
+// build-prepare.yml runs the shared copy in CI) and `build-info.sh` (the local
 // DRY_RUN rehearsal, while CI writes the release's build-info.json with the
 // shared copy). The two copies are contract-identical, not byte-identical, and
 // a drift between them means a local rehearsal that says one thing and a

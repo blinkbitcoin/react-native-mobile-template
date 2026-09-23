@@ -22,7 +22,7 @@ place, so the template's adoption script can strip it completely in one pass.
 - Non-file removals: the `app.config.ts` `web:` block, the `metro.config.js`
   web branch, `package.json` `web` / `build:web` / `test:e2e:web`, Makefile
   `web` / `build-web` / `e2e-web`, `scripts/e2e/web.sh`,
-  `.github/workflows/web.yml`, `knip.json`'s `playwright` plugin key.
+  `.github/workflows/ci-web.yml`, `knip.json`'s `playwright` plugin key.
 - Deployment is GitHub Pages from the gated production dispatch, not the tag
   push, so the site tracks what is actually live in the stores.
 

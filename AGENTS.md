@@ -151,7 +151,7 @@ Every row is a make target; nothing here is run through pnpm directly.
   commit message, so the PR title is linted too.
 - **Releases are release-please's job.** Merge (squash) the release PR; never
   `sed` a version into `package.json`, `app.config.ts` or the manifest. The
-  store notes are drafted into the release PR body by `release-please.yml`
+  store notes are drafted into the release PR body by `cd-release.yml`
   from `release-notes.prompt.md`; to change them, edit the prompt (the next
   push regenerates) or the release body after merging, then preview with
   `make release-notes` — see `docs/release-runbook.md`.

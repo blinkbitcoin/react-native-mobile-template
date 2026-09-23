@@ -22,9 +22,9 @@ touched a workflow.
 Create the `vX.Y.Z-build.N` tag seconds after the push, while the commit is
 still the tip, and publish the release on the existing tag later.
 
-- `.github/workflows/release-internal.yml` — `reserve-tag: true` and
+- `.github/workflows/cd-internal.yml` — `reserve-tag: true` and
   `contents: write` on the prepare job.
-- shared-workflows `expo-prepare.yml` (0.6.0) — `Resolve version` and
+- shared-workflows `build-prepare.yml` (0.6.0) — `Resolve version` and
   `Reserve build tag` run before the green gate and before `Setup`; a red gate
   deletes the tag this run reserved. `scripts/release/reserve-tag.sh` is
   idempotent and explains the refusal when it still happens.

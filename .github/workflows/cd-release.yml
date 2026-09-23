@@ -2,7 +2,7 @@ name: CD / Release
 # Keeps one "chore(main): release X.Y.Z" PR open against main. Merging that PR
 # is the only human action that cuts a release: it bumps package.json, writes
 # the CHANGELOG section, tags `vX.Y.Z` and publishes the GitHub release, which
-# is what `release-beta.yml` listens for.
+# is what `cd-beta.yml` listens for.
 #
 # Merge that PR with **squash** (or rebase). `scripts/release/resolve-version.sh`
 # reads the release commit's `chore(main): release X.Y.Z` subject to stamp the
@@ -63,7 +63,7 @@ jobs:
       # `release: published` or `pull_request` trigger. The one exemption is
       # `workflow_dispatch`, so the follow-on work is started here by name.
       # `--ref "$TAG"` puts the run on the release commit: `github.sha` is then
-      # the same sha release-internal built, which is what release-retry.yml
+      # the same sha release-internal built, which is what cd-beta-retry.yml
       # matches on.
       - name: Start the beta promotion at the new tag
         if: ${{ steps.release.outputs.release_created == 'true' }}
@@ -71,14 +71,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           TAG: ${{ steps.release.outputs.tag_name }}
-        run: gh workflow run release-beta.yml --repo "$REPO" --ref "$TAG" -f "tag=$TAG"
+        run: gh workflow run cd-beta.yml --repo "$REPO" --ref "$TAG" -f "tag=$TAG"
       - name: Deploy the web build at the new tag
         if: ${{ steps.release.outputs.release_created == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           TAG: ${{ steps.release.outputs.tag_name }}
-        run: gh workflow run web.yml --repo "$REPO" --ref "$TAG" -f "deploy=true"
+        run: gh workflow run ci-web.yml --repo "$REPO" --ref "$TAG" -f "deploy=true"
       # The PR's number and branch are read from the `pr` output in the shell,
       # not with `fromJSON()` in `env:`: the runner validates a step's `env`
       # expressions even when its `if` is false, and `fromJSON('')` is a
@@ -116,7 +116,7 @@ jobs:
   # The store release notes, drafted once into the release PR body for a human
   # to review with the version bump. release-please carries the section into
   # the GitHub release body on merge, and beta and production read it back
-  # verbatim (expo-prepare with release-tag), so this is the only job in the
+  # verbatim (build-prepare with release-tag), so this is the only job in the
   # repository that may call an LLM - internal builds keep the free
   # deterministic notes from commits. Its own job, after the dispatches above:
   # a red draft never withholds a release, and `gh run rerun --failed` re-drafts.
@@ -126,7 +126,7 @@ jobs:
     name: Store Notes
     needs: release-please
     if: ${{ needs.release-please.outputs.pr-number != '' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/release-pr-notes.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/pr-release-notes.yml@v0
     permissions:
       contents: read
       pull-requests: write
@@ -135,7 +135,7 @@ jobs:
       # The release branch, so the prompt template and the generator under
       # release are the ones that draft.
       ref: ${{ needs.release-please.outputs.pr-branch }}
-      # Non-secret only (see the build-env note in release-internal.yml); the
+      # Non-secret only (see the build-env note in cd-internal.yml); the
       # two keys travel as secrets below and are only needed when the provider
       # variable selects them.
       build-env: >-

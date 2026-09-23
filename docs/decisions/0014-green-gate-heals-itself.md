@@ -15,15 +15,15 @@ not have to know whether some other run is still going.
 ## Decision
 
 The gate heals itself. When the internal run for the release commit is
-missing, cancelled or failed, it dispatches `release-internal.yml` at the
+missing, cancelled or failed, it dispatches `cd-internal.yml` at the
 release tag once and waits for the run that dispatch creates.
 
-- `.github/workflows/release-beta.yml` — `require-green-dispatch: true` beside
+- `.github/workflows/cd-beta.yml` — `require-green-dispatch: true` beside
   `require-green-workflow`, and `actions: write` on the prepare job.
 - shared-workflows `scripts/release/require-green-run.sh` (0.5.0) — the
   dispatch, once; the replaced run is ignored; a dispatched run that also
   fails is fatal; `skipped` is never dispatched.
-- `.github/workflows/release-retry.yml` — the second line: re-runs a failed
+- `.github/workflows/cd-beta-retry.yml` — the second line: re-runs a failed
   beta when an internal run for `main` completes.
 - `scripts/release-workflows.test.mjs` — pins the flag, the tag and the
   permission together.

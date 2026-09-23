@@ -1131,7 +1131,7 @@ class LaneBehaviourTest < Minitest::Test
     end
   end
 
-  # The publish job never builds: `fastlane-lane.yml` downloads the build job's
+  # The publish job never builds: `publish-store.yml` downloads the build job's
   # artifacts into $WORKFLOWS_ASSETS_DIR, one level *below* $WORKFLOWS_OUTPUT_DIR. Reading
   # the output directory here handed pilot a path with no ipa at it, on every
   # single run.

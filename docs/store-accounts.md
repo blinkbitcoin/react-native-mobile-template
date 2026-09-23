@@ -315,10 +315,10 @@ flowchart LR
   push -->|"gh secret set"| s5["HUAWEI_CLIENT_ID<br/>HUAWEI_CLIENT_SECRET"]
   push -->|"gh variable set"| v1["HUAWEI_APP_ID<br/>(repository scope only)"]
 
-  s1 -->|"secrets: on fastlane-lane<br/>and expo-build-ios"| l1["ios upload_internal, promote_beta,<br/>release_production, sync_metadata"]
+  s1 -->|"secrets: on publish-store<br/>and build-ios"| l1["ios upload_internal, promote_beta,<br/>release_production, sync_metadata"]
   s2 -->|"secrets:, then a 600 file"| l2["android upload_internal, promote_beta,<br/>release_production, sync_metadata"]
-  s3 -->|"secrets: on expo-build-android,<br/>then a 600 file"| l3["android build"]
-  s4 -->|"secrets: on expo-build-ios"| l4["ios build (match)"]
+  s3 -->|"secrets: on build-android,<br/>then a 600 file"| l3["android build"]
+  s4 -->|"secrets: on build-ios"| l4["ios build (match)"]
   s5 -->|"secrets:, in the lane step's env"| l5["upload_huawei_internal,<br/>promote_huawei_beta, upload_huawei"]
   v1 -->|"env-json on the Huawei jobs"| l5
 ```
