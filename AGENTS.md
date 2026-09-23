@@ -163,6 +163,19 @@ Every row is a make target; nothing here is run through pnpm directly.
   expand an uncommon one on first use. A prefix made of the family's initials
   was rejected for exactly this reason; so was "ids" for identifiers in a
   status message.
+- **Workflow files carry their stage in the name.** GitHub reads only the top
+  level of `.github/workflows/`, so the prefix is the only grouping there is:
+  `ci.yml` and `ci-*.yml` run on every change and display as `CI` /
+  `CI / ...`; `cd-*.yml` make releases and display as `CD / ...`. A new
+  workflow takes the prefix and the matching display name
+  (`scripts/workflow-names.test.mjs` fails otherwise). A rename updates every
+  reference in the same PR, not just the ones spelled `.yml`: `uses:` paths,
+  `gh workflow run` targets, `require-green-workflow`, `workflow_run` listeners
+  (they match the display name), the init manifest, docs, diagrams, README
+  tables and "Actions → ..." paths (the sidebar shows display names). Before
+  pushing, `git grep` the old name without its suffix. Only `CHANGELOG.md`,
+  `docs/superpowers/` and concurrency group names (renaming one changes which
+  runs queue together) may still hold it.
 - **Docs ship with the code.** Architecture-relevant changes without a `docs/`
   change get a warning from `make check-docs` (a dependency bump does not count,
   and Dependabot is exempt); adding a make target without a row in the table
