@@ -16,7 +16,7 @@ release-please. Conventional Commits, closed scope enum — see CONTRIBUTING.md.
 - [ ] PR title is a Conventional Commit with a valid scope (`app ui i18n graphql native plugins config tooling ci release deps deps-dev docs e2e web`)
 - [ ] `make check` and `make unit` pass locally
 - [ ] Tests added or updated for the behaviour that changed
-- [ ] Docs updated (`docs/`, `AGENTS.md` command table if a make target changed)
+- [ ] Docs and diagrams updated in this PR: every doc, README table and diagram (mermaid, ASCII, SVG) that shows what changed; searched each changed name with and without `.yml` (`AGENTS.md` command table if a make target changed)
 - [ ] User-visible strings go through Lingui and `make i18n` was run
 - [ ] Screenshots or a screen recording for UI changes
 - [ ] Native change (`app.config.ts`, `plugins/`, `modules/`)? → `make check-prebuild` passes and the plugin/module is documented

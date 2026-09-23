@@ -176,12 +176,22 @@ Every row is a make target; nothing here is run through pnpm directly.
   pushing, `git grep` the old name without its suffix. Only `CHANGELOG.md`,
   `docs/superpowers/` and concurrency group names (renaming one changes which
   runs queue together) may still hold it.
-- **Docs ship with the code.** Architecture-relevant changes without a `docs/`
-  change get a warning from `make check-docs` (a dependency bump does not count,
-  and Dependabot is exempt); adding a make target without a row in the table
-  above is a hard failure, and so is a markdown table cell wider than 120
-  visible characters (break it with `<br>`) or a fenced `mermaid` block that
-  does not parse.
+- **Docs and diagrams ship in the same PR as the change, never as a
+  follow-up.** Any change to a name, input, output, job, file, flow, count or
+  default updates every doc that describes it, in the same PR: prose, tables,
+  README and AGENTS.md, and every diagram (mermaid blocks, ASCII drawings in
+  code fences, SVGs under `docs/assets/`). Before pushing, `git grep` each
+  thing the diff renamed or changed, spelled every way a reader would meet it
+  (with and without `.yml`, the display name, the job name), and read each
+  diagram that shows the part you touched; a diagram that still draws the old
+  flow is drift even when no text search finds it. The PR description names
+  the docs it updated, or says why none needed to change. Mechanically
+  enforced on top: architecture-relevant changes without a `docs/` change get
+  a warning from `make check-docs` (a dependency bump does not count, and
+  Dependabot is exempt); adding a make target without a row in the table above
+  is a hard failure, and so is a markdown table cell wider than 120 visible
+  characters (break it with `<br>`) or a fenced `mermaid` block that does not
+  parse.
 
 ## Testing map
 
