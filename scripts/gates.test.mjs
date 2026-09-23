@@ -6,10 +6,11 @@
 // scripts load-bearing in CI, so the properties below are no longer a local
 // style preference.
 //
-// The cross-repo half of this contract is enforced from the workflows repo,
-// where the CI step list lives. What is checkable from here is that the scripts
-// CI asks for exist, and that each is at least as strict as the implementation
-// it displaced.
+// The cross-repo half of this contract - that `make ci` and CI run the same
+// gates - is enforced by this repo's own CI: the Checks / Contract job runs
+// shared-workflows' contract checker against this repo. What this file checks
+// is that the scripts CI asks for exist, and that each is at least as strict as
+// the implementation it displaced.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';

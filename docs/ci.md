@@ -150,9 +150,10 @@ Two gates are opt-in in CI and grouped locally as `make check-slow`:
 seconds. Enable the `prebuild-check` and `bundle-secrets` inputs on the
 `checks` call where the coverage earns the wall clock.
 
-That `make ci` and CI agree is enforced from `shared-workflows`, whose
-`consumer-contract.bats` reads this repo's `Makefile` against the workflow
-YAML and fails in either direction. See
+That `make ci` and CI agree is enforced here, by this repo's own CI: the
+`Checks / Contract` job runs shared-workflows' contract checker against this
+repo at the workflows version `ci.yml` pins, and fails this repo's PR in either
+direction. See
 [quality.md](quality.md#make-check-is-the-ci-gate-set-and-that-is-enforced).
 
 What that costs: only `unit` and `e2e` skip on a docs-only change.
