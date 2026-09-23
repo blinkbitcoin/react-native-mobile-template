@@ -113,15 +113,19 @@ at all: i18n drift, codegen drift, lockfile provenance and the licence check. A
 green `make check` was making a claim about coverage CI was not providing, and
 nothing detected it.
 
-Two cases at the end of `test/consumer-contract.bats` in
-`shared-workflows` now read the workflow YAML and this repo's `Makefile`
-and fail in both directions:
+The `Checks / Contract` job, the first job of every CI run, reads this repo's
+`Makefile` and callers against the contract of the shared-workflows version
+`ci.yml` pins, and fails in both directions:
 
 - a script CI calls that `make ci` cannot reach;
-- a gate `make check` runs that has no CI step.
+- a target `make ci` reaches that no CI step runs, such as a check that runs
+  only in `make coverage`.
 
-They run in that repo's `parity` job, where a skipped parity case is itself a
-failure. So adding a gate here means adding its CI step, and vice versa.
+It is this repo's PR that fails, never shared-workflows': that repo defines the
+contract and never checks out a consumer. So adding a gate here means adding
+its CI step, and vice versa. To run the same check before pushing, point the
+checker at this repo from a shared-workflows checkout:
+`node ../shared-workflows/packages/dev-config/bin/check-consumer-contract.mjs --root .`
 
 ### How a gate gets into CI
 
