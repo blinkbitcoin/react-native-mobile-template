@@ -9,30 +9,30 @@ OTA is documented separately in [ota.md](ota.md).
 ## The shape of it
 
 ```
-merge a PR ──► release-internal   TestFlight internal + Play internal
+merge a PR ──► CD / Internal      TestFlight internal + Play internal
                     │              vX.Y.Z-build.N pre-release, OTA internal
                     ▼
 merge the release PR ──► release-please ──► vX.Y.Z release published,
-                                                  │  release-beta + web dispatched
+                                                  │  CD / Beta + CI / Web dispatched
                                                   ▼
-                                            release-beta   TestFlight external
+                                            CD / Beta      TestFlight external
                                                   │        + Play open beta
                                             (soak)│        + OTA beta
                                                   ▼
-                                     release-production (dispatch, reviewed)
+                                     CD / Production (dispatch, reviewed)
                                             App Store + Play + web + OTA
 ```
 
 One binary is built once, on the merge to main, and then *promoted*. Beta and
 production never rebuild — they call store APIs against the build that internal
 already produced and that testers already used. That is why
-`cd-beta.yml` will not promote until that exact commit's `release-internal`
+`cd-beta.yml` will not promote until that exact commit's `cd-internal`
 run is green (`require-green-workflow: cd-internal.yml`).
 
 ## The six steps
 
 The whole chain, with what triggers each hop and what each stage produces. Two
-workflows run off the same push to `main` — `release-internal` builds, and
+workflows run off the same push to `main` — `cd-internal` builds, and
 `release-please` maintains the release PR — and everything after the tag is a
 dispatch, because a workflow cannot trigger a workflow through its own
 `GITHUB_TOKEN` (see [Why the hop is a dispatch](#why-the-hop-is-a-dispatch)).
@@ -167,7 +167,7 @@ automation here on purpose.
 
 ### 5. Dispatch the production release
 
-**Actions → release-production → Run workflow**, `tag: vX.Y.Z`,
+**Actions → CD / Production → Run workflow**, `tag: vX.Y.Z`,
 `action: release`. A reviewer on the `production` environment has to approve
 before any store job starts. It then:
 
@@ -282,11 +282,11 @@ and takes Play to 100%. `action: halt` stops both. See
     still resolves. Squash or rebase merging keeps it on HEAD directly; see
     step 2.
   - The subject source is what makes that true on the one commit where it
-    matters. `release-please` and `release-internal` are triggered by the same
+    matters. `release-please` and `cd-internal` are triggered by the same
     push to main and run concurrently, so on the release commit the `vX.Y.Z` tag
     does not exist yet, `RELEASE_PR_TITLE` is empty (a push carries no PR) and
     the `autorelease: pending` PR has just been merged. Without it a `0.2.0`
-    release built and uploaded `0.1.1`, and `release-beta` then asked for a
+    release built and uploaded `0.1.1`, and `cd-beta` then asked for a
     `v0.2.0-build.N` pre-release nothing had ever created.
 - **Build number** = `git rev-list --count --first-parent HEAD` plus
   `BUILD_NUMBER_OFFSET` (repo variable, default `1000`). Identical on both
@@ -349,11 +349,11 @@ production. Its line structure is kept as written; it still goes through the
 same hygiene filter, so a link, a `#123` or a marker line in it is removed
 rather than shipped.
 
-`release-beta` writes that section itself after promoting (`github-release` in
+`cd-beta` writes that section itself after promoting (`github-release` in
 `append` mode, marker-delimited and idempotent), so the release body always
 shows what the pipeline actually shipped — and an operator editing it for the
 next stage has the heading in front of them rather than typing it from memory.
-`release-production` appends a `## Production` line the same way
+`cd-production` appends a `## Production` line the same way
 (`<action> at <time>, platforms <x>, rollout <n>%`), so the release records
 which stage it reached.
 
@@ -520,9 +520,9 @@ build that needs no account anywhere.
 
 `STORE_UPLOADS_ENABLED` implies signing on both platforms, so uploading with
 nothing signed to upload cannot be expressed. Until it is `true` every job that
-talks to a store is skipped: TestFlight and Play uploads in `release-internal`,
-the promotions in `release-beta`, and the release, phased and rollout lanes in
-`release-production`.
+talks to a store is skipped: TestFlight and Play uploads in `cd-internal`,
+the promotions in `cd-beta`, and the release, phased and rollout lanes in
+`cd-production`.
 
 **The unsigned tier still builds and still verifies.** Gradle falls back to the
 debug keystore (`plugins/with-android-release-signing.ts` does that and warns),
@@ -619,9 +619,9 @@ lane still walks end to end
 | `IOS_BUNDLE_ID` | every build and lane job | Your App Store bundle identifier |
 | `IOS_SCHEME` | every build and lane job | Xcode scheme name (the Expo prebuild generates it from the app name) |
 | `ANDROID_PACKAGE` | every build and lane job | Play application id |
-| `XCODE_VERSION` | `release-internal` iOS build | A version installed on the runner image, e.g. `26.0`; sets `DEVELOPER_DIR` |
-| `IOS_SIGNING_ENABLED` | repo variable; `build-ios` in `release-internal` | `true` signs and exports an `.ipa`.<br>Unset archives unsigned, which needs no Apple account |
-| `ANDROID_SIGNING_ENABLED` | repo variable; `build-android` in `release-internal` | `true` signs with the upload keystore.<br>Unset falls back to the debug keystore, which needs no Play account |
+| `XCODE_VERSION` | `cd-internal` iOS build | A version installed on the runner image, e.g. `26.0`; sets `DEVELOPER_DIR` |
+| `IOS_SIGNING_ENABLED` | repo variable; `build-ios` in `cd-internal` | `true` signs and exports an `.ipa`.<br>Unset archives unsigned, which needs no Apple account |
+| `ANDROID_SIGNING_ENABLED` | repo variable; `build-android` in `cd-internal` | `true` signs with the upload keystore.<br>Unset falls back to the debug keystore, which needs no Play account |
 | `STORE_UPLOADS_ENABLED` | repo variable; every store job in all three release workflows | `true` turns on TestFlight and Play uploads.<br>Unset means off, and the store credentials below<br>are only needed once it is on — see<br>[Before you have store accounts](#before-you-have-store-accounts) |
 | `HUAWEI_UPLOADS_ENABLED` | repo variable; every Huawei job in all three release<br>workflows and the three Huawei lanes via `env-json` | `true` turns on the Huawei AppGallery upload,<br>on top of `STORE_UPLOADS_ENABLED`. Unset means off<br>and no Huawei job runs — see [Huawei AppGallery](#huawei-appgallery) |
 | `HUAWEI_APP_ID` | every Huawei job in all three release workflows,<br>via `env-json` | The numeric app id under the AppGallery Connect<br>app record's information page. An identifier, not a<br>credential, so it is a variable and appears in the log |
@@ -633,8 +633,8 @@ lane still walks end to end
 | `PLAY_METADATA_TRACK` | `android sync_metadata` / `pull_metadata` via `env-json` | Track whose release the listing edit rides on;<br>default first of `production`, `beta`, `internal`<br>with one |
 | `BUILD_NUMBER_OFFSET` | every `build-prepare` call | Integer, default `1000`. Raise only |
 | `WORKFLOWS_MACOS_RUNNER` | iOS build + iOS internal upload | Runner label, default `macos-26` |
-| `TESTFLIGHT_INTERNAL_GROUP` | `release-internal` iOS upload | Group name in App Store Connect → TestFlight |
-| `TESTFLIGHT_EXTERNAL_GROUP` | `release-beta` iOS promote | External group name; must already exist and be approved |
+| `TESTFLIGHT_INTERNAL_GROUP` | `cd-internal` iOS upload | Group name in App Store Connect → TestFlight |
+| `TESTFLIGHT_EXTERNAL_GROUP` | `cd-beta` iOS promote | External group name; must already exist and be approved |
 | `PLAY_UPDATE_PRIORITY` | Android upload / production | `0`–`5`, Play in-app update priority |
 | `ANDROID_UPLOAD_CERT_SHA256` | `verify-android.sh`, read from the environment (via `build-env`); `--cert-sha256` is the manual override | `keytool -list -v -keystore upload.keystore`, the SHA-256 line.<br>**Leave it unset and the signature check reports `skip`** —<br>the gate that exists to catch a wrong signing identity stops checking |
 | `OTA_ENABLED` | `app.config.ts` at build time (via `build-env`) and the `if:` on every `ota-*` job | `true` to turn OTA on; see [ota.md](ota.md) |
@@ -709,30 +709,30 @@ release PR's branch whenever the PR is created or updated. The job needs
 `actions: write` for that, nothing else.
 
 `--ref` is the tag on purpose: the dispatched run's `github.sha` is then the
-release commit, the same sha `release-internal` built, which is what
+release commit, the same sha `cd-internal` built, which is what
 `cd-beta-retry.yml` matches a failed beta run on.
 
 The alternative is a GitHub App whose token creates the release, so that the
 `release:` event fires normally. It is more moving parts for the same result —
 an App to register, two secrets to rotate, and a `release:` trigger that then
-also fires on every `-build.N` pre-release from `release-internal` unless every
+also fires on every `-build.N` pre-release from `cd-internal` unless every
 listener filters `prerelease`. The reusable `publish-github-release.yml` still accepts
 `RELEASE_TAGGER_APP_ID` / `RELEASE_TAGGER_APP_PRIVATE_KEY` for a consumer that
 already has such an App; this template does not use them.
 
 ### Concurrency: which workflows share a queue
 
-The **promoting** workflows — `release-beta`, `release-production`,
-`ota-hotfix` — share `concurrency: release` with `cancel-in-progress: false`,
+The **promoting** workflows — `cd-beta`, `cd-production`,
+`cd-ota-hotfix` — share `concurrency: release` with `cancel-in-progress: false`,
 so two of them can never touch a store at the same time and none is ever
-cancelled half-way. `release-internal` used to share it too, and that is where
+cancelled half-way. `cd-internal` used to share it too, and that is where
 releases got lost: GitHub keeps one *pending* run per group and evicts the
 older one, and an internal run spends ~35 minutes in Prepare waiting for its
 commit's CI before it builds at all. A release PR merged behind a fix — the
 normal sequence — had its own internal build evicted, and its beta then failed
 the green gate (v0.2.3, v0.2.4 and v0.2.5 each needed a manual dispatch).
 
-So `release-internal` queues **per commit** (`release-internal-<sha>`): nothing
+So `cd-internal` queues **per commit** (`release-internal-<sha>`): nothing
 is evicted, and two commits' builds run side by side. Only its store-touching
 jobs — `upload-ios`, `upload-android`, `ota-internal` — join the `release`
 queue, each at job level. The residual: a *pending* upload can still be evicted
@@ -743,14 +743,14 @@ finishes it.
 The group is a **constant**, not `release-${{ github.ref }}`. `github.ref` is
 `refs/heads/main` on a push or a manual dispatch but `refs/tags/vX.Y.Z` on the
 dispatch release-please makes at the tag, so a ref-keyed group put
-`release-beta` in a queue of its own — and the same workflow changed queue
+`cd-beta` in a queue of its own — and the same workflow changed queue
 depending on how it was started.
 
-`release-please` and `release-retry` deliberately have their own groups
+`release-please` and `cd-beta-retry` deliberately have their own groups
 (`release-please-*`, `release-retry-*`). GitHub keeps only one *pending* run per
 group and evicts the older one, so sharing the store queue would leave the
 release PR stale for the length of a 60-90 minute build and drop the run
-entirely on two quick pushes — and `release-retry` is precisely the workflow
+entirely on two quick pushes — and `cd-beta-retry` is precisely the workflow
 that has to run promptly. Neither calls a store API.
 
 ## GitHub Environments
@@ -759,13 +759,13 @@ Settings → Environments. Four, three of which exist only to scope secrets:
 
 | Environment | Protection | Purpose |
 | --- | --- | --- |
-| `internal` | none | Scopes the signing and store credentials used by `release-internal` |
-| `beta` | none | Scopes the credentials used by `release-beta` |
+| `internal` | none | Scopes the signing and store credentials used by `cd-internal` |
+| `beta` | none | Scopes the credentials used by `cd-beta` |
 | `production` | **Required reviewers** (at least one, "prevent self-review" on), deployment branches and tags limited to the tag pattern `v*` | Gates every store job in `cd-production.yml` and a production OTA hotfix |
 | `github-pages` | GitHub creates it, allowing `main` only; **add a tag policy `v*`** | Used by the `ci-web.yml` deploy job, which runs at the release tag.<br>Without the tag policy the deploy is rejected: "Tag … is not allowed to deploy to github-pages" |
 
 The `production` reviewer is the release gate: nothing in `cd-production.yml`
-or a production `ota-hotfix` starts until someone approves. On a private
+or a production `cd-ota-hotfix` starts until someone approves. On a private
 repository, required reviewers need a Team plan or above.
 
 ## Rollback and halt
@@ -796,7 +796,7 @@ fingerprint gate rejects anything that moved the native layer, and it is right
 to — such an update crashes every user on the channel on launch.
 
 **Anything native**: it is a normal release, just a faster one. Land the fix,
-let `release-internal` build it, merge the release PR release-please opens,
+let `cd-internal` build it, merge the release PR release-please opens,
 let beta promote, then dispatch production. The steps do not change; only the
 soak does.
 

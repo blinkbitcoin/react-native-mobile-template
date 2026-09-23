@@ -98,7 +98,7 @@ codegen: ## Regenerate typed GraphQL documents
 	pnpm codegen
 
 # ---------- Quality gates ----------
-# `make check` is the `checks` workflow's gate set and `make ci` adds the `unit`
+# `make check` is the `check-code` workflow's gate set and `make ci` adds the `check-unit`
 # workflow's, so a green run here is the same set of gates CI makes - not a
 # similar one. That used to be a comment claiming as much while five gates
 # (i18n, codegen, SDK drift, lockfile provenance, licences) ran here and in no
@@ -171,7 +171,7 @@ check-skills: ## Only the skill tests (offline, fakes only; needs bundle install
 check-secrets: ## Scan the whole git history for committed secrets (gitleaks)
 	gitleaks git --redact --no-banner .
 
-check: check-code check-gen check-deps check-ci check-docs check-release check-secrets ## Every static gate the checks workflow runs (no tests/builds)
+check: check-code check-gen check-deps check-ci check-docs check-release check-secrets ## Every static gate the check-code workflow runs (no tests/builds)
 
 # The two expensive gates are not in `check` and are off by default in CI for
 # the same reason: a prebuild of both platforms and a web export are minutes

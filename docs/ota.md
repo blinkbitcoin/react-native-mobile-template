@@ -202,7 +202,7 @@ A JS-only fix on a channel that already has a store build:
 1. Land the fix (or a cherry-pick branch). **If it touches native code, plugins,
    or adds a dependency with a native module, it is not a hotfix** — the gate
    will reject it, and correctly so. Cut a new version instead.
-2. Run **Actions → ota-hotfix** with `channel`, `ref` and a `rollout` (default
+2. Run **Actions → CD / OTA Hotfix** with `channel`, `ref` and a `rollout` (default
    `10`). `baseline_tag` can stay empty; it resolves to the latest release.
 3. Production requires the `production` environment's reviewer, the same as a
    store release.
@@ -216,7 +216,7 @@ supersedes the bad update:
 
 | Situation | Action |
 | --- | --- |
-| Bad update, good previous JS | Publish the previous commit to the same channel at 100% (`ota-hotfix` with `ref` = the last good sha) |
+| Bad update, good previous JS | Publish the previous commit to the same channel at 100% (`cd-ota-hotfix` with `ref` = the last good sha) |
 | Bad update, want the store binary's own bundle back | `rollBackToEmbedded` directive on the channel, or `eoas rollback` — both leave the installed binary running its baked-in JS |
 | Bad **native** build | OTA cannot help. Halt the store rollout (`cd-production.yml` with `action: halt`) and ship a new build |
 

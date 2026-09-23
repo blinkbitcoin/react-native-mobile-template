@@ -1,5 +1,5 @@
 # gitleaks configuration, read by `make check-secrets` (full history), the
-# pre-commit hook (staged changes) and CI (the checks workflow's Secrets step).
+# pre-commit hook (staged changes) and CI (the check-code workflow's Secrets step).
 #
 # The default rule set stays on; this file only carves out places that hold
 # secret-SHAPED test data on purpose. Each entry says why. Add to it only for

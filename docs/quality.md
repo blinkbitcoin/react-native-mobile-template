@@ -96,8 +96,8 @@ Not in `make check`, because each is slow or needs a build:
 
 ## `make check` is the CI gate set, and that is enforced
 
-`make check` runs the gates the `checks` workflow runs. `make ci` adds the
-`unit` workflow's — coverage and the script tests — and is the one-command
+`make check` runs the gates the `check-code` workflow runs. `make ci` adds the
+`check-unit` workflow's — coverage and the script tests — and is the one-command
 local CI run:
 
 ```sh
@@ -144,7 +144,7 @@ as the fallbacks they displace; `scripts/gates.test.mjs` holds them to it.
 
 ### Why CI is not one `make check` step
 
-It would guarantee parity trivially, and it was rejected. The `checks` workflow
+It would guarantee parity trivially, and it was rejected. The `check-code` workflow
 runs each gate as its own step, which buys three things a single step loses: the
 per-gate workflow inputs, which are a documented consumer interface; the audit
 step's own `timeout-minutes` and its advisory-on-PR behaviour; and per-step

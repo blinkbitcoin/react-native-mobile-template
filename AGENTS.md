@@ -63,7 +63,7 @@ Every row is a make target; nothing here is run through pnpm directly.
 
 | Gates | |
 |---|---|
-| `make check` | Every static gate the `checks` workflow runs (no tests/builds) |
+| `make check` | Every static gate the `check-code` workflow runs (no tests/builds) |
 | `make ci` | Everything CI runs except E2E — `check` plus coverage and the script tests |
 | `make check-slow` | The minutes-long gates: prebuild output + bundle secrets (off by default in CI too) |
 | `make check-code` | typecheck + lint + format-check + knip + spell |

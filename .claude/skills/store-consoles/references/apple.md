@@ -70,8 +70,8 @@ exactly these fields, in this order: `Console:`, `Click-path:`, `Enter:`,
 **Console:** App Store Connect — https://appstoreconnect.apple.com
 **Click-path:** App Store Connect → app → TestFlight → Internal Testing → **+** → name the group, add testers → External Testing → **+** → name the group, add testers, submit for Beta App Review
 **Enter:** internal group name and external group name, from the human
-**Take away:** internal group name → `TESTFLIGHT_INTERNAL_GROUP` (variable); external group name → `TESTFLIGHT_EXTERNAL_GROUP` (variable); the external group must exist and be approved before `release-beta` runs
-**Confirm:** safe — naming a tester group commits nothing; only submitting a build for external review does, and that happens later, in `release-beta`
+**Take away:** internal group name → `TESTFLIGHT_INTERNAL_GROUP` (variable); external group name → `TESTFLIGHT_EXTERNAL_GROUP` (variable); the external group must exist and be approved before `cd-beta` runs
+**Confirm:** safe — naming a tester group commits nothing; only submitting a build for external review does, and that happens later, in `cd-beta`
 **Browser mode:** create both groups, read the two names back before submitting external for Beta App Review
 **Guided mode:** print the click-path and the two names to create; the human creates them and reports back
 **Then:** `gh variable set TESTFLIGHT_INTERNAL_GROUP --body '<name>'`; `gh variable set TESTFLIGHT_EXTERNAL_GROUP --body '<name>'`; next `apple-privacy-labels`, `apple-pricing`

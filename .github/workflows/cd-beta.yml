@@ -1,7 +1,7 @@
 name: CD / Beta
 # Dispatched by cd-release.yml the moment it cuts the `vX.Y.Z` release
 # (not `release: published`: a release created with GITHUB_TOKEN never fires
-# that). It never builds: it waits for that exact commit's `release-internal`
+# that). It never builds: it waits for that exact commit's `cd-internal`
 # run to be green and then promotes the binary that run already uploaded, so
 # beta ships bytes that were tested on internal.
 on:
@@ -16,8 +16,8 @@ permissions:
 concurrency:
   # A constant group, not one keyed on github.ref: `github.ref` is
   # refs/heads/main on a push or a dispatch and refs/tags/vX.Y.Z on a
-  # `release: published` event, so a ref-keyed group put release-beta in a
-  # queue of its own and let it touch a store while release-internal or a
+  # `release: published` event, so a ref-keyed group put cd-beta in a
+  # queue of its own and let it touch a store while cd-internal or a
   # production dispatch was in one. Every workflow that talks to App Store
   # Connect, Play or the update server shares this one queue.
   group: release
@@ -45,7 +45,7 @@ jobs:
       require-green-workflow: cd-internal.yml
       # ...and a release must never wait for a human either. When that build is
       # missing, cancelled or failed - lost to a queue eviction, a flaky runner -
-      # the gate dispatches release-internal at this tag once and waits for it.
+      # the gate dispatches cd-internal at this tag once and waits for it.
       # Merge the release PR whenever; the pipeline sorts the rest out.
       require-green-dispatch: true
       build-env: >-
@@ -140,7 +140,7 @@ jobs:
       # same source would be a different binary with a different signature and a
       # different fingerprint, and the OTA gate downstream compares fingerprints.
       # The build number is derived from the tag's commit, so it resolves to the
-      # same `-build.N` tag release-internal created for that sha.
+      # same `-build.N` tag cd-internal created for that sha.
       from-tag: v${{ needs.prepare.outputs.version }}-build.${{ needs.prepare.outputs.build-number }}
       # Empty when uploads ran, so a real store build carries no marker.
       # Inverted on purpose: GitHub's `&&` yields its first falsy operand, so

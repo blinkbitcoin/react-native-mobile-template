@@ -5,7 +5,7 @@
 // `github-prerelease` needed `upload-ios` and `upload-android`, and neither
 // upload job carried a condition — so without credentials nothing past the
 // native builds ran, including the release itself, which needs only the default
-// token. On a template that fires `release-internal` on every push to `main`,
+// token. On a template that fires `cd-internal` on every push to `main`,
 // that meant an adopter's first commit went red after paying for a macOS build.
 //
 // The gating is invisible in review: a `needs:` list looks identical whether or
@@ -109,7 +109,7 @@ describe('every workflow_run listener names a workflow that exists', () => {
 });
 
 // GitHub keeps one *pending* run per concurrency group and evicts the older
-// one. release-internal waits ~35 minutes in Prepare for the commit's CI
+// one. cd-internal waits ~35 minutes in Prepare for the commit's CI
 // before it builds, so on the shared `release` queue any push inside that
 // window lost its internal build - and the release's beta then failed its
 // green gate (v0.2.3, v0.2.4, v0.2.5). Internal therefore queues per commit,
@@ -208,7 +208,7 @@ describe('cd-release.yml chains the release by dispatch', () => {
     assert.match(code, /^\s+actions: write$/m, 'cd-release.yml lacks actions: write');
   });
 
-  test('a cut release dispatches release-beta and web at the tag', () => {
+  test('a cut release dispatches cd-beta and web at the tag', () => {
     for (const wf of ['cd-beta.yml', 'ci-web.yml']) {
       const step = new RegExp(
         `release_created == 'true'[\\s\\S]*?gh workflow run ${wf.replace('.', '\\.')} [^\n]*--ref "\\$TAG"`,
@@ -383,7 +383,7 @@ describe('the release path without a store account', () => {
       });
 
       test('signing is derived so that uploading implies something to upload', () => {
-        // Only release-internal builds; beta and production promote what it
+        // Only cd-internal builds; beta and production promote what it
         // produced, so they have no signing inputs to derive.
         if (file !== 'cd-internal.yml') return;
         for (const [job, input, variable] of [

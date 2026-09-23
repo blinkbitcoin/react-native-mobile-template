@@ -12,7 +12,7 @@ starts a workflow from an event that token caused. So `cd-beta.yml` and
 shipped and beta never ran. The documented remedy was a "release tagger"
 GitHub App plus two secrets, so the release would be App-authored. That is an
 App to register and rotate for one hop, and a `release:` trigger fed by an
-App would also fire on every `-build.N` pre-release from `release-internal`.
+App would also fire on every `-build.N` pre-release from `cd-internal`.
 
 ## Decision
 

@@ -6,7 +6,7 @@ name: CD / Release
 #
 # Merge that PR with **squash** (or rebase). `scripts/release/resolve-version.sh`
 # reads the release commit's `chore(main): release X.Y.Z` subject to stamp the
-# build that ships with the release — release-internal runs on the same push and
+# build that ships with the release — cd-internal runs on the same push and
 # the tag does not exist yet, so the subject is the only source that is right on
 # that commit. Squash and rebase both put the PR title on main; a merge commit
 # writes `Merge pull request #N from …` and the script has to fall back to the
@@ -19,7 +19,7 @@ permissions:
   contents: read
 concurrency:
   # Deliberately NOT the shared `release-` group. GitHub keeps one pending run
-  # per group and evicts the older one, so sharing it with release-internal
+  # per group and evicts the older one, so sharing it with cd-internal
   # would leave the release PR stale for the length of a build and drop this
   # run entirely on two quick pushes. Nothing here touches a store, so it does
   # not need the store-serialising group.
@@ -63,7 +63,7 @@ jobs:
       # `release: published` or `pull_request` trigger. The one exemption is
       # `workflow_dispatch`, so the follow-on work is started here by name.
       # `--ref "$TAG"` puts the run on the release commit: `github.sha` is then
-      # the same sha release-internal built, which is what cd-beta-retry.yml
+      # the same sha cd-internal built, which is what cd-beta-retry.yml
       # matches on.
       - name: Start the beta promotion at the new tag
         if: ${{ steps.release.outputs.release_created == 'true' }}

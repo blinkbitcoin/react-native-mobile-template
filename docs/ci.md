@@ -143,7 +143,7 @@ cut a build for this" rule, and it calls no classifier.
 ### Running CI locally
 
 `make ci` runs everything CI runs except E2E, which needs a simulator or an
-emulator. `make check` is the `checks` workflow's half of that on its own.
+emulator. `make check` is the `check-code` workflow's half of that on its own.
 
 Two gates are opt-in in CI and grouped locally as `make check-slow`:
 `check-prebuild` and the bundle-secrets check, both minutes rather than
