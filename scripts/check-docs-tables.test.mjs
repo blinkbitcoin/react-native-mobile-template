@@ -1,11 +1,18 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   DOC_EXCLUDES,
   DOC_GLOBS,
+  docFiles,
   fencedBlocks,
   formatFindings,
   MAX_LINE,
+  main,
   overlongTableLines,
 } from './check-docs-tables.mjs';
 
@@ -129,4 +136,80 @@ test('fencedBlocks reports the info string, the delimiters and whether it closed
 test('fencedBlocks reports an unclosed fence as running to the end of the file', () => {
   const [block] = fencedBlocks(['```ts', 'const a = 1;']);
   assert.deepEqual({ end: block.end, closed: block.closed }, { end: 2, closed: false });
+});
+
+const SCRIPT = fileURLToPath(new URL('./check-docs-tables.mjs', import.meta.url));
+
+/** Captures what `main` writes, instead of letting it reach the test output. */
+const capture = () => {
+  const out = [];
+  const err = [];
+  return { out, err, io: { log: (line) => out.push(line), error: (line) => err.push(line) } };
+};
+
+test('docFiles globs the doc set, sorted, without the excluded subtrees', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'docs-tables-'));
+  try {
+    mkdirSync(path.join(dir, 'docs/plans'), { recursive: true });
+    for (const file of ['b.md', 'a.md', 'docs/plans/skip.md', 'docs/keep.md', 'notes.txt']) {
+      writeFileSync(path.join(dir, file), '');
+    }
+    assert.deepEqual(docFiles([`${dir}/*.md`, `${dir}/docs/**/*.md`], [`${dir}/docs/plans/`]), [
+      `${dir}/a.md`,
+      `${dir}/b.md`,
+      `${dir}/docs/keep.md`,
+    ]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('main passes the named files that stay within the limit', () => {
+  const { out, err, io } = capture();
+  const read = () => table('x');
+  assert.equal(main(['a.md', 'b.md'], { ...io, read }), 0);
+  assert.deepEqual(out, ['docs tables ok (2 files)']);
+  assert.deepEqual(err, []);
+});
+
+test('main reports every over-wide line and exits 1', () => {
+  const { out, err, io } = capture();
+  const read = (file) => (file === 'wide.md' ? table('x'.repeat(MAX_LINE + 1)) : table('x'));
+  assert.equal(main(['ok.md', 'wide.md'], { ...io, read }), 1);
+  assert.deepEqual(out, []);
+  assert.equal(err.length, 2);
+  assert.match(err[0], /^wide\.md:3: table cell \(column 2\)/);
+  assert.equal(err[1], `docs tables: 1 over-wide table line(s), limit ${MAX_LINE}`);
+});
+
+test('main with no files checks the whole doc set', () => {
+  const { out, io } = capture();
+  const code = main([], { ...io, read: () => '', listDocs: () => ['README.md', 'AGENTS.md'] });
+  assert.equal(code, 0);
+  assert.deepEqual(out, ['docs tables ok (2 files)']);
+});
+
+// The command line, end to end, in a scratch directory holding a doc set of its
+// own. The environment is inherited so a coverage run sees the child too.
+test('as a command it checks the doc set of the working directory', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'docs-tables-cli-'));
+  try {
+    writeFileSync(path.join(dir, 'README.md'), table('x'));
+    const run = (args) =>
+      spawnSync(process.execPath, [SCRIPT, ...args], {
+        cwd: dir,
+        encoding: 'utf8',
+        env: process.env,
+      });
+    const ok = run([]);
+    assert.equal(ok.status, 0, ok.stderr);
+    assert.equal(ok.stdout, 'docs tables ok (1 files)\n');
+
+    writeFileSync(path.join(dir, 'wide.md'), table('x'.repeat(MAX_LINE + 1)));
+    const wide = run(['wide.md']);
+    assert.equal(wide.status, 1);
+    assert.match(wide.stderr, /over-wide table line/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

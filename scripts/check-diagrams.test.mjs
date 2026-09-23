@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   BROWSER_PATHS,
+  changedDocs,
   checkBlock,
   cleanOutput,
   extractMermaidBlocks,
@@ -12,6 +15,8 @@ import {
   findBrowser,
   formatParseError,
   MERMAID_CLI,
+  main,
+  mmdcRunner,
   PROBE_DIAGRAM,
   probeToolchain,
   writePuppeteerConfig,
@@ -252,6 +257,217 @@ test('the puppeteer config names the browser found and always disarms the sandbo
     // pointed at a path that does not exist.
     const without = JSON.parse(readFileSync(writePuppeteerConfig(dir, undefined), 'utf8'));
     assert.equal('executablePath' in without, false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('changedDocs keeps the changed markdown outside the excluded subtrees', () => {
+  const calls = [];
+  const exec = (command, args) => {
+    calls.push([command, ...args]);
+    return 'README.md\nsrc/app.ts\ndocs/superpowers/plan.md\ndocs/ci.md\n';
+  };
+  assert.deepEqual(changedDocs(exec), ['README.md', 'docs/ci.md']);
+  assert.deepEqual(calls, [['git', 'diff', '--name-only', 'origin/main...HEAD']]);
+});
+
+test('changedDocs is undefined when git cannot diff against origin/main', () => {
+  assert.equal(
+    changedDocs(() => {
+      throw new Error('unknown revision origin/main');
+    }),
+    undefined,
+  );
+});
+
+test('mmdcRunner renders each block through npx with its own input file', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'check-diagrams-runner-'));
+  try {
+    const calls = [];
+    const spawn = (command, args) => {
+      calls.push([command, args]);
+      return { status: 0, stderr: 'warn\n', stdout: 'out' };
+    };
+    const run = mmdcRunner(dir, spawn, '/usr/bin/chromium');
+    assert.deepEqual(run('graph TD;'), { status: 0, stderr: 'warn\nout' });
+    run('graph LR;');
+    const config = path.join(dir, 'puppeteer.json');
+    assert.equal(JSON.parse(readFileSync(config, 'utf8')).executablePath, '/usr/bin/chromium');
+    const first = path.join(dir, 'block-0.mmd');
+    assert.deepEqual(calls[0], [
+      'npx',
+      ['--yes', MERMAID_CLI, '--quiet', '-p', config, '-i', first, '-o', `${first}.svg`],
+    ]);
+    assert.equal(readFileSync(first, 'utf8'), 'graph TD;\n');
+    assert.equal(readFileSync(path.join(dir, 'block-1.mmd'), 'utf8'), 'graph LR;\n');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('mmdcRunner treats missing output streams as empty', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'check-diagrams-runner-'));
+  try {
+    const run = mmdcRunner(dir, () => ({ status: 1, stderr: null, stdout: null }), undefined);
+    assert.deepEqual(run('x'), { status: 1, stderr: '' });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('mmdcRunner reports an npx that never started as a failure', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'check-diagrams-runner-'));
+  try {
+    const run = mmdcRunner(dir, () => ({ error: new Error('spawnSync npx ENOENT') }));
+    assert.deepEqual(run('x'), { status: 1, stderr: 'could not run npx: spawnSync npx ENOENT' });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+const DIAGRAM = '```mermaid\ngraph TD;\n```';
+const BROKEN = '```mermaid\ngrph TD;\n```';
+
+/**
+ * `main` against an in-memory doc set. `render(code)` stands in for the CLI;
+ * the default renders everything. Returns the exit code, what it wrote, and
+ * the directory the runner was handed.
+ */
+function runMain(argv, { docs = {}, render = () => ({ status: 0, stderr: '' }), ...io } = {}) {
+  const out = [];
+  const err = [];
+  let runnerDir;
+  const code = main(argv, {
+    log: (line) => out.push(line),
+    error: (line) => err.push(line),
+    env: {},
+    read: (file) => {
+      if (!(file in docs)) throw new Error(`ENOENT: ${file}`);
+      return docs[file];
+    },
+    listDocs: () => Object.keys(docs),
+    changed: () => undefined,
+    runner: (dir) => {
+      runnerDir = dir;
+      return render;
+    },
+    ...io,
+  });
+  return { code, out, err, runnerDir };
+}
+
+test('main checks only the files it is given', () => {
+  const rendered = [];
+  const result = runMain(['a.md'], {
+    docs: { 'a.md': DIAGRAM, 'b.md': BROKEN },
+    render: (code) => {
+      rendered.push(code);
+      return { status: 0, stderr: '' };
+    },
+  });
+  assert.equal(result.code, 0);
+  assert.deepEqual(result.out, ['diagrams ok (1 mermaid block(s) in 1 file(s))']);
+  assert.deepEqual(rendered, [PROBE_DIAGRAM, 'graph TD;']);
+  // The scratch directory is gone afterwards.
+  assert.equal(existsSync(result.runnerDir), false);
+});
+
+test('main --all checks the whole doc set, whatever changed', () => {
+  const result = runMain(['--all'], {
+    docs: { 'a.md': DIAGRAM, 'b.md': DIAGRAM },
+    changed: () => [],
+  });
+  assert.deepEqual(result.out, ['diagrams ok (2 mermaid block(s) in 2 file(s))']);
+});
+
+test('main with no arguments checks the docs changed against origin/main', () => {
+  const result = runMain([], {
+    docs: { 'a.md': DIAGRAM, 'b.md': DIAGRAM },
+    changed: () => ['b.md'],
+  });
+  assert.deepEqual(result.out, ['diagrams ok (1 mermaid block(s) in 1 file(s))']);
+});
+
+test('main falls back to the whole doc set when git cannot tell what changed', () => {
+  const result = runMain([], { docs: { 'a.md': DIAGRAM, 'b.md': DIAGRAM } });
+  assert.deepEqual(result.out, ['diagrams ok (2 mermaid block(s) in 2 file(s))']);
+});
+
+test('main skips a changed doc deleted from the working tree', () => {
+  const result = runMain([], { docs: { 'a.md': DIAGRAM }, changed: () => ['gone.md', 'a.md'] });
+  assert.deepEqual(result.out, ['diagrams ok (1 mermaid block(s) in 1 file(s))']);
+});
+
+test('main without a mermaid block to check never starts the CLI', () => {
+  const result = runMain(['a.md'], {
+    docs: { 'a.md': 'no diagrams' },
+    runner: () => assert.fail('the runner must not start'),
+  });
+  assert.equal(result.code, 0);
+  assert.deepEqual(result.out, ['diagrams ok (no changed doc has a mermaid block)']);
+});
+
+test('main reports every block that does not parse and exits 1', () => {
+  const result = runMain(['a.md', 'b.md'], {
+    docs: { 'a.md': `${BROKEN}\n\n${BROKEN}`, 'b.md': DIAGRAM },
+    render: (code) =>
+      code.startsWith('grph') ? { status: 1, stderr: 'Parse error' } : { status: 0, stderr: '' },
+  });
+  assert.equal(result.code, 1);
+  assert.deepEqual(result.out, []);
+  assert.deepEqual(result.err, [
+    'a.md:1: mermaid block does not parse — Parse error',
+    'a.md:5: mermaid block does not parse — Parse error',
+    'diagrams: 2 mermaid block(s) do not parse',
+  ]);
+});
+
+test('main skips with a warning when the toolchain cannot render locally', () => {
+  const rendered = [];
+  const result = runMain(['a.md'], {
+    docs: { 'a.md': DIAGRAM },
+    render: (code) => {
+      rendered.push(code);
+      return { status: 1, stderr: 'npm warn config\nnpm error code ENOTFOUND\ngetaddrinfo\nmore' };
+    },
+  });
+  assert.equal(result.code, 0);
+  // Only the probe ran: no doc block reached the CLI.
+  assert.deepEqual(rendered, [PROBE_DIAGRAM]);
+  assert.deepEqual(result.err, [
+    `warning: mermaid check skipped: ${MERMAID_CLI} could not render a known-good diagram ` +
+      '(npm error code ENOTFOUND getaddrinfo) — this gate needs the network on a cold npx cache',
+  ]);
+});
+
+test('main fails under CI when the toolchain cannot render', () => {
+  const result = runMain(['a.md'], {
+    docs: { 'a.md': DIAGRAM },
+    env: { CI: 'true' },
+    render: () => ({ status: 1, stderr: '' }),
+  });
+  assert.equal(result.code, 1);
+  assert.deepEqual(result.err, [
+    `::error::diagrams: ${MERMAID_CLI} could not render a known-good diagram (no output)`,
+  ]);
+});
+
+// The command line, end to end, offline: a scratch directory outside any git
+// repository has no origin/main, so the whole (mermaid-free) doc set is read
+// and the CLI never starts. The environment is inherited so a coverage run
+// sees the child too.
+test('as a command it passes a doc set without diagrams without starting the CLI', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'check-diagrams-cli-'));
+  try {
+    writeFileSync(path.join(dir, 'README.md'), '# Title\n');
+    const result = spawnSync(
+      process.execPath,
+      [fileURLToPath(new URL('./check-diagrams.mjs', import.meta.url))],
+      { cwd: dir, encoding: 'utf8', env: { ...process.env, GIT_CEILING_DIRECTORIES: dir } },
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, 'diagrams ok (no changed doc has a mermaid block)\n');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

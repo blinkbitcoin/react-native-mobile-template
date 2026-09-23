@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { test } from 'node:test';
-import { findings, summarize } from './codeql-findings.mjs';
+import { fileURLToPath } from 'node:url';
+import { findings, main, summarize } from './codeql-findings.mjs';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
 
 const result = (ruleId, uri, line, text, extra = {}) => ({
   ruleId,
@@ -93,4 +100,50 @@ test('a run whose every finding is suppressed reports zero open, so the gate pas
   assert.equal(open, 0);
   assert.equal(suppressed, 1);
   assert.equal(lines.at(-1), 'codeql: 0 open, 1 suppressed by an inline marker');
+});
+
+/** Writes `sarif` to a temporary file and returns its path. */
+const sarifFile = (t, contents) => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'codeql-findings-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const file = path.join(dir, 'results.sarif');
+  writeFileSync(file, JSON.stringify(contents));
+  return file;
+};
+
+/** Captures what `main` writes, instead of letting it reach the test output. */
+const capture = () => {
+  const out = [];
+  const err = [];
+  return { out, err, io: { log: (line) => out.push(line), error: (line) => err.push(line) } };
+};
+
+test('main without a file prints the usage and exits 2', () => {
+  const { out, err, io } = capture();
+  assert.equal(main([], io), 2);
+  assert.deepEqual(out, []);
+  assert.deepEqual(err, ['usage: codeql-findings.mjs <results.sarif>']);
+});
+
+test('main prints every line and exits 1 while a finding is open', (t) => {
+  const { out, io } = capture();
+  assert.equal(main([sarifFile(t, sarif)], io), 1);
+  assert.deepEqual(out, summarize(sarif).lines);
+});
+
+test('main exits 0 when nothing is open', (t) => {
+  const { out, io } = capture();
+  assert.equal(main([sarifFile(t, { runs: [] })], io), 0);
+  assert.deepEqual(out, ['codeql: no findings']);
+});
+
+test('as a command it reads the file named on the command line', (t) => {
+  const script = path.join(here, 'codeql-findings.mjs');
+  // The inherited environment keeps NODE_V8_COVERAGE, so the child counts.
+  const run = (...args) =>
+    spawnSync(process.execPath, [script, ...args], { encoding: 'utf8', env: process.env });
+  assert.equal(run().status, 2);
+  const open = run(sarifFile(t, sarif));
+  assert.equal(open.status, 1);
+  assert.match(open.stdout, /codeql: 2 open, 1 suppressed/);
 });

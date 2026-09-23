@@ -6,7 +6,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
-  chmodSync,
   cpSync,
   existsSync,
   mkdirSync,
@@ -19,11 +18,14 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { PassThrough, Writable } from 'node:stream';
 import test, { after, describe } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
   applyTokens,
+  buildPlan,
+  cli,
   deriveAnswers,
   expandGlob,
   loadManifest,
@@ -38,6 +40,7 @@ import {
   renderTemplate,
   rewriteJson,
   validateAnswers,
+  validateEdit,
   validateField,
   validatePlan,
 } from './init.mjs';
@@ -91,6 +94,10 @@ describe('validation', () => {
     assert.match(validateField('scheme', 'acme-wallet'), /^scheme:/);
     assert.match(validateField('scheme', 'Acme'), /^scheme:/);
     assert.equal(validateField('scheme', 'acme2'), null);
+  });
+
+  test('an unknown field is a programming error, not a validation message', () => {
+    assert.throws(() => validateField('colour', 'blue'), /unknown field: colour/);
   });
 });
 
@@ -221,6 +228,10 @@ describe('removeLines / removeParagraphs', () => {
     assert.equal(removeParagraphs(text, ['PLAYWRIGHT_SKIP_EXPORT']), 'one\n\nthree\n');
   });
 
+  test('removeParagraphs keeps a missing trailing newline missing', () => {
+    assert.equal(removeParagraphs('keep\n\ndrop me', ['drop']), 'keep');
+  });
+
   test('removeParagraphs with no patterns is a no-op', () => {
     assert.equal(removeParagraphs('a\n\nb\n', []), 'a\n\nb\n');
   });
@@ -337,6 +348,7 @@ describe('expandGlob', () => {
     assert.ok(expandGlob(REPO, 'docs/*.md').includes('docs/template-usage.md'));
     assert.deepEqual(expandGlob(REPO, 'nope/*.md'), []);
     assert.deepEqual(expandGlob(REPO, 'Makefile'), ['Makefile']);
+    assert.deepEqual(expandGlob(REPO, 'docs/no-such-file.md'), []);
   });
 });
 
@@ -557,31 +569,41 @@ function removedLines(beforeRoot, afterRoot, rel) {
   return gone;
 }
 
+/** Real sub-processes, but with their output captured instead of inherited. */
+const quietSpawn = (command, args, options) =>
+  spawnSync(command, args, { ...options, stdio: 'pipe' });
+
 /**
- * Runs init with a stubbed `pnpm` that fails, so the gates run for real and the
- * first of them blows up the way a registry hiccup would.
+ * Runs init in-process against the copy at `root` — the same engine the copy
+ * carries, driven through `cli` so a thrown failure becomes exit 1 exactly as
+ * it does on the command line — with INIT_SKIP_INSTALL=1 INIT_SKIP_COMMIT=1
+ * unless `env` says otherwise. Resolves to `{ status, stdout, stderr }`.
  */
-function runInitWithFailingPnpm(root, args) {
-  const stub = path.join(root, 'stub-bin');
-  mkdirSync(stub, { recursive: true });
-  const pnpm = path.join(stub, 'pnpm');
-  writeFileSync(pnpm, '#!/bin/sh\necho "registry unreachable" >&2\nexit 1\n');
-  chmodSync(pnpm, 0o755);
-  return spawnSync(process.execPath, [path.join(root, 'scripts/init.mjs'), ...args], {
-    cwd: root,
-    encoding: 'utf8',
-    // INIT_SKIP_INSTALL deliberately NOT set: the point is to reach the gates.
-    env: { ...process.env, PATH: `${stub}:${process.env.PATH}`, INIT_SKIP_INSTALL: '' },
+async function runInit(root, args, { env = {}, spawn = quietSpawn, ...io } = {}) {
+  const out = [];
+  const err = [];
+  const status = await cli(args, {
+    root,
+    env: { ...process.env, INIT_SKIP_INSTALL: '1', INIT_SKIP_COMMIT: '1', ...env },
+    log: (line) => out.push(`${line}\n`),
+    error: (line) => err.push(`${line}\n`),
+    spawn,
+    ...io,
   });
+  return { status, stdout: out.join(''), stderr: err.join('') };
 }
 
-function runInit(root, args) {
-  return spawnSync(process.execPath, [path.join(root, 'scripts/init.mjs'), ...args], {
-    cwd: root,
-    encoding: 'utf8',
-    env: { ...process.env, INIT_SKIP_INSTALL: '1', INIT_SKIP_COMMIT: '1' },
+/**
+ * Runs init with a `pnpm` that fails, so the gates run for real and the first
+ * of them blows up the way a registry hiccup would.
+ */
+const runInitWithFailingPnpm = (root, args) =>
+  runInit(root, args, {
+    // INIT_SKIP_INSTALL deliberately NOT set: the point is to reach the gates.
+    env: { INIT_SKIP_INSTALL: '' },
+    spawn: (command, commandArgs, options) =>
+      command === 'pnpm' ? { status: 1 } : quietSpawn(command, commandArgs, options),
   });
-}
 
 /** Walk the tree and return [relative path, contents] for every text file. */
 function textFiles(root, rel = '') {
@@ -615,10 +637,10 @@ const ANSWERS = [
 ];
 
 describe('init --dry-run', () => {
-  test('prints the touch list, exits 0 and changes nothing', () => {
+  test('prints the touch list, exits 0 and changes nothing', async () => {
     const root = copyRepo();
     const before = new Map(textFiles(root));
-    const result = runInit(root, ['--dry-run']);
+    const result = await runInit(root, ['--dry-run']);
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /init --dry-run: \d+ operations/);
     assert.match(result.stdout, /scripts\/init\.mjs/);
@@ -629,9 +651,9 @@ describe('init --dry-run', () => {
   });
 });
 
-describe('init --yes --no-web', () => {
+describe('init --yes --no-web', async () => {
   const root = copyRepo();
-  const result = runInit(root, ['--yes', '--no-web', ...ANSWERS]);
+  const result = await runInit(root, ['--yes', '--no-web', ...ANSWERS]);
   const files = result.status === 0 ? textFiles(root) : [];
 
   test('exits 0', () => {
@@ -897,9 +919,9 @@ describe('init --yes --no-web', () => {
   });
 });
 
-describe('init --yes --web', () => {
+describe('init --yes --web', async () => {
   const root = copyRepo();
-  const result = runInit(root, ['--yes', '--web', ...ANSWERS]);
+  const result = await runInit(root, ['--yes', '--web', ...ANSWERS]);
 
   test('exits 0 and keeps the web target', () => {
     assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
@@ -946,17 +968,22 @@ describe('init --yes --web', () => {
 });
 
 describe('init --yes with a bad value', () => {
-  test('exits 2 and changes nothing', () => {
+  test('exits 2 and changes nothing', async () => {
     const root = copyRepo();
-    const result = runInit(root, ['--yes', '--no-web', ...ANSWERS.slice(0, -1), 'Bad Owner!']);
+    const result = await runInit(root, [
+      '--yes',
+      '--no-web',
+      ...ANSWERS.slice(0, -1),
+      'Bad Owner!',
+    ]);
     assert.equal(result.status, 2);
     assert.match(result.stderr, /^owner:/m);
     assert.ok(existsSync(path.join(root, 'scripts/init.mjs')));
   });
 
-  test('--yes without --web or --no-web exits 2 rather than guessing', () => {
+  test('--yes without --web or --no-web exits 2 rather than guessing', async () => {
     const root = copyRepo();
-    const result = runInit(root, ['--yes', ...ANSWERS]);
+    const result = await runInit(root, ['--yes', ...ANSWERS]);
     assert.equal(result.status, 2);
     assert.match(result.stderr, /--yes needs --web or --no-web/);
     assert.ok(existsSync(path.join(root, 'scripts/init.mjs')));
@@ -964,7 +991,7 @@ describe('init --yes with a bad value', () => {
 });
 
 describe('init preflight', () => {
-  test('a drifted anchor stops the run before the first write', () => {
+  test('a drifted anchor stops the run before the first write', async () => {
     const root = copyRepo({ git: true });
     // Reflow the sentence docs/ci.md's anchored replacement points at, the way
     // a later docs change would.
@@ -992,7 +1019,7 @@ describe('init preflight', () => {
       { cwd: root },
     );
 
-    const result = runInit(root, ['--yes', '--no-web', ...ANSWERS]);
+    const result = await runInit(root, ['--yes', '--no-web', ...ANSWERS]);
     assert.equal(result.status, 2, result.stdout);
     assert.match(result.stderr, /no longer matches this repo/);
     assert.match(result.stderr, /docs\/ci\.md: anchor occurs 0x/);
@@ -1003,11 +1030,11 @@ describe('init preflight', () => {
     assert.ok(existsSync(path.join(root, 'playwright.config.ts')));
   });
 
-  test('--dry-run defaults to --no-web, the way the prompt does', () => {
+  test('--dry-run defaults to --no-web, the way the prompt does', async () => {
     const root = copyRepo({ git: true });
-    const bare = runInit(root, ['--dry-run']);
-    const noWeb = runInit(root, ['--dry-run', '--no-web']);
-    const web = runInit(root, ['--dry-run', '--web']);
+    const bare = await runInit(root, ['--dry-run']);
+    const noWeb = await runInit(root, ['--dry-run', '--no-web']);
+    const web = await runInit(root, ['--dry-run', '--web']);
     assert.equal(bare.status, 0, bare.stderr);
     assert.equal(bare.stdout, noWeb.stdout);
     assert.notEqual(bare.stdout, web.stdout);
@@ -1026,9 +1053,9 @@ describe('init preflight', () => {
 // `git checkout .` would have thrown away the rename they came for. The
 // destructive step now runs last, after the gates have passed.
 describe('init when a gate fails', () => {
-  test('leaves the initialiser in place so the run can be repeated', () => {
+  test('leaves the initialiser in place so the run can be repeated', async () => {
     const root = copyRepo({ git: true });
-    const result = runInitWithFailingPnpm(root, ['--yes', '--no-web', ...ANSWERS]);
+    const result = await runInitWithFailingPnpm(root, ['--yes', '--no-web', ...ANSWERS]);
 
     assert.notEqual(result.status, 0, 'a failing pnpm should fail the run');
     assert.ok(
@@ -1041,24 +1068,468 @@ describe('init when a gate fails', () => {
     );
   });
 
-  test('commits nothing, so the working tree is still recoverable', () => {
+  test('commits nothing, so the working tree is still recoverable', async () => {
     const root = copyRepo({ git: true });
     const before = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).stdout;
-    const result = runInitWithFailingPnpm(root, ['--yes', '--no-web', ...ANSWERS]);
+    const result = await runInitWithFailingPnpm(root, ['--yes', '--no-web', ...ANSWERS]);
     const after = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).stdout;
 
     assert.notEqual(result.status, 0);
     assert.equal(after, before, 'a failed init created a commit');
   });
 
-  test('says what state the tree is in and what to type next', () => {
+  test('says what state the tree is in and what to type next', async () => {
     const root = copyRepo({ git: true });
-    const result = runInitWithFailingPnpm(root, ['--yes', '--no-web', ...ANSWERS]);
+    const result = await runInitWithFailingPnpm(root, ['--yes', '--no-web', ...ANSWERS]);
 
     assert.match(result.stderr, /init did not finish/);
     // The two facts an adopter needs: the rename happened, and the script that
     // redoes it is still there.
     assert.match(result.stderr, /still here/);
     assert.match(result.stderr, /node scripts\/init\.mjs/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A miniature repository
+// ---------------------------------------------------------------------------
+//
+// The copies above prove the real manifest against the real tree. The engine's
+// own branches — optional entries, missing files, every kind of drift, the
+// prompt, the gates and the commit — are cheaper and clearer against a tree of
+// a dozen lines whose manifest exercises each of them on purpose.
+
+const MINI_MANIFEST = {
+  rename: {
+    perFile: [
+      { path: 'app.json', replace: [['"slug": "rnmt"', '"slug": "{{slug}}"', '+']] },
+      { path: 'optional.txt', optional: true, replace: [['x', 'y']] },
+    ],
+    tokens: [['rnmt', '{{slug}}']],
+    paths: ['README.md'],
+    // `README.md` again, and a directory that is not there: the plan lists a
+    // file once, and a glob into nothing is nothing.
+    globs: ['docs/*.md', 'README.md', 'nowhere/*.md'],
+  },
+  web: {
+    filesList: 'docs/web-files.txt',
+    packageJson: 'package.json',
+    makefile: 'Makefile',
+    knipConfig: 'knip.json',
+    commitlintConfig: 'commitlint.config.mjs',
+    files: ['web.config.ts'],
+    packageScripts: ['web'],
+    packageDependencies: ['react-native-web'],
+    packageDevDependencies: ['@playwright/test'],
+    makeTargets: ['web'],
+    commitlintScopes: ['web'],
+    knipPlugins: ['playwright'],
+    markedBlocks: [{ path: 'app.config.ts', marker: 'init:web' }],
+    edits: [
+      {
+        path: 'docs/notes.md',
+        replace: [['Web: yes', 'Web: no']],
+        blocks: [{ from: '^test\\(', until: '^\\}\\);$' }],
+        lines: ['^web line$'],
+        paragraphs: ['web paragraph'],
+      },
+      { path: 'docs/gone.md', optional: true, lines: ['anything'] },
+    ],
+    docScrub: {
+      globs: ['*.md'],
+      lines: ['make web'],
+      bullets: ['WEB_BULLET'],
+      paragraphs: ['WEB_PARAGRAPH'],
+    },
+  },
+  selfDelete: {
+    paths: ['scripts/init.mjs', 'scripts/init.manifest.json'],
+    makeTargets: ['init'],
+    markedBlocks: [
+      { path: 'README.md', marker: 'init:usage' },
+      { path: 'absent.md', marker: 'init:usage', optional: true },
+    ],
+    // Bullets only: the web scrub carries every kind, this one none but that.
+    docScrub: { globs: ['*.md'], bullets: ['make init'] },
+  },
+};
+
+const MINI_FILES = {
+  'app.json': '{ "slug": "rnmt" }\n',
+  'README.md': [
+    '# rnmt',
+    '',
+    '<!-- init:usage-start -->',
+    'Run `make init` first.',
+    '<!-- init:usage-end -->',
+    '',
+    '| `make web` | web |',
+    '',
+    '- `make init` renames it',
+    '- WEB_BULLET item',
+    '- kept item',
+    '',
+    'WEB_PARAGRAPH text',
+    '',
+  ].join('\n'),
+  'docs/notes.md': [
+    'Web: yes',
+    '',
+    "test('web', () => {",
+    '});',
+    '',
+    'web line',
+    '',
+    'a web paragraph',
+    '',
+    'kept',
+    '',
+  ].join('\n'),
+  'docs/web-files.txt': '# web-only files\n\nweb.config.ts\n',
+  'web.config.ts': 'export default {};\n',
+  'app.config.ts': [
+    'export default {',
+    '  // init:web-start',
+    '  web: {},',
+    '  // init:web-end',
+    '};',
+    '',
+  ].join('\n'),
+  'package.json': `${JSON.stringify(
+    {
+      name: 'rnmt',
+      scripts: { web: 'expo start --web', test: 'jest' },
+      dependencies: { 'react-native-web': '1.0.0' },
+      devDependencies: { '@playwright/test': '1.0.0' },
+    },
+    null,
+    2,
+  )}\n`,
+  'knip.json': '{ "playwright": {} }\n',
+  Makefile: [
+    'init: ## rename',
+    '\tnode scripts/init.mjs',
+    '',
+    'web: ## web',
+    '\tpnpm web',
+    '',
+    '.PHONY: init web',
+    '',
+  ].join('\n'),
+  'commitlint.config.mjs': "export default [\n  'app',\n  'web',\n];\n",
+  'scripts/init.mjs': '// stand-in\n',
+};
+
+/** A fresh miniature repository; `files` entries override (null deletes). */
+function miniRepo({ manifest = MINI_MANIFEST, files = {} } = {}) {
+  const root = mkdtempSync(path.join(tmpdir(), 'init-mini-'));
+  tempDirs.push(root);
+  const all = {
+    ...MINI_FILES,
+    'scripts/init.manifest.json': `${JSON.stringify(manifest, null, 2)}\n`,
+    ...files,
+  };
+  for (const [rel, text] of Object.entries(all)) {
+    if (text === null) continue;
+    mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
+    writeFileSync(path.join(root, rel), text);
+  }
+  return root;
+}
+
+const MINI_ANSWERS = [...ANSWERS, '--yes'];
+
+/** A spawner that records every command and answers with `status(command, args)`. */
+function recordingSpawn(status = () => 0) {
+  const calls = [];
+  const spawn = (command, args, options) => {
+    calls.push([command, ...args].join(' '));
+    assert.equal(options.stdio, 'inherit');
+    assert.equal(options.shell, false);
+    return { status: status(command, args) };
+  };
+  return { calls, spawn };
+}
+
+const GATES = { INIT_SKIP_INSTALL: '', INIT_SKIP_COMMIT: '' };
+
+describe('init against a miniature repository', () => {
+  test('the miniature manifest is sound in both modes', () => {
+    const root = miniRepo();
+    assert.deepEqual(validatePlan(root, loadManifest(root), { web: false }), []);
+    assert.deepEqual(validatePlan(root, loadManifest(root), { web: true }), []);
+  });
+
+  test('the plan names each file once and skips what is optional and absent', () => {
+    const root = miniRepo();
+    const plan = buildPlan(root, loadManifest(root), { web: false });
+    const readme = plan.filter(
+      (row) => row.path === 'README.md' && row.detail === 'rename (tokens)',
+    );
+    assert.equal(readme.length, 1);
+    for (const absent of ['optional.txt', 'docs/gone.md', 'absent.md']) {
+      assert.equal(plan.filter((row) => row.path === absent).length, 0, absent);
+    }
+    assert.ok(plan.some((row) => row.action === 'delete' && row.path === 'web.config.ts'));
+  });
+
+  test('a full run installs, checks, strips web, deletes itself and commits', async () => {
+    const root = miniRepo();
+    const { calls, spawn } = recordingSpawn();
+    const result = await runInit(root, ['--no-web', ...MINI_ANSWERS], { env: GATES, spawn });
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(calls, [
+      'pnpm install',
+      'pnpm codegen',
+      'pnpm i18n:check',
+      'make check-code',
+      'git add -A',
+      'git commit -m chore(app): initialize acme-wallet from react-native-mobile-template',
+    ]);
+    assert.match(result.stdout, /Acme Wallet is ready/);
+    const read = (rel) => readFileSync(path.join(root, rel), 'utf8');
+    assert.equal(read('app.json'), '{ "slug": "acme-wallet" }\n');
+    assert.equal(existsSync(path.join(root, 'web.config.ts')), false);
+    assert.equal(existsSync(path.join(root, 'scripts/init.mjs')), false);
+    assert.equal(read('docs/notes.md'), 'Web: no\n\nkept\n');
+    assert.equal(read('README.md'), '# acme-wallet\n\n- kept item\n');
+    assert.equal(read('Makefile'), '\n.PHONY:\n');
+    assert.equal(read('commitlint.config.mjs'), "export default [\n  'app',\n];\n");
+    assert.deepEqual(JSON.parse(read('knip.json')), {});
+    assert.deepEqual(JSON.parse(read('package.json')), {
+      name: 'rnmt',
+      scripts: { test: 'jest' },
+      dependencies: {},
+      devDependencies: {},
+    });
+    assert.equal(read('app.config.ts'), 'export default {\n};\n');
+  });
+
+  test('a gate that fails after the self-delete says the remaining steps are ordinary ones', async () => {
+    const root = miniRepo();
+    const { spawn } = recordingSpawn((command) => (command === 'git' ? null : 0));
+    const result = await runInit(root, ['--web', ...MINI_ANSWERS], { env: GATES, spawn });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /init did not finish/);
+    assert.match(result.stderr, /has already been removed/);
+    assert.match(result.stderr, /git add -A exited null/);
+    // Web kept: the block stays, its markers go.
+    assert.equal(
+      readFileSync(path.join(root, 'app.config.ts'), 'utf8'),
+      'export default {\n  web: {},\n};\n',
+    );
+  });
+
+  test('--help prints the usage and exits 0', async () => {
+    let written = '';
+    const stdout = new Writable({
+      write(chunk, _encoding, done) {
+        written += chunk;
+        done();
+      },
+    });
+    const result = await runInit(miniRepo(), ['--help'], { stdout });
+    assert.equal(result.status, 0);
+    assert.match(written, /^make init — rename this template into your app\./);
+  });
+
+  test('an unknown argument exits 1 with the reason', async () => {
+    const result = await runInit(miniRepo(), ['--bogus']);
+    assert.equal(result.status, 1);
+    assert.equal(result.stderr, 'unknown argument: --bogus\n');
+  });
+});
+
+/**
+ * A terminal that types the next of `replies` each time a question is asked,
+ * and remembers every question it saw.
+ */
+function scriptedTerminal(replies) {
+  const stdin = new PassThrough();
+  const questions = [];
+  const stdout = new Writable({
+    write(chunk, _encoding, done) {
+      questions.push(String(chunk));
+      setImmediate(() => stdin.write(`${replies.shift()}\n`));
+      done();
+    },
+  });
+  return { stdin, stdout, questions };
+}
+
+/** Replies to the six value questions, taking every offered default. */
+const TYPED = ['Acme Wallet', '', '', '', '', 'acme'];
+
+describe('init prompts', () => {
+  test('offers derived defaults, re-asks an invalid answer and keeps web on "y"', async () => {
+    const root = miniRepo();
+    const terminal = scriptedTerminal([
+      '', // no name, no default: asked again
+      'Acme Wallet',
+      '', // slug: take acme-wallet
+      '', // iOS: take com.example.acmewallet
+      'com.acme.wallet',
+      'Bad Scheme', // asked again
+      '',
+      'acme',
+      'y',
+    ]);
+    const result = await runInit(root, [], { stdin: terminal.stdin, stdout: terminal.stdout });
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(terminal.questions, [
+      'App display name: ',
+      'App display name: ',
+      'Slug (package name, Expo slug) [acme-wallet]: ',
+      'iOS bundle identifier [com.example.acmewallet]: ',
+      'Android package [com.example.acmewallet]: ',
+      'Deep-link scheme [acmewallet]: ',
+      'Deep-link scheme [acmewallet]: ',
+      'GitHub owner (org or user): ',
+      'Keep the web target? [y/N]: ',
+    ]);
+    assert.match(result.stderr, /^name: expected/m);
+    assert.match(result.stderr, /^scheme: expected/m);
+    assert.ok(existsSync(path.join(root, 'web.config.ts')));
+    assert.equal(readFileSync(path.join(root, 'app.json'), 'utf8'), '{ "slug": "acme-wallet" }\n');
+  });
+
+  for (const [reply, kept] of [
+    ['yes', true],
+    ['n', false],
+  ]) {
+    test(`"${reply}" to the web question ${kept ? 'keeps' : 'drops'} the web target`, async () => {
+      const root = miniRepo();
+      const terminal = scriptedTerminal([...TYPED, reply]);
+      const result = await runInit(root, [], terminal);
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(existsSync(path.join(root, 'web.config.ts')), kept);
+    });
+  }
+
+  test('--web or --no-web on the command line skips the web question', async () => {
+    const terminal = scriptedTerminal([...TYPED]);
+    const root = miniRepo();
+    const result = await runInit(root, ['--no-web'], terminal);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(terminal.questions.length, TYPED.length);
+    assert.ok(!terminal.questions.some((question) => question.startsWith('Keep the web')));
+    assert.equal(existsSync(path.join(root, 'web.config.ts')), false);
+  });
+});
+
+describe('init preflight problems', () => {
+  const problemsFor = (options, web = false) => {
+    const root = miniRepo(options);
+    return validatePlan(root, loadManifest(root), { web });
+  };
+
+  test('validateEdit names each kind of drift', () => {
+    const root = miniRepo();
+    assert.deepEqual(validateEdit(root, { path: 'absent.md', optional: true }), []);
+    assert.deepEqual(validateEdit(root, { path: 'absent.md' }), [
+      'absent.md: missing (the manifest lists it)',
+    ]);
+    assert.deepEqual(
+      validateEdit(root, {
+        path: 'docs/notes.md',
+        replace: [
+          ['Web: yes', 'x'],
+          ['nothing like this', 'x', '+'],
+          ['web', 'x', 2],
+        ],
+        blocks: [
+          { from: '^no such start$', until: '.' },
+          { from: '^kept$', until: '^no such end$' },
+        ],
+        lines: ['^no such line$'],
+        paragraphs: ['no such paragraph'],
+      }),
+      [
+        'docs/notes.md: anchor occurs 0x, expected +x: "nothing like this"',
+        'docs/notes.md: anchor occurs 3x, expected 2x: "web"',
+        'docs/notes.md: no line matches block start /^no such start$/',
+        'docs/notes.md: no line matches block end /^no such end$/ after /^kept$/',
+        'docs/notes.md: no line matches /^no such line$/',
+        'docs/notes.md: no paragraph matches /no such paragraph/',
+      ],
+    );
+  });
+
+  test('every web-side drift is reported, not just the first', () => {
+    const manifest = structuredClone(MINI_MANIFEST);
+    manifest.web.markedBlocks.push({ path: 'absent.ts', marker: 'init:web' });
+    manifest.web.docScrub = {
+      globs: ['*.md'],
+      lines: ['^no such row$'],
+      bullets: ['NO_SUCH_BULLET'],
+      paragraphs: ['NO_SUCH_PARAGRAPH'],
+    };
+    manifest.selfDelete.paths.push('scripts/absent.mjs');
+    const problems = problemsFor({
+      manifest,
+      files: {
+        'package.json': '{}\n',
+        'knip.json': '{}\n',
+        'docs/web-files.txt': null,
+        'web.config.ts': null,
+        'app.config.ts': '// init:web-start\n// init:web-start\n// init:web-end\n',
+        Makefile: '.PHONY:\n',
+        'commitlint.config.mjs': 'export default [];\n',
+      },
+    });
+    assert.deepEqual(problems, [
+      'web.config.ts: missing (the web file list names it)',
+      'package.json: no script "web"',
+      'package.json: no dependency "react-native-web"',
+      'package.json: no devDependency "@playwright/test"',
+      'knip.json: no "playwright" plugin key',
+      'Makefile: no line matches /^web:/',
+      "commitlint.config.mjs: no line matches /^\\s*'web',\\s*$/",
+      'app.config.ts: expected one init:web-start/-end pair, found 2/1',
+      'absent.ts: missing (the manifest lists it)',
+      'web.docScrub: no line in any scrubbed file matches /^no such row$/',
+      'web.docScrub: no line in any scrubbed file matches /NO_SUCH_BULLET/',
+      'web.docScrub: no paragraph in any scrubbed file matches /NO_SUCH_PARAGRAPH/',
+      'scripts/absent.mjs: missing (selfDelete.paths lists it)',
+      'Makefile: no line matches /^init:/',
+    ]);
+  });
+
+  test('a missing package.json or knip.json is left to the file checks', () => {
+    const problems = problemsFor({ files: { 'package.json': null, 'knip.json': null } });
+    assert.deepEqual(problems, []);
+  });
+
+  test('keeping web still checks the markers it will drop', () => {
+    const problems = problemsFor({ files: { 'app.config.ts': 'no markers\n' } }, true);
+    assert.deepEqual(problems, ['app.config.ts: expected one init:web-start/-end pair, found 0/0']);
+  });
+
+  test('a missing rename path is drift', () => {
+    const problems = problemsFor({ files: { 'README.md': null } }, true);
+    assert.ok(problems.includes('README.md: missing (rename.paths lists it)'), problems.join('\n'));
+  });
+});
+
+describe('init as a command', () => {
+  // The in-process runs above cover the engine; this covers the entry line
+  // itself. The environment is inherited so a coverage run sees the child.
+  const command = (args, input) =>
+    spawnSync(process.execPath, [path.join(REPO, 'scripts/init.mjs'), ...args], {
+      encoding: 'utf8',
+      input,
+      env: { ...process.env },
+    });
+
+  test('--help prints the usage and exits 0', () => {
+    const result = command(['--help'], '');
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /^make init — rename this template/);
+  });
+
+  test('an unknown argument exits 1 with the reason on stderr', () => {
+    const result = command(['--bogus'], '');
+    assert.equal(result.status, 1);
+    assert.equal(result.stderr, 'unknown argument: --bogus\n');
   });
 });

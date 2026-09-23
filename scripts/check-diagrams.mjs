@@ -24,7 +24,6 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { DOC_EXCLUDES, DOC_GLOBS, docFiles, fencedBlocks } from './check-docs-tables.mjs';
 
 // Pinned, not `@latest`: the parser is the thing under test, so a mermaid
@@ -137,9 +136,10 @@ export function checkBlock(file, block, run) {
   return status === 0 ? { ok: true } : { error: formatParseError(file, block, stderr) };
 }
 
-function changedDocs() {
+/** Docs changed against origin/main, or undefined when git cannot tell. */
+export function changedDocs(exec = execFileSync) {
   try {
-    const out = execFileSync('git', ['diff', '--name-only', 'origin/main...HEAD'], {
+    const out = exec('git', ['diff', '--name-only', 'origin/main...HEAD'], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     });
@@ -156,13 +156,13 @@ function changedDocs() {
 // single block today, so this is two spawns; past roughly three blocks it is
 // worth writing them all into `dir` and handing `mmdc` the directory once
 // (`-i dir`), or resolving the CLI once with a warm `npx --no-install`.
-function mmdcRunner(dir) {
-  const puppeteerConfig = writePuppeteerConfig(dir, findBrowser());
+export function mmdcRunner(dir, spawn = spawnSync, browser = findBrowser()) {
+  const puppeteerConfig = writePuppeteerConfig(dir, browser);
   let n = 0;
   return (code) => {
     const input = path.join(dir, `block-${n++}.mmd`);
     writeFileSync(input, `${code}\n`);
-    const result = spawnSync(
+    const result = spawn(
       'npx',
       ['--yes', MERMAID_CLI, '--quiet', '-p', puppeteerConfig, '-i', input, '-o', `${input}.svg`],
       { encoding: 'utf8' },
@@ -173,20 +173,30 @@ function mmdcRunner(dir) {
   };
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
-  const args = process.argv.slice(2);
-  const all = args.includes('--all');
-  const explicit = args.filter((a) => a !== '--all');
+/** Command-line entry; returns the exit code. */
+export function main(
+  argv = process.argv.slice(2),
+  {
+    log = console.log,
+    error = console.error,
+    env = process.env,
+    read = (file) => readFileSync(file, 'utf8'),
+    listDocs = () => docFiles(DOC_GLOBS, DOC_EXCLUDES),
+    changed = changedDocs,
+    runner = mmdcRunner,
+  } = {},
+) {
+  const all = argv.includes('--all');
+  const explicit = argv.filter((a) => a !== '--all');
 
-  const read = (file) => readFileSync(file, 'utf8');
   let candidates;
   if (explicit.length > 0) {
     candidates = explicit;
   } else if (all) {
-    candidates = docFiles(DOC_GLOBS, DOC_EXCLUDES);
+    candidates = listDocs();
   } else {
-    const changed = changedDocs();
-    candidates = changed === undefined ? docFiles(DOC_GLOBS, DOC_EXCLUDES) : changed;
+    const docs = changed();
+    candidates = docs === undefined ? listDocs() : docs;
   }
   const files = filesWithMermaid(
     candidates.filter((file) => {
@@ -201,12 +211,12 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   );
 
   if (files.length === 0) {
-    console.log('diagrams ok (no changed doc has a mermaid block)');
-    process.exit(0);
+    log('diagrams ok (no changed doc has a mermaid block)');
+    return 0;
   }
 
   const dir = mkdtempSync(path.join(tmpdir(), 'check-diagrams-'));
-  const run = mmdcRunner(dir);
+  const run = runner(dir);
   const errors = [];
   let blocks = 0;
   let probe;
@@ -219,8 +229,8 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
       for (const file of files) {
         for (const block of extractMermaidBlocks(read(file))) {
           blocks++;
-          const { error } = checkBlock(file, block, run);
-          if (error) errors.push(error); // collect them all; never stop early
+          const { error: failure } = checkBlock(file, block, run);
+          if (failure) errors.push(failure); // collect them all; never stop early
         }
       }
     }
@@ -233,20 +243,23 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
     const message = `${MERMAID_CLI} could not render a known-good diagram (${why})`;
     // A runner is expected to have both the network and a browser, so a probe
     // failure there is the gate breaking, not an environment to work around.
-    if (process.env.CI) {
-      console.error(`::error::diagrams: ${message}`);
-      process.exit(1);
+    if (env.CI) {
+      error(`::error::diagrams: ${message}`);
+      return 1;
     }
-    console.error(
+    error(
       `warning: mermaid check skipped: ${message} — this gate needs the network on a cold npx cache`,
     );
-    process.exit(0);
+    return 0;
   }
 
   if (errors.length > 0) {
-    for (const error of errors) console.error(error);
-    console.error(`diagrams: ${errors.length} mermaid block(s) do not parse`);
-    process.exit(1);
+    for (const line of errors) error(line);
+    error(`diagrams: ${errors.length} mermaid block(s) do not parse`);
+    return 1;
   }
-  console.log(`diagrams ok (${blocks} mermaid block(s) in ${files.length} file(s))`);
+  log(`diagrams ok (${blocks} mermaid block(s) in ${files.length} file(s))`);
+  return 0;
 }
+
+if (import.meta.main) process.exitCode = main();

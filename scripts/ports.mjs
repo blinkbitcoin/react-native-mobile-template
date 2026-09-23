@@ -100,19 +100,25 @@ export const envLines = (env) => {
 };
 
 // CLI: `--sh` for `eval "$(node scripts/ports.mjs --sh)"`, no argument for a
-// human-readable table.
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
-  const [, , flag] = process.argv;
+// human-readable table. Returns the exit code.
+export const main = (
+  argv = process.argv.slice(2),
+  { env = process.env, log = console.log, error = console.error } = {},
+) => {
+  const [flag] = argv;
   if (flag === '--sh') {
-    console.log(envLines(process.env).join('\n'));
+    log(envLines(env).join('\n'));
   } else if (flag === undefined) {
-    const ports = resolvePorts(process.env);
-    console.log(`${BASE_VAR}=${ports.base} (default ${BASE_DEFAULT})`);
+    const ports = resolvePorts(env);
+    log(`${BASE_VAR}=${ports.base} (default ${BASE_DEFAULT})`);
     for (const [key, { offset, env: name, what }] of Object.entries(SERVICES)) {
-      console.log(`  ${String(ports[key]).padEnd(6)} base+${offset}  ${name}  ${what}`);
+      log(`  ${String(ports[key]).padEnd(6)} base+${offset}  ${name}  ${what}`);
     }
   } else {
-    console.error(`usage: node scripts/ports.mjs [--sh]`);
-    process.exit(2);
+    error(`usage: node scripts/ports.mjs [--sh]`);
+    return 2;
   }
-}
+  return 0;
+};
+
+if (import.meta.main) process.exitCode = main();

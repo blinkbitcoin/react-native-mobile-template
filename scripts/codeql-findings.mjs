@@ -13,8 +13,6 @@
 // Exits 1 while any finding is still unsuppressed, so the local run works as a
 // pre-push gate. The pure half is exported and tested in codeql-findings.test.mjs.
 import { readFileSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 const location = (result) => {
   const physical = result.locations?.[0]?.physicalLocation;
@@ -53,13 +51,19 @@ export const summarize = (sarif) => {
   return { open, suppressed, lines };
 };
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
-  const [file] = process.argv.slice(2);
+/** Command-line entry; returns the exit code. */
+export function main(
+  argv = process.argv.slice(2),
+  { log = console.log, error = console.error } = {},
+) {
+  const [file] = argv;
   if (!file) {
-    console.error('usage: codeql-findings.mjs <results.sarif>');
-    process.exit(2);
+    error('usage: codeql-findings.mjs <results.sarif>');
+    return 2;
   }
   const { open, lines } = summarize(JSON.parse(readFileSync(file, 'utf8')));
-  for (const line of lines) console.log(line);
-  process.exit(open > 0 ? 1 : 0);
+  for (const line of lines) log(line);
+  return open > 0 ? 1 : 0;
 }
+
+if (import.meta.main) process.exitCode = main();

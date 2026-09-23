@@ -39,8 +39,11 @@ which is why they sit at the top level and not in either project.
 
 ### `pnpm test:scripts`
 
-`node --test "scripts/**/*.test.mjs"` covers the tooling that has no business
-booting React Native:
+`node --test --experimental-test-coverage --test-coverage-lines=100
+--test-coverage-branches=100 --test-coverage-functions=100
+"scripts/**/*.test.mjs"` covers the tooling that has no business booting React
+Native, and fails below 100% — see [Script coverage](#script-coverage). The
+suites include:
 
 | Suite | Covers |
 | --- | --- |
@@ -54,6 +57,7 @@ booting React Native:
 | `scripts/release/verify.test.mjs` | The artifact verification helpers |
 | `scripts/release/fingerprint.test.mjs` | The fingerprint and OTA plumbing |
 | `scripts/release/build-info.test.mjs` | The per-build provenance record |
+| `scripts/coverage-completeness.test.mjs` | Loads every `scripts/**/*.mjs` module, so one no test imports still counts |
 | `scripts/release/shared-copies.test.mjs` | Our `resolve-version.sh` and `build-info.sh` against shared-workflows' copies, read from `$WORKFLOWS_DIR`.<br>CI always compares; locally they skip unless `WORKFLOWS_DIR` points at a checkout |
 
 These run in `make ci` (and in CI's Unit job), **not** in `make check`, which
@@ -106,6 +110,36 @@ file: that is why the root layout's global error handler moved to
 test passes rather than a branch no test can take, and why `assertSilent()` is
 split out of `installConsoleGuard()` — an `afterEach` cannot observe its own
 failure, so the throwing branch needs a seam a test can call.
+
+### Script coverage
+
+`pnpm test:scripts` (`make test-scripts`, `make ci`, CI's Unit job through
+shared-workflows' `check-unit`) measures the Node scripts with `node:test`'s
+own coverage and fails below **100% of lines, branches and functions**. The
+flags live in the `test:scripts` script in `package.json`, so CI enforces
+exactly what `make test-scripts` does. No dependency does the measuring, and
+nothing is excluded: test files are measured too, and are at 100% like the
+rest.
+
+Two things make that reachable:
+
+- **Each script's command-line entry is a function.** A script exports
+  `main(argv, io)` that returns the exit code, with its console, environment,
+  file reads and child processes arriving through `io` (real ones by
+  default). Tests call it in-process with stubs, so every exit path is a plain
+  assertion, never a network call or a real `npx`. The entry is then only a
+  guard, `if (import.meta.main) process.exitCode = main();` (awaited for an
+  asynchronous `main`; `init.mjs` uses `.then` so a closed prompt still exits
+  0), and a single subprocess run per script covers it. The coverage run hands `NODE_V8_COVERAGE` to the
+  child through the environment, so a subprocess test must pass
+  `{ ...process.env, ... }`, never a fresh environment.
+- **Every module is in the report.** Node only reports files something loaded,
+  so a script no test imports would be missing rather than at 0%.
+  `scripts/coverage-completeness.test.mjs` imports every `scripts/**/*.mjs`
+  module, which puts a new, untested script in the report and fails the gate.
+
+The same rules as Jest apply: a threshold is never lowered, and a branch no
+test can take is restructured away rather than ignored.
 
 ### Files with nothing to cover
 

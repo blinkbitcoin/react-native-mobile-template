@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { closeSync, openSync, readFileSync, readSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
@@ -9,6 +9,7 @@ import {
   BASE_VAR,
   baseFrom,
   envLines,
+  main,
   mockApiUrl,
   portFrom,
   resolvePorts,
@@ -105,6 +106,58 @@ test('a per-service override still reaches the CLI', () => {
   });
   assert.ok(out.includes('export MOCK_API_PORT=4444'), out);
   assert.ok(out.includes('export METRO_PORT=8091'), out);
+});
+
+/** Runs `main` in-process and captures what it writes. */
+const runMain = (argv, env) => {
+  const out = [];
+  const err = [];
+  const code = main(argv, {
+    env,
+    log: (text) => out.push(...text.split('\n')),
+    error: (text) => err.push(text),
+  });
+  return { code, out, err };
+};
+
+test('main --sh prints the export lines', () => {
+  const env = { [BASE_VAR]: String(BASE_DEFAULT + 10) };
+  assert.deepEqual(runMain(['--sh'], env), { code: 0, out: envLines(env), err: [] });
+});
+
+test('main with no argument prints the table for a human', () => {
+  const env = { [BASE_VAR]: String(BASE_DEFAULT + 10) };
+  const ports = resolvePorts(env);
+  const { code, out, err } = runMain([], env);
+  assert.equal(code, 0);
+  assert.deepEqual(err, []);
+  assert.equal(out[0], `${BASE_VAR}=${ports.base} (default ${BASE_DEFAULT})`);
+  assert.equal(out.length, 1 + Object.keys(SERVICES).length);
+  for (const [i, [key, { offset, env: name }]] of Object.entries(SERVICES).entries()) {
+    assert.match(out[i + 1], new RegExp(`^  ${ports[key]} +base\\+${offset}  ${name}  `));
+  }
+});
+
+test('main rejects an unknown flag with the usage and exit code 2', () => {
+  assert.deepEqual(runMain(['--json'], {}), {
+    code: 2,
+    out: [],
+    err: ['usage: node scripts/ports.mjs [--sh]'],
+  });
+});
+
+test('the CLI prints the table and rejects an unknown flag', () => {
+  const run = (...args) =>
+    spawnSync(process.execPath, [path.join(root, 'scripts/ports.mjs'), ...args], {
+      env: { ...process.env, ...bareServiceEnv },
+      encoding: 'utf8',
+    });
+  const table = run();
+  assert.equal(table.status, 0, table.stderr);
+  assert.match(table.stdout, new RegExp(`^${BASE_VAR}=\\d+ \\(default ${BASE_DEFAULT}\\)`));
+  const bad = run('--json');
+  assert.equal(bad.status, 2);
+  assert.equal(bad.stderr, 'usage: node scripts/ports.mjs [--sh]\n');
 });
 
 // ---------------------------------------------------------------------------

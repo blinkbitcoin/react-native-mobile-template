@@ -88,7 +88,7 @@ Every row is a make target; nothing here is run through pnpm directly.
 |---|---|
 | `make test` | Unit tests + code checks |
 | `make unit` | Unit + component tests |
-| `make test-scripts` | `node:test` for `scripts/**/*.test.mjs` |
+| `make test-scripts` | `node:test` for `scripts/**/*.test.mjs`, with the 100% coverage gate over `scripts/**/*.mjs` |
 | `make coverage` | Tests with the coverage thresholds and the empty-row check CI enforces |
 | `make badges` | Render the CI badges into `coverage/badge/` (after `make coverage`) |
 | `make e2e-ios` | Maestro flows on iOS (needs mock-api, start, ios) |
@@ -180,11 +180,11 @@ Every row is a make target; nothing here is run through pnpm directly.
   the happy path, every error path and every branch a reviewer could ask
   about, and the PR description names the tests that cover the change. Where a
   tool measures coverage the gate is 100%: Jest over `src/`, `plugins/` and
-  `modules/*/index.ts` (lines, branches, functions, statements). Code no tool
-  measures here is held to the same bar by review: a `node:test` file per
-  `scripts/**/*.mjs` module, an end-to-end flow per user-facing flow, a
-  `fastlane/test/` case per lane, a `scripts/*.test.mjs` assertion per
-  workflow rule. A threshold is never lowered and no file is excluded from
+  `modules/*/index.ts` (lines, branches, functions, statements), and
+  `node:test` over `scripts/**/*.mjs` (lines, branches, functions; `make
+  test-scripts`). Code no tool measures here is held to the same bar by
+  review: an end-to-end flow per user-facing flow, a `fastlane/test/` case per
+  lane, a `scripts/*.test.mjs` assertion per workflow rule. A threshold is never lowered and no file is excluded from
   coverage to make a PR pass; if something truly cannot be tested, the PR says
   what and why.
 - **Docs and diagrams ship in the same PR as the change, never as a
@@ -210,7 +210,7 @@ Every row is a make target; nothing here is run through pnpm directly.
 |---|---|---|
 | Units, components, router, Apollo (MSW) | `src/**/*.test.ts(x)` | `make unit` |
 | Config plugins | `plugins/*.test.ts` | `make unit` |
-| Node scripts (release, doctor, verify) | `scripts/**/*.test.mjs` | `make test-scripts` |
+| Node scripts (release, doctor, init, checks), 100% coverage | `scripts/**/*.test.mjs` | `make test-scripts` |
 | Fastlane lanes | `fastlane/test/` | `make check-release` |
 | Native e2e | `.maestro/flows/` | `make e2e-ios`, `make e2e-android` |
 | Web e2e | `e2e/web/` | `make e2e-web` |
@@ -221,7 +221,14 @@ assert goes in `coveragePathIgnorePatterns` **with a one-line reason**; an entry
 without one is not mergeable, and a native module's TS wrapper does not qualify
 just because the native half is Swift/Kotlin. `make coverage` (and CI, through
 `test:coverage`) also fails on any file with zero statements (`scripts/check-coverage-empty.mjs`), so a re-export
-barrel cannot lift the number while testing nothing. See `docs/testing.md`.
+barrel cannot lift the number while testing nothing.
+
+The Node scripts have their own gate: `test:scripts` (`make test-scripts`, CI's
+Unit job) runs `node:test` with its built-in coverage at 100% lines, branches
+and functions over every `scripts/**/*.mjs` module. A script's command-line
+entry is an exported `main(argv, io)` that returns the exit code, tested
+in-process; the entry itself is only an `import.meta.main` guard that sets
+`process.exitCode` from `main`, which one subprocess run per script covers. See `docs/testing.md`.
 
 ## CI, release and troubleshooting
 

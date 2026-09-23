@@ -1,8 +1,6 @@
 #!/usr/bin/env node
 // Allowlist check over `pnpm licenses list --json --prod`.
 import { execSync } from 'node:child_process';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 const ALLOWED = [
   'MIT',
@@ -42,12 +40,16 @@ export function findViolations(report) {
   return out;
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
-  const report = JSON.parse(execSync('pnpm licenses list --json --prod', { encoding: 'utf8' }));
+/** Command-line entry; returns the exit code. */
+export function main({ exec = execSync, log = console.log, error = console.error } = {}) {
+  const report = JSON.parse(exec('pnpm licenses list --json --prod', { encoding: 'utf8' }));
   const violations = findViolations(report);
   if (violations.length) {
-    for (const v of violations) console.error(`disallowed license ${v.license}: ${v.name}`);
-    process.exit(1);
+    for (const v of violations) error(`disallowed license ${v.license}: ${v.name}`);
+    return 1;
   }
-  console.log('licenses ok');
+  log('licenses ok');
+  return 0;
 }
+
+if (import.meta.main) process.exitCode = main();

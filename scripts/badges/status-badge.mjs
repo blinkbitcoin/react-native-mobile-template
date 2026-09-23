@@ -10,7 +10,6 @@
 // GitHub adds later must be visible, and "we could not tell" is not "passing".
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { BadgeError, renderBadgeJson, renderBadgeSvg, STATUS_RESULTS } from './badge.mjs';
 import { argValue, BADGE_DIR } from './coverage-badge.mjs';
 
@@ -33,8 +32,11 @@ export function writeStatusBadge({ outDir = BADGE_DIR, name, label, result }) {
   return badge;
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
-  const argv = process.argv.slice(2);
+/** Command-line entry; returns the exit code. */
+export function main(
+  argv = process.argv.slice(2),
+  { log = console.log, error = console.error } = {},
+) {
   const [name, label, result] = argv;
   try {
     const badge = writeStatusBadge({
@@ -43,14 +45,17 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
       label,
       result,
     });
-    console.log(`status-badge: ${badge.label}: ${badge.message}`);
+    log(`status-badge: ${badge.label}: ${badge.message}`);
+    return 0;
   } catch (e) {
     if (!(e instanceof BadgeError)) throw e;
-    console.error(e.message);
-    console.error(
+    error(e.message);
+    error(
       'usage: status-badge.mjs <name> <label> <' +
         `${Object.keys(STATUS_RESULTS).join('|')}> [--out DIR]`,
     );
-    process.exit(1);
+    return 1;
   }
 }
+
+if (import.meta.main) process.exitCode = main();

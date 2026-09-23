@@ -189,7 +189,7 @@ locally means the same commands passed the same way in CI.
 | CI job | Scripts it runs | Local equivalent |
 | --- | --- | --- |
 | `check-code.yml` | `typecheck`, `lint`, `format:check`, `knip`, `spell`, `expo-doctor`, `pnpm audit --prod`,<br>commitlint, actionlint, zizmor, shellcheck, `check:docs`, `check:release`, `check:secrets` | `make check-code`, `make check-deps`, `make check-ci`, `make check-docs`,<br>`make check-release`, `make check-secrets` (`make check` runs all of it) |
-| `check-unit.yml` | `test:coverage`, `test:scripts` | `make coverage`, `make test-scripts` (`make unit` runs `test` + `test:scripts`) |
+| `check-unit.yml` | `test:coverage`, `test:scripts` | `make coverage`, `make test-scripts` (`make unit` runs `test` + `test:scripts`);<br>both gate coverage at 100% |
 | `check-e2e.yml` | Maestro flows in `.maestro/` against a debug build | `make e2e-ios` / `make e2e-android` (after `make mock-api`, `make start`, `make ios`/`make android`) |
 | `build-web.yml` | `build:web`, `test:e2e:web` | `make build-web`, `make e2e-web` |
 | `check-codeql.yml` | no consumer script: the CodeQL action reads `.github/codeql/codeql-config.yml` | `make codeql` (same config, same suite, same packs) |

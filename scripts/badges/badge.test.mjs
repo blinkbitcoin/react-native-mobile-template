@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { after, describe, test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   BadgeError,
   COLORS,
@@ -17,9 +19,9 @@ import {
   STATUS_RESULTS,
   textWidth,
 } from './badge.mjs';
-import { argValue, writeCoverageBadge } from './coverage-badge.mjs';
-import { coverageModeFor, renderBadges } from './render.mjs';
-import { writeStatusBadge } from './status-badge.mjs';
+import { argValue, main as coverageMain, writeCoverageBadge } from './coverage-badge.mjs';
+import { coverageModeFor, renderBadges, main as renderMain } from './render.mjs';
+import { main as statusMain, writeStatusBadge } from './status-badge.mjs';
 
 const tmp = mkdtempSync(path.join(tmpdir(), 'badge-render-'));
 after(() => rmSync(tmp, { recursive: true, force: true }));
@@ -374,5 +376,175 @@ describe('renderBadges', () => {
       () => renderBadges({ BADGE_OUT_DIR: outDir(), BADGE_COVERAGE: 'skip' }),
       BadgeError,
     );
+  });
+});
+
+/** Captures what a `main` writes, instead of letting it reach the test output. */
+const capture = () => {
+  const out = [];
+  const err = [];
+  return { out, err, io: { log: (line) => out.push(line), error: (line) => err.push(line) } };
+};
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Runs a badge script as a command, in `cwd`. The environment is inherited so
+ * the coverage run (NODE_V8_COVERAGE) sees the child too.
+ */
+const runScript = (script, args, { cwd, env = {} }) =>
+  spawnSync(process.execPath, [path.join(HERE, script), ...args], {
+    cwd,
+    encoding: 'utf8',
+    env: { ...process.env, ...env },
+  });
+
+describe('coverage-badge main', () => {
+  test('measures the summary named by --summary into --out', () => {
+    const dir = outDir();
+    const summaryFile = path.join(tmp, 'main-summary.json');
+    writeFileSync(summaryFile, JSON.stringify(summaryWith(1, 2)));
+    const { out, err, io } = capture();
+    assert.equal(coverageMain(['--out', dir, '--summary', summaryFile], io), 0);
+    assert.deepEqual(out, ['coverage-badge: 50% (1/2 lines)']);
+    assert.deepEqual(err, []);
+    assert.ok(readFileSync(path.join(dir, 'coverage.svg'), 'utf8').includes('50%'));
+  });
+
+  test('a --status placeholder reads no summary', () => {
+    const dir = outDir();
+    const { out, io } = capture();
+    assert.equal(coverageMain(['--status', 'pending', '--out', dir], io), 0);
+    assert.deepEqual(out, ['coverage-badge: pending (placeholder)']);
+  });
+
+  test('a missing summary exits 1 with the reason', () => {
+    const { out, err, io } = capture();
+    const code = coverageMain(['--out', outDir(), '--summary', path.join(tmp, 'gone.json')], io);
+    assert.equal(code, 1);
+    assert.deepEqual(out, []);
+    assert.match(err[0], /gone\.json is missing or unreadable/);
+  });
+
+  test('an unknown --status exits 1', () => {
+    const { err, io } = capture();
+    assert.equal(coverageMain(['--status', 'green', '--out', outDir()], io), 1);
+    assert.equal(err.length, 1);
+  });
+
+  test('an error that is not a badge error is not swallowed', () => {
+    const blocker = path.join(tmp, 'a-file-not-a-directory');
+    writeFileSync(blocker, '');
+    assert.throws(
+      () =>
+        coverageMain(['--status', 'failing', '--out', path.join(blocker, 'badge')], capture().io),
+      { code: 'ENOTDIR' },
+    );
+  });
+
+  test('as a command it writes coverage/badge from coverage/coverage-summary.json', () => {
+    const cwd = mkdtempSync(path.join(tmp, 'cwd-'));
+    const missing = runScript('coverage-badge.mjs', [], { cwd });
+    assert.equal(missing.status, 1);
+    assert.match(missing.stderr, /coverage\/coverage-summary\.json is missing/);
+
+    const placeholder = runScript('coverage-badge.mjs', ['--status', 'failing'], { cwd });
+    assert.equal(placeholder.status, 0, placeholder.stderr);
+    assert.equal(placeholder.stdout, 'coverage-badge: failing (placeholder)\n');
+    assert.ok(readFileSync(path.join(cwd, 'coverage/badge/coverage.svg'), 'utf8'));
+  });
+});
+
+describe('status-badge main', () => {
+  test('writes the named badge and reports it', () => {
+    const dir = outDir();
+    const { out, io } = capture();
+    assert.equal(statusMain(['e2e', 'E2E', 'cancelled', '--out', dir], io), 0);
+    assert.deepEqual(out, ['status-badge: E2E: cancelled']);
+    assert.ok(readFileSync(path.join(dir, 'e2e.svg'), 'utf8').includes('cancelled'));
+  });
+
+  test('a bad result exits 1 with the reason and the usage line', () => {
+    const { err, io } = capture();
+    assert.equal(statusMain(['unit', 'Unit', 'green', '--out', outDir()], io), 1);
+    assert.match(err[0], /unknown job result "green"/);
+    assert.equal(
+      err[1],
+      'usage: status-badge.mjs <name> <label> <success|failure|cancelled|skipped> [--out DIR]',
+    );
+  });
+
+  test('an error that is not a badge error is not swallowed', () => {
+    const blocker = path.join(tmp, 'status-blocker');
+    writeFileSync(blocker, '');
+    assert.throws(
+      () => statusMain(['unit', 'Unit', 'success', '--out', path.join(blocker, 'x')], capture().io),
+      { code: 'ENOTDIR' },
+    );
+  });
+
+  test('as a command it writes into coverage/badge by default', () => {
+    const cwd = mkdtempSync(path.join(tmp, 'cwd-'));
+    const ok = runScript('status-badge.mjs', ['unit', 'Unit', 'success'], { cwd });
+    assert.equal(ok.status, 0, ok.stderr);
+    assert.equal(ok.stdout, 'status-badge: Unit: passing\n');
+    assert.ok(readFileSync(path.join(cwd, 'coverage/badge/unit.svg'), 'utf8').includes('passing'));
+
+    const bad = runScript('status-badge.mjs', [], { cwd });
+    assert.equal(bad.status, 1);
+    assert.match(bad.stderr, /usage: status-badge\.mjs/);
+  });
+});
+
+describe('render main', () => {
+  test('renders from the environment it is given', () => {
+    const dir = outDir();
+    const code = renderMain(
+      { BADGE_OUT_DIR: dir, BADGE_UNIT: 'skipped', BADGE_E2E: 'success' },
+      capture().io,
+    );
+    assert.equal(code, 0);
+    assert.ok(readFileSync(path.join(dir, 'e2e.svg'), 'utf8').includes('passing'));
+  });
+
+  test('a badge error exits 1 with the reason', () => {
+    const { err, io } = capture();
+    assert.equal(renderMain({ BADGE_OUT_DIR: outDir(), BADGE_COVERAGE: 'skip' }, io), 1);
+    assert.match(err[0], /unknown job result ""/);
+  });
+
+  test('an error that is not a badge error is not swallowed', () => {
+    const blocker = path.join(tmp, 'render-blocker');
+    writeFileSync(blocker, '');
+    assert.throws(
+      () =>
+        renderMain(
+          { BADGE_OUT_DIR: path.join(blocker, 'x'), BADGE_UNIT: 'skipped', BADGE_E2E: 'skipped' },
+          capture().io,
+        ),
+      { code: 'ENOTDIR' },
+    );
+  });
+
+  test('as a command it reads the environment and defaults to coverage/', () => {
+    const cwd = mkdtempSync(path.join(tmp, 'cwd-'));
+    mkdirSync(path.join(cwd, 'coverage'));
+    writeFileSync(
+      path.join(cwd, 'coverage/coverage-summary.json'),
+      JSON.stringify(summaryWith(3, 4)),
+    );
+    const ok = runScript('render.mjs', [], {
+      cwd,
+      env: { BADGE_UNIT: 'success', BADGE_E2E: 'skipped', BADGE_OUT_DIR: '', BADGE_COVERAGE: '' },
+    });
+    assert.equal(ok.status, 0, ok.stderr);
+    assert.ok(readFileSync(path.join(cwd, 'coverage/badge/coverage.svg'), 'utf8').includes('75%'));
+
+    const bad = runScript('render.mjs', [], {
+      cwd,
+      env: { BADGE_UNIT: 'nonsense', BADGE_E2E: 'skipped', BADGE_COVERAGE: 'skip' },
+    });
+    assert.equal(bad.status, 1);
+    assert.match(bad.stderr, /unknown job result "nonsense"/);
   });
 });

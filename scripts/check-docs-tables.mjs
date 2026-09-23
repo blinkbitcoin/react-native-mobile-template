@@ -11,8 +11,6 @@
 // document long command lines. Measured against this repo, 72 flags 117 lines
 // and 120 flags only the rows that actually squeeze a neighbouring column.
 import { globSync, readFileSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 export const MAX_LINE = 120;
 
@@ -160,18 +158,30 @@ export function docFiles(globs = DOC_GLOBS, excludes = DOC_EXCLUDES) {
     .sort();
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
-  const files = process.argv.length > 2 ? process.argv.slice(2) : docFiles();
+/** Command-line entry; returns the exit code. */
+export function main(
+  argv = process.argv.slice(2),
+  {
+    log = console.log,
+    error = console.error,
+    read = (file) => readFileSync(file, 'utf8'),
+    listDocs = docFiles,
+  } = {},
+) {
+  const files = argv.length > 0 ? argv : listDocs();
   let problems = 0;
   for (const file of files) {
-    for (const line of formatFindings(file, overlongTableLines(readFileSync(file, 'utf8')))) {
-      console.error(line);
+    for (const line of formatFindings(file, overlongTableLines(read(file)))) {
+      error(line);
       problems++;
     }
   }
   if (problems > 0) {
-    console.error(`docs tables: ${problems} over-wide table line(s), limit ${MAX_LINE}`);
-    process.exit(1);
+    error(`docs tables: ${problems} over-wide table line(s), limit ${MAX_LINE}`);
+    return 1;
   }
-  console.log(`docs tables ok (${files.length} files)`);
+  log(`docs tables ok (${files.length} files)`);
+  return 0;
 }
+
+if (import.meta.main) process.exitCode = main();

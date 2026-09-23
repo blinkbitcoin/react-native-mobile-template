@@ -24,17 +24,12 @@
 // Env escape hatches (used by scripts/init.test.mjs):
 //   INIT_SKIP_INSTALL=1   skip `pnpm install`, codegen, i18n and `make check-code`
 //   INIT_SKIP_COMMIT=1    skip `git add -A && git commit`
+//
+// `main(argv, io)` takes the root, environment, streams and process spawner
+// through `io`, so the tests drive the whole run in-process against a copy.
 
 import { spawnSync } from 'node:child_process';
-import {
-  existsSync,
-  readdirSync,
-  readFileSync,
-  realpathSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
@@ -350,8 +345,8 @@ function expandGlobs(root, patterns) {
   return [...new Set(patterns.flatMap((pattern) => expandGlob(root, pattern)))];
 }
 
-function run(command, args, { cwd } = {}) {
-  const result = spawnSync(command, args, { cwd, stdio: 'inherit', shell: false });
+function runCommand(spawn, command, args, { cwd }) {
+  const result = spawn(command, args, { cwd, stdio: 'inherit', shell: false });
   if (result.status !== 0) {
     throw new Error(`${command} ${args.join(' ')} exited ${result.status ?? 'null'}`);
   }
@@ -609,9 +604,10 @@ function applyRename(root, manifest, answers) {
     if (!exists(root, entry.path)) continue;
     write(root, entry.path, applyTokens(read(root, entry.path), entry.replace, answers));
   }
+  // Every one of these exists: validatePlan has checked each rename.paths entry,
+  // and a glob only ever expands to files that are there.
   const targets = [...manifest.rename.paths, ...expandGlobs(root, manifest.rename.globs)];
   for (const rel of new Set(targets)) {
-    if (!exists(root, rel)) continue;
     write(root, rel, applyTokens(read(root, rel), manifest.rename.tokens, answers));
   }
 }
@@ -745,8 +741,8 @@ function defaultsFrom(answers) {
   };
 }
 
-async function prompt(answers) {
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
+async function prompt(answers, { input, output, error }) {
+  const rl = createInterface({ input, output });
   try {
     const ask = async (field, label) => {
       for (;;) {
@@ -754,12 +750,12 @@ async function prompt(answers) {
         const suffix = fallback ? ` [${fallback}]` : '';
         const raw = (await rl.question(`${label}${suffix}: `)).trim();
         const value = raw || fallback || '';
-        const error = validateField(field, value);
-        if (!error) {
+        const problem = validateField(field, value);
+        if (!problem) {
           answers[field] = value;
           return;
         }
-        console.error(error);
+        error(problem);
       }
     };
     await ask('name', 'App display name');
@@ -782,10 +778,24 @@ async function prompt(answers) {
 // main
 // ---------------------------------------------------------------------------
 
-export async function main(argv, root = REPO_ROOT) {
+/**
+ * Command-line entry; resolves to the exit code. Everything the run reads from
+ * or writes to the outside world comes through `io`, defaulting to the real one.
+ */
+export async function main(argv = process.argv.slice(2), io = {}) {
+  const {
+    root = REPO_ROOT,
+    env = process.env,
+    stdin = process.stdin,
+    stdout = process.stdout,
+    log = console.log,
+    error = console.error,
+    spawn = spawnSync,
+  } = io;
+  const run = (command, args) => runCommand(spawn, command, args, { cwd: root });
   const options = parseArgs(argv);
   if (options.help) {
-    process.stdout.write(USAGE);
+    stdout.write(USAGE);
     return 0;
   }
 
@@ -801,20 +811,20 @@ export async function main(argv, root = REPO_ROOT) {
     if (web === null) web = false;
   } else if (options.yes) {
     if (web === null) {
-      console.error('--yes needs --web or --no-web: say whether to keep the web target.');
-      console.error(`\n${USAGE}`);
+      error('--yes needs --web or --no-web: say whether to keep the web target.');
+      error(`\n${USAGE}`);
       return 2;
     }
   } else {
     answers.web = web ?? undefined;
-    answers = await prompt(answers);
+    answers = await prompt(answers, { input: stdin, output: stdout, error });
     web = answers.web;
   }
 
   const errors = validateAnswers(answers);
   if (errors.length > 0) {
-    for (const message of errors) console.error(message);
-    console.error(`\n${USAGE}`);
+    for (const message of errors) error(message);
+    error(`\n${USAGE}`);
     return 2;
   }
   const filled = deriveAnswers(answers);
@@ -823,19 +833,19 @@ export async function main(argv, root = REPO_ROOT) {
   // leaving a half-renamed, half-stripped tree behind.
   const problems = validatePlan(root, manifest, { web });
   if (problems.length > 0) {
-    console.error('scripts/init.manifest.json no longer matches this repo:\n');
-    for (const problem of problems) console.error(`  ${problem}`);
-    console.error('\nNothing was changed. Update the manifest anchors and run init again.');
+    error('scripts/init.manifest.json no longer matches this repo:\n');
+    for (const problem of problems) error(`  ${problem}`);
+    error('\nNothing was changed. Update the manifest anchors and run init again.');
     return 2;
   }
 
   const plan = buildPlan(root, manifest, { web });
   if (options.dryRun) {
-    console.log(`init --dry-run: ${plan.length} operations (nothing was changed)\n`);
+    log(`init --dry-run: ${plan.length} operations (nothing was changed)\n`);
     for (const row of plan) {
-      console.log(`  ${row.action.padEnd(7)} ${row.path.padEnd(52)} ${row.detail}`);
+      log(`  ${row.action.padEnd(7)} ${row.path.padEnd(52)} ${row.detail}`);
     }
-    console.log(`\nweb target: ${web ? 'kept' : 'removed'}`);
+    log(`\nweb target: ${web ? 'kept' : 'removed'}`);
     return 0;
   }
 
@@ -855,13 +865,13 @@ export async function main(argv, root = REPO_ROOT) {
   // So the destructive step moved to the end, and a failure before it now leaves
   // the tree exactly as re-runnable as it was.
   try {
-    if (process.env.INIT_SKIP_INSTALL !== '1') {
-      run('pnpm', ['install'], { cwd: root });
-      run('pnpm', ['codegen'], { cwd: root });
+    if (env.INIT_SKIP_INSTALL !== '1') {
+      run('pnpm', ['install']);
+      run('pnpm', ['codegen']);
       // Renaming touches no message id, so the catalogs must come back unchanged.
-      run('pnpm', ['i18n:check'], { cwd: root });
+      run('pnpm', ['i18n:check']);
     } else {
-      console.log('INIT_SKIP_INSTALL=1: skipping install, codegen, i18n and check-code');
+      log('INIT_SKIP_INSTALL=1: skipping install, codegen, i18n and check-code');
     }
 
     // The JSON rewrites above are parse/stringify: valid JSON, but not always
@@ -871,42 +881,42 @@ export async function main(argv, root = REPO_ROOT) {
     // Biome directly, not `pnpm format`: pnpm would re-run the `prepare` lifecycle
     // (`lefthook install`), which needs a git repo the scratch copies do not have.
     if (exists(root, 'node_modules/.bin/biome')) {
-      run(abs(root, 'node_modules/.bin/biome'), ['format', '--write', '.'], { cwd: root });
+      run(abs(root, 'node_modules/.bin/biome'), ['format', '--write', '.']);
     }
-    if (process.env.INIT_SKIP_INSTALL !== '1') {
-      run('make', ['check-code'], { cwd: root });
+    if (env.INIT_SKIP_INSTALL !== '1') {
+      run('make', ['check-code']);
     }
 
     // Last, and only once the gates have passed: this removes the initialiser
     // and its manifest, so it is the one step that cannot be undone by re-running.
     applySelfDelete(root, manifest, { web });
 
-    if (process.env.INIT_SKIP_COMMIT !== '1') {
-      run('git', ['add', '-A'], { cwd: root });
-      run(
-        'git',
-        ['commit', '-m', `chore(app): initialize ${filled.slug} from react-native-mobile-template`],
-        { cwd: root },
-      );
+    if (env.INIT_SKIP_COMMIT !== '1') {
+      run('git', ['add', '-A']);
+      run('git', [
+        'commit',
+        '-m',
+        `chore(app): initialize ${filled.slug} from react-native-mobile-template`,
+      ]);
     } else {
-      console.log('INIT_SKIP_COMMIT=1: leaving the changes uncommitted');
+      log('INIT_SKIP_COMMIT=1: leaving the changes uncommitted');
     }
-  } catch (error) {
+  } catch (failure) {
     // A bare non-zero exit here would look like the adopter did something wrong.
     // Say what state the tree is in and what to type next, then re-throw so the
     // exit code still reports failure.
     const initialiserGone = !exists(root, 'scripts/init.mjs');
-    console.error('\ninit did not finish.\n');
-    console.error('The rename and the web-target choice have been applied to the working tree.');
+    error('\ninit did not finish.\n');
+    error('The rename and the web-target choice have been applied to the working tree.');
     if (initialiserGone) {
-      console.error(
+      error(
         'scripts/init.mjs has already been removed, so the remaining steps are ordinary ones:\n' +
           '  pnpm install && pnpm codegen && make check-code\n' +
           '  git add -A && git commit -m "chore(app): initialize ' +
           `${filled.slug} from react-native-mobile-template"`,
       );
     } else {
-      console.error(
+      error(
         'scripts/init.mjs is still here and nothing has been committed, so you can fix the\n' +
           'cause and re-run it:\n' +
           '  git checkout . && node scripts/init.mjs\n' +
@@ -914,28 +924,30 @@ export async function main(argv, root = REPO_ROOT) {
           '  pnpm install && pnpm codegen && make check-code',
       );
     }
-    throw error;
+    throw failure;
   }
 
-  console.log(
+  log(
     `\n${filled.name} is ready. Next: set the repo variables and secrets listed in docs/release-runbook.md.`,
   );
   return 0;
 }
 
-// realpath on both sides: Node resolves symlinks for the main module's URL, and
-// on macOS a temp dir is reached through the /var -> /private/var symlink.
-const invokedDirectly =
-  process.argv[1] !== undefined &&
-  realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+/**
+ * `main` as a command: a failure that escapes it (a gate that exited non-zero,
+ * an unknown argument) prints its message and exits 1.
+ */
+export async function cli(argv = process.argv.slice(2), io = {}) {
+  try {
+    return await main(argv, io);
+  } catch (failure) {
+    (io.error ?? console.error)(failure.message);
+    return 1;
+  }
+}
 
-if (invokedDirectly) {
-  main(process.argv.slice(2))
-    .then((code) => {
-      process.exitCode = code;
-    })
-    .catch((error) => {
-      console.error(error.message);
-      process.exitCode = 1;
-    });
+if (import.meta.main) {
+  cli().then((code) => {
+    process.exitCode = code;
+  });
 }

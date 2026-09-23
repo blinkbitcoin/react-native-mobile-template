@@ -74,15 +74,27 @@ export function startServer({ dist, basePath, port }) {
   return server;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+/**
+ * Command-line entry: starts the server and returns 0 (the open server keeps
+ * the process alive), or returns 1 when no port is configured.
+ */
+export function main({
+  env = process.env,
+  root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..'),
+  start = startServer,
+  log = console.log,
+  error = console.error,
+} = {}) {
   const dist = path.join(root, 'dist');
-  const basePath = normalizeBasePath(process.env.EXPO_PUBLIC_BASE_URL);
-  const port = Number(process.env.WEB_PREVIEW_PORT);
+  const basePath = normalizeBasePath(env.EXPO_PUBLIC_BASE_URL);
+  const port = Number(env.WEB_PREVIEW_PORT);
   if (!port) {
-    console.error('WEB_PREVIEW_PORT is not set; run through scripts/e2e/web.sh');
-    process.exit(1);
+    error('WEB_PREVIEW_PORT is not set; run through scripts/e2e/web.sh');
+    return 1;
   }
-  startServer({ dist, basePath, port });
-  console.log(`serving ${dist} at http://localhost:${port}${basePath || '/'} (404 -> 404.html)`);
+  start({ dist, basePath, port });
+  log(`serving ${dist} at http://localhost:${port}${basePath || '/'} (404 -> 404.html)`);
+  return 0;
 }
+
+if (import.meta.main) process.exitCode = main();
