@@ -74,7 +74,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     typedRoutes: true,
     // Web only. A project GitHub Pages site lives under `/<repo>/`, and without
     // this every `href` and the bundle `src` are root-absolute, so the deployed
-    // site 404s on its first click. `web.yml` sets it from the repository name
+    // site 404s on its first click. `ci-web.yml` sets it from the repository name
     // when it deploys; empty otherwise, which keeps every other export at `/`.
     ...(process.env.EXPO_PUBLIC_BASE_URL ? { baseUrl: process.env.EXPO_PUBLIC_BASE_URL } : {}),
   },

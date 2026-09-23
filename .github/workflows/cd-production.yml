@@ -43,8 +43,8 @@ permissions:
 concurrency:
   # A constant group, not one keyed on github.ref: `github.ref` is
   # refs/heads/main on a push or a dispatch and refs/tags/vX.Y.Z on a
-  # `release: published` event, so a ref-keyed group put release-beta in a
-  # queue of its own and let it touch a store while release-internal or a
+  # `release: published` event, so a ref-keyed group put cd-beta in a
+  # queue of its own and let it touch a store while cd-internal or a
   # production dispatch was in one. Every workflow that talks to App Store
   # Connect, Play or the update server shares this one queue.
   group: release
@@ -52,10 +52,10 @@ concurrency:
 jobs:
   prepare:
     name: Prepare
-    uses: blinkbitcoin/shared-workflows/.github/workflows/expo-prepare.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/build-prepare.yml@v0
     permissions:
       contents: read
-      # expo-prepare declares `actions: read` statically (its green-workflow
+      # build-prepare declares `actions: read` statically (its green-workflow
       # gate runs `gh run list`), and a called workflow can only narrow the
       # caller's token — so it has to be granted here even though this caller
       # sets no `require-green-workflow`.
@@ -82,7 +82,7 @@ jobs:
     name: Release iOS
     needs: prepare
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && (inputs.action == 'release' && inputs.platforms != 'android') }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/fastlane-lane.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@v0
     permissions:
       contents: read
     with:
@@ -120,7 +120,7 @@ jobs:
     name: Release Android
     needs: prepare
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && (inputs.action == 'release' && inputs.platforms != 'ios') }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/fastlane-lane.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@v0
     permissions:
       contents: read
     with:
@@ -175,7 +175,7 @@ jobs:
     # android-release too: AppGallery should not receive a release Play refused.
     needs: [prepare, android-release, huawei-binary]
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && vars.HUAWEI_UPLOADS_ENABLED == 'true' && (inputs.action == 'release' && inputs.platforms != 'ios') }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/fastlane-lane.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@v0
     permissions:
       contents: read
     with:
@@ -207,7 +207,7 @@ jobs:
     name: Phased iOS
     needs: prepare
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && (contains(fromJSON('["halt", "resume", "complete"]'), inputs.action) && inputs.platforms != 'android') }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/fastlane-lane.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@v0
     permissions:
       contents: read
     with:
@@ -236,7 +236,7 @@ jobs:
     name: Rollout Android
     needs: prepare
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && (contains(fromJSON('["rollout", "resume", "complete"]'), inputs.action) && inputs.platforms != 'ios') }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/fastlane-lane.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@v0
     permissions:
       contents: read
     with:
@@ -261,7 +261,7 @@ jobs:
     name: Halt Android
     needs: prepare
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && (inputs.action == 'halt' && inputs.platforms != 'ios') }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/fastlane-lane.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@v0
     permissions:
       contents: read
     with:
@@ -290,7 +290,7 @@ jobs:
     # a job skipped by `platforms` does not skip this one; `!failure()` still
     # holds the line on a store job that actually failed.
     if: ${{ !failure() && !cancelled() && inputs.action == 'release' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/github-release.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-github-release.yml@v0
     permissions:
       contents: write
     with:
@@ -342,7 +342,7 @@ jobs:
     name: Attach stage note
     needs: [prepare, stage-note]
     if: ${{ !failure() && !cancelled() }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/github-release.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-github-release.yml@v0
     permissions:
       contents: write
     with:
@@ -358,7 +358,7 @@ jobs:
     # fingerprint baseline the gate downloads.
     needs: [prepare, github-release]
     if: ${{ !failure() && !cancelled() && inputs.action == 'release' && vars.OTA_ENABLED == 'true' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/expo-ota-publish.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-ota.yml@v0
     permissions:
       contents: read
     with:
@@ -385,7 +385,7 @@ jobs:
     # The site tracks what is actually live in the stores, so it deploys from
     # the production dispatch rather than from the tag push.
     if: ${{ !failure() && !cancelled() && inputs.action == 'release' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/web.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/build-web.yml@v0
     permissions:
       contents: read
       # The called `deploy` job (environment `github-pages`) needs these, and a

@@ -86,7 +86,7 @@ test('a tag on HEAD wins over a release-please PR title', () => {
 
 test('the release commit is stamped with the version it releases, not patch+1', () => {
   // The commit that merges release-please's PR: the vX.Y.Z tag does not exist
-  // yet (release-please and release-internal are triggered by the same push and
+  // yet (release-please and cd-internal are triggered by the same push and
   // run concurrently), RELEASE_PR_TITLE is empty on a push, and the pending PR
   // has just been merged. Without the subject source this resolves to 1.4.3 and
   // beta then looks for a v1.5.0-build.N pre-release nothing ever created.

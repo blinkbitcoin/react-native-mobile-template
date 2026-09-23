@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # GitHub's CodeQL analysis, on this machine: the same language, the same query
 # suite, the same packs and the same path exclusions as
-# .github/workflows/codeql.yml - and therefore the same findings, before a push,
+# .github/workflows/ci-codeql.yml - and therefore the same findings, before a push,
 # with the inline `// codeql[<rule-id>]` markers shown as suppressed or not.
 #
 #   make codeql

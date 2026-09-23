@@ -433,7 +433,7 @@ test('a hand-written "## Store notes" override is cleaned, not trusted', () => {
 // ---------- store notes on the release PR: markers and rules ----------
 
 test('a section appended by the shared workflow ends at its end marker', () => {
-  // The exact shape release-beta leaves behind: the shared append mode wraps
+  // The exact shape cd-beta leaves behind: the shared append mode wraps
   // the section in HTML-comment markers, and production reads it back.
   const body = [
     '## [0.6.1](https://example.com/compare/v0.6.0...v0.6.1) (2026-09-21)',
@@ -654,7 +654,7 @@ test('locales come from the ios metadata directories, ignoring the non-locales',
 });
 
 test('NOTES_LOCALES is honoured, below --locales and above discovery', () => {
-  // expo-prepare exports it for its `notes-locales` input; before this the
+  // build-prepare exports it for its `notes-locales` input; before this the
   // input was plumbed through the whole workflow and then ignored.
   const flag = { locales: ['sv-SE'] };
   const none = { locales: [] };

@@ -1,5 +1,5 @@
 # CodeQL configuration, read by BOTH the CI analysis
-# (.github/workflows/codeql.yml, which passes this path to
+# (.github/workflows/ci-codeql.yml, which passes this path to
 # github/codeql-action/init) and the local run (`make codeql`, which parses the
 # suite and the packs out of this file). One file, so local and CI cannot
 # disagree about what was scanned or with which queries.

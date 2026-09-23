@@ -13,4 +13,4 @@ rules:
       # code from an untrusted (fork) head. This one is filtered to main, checks
       # nothing out, and only asks the API to re-run a beta run for the same
       # commit.
-      - release-retry.yml
+      - cd-beta-retry.yml

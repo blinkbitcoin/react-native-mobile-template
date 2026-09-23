@@ -9,30 +9,30 @@ OTA is documented separately in [ota.md](ota.md).
 ## The shape of it
 
 ```
-merge a PR ──► release-internal   TestFlight internal + Play internal
+merge a PR ──► CD / Internal      TestFlight internal + Play internal
                     │              vX.Y.Z-build.N pre-release, OTA internal
                     ▼
 merge the release PR ──► release-please ──► vX.Y.Z release published,
-                                                  │  release-beta + web dispatched
+                                                  │  CD / Beta + CI / Web dispatched
                                                   ▼
-                                            release-beta   TestFlight external
+                                            CD / Beta      TestFlight external
                                                   │        + Play open beta
                                             (soak)│        + OTA beta
                                                   ▼
-                                     release-production (dispatch, reviewed)
+                                     CD / Production (dispatch, reviewed)
                                             App Store + Play + web + OTA
 ```
 
 One binary is built once, on the merge to main, and then *promoted*. Beta and
 production never rebuild — they call store APIs against the build that internal
 already produced and that testers already used. That is why
-`release-beta.yml` will not promote until that exact commit's `release-internal`
-run is green (`require-green-workflow: release-internal.yml`).
+`cd-beta.yml` will not promote until that exact commit's `cd-internal`
+run is green (`require-green-workflow: cd-internal.yml`).
 
 ## The six steps
 
 The whole chain, with what triggers each hop and what each stage produces. Two
-workflows run off the same push to `main` — `release-internal` builds, and
+workflows run off the same push to `main` — `cd-internal` builds, and
 `release-please` maintains the release PR — and everything after the tag is a
 dispatch, because a workflow cannot trigger a workflow through its own
 `GITHUB_TOKEN` (see [Why the hop is a dispatch](#why-the-hop-is-a-dispatch)).
@@ -85,7 +85,7 @@ that second gate, the moment internal for the same commit turns green.
 
 ### 1. Merge PRs to main
 
-`release-internal.yml` runs on every push: it resolves the version and build
+`cd-internal.yml` runs on every push: it resolves the version and build
 number, builds and signs both platforms, uploads to TestFlight internal and the
 Play internal track, creates a `vX.Y.Z-build.N` GitHub pre-release with every
 artifact, and (if OTA is on) publishes to the `internal` channel. When Huawei
@@ -117,10 +117,10 @@ The release PR's own checks look odd and that is expected: a bot-authored PR's
 the PR merges. release-please dispatches `ci.yml` on the PR's branch instead
 every time it creates or updates the PR, and that run - a full one, E2E
 included - is the one to read. A private consumer that finds a full run per
-release-PR update too expensive drops that single step in `release-please.yml`.
+release-PR update too expensive drops that single step in `cd-release.yml`.
 
 The PR body carries a `## Store notes` section: the prose the stores will
-get, drafted by the `Store Notes` job of `release-please.yml` from the
+get, drafted by the `Store Notes` job of `cd-release.yml` from the
 changelog the PR carries (and rewritten by the optional LLM pass when one is
 configured). **Review it with the version bump** — see
 [Store notes](#store-notes). To change it, edit `release-notes.prompt.md` and
@@ -131,7 +131,7 @@ before step 3's Prepare reads it is still an override.
 
 ### 3. Beta promotes itself
 
-`release-please.yml` dispatches `release-beta.yml` at the new tag the moment
+`cd-release.yml` dispatches `cd-beta.yml` at the new tag the moment
 the release exists (see [Why the hop is a dispatch](#why-the-hop-is-a-dispatch)).
 It waits for the release commit's internal run - and if that run is missing,
 cancelled or failed, it dispatches one at the tag itself and waits for that
@@ -150,14 +150,14 @@ and the OTA gate downstream compares fingerprints — so the release has to carr
 the exact bytes internal testers ran. The pre-release is deleted only once the
 upload has succeeded, so a failed upload can never leave the binaries nowhere.
 
-Everything in this run is scoped to the tag, not to `main`: `expo-prepare`'s
+Everything in this run is scoped to the tag, not to `main`: `build-prepare`'s
 `release-tag` input makes the tag the checkout ref, resolves `TAG^{commit}` as
 the commit that is gated and stamped into `build-info.json`, and takes the store
 notes from that release's body. `github.sha` would be the branch tip at the
 moment the event fired, which may already be ahead of the tag.
 
 If beta was published before internal finished, the beta run fails at the gate.
-`release-retry.yml` re-runs it automatically the moment internal for that commit
+`cd-beta-retry.yml` re-runs it automatically the moment internal for that commit
 goes green — no manual retry needed.
 
 ### 4. Soak
@@ -167,7 +167,7 @@ automation here on purpose.
 
 ### 5. Dispatch the production release
 
-**Actions → release-production → Run workflow**, `tag: vX.Y.Z`,
+**Actions → CD / Production → Run workflow**, `tag: vX.Y.Z`,
 `action: release`. A reviewer on the `production` environment has to approve
 before any store job starts. It then:
 
@@ -191,9 +191,9 @@ them are in [store-accounts.md](store-accounts.md#huawei-appgallery).
 
 | Tier | Workflow | Jobs | Lane | What AppGallery does | Review |
 | --- | --- | --- | --- | --- | --- |
-| internal | `release-internal.yml` | `Upload Huawei` | `upload_huawei_internal` | Test version, manual review<br>skipped, up to 100 testers | Automated,<br>hours |
-| beta | `release-beta.yml` | `Stage Huawei binary`,<br>`Promote Huawei` | `promote_huawei_beta` | Test version, open testing<br>with review, up to 5,000 testers | Manual,<br>1 to 3 days |
-| release | `release-production.yml` | `Stage Huawei binary`,<br>`Release Huawei` | `upload_huawei` | The formal release, testing<br>flag off | Manual,<br>days |
+| internal | `cd-internal.yml` | `Upload Huawei` | `upload_huawei_internal` | Test version, manual review<br>skipped, up to 100 testers | Automated,<br>hours |
+| beta | `cd-beta.yml` | `Stage Huawei binary`,<br>`Promote Huawei` | `promote_huawei_beta` | Test version, open testing<br>with review, up to 5,000 testers | Manual,<br>1 to 3 days |
+| release | `cd-production.yml` | `Stage Huawei binary`,<br>`Release Huawei` | `upload_huawei` | The formal release, testing<br>flag off | Manual,<br>days |
 
 **One version slot.** AppGallery has no tracks. A tier is a flavour of the
 submit, not a destination: the same version record is submitted with the testing
@@ -282,11 +282,11 @@ and takes Play to 100%. `action: halt` stops both. See
     still resolves. Squash or rebase merging keeps it on HEAD directly; see
     step 2.
   - The subject source is what makes that true on the one commit where it
-    matters. `release-please` and `release-internal` are triggered by the same
+    matters. `release-please` and `cd-internal` are triggered by the same
     push to main and run concurrently, so on the release commit the `vX.Y.Z` tag
     does not exist yet, `RELEASE_PR_TITLE` is empty (a push carries no PR) and
     the `autorelease: pending` PR has just been merged. Without it a `0.2.0`
-    release built and uploaded `0.1.1`, and `release-beta` then asked for a
+    release built and uploaded `0.1.1`, and `cd-beta` then asked for a
     `v0.2.0-build.N` pre-release nothing had ever created.
 - **Build number** = `git rev-list --count --first-parent HEAD` plus
   `BUILD_NUMBER_OFFSET` (repo variable, default `1000`). Identical on both
@@ -327,7 +327,7 @@ Where the text comes from differs per tier, and that is the design:
 | Tier | Source | Generated or copied |
 | --- | --- | --- |
 | Internal (every push to `main`) | Commit subjects since the last tag | Generated, deterministic only; the LLM never runs here |
-| The release PR | The changelog the PR carries | Generated once, by `Store Notes` in `release-please.yml`; the LLM pass runs here when configured. **This is the review point** |
+| The release PR | The changelog the PR carries | Generated once, by `Store Notes` in `cd-release.yml`; the LLM pass runs here when configured. **This is the review point** |
 | Beta and production | The `## Store notes` section of the release body | Copied verbatim; nothing is regenerated, so both tiers ship the reviewed text |
 
 release-please builds the release body from the PR body, so the section a
@@ -349,11 +349,11 @@ production. Its line structure is kept as written; it still goes through the
 same hygiene filter, so a link, a `#123` or a marker line in it is removed
 rather than shipped.
 
-`release-beta` writes that section itself after promoting (`github-release` in
+`cd-beta` writes that section itself after promoting (`github-release` in
 `append` mode, marker-delimited and idempotent), so the release body always
 shows what the pipeline actually shipped — and an operator editing it for the
 next stage has the heading in front of them rather than typing it from memory.
-`release-production` appends a `## Production` line the same way
+`cd-production` appends a `## Production` line the same way
 (`<action> at <time>, platforms <x>, rollout <n>%`), so the release records
 which stage it reached.
 
@@ -364,7 +364,7 @@ one of those names would replace the checksums of the release's binaries.
 
 **Locales.** `notes.mjs` emits one entry per locale directory under
 `fastlane/metadata/ios` unless `--locales` or `$NOTES_LOCALES` (which is what
-`expo-prepare`'s `notes-locales` input becomes) says otherwise. Use the
+`build-prepare`'s `notes-locales` input becomes) says otherwise. Use the
 *metadata* locale names there — `en-US`, not `en`: the lanes look a locale up in
 `store-notes.json` by directory name, and a key they cannot find sends every
 locale back to the single-locale fallback and throws the LLM pass away.
@@ -396,7 +396,7 @@ part of the prompt and cannot be relaxed from it.
 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | **secret** | Key for the chosen provider |
 
 The three variables reach `notes.mjs` through the `Store Notes` job's
-`build-env`; the two keys are declared secrets on `release-pr-notes.yml`,
+`build-env`; the two keys are declared secrets on `pr-release-notes.yml`,
 because `build-env` is a workflow input and would publish them in the run's
 parameters. No CD lane receives them: the LLM runs in that one job.
 
@@ -405,8 +405,8 @@ parameters. No CD lane receives them: the LLM runs in that one job.
 `fastlane/metadata/**` is the source of truth for the public store page.
 `fastlane ios sync_metadata` and `android sync_metadata` push it; `pull_metadata`
 pulls the console's copy back. Both are gated on `STORE_METADATA_SYNC_ENABLED`
-and both are wired into the **Store listing** workflow
-(`store-metadata.yml`, `workflow_dispatch`, `direction: push | pull`), separate
+and both are wired into the **CD / Store listing** workflow
+(`cd-store-listing.yml`, `workflow_dispatch`, `direction: push | pull`), separate
 from a version release.
 
 | CD owns per version | sync owns | Console-only |
@@ -520,9 +520,9 @@ build that needs no account anywhere.
 
 `STORE_UPLOADS_ENABLED` implies signing on both platforms, so uploading with
 nothing signed to upload cannot be expressed. Until it is `true` every job that
-talks to a store is skipped: TestFlight and Play uploads in `release-internal`,
-the promotions in `release-beta`, and the release, phased and rollout lanes in
-`release-production`.
+talks to a store is skipped: TestFlight and Play uploads in `cd-internal`,
+the promotions in `cd-beta`, and the release, phased and rollout lanes in
+`cd-production`.
 
 **The unsigned tier still builds and still verifies.** Gradle falls back to the
 debug keystore (`plugins/with-android-release-signing.ts` does that and warns),
@@ -619,28 +619,28 @@ lane still walks end to end
 | `IOS_BUNDLE_ID` | every build and lane job | Your App Store bundle identifier |
 | `IOS_SCHEME` | every build and lane job | Xcode scheme name (the Expo prebuild generates it from the app name) |
 | `ANDROID_PACKAGE` | every build and lane job | Play application id |
-| `XCODE_VERSION` | `release-internal` iOS build | A version installed on the runner image, e.g. `26.0`; sets `DEVELOPER_DIR` |
-| `IOS_SIGNING_ENABLED` | repo variable; `build-ios` in `release-internal` | `true` signs and exports an `.ipa`.<br>Unset archives unsigned, which needs no Apple account |
-| `ANDROID_SIGNING_ENABLED` | repo variable; `build-android` in `release-internal` | `true` signs with the upload keystore.<br>Unset falls back to the debug keystore, which needs no Play account |
+| `XCODE_VERSION` | `cd-internal` iOS build | A version installed on the runner image, e.g. `26.0`; sets `DEVELOPER_DIR` |
+| `IOS_SIGNING_ENABLED` | repo variable; `build-ios` in `cd-internal` | `true` signs and exports an `.ipa`.<br>Unset archives unsigned, which needs no Apple account |
+| `ANDROID_SIGNING_ENABLED` | repo variable; `build-android` in `cd-internal` | `true` signs with the upload keystore.<br>Unset falls back to the debug keystore, which needs no Play account |
 | `STORE_UPLOADS_ENABLED` | repo variable; every store job in all three release workflows | `true` turns on TestFlight and Play uploads.<br>Unset means off, and the store credentials below<br>are only needed once it is on — see<br>[Before you have store accounts](#before-you-have-store-accounts) |
 | `HUAWEI_UPLOADS_ENABLED` | repo variable; every Huawei job in all three release<br>workflows and the three Huawei lanes via `env-json` | `true` turns on the Huawei AppGallery upload,<br>on top of `STORE_UPLOADS_ENABLED`. Unset means off<br>and no Huawei job runs — see [Huawei AppGallery](#huawei-appgallery) |
 | `HUAWEI_APP_ID` | every Huawei job in all three release workflows,<br>via `env-json` | The numeric app id under the AppGallery Connect<br>app record's information page. An identifier, not a<br>credential, so it is a variable and appears in the log |
 | `HUAWEI_SUBMIT_DELAY_SECONDS` | the three Huawei lanes via `env-json` | Optional. Whole seconds to wait between the upload<br>and the submit; default `60`. Raise it if AppGallery<br>refuses the submit because the bundle is still compiling |
 | `HUAWEI_FEEDBACK_EMAIL` | `android upload_huawei_internal` and<br>`android promote_huawei_beta` via `env-json` | Optional. The address AppGallery shows testers for<br>feedback; omitted from the submit when unset. It is an<br>unmasked workflow input, acceptable because AppGallery<br>publishes it to testers anyway — move it to `secrets:`<br>on the two jobs if you would rather it stayed out of logs |
 | `HUAWEI_TEST_DAYS` | `android upload_huawei_internal` and<br>`android promote_huawei_beta` via `env-json` | Optional. Length of the test window in days; default<br>`80`. AppGallery refuses more than 90, so the lane caps<br>it at `89` and says so |
-| `STORE_METADATA_SYNC_ENABLED` | repo variable; both jobs in `store-metadata.yml`<br>and the `sync_metadata` lanes | `true` lets a lane write the public store page.<br>Unset means off and the lane refuses |
+| `STORE_METADATA_SYNC_ENABLED` | repo variable; both jobs in `cd-store-listing.yml`<br>and the `sync_metadata` lanes | `true` lets a lane write the public store page.<br>Unset means off and the lane refuses |
 | `IOS_METADATA_EDIT_LIVE` | `ios sync_metadata` via `env-json` | `true` edits the live version's editable subset<br>when no version is in preparation.<br>`pull_metadata` ignores it: `deliver`'s<br>download always takes the latest version |
 | `PLAY_METADATA_TRACK` | `android sync_metadata` / `pull_metadata` via `env-json` | Track whose release the listing edit rides on;<br>default first of `production`, `beta`, `internal`<br>with one |
-| `BUILD_NUMBER_OFFSET` | every `expo-prepare` call | Integer, default `1000`. Raise only |
+| `BUILD_NUMBER_OFFSET` | every `build-prepare` call | Integer, default `1000`. Raise only |
 | `WORKFLOWS_MACOS_RUNNER` | iOS build + iOS internal upload | Runner label, default `macos-26` |
-| `TESTFLIGHT_INTERNAL_GROUP` | `release-internal` iOS upload | Group name in App Store Connect → TestFlight |
-| `TESTFLIGHT_EXTERNAL_GROUP` | `release-beta` iOS promote | External group name; must already exist and be approved |
+| `TESTFLIGHT_INTERNAL_GROUP` | `cd-internal` iOS upload | Group name in App Store Connect → TestFlight |
+| `TESTFLIGHT_EXTERNAL_GROUP` | `cd-beta` iOS promote | External group name; must already exist and be approved |
 | `PLAY_UPDATE_PRIORITY` | Android upload / production | `0`–`5`, Play in-app update priority |
 | `ANDROID_UPLOAD_CERT_SHA256` | `verify-android.sh`, read from the environment (via `build-env`); `--cert-sha256` is the manual override | `keytool -list -v -keystore upload.keystore`, the SHA-256 line.<br>**Leave it unset and the signature check reports `skip`** —<br>the gate that exists to catch a wrong signing identity stops checking |
 | `OTA_ENABLED` | `app.config.ts` at build time (via `build-env`) and the `if:` on every `ota-*` job | `true` to turn OTA on; see [ota.md](ota.md) |
 | `EXPO_UPDATES_URL` | `app.config.ts` at build time (via `build-env`) and the OTA manifest smoke check | Public origin of the update server |
-| `OTA_CLI_VERSION` | `expo-ota-publish` | Exact `eoas` version; the publish script refuses to run unpinned |
-| `STORE_NOTES_INCLUDE_CHANGELOG` | `notes.mjs` in internal's `expo-prepare` and in `Store Notes` (via `build-env`) | `true` appends the changelog where notes are generated |
+| `OTA_CLI_VERSION` | `publish-ota` | Exact `eoas` version; the publish script refuses to run unpinned |
+| `STORE_NOTES_INCLUDE_CHANGELOG` | `notes.mjs` in internal's `build-prepare` and in `Store Notes` (via `build-env`) | `true` appends the changelog where notes are generated |
 | `RELEASE_NOTES_LLM_PROVIDER` | `notes.mjs` in `Store Notes` (via `build-env`) | `anthropic` or `openai`; anything else disables the optional LLM pass |
 | `RELEASE_NOTES_LLM_MODEL` | `notes.mjs` in `Store Notes` (via `build-env`) | Model override for that provider |
 | `OPENAI_BASE_URL` | `notes.mjs` in `Store Notes` (via `build-env`) | OpenAI-compatible endpoint |
@@ -680,7 +680,7 @@ you want a reviewer between a token and production.
 | `HUAWEI_CLIENT_ID` | every Huawei lane job: internal, beta and release | AppGallery Connect → Users and permissions → API key → Connect API → Create; the client id half of the pair |
 | `HUAWEI_CLIENT_SECRET` | same three jobs | Same page, the client secret half. It is shown exactly once |
 | `OTA_PUBLISH_TOKEN` | every `ota-*` job | One of the update server's `EOO_TOKENS`; scope per environment |
-| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | `Store Notes` in `release-please.yml` (`notes.mjs`) | Only needed when `RELEASE_NOTES_LLM_PROVIDER` selects that provider. The notes fall back to deterministic prose without them |
+| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | `Store Notes` in `cd-release.yml` (`notes.mjs`) | Only needed when `RELEASE_NOTES_LLM_PROVIDER` selects that provider. The notes fall back to deterministic prose without them |
 | `APP_REVIEW_EMAIL`, `APP_REVIEW_FIRST_NAME`, `APP_REVIEW_LAST_NAME`, `APP_REVIEW_PHONE` | iOS `promote_beta` and `release_production` lanes | The contact Apple reaches for review questions |
 | `APP_REVIEW_DEMO_USER`, `APP_REVIEW_DEMO_PASSWORD` | same | A working login for the reviewer; omit both if the app needs no account |
 | `APP_REVIEW_NOTES` | same | Free-text notes for the reviewer |
@@ -700,39 +700,39 @@ configured in App Store Connect.
 Everything release-please creates — the PR, the tag, the `vX.Y.Z` release — is
 created with the workflow's own `GITHUB_TOKEN`, and GitHub **never starts a
 workflow from an event that token caused**, so that workflows cannot trigger
-each other forever. A `release: published` trigger on `release-beta.yml` or
-`web.yml` would therefore never fire. The rule has two exemptions,
-`workflow_dispatch` and `repository_dispatch`, so `release-please.yml` starts
-the follow-on work itself: `gh workflow run release-beta.yml --ref vX.Y.Z -f
-tag=vX.Y.Z`, the same for `web.yml` with `deploy=true`, and `ci.yml` on the
+each other forever. A `release: published` trigger on `cd-beta.yml` or
+`ci-web.yml` would therefore never fire. The rule has two exemptions,
+`workflow_dispatch` and `repository_dispatch`, so `cd-release.yml` starts
+the follow-on work itself: `gh workflow run cd-beta.yml --ref vX.Y.Z -f
+tag=vX.Y.Z`, the same for `ci-web.yml` with `deploy=true`, and `ci.yml` on the
 release PR's branch whenever the PR is created or updated. The job needs
 `actions: write` for that, nothing else.
 
 `--ref` is the tag on purpose: the dispatched run's `github.sha` is then the
-release commit, the same sha `release-internal` built, which is what
-`release-retry.yml` matches a failed beta run on.
+release commit, the same sha `cd-internal` built, which is what
+`cd-beta-retry.yml` matches a failed beta run on.
 
 The alternative is a GitHub App whose token creates the release, so that the
 `release:` event fires normally. It is more moving parts for the same result —
 an App to register, two secrets to rotate, and a `release:` trigger that then
-also fires on every `-build.N` pre-release from `release-internal` unless every
-listener filters `prerelease`. The reusable `github-release.yml` still accepts
+also fires on every `-build.N` pre-release from `cd-internal` unless every
+listener filters `prerelease`. The reusable `publish-github-release.yml` still accepts
 `RELEASE_TAGGER_APP_ID` / `RELEASE_TAGGER_APP_PRIVATE_KEY` for a consumer that
 already has such an App; this template does not use them.
 
 ### Concurrency: which workflows share a queue
 
-The **promoting** workflows — `release-beta`, `release-production`,
-`ota-hotfix` — share `concurrency: release` with `cancel-in-progress: false`,
+The **promoting** workflows — `cd-beta`, `cd-production`,
+`cd-ota-hotfix` — share `concurrency: release` with `cancel-in-progress: false`,
 so two of them can never touch a store at the same time and none is ever
-cancelled half-way. `release-internal` used to share it too, and that is where
+cancelled half-way. `cd-internal` used to share it too, and that is where
 releases got lost: GitHub keeps one *pending* run per group and evicts the
 older one, and an internal run spends ~35 minutes in Prepare waiting for its
 commit's CI before it builds at all. A release PR merged behind a fix — the
 normal sequence — had its own internal build evicted, and its beta then failed
 the green gate (v0.2.3, v0.2.4 and v0.2.5 each needed a manual dispatch).
 
-So `release-internal` queues **per commit** (`release-internal-<sha>`): nothing
+So `cd-internal` queues **per commit** (`release-internal-<sha>`): nothing
 is evicted, and two commits' builds run side by side. Only its store-touching
 jobs — `upload-ios`, `upload-android`, `ota-internal` — join the `release`
 queue, each at job level. The residual: a *pending* upload can still be evicted
@@ -743,14 +743,14 @@ finishes it.
 The group is a **constant**, not `release-${{ github.ref }}`. `github.ref` is
 `refs/heads/main` on a push or a manual dispatch but `refs/tags/vX.Y.Z` on the
 dispatch release-please makes at the tag, so a ref-keyed group put
-`release-beta` in a queue of its own — and the same workflow changed queue
+`cd-beta` in a queue of its own — and the same workflow changed queue
 depending on how it was started.
 
-`release-please` and `release-retry` deliberately have their own groups
+`release-please` and `cd-beta-retry` deliberately have their own groups
 (`release-please-*`, `release-retry-*`). GitHub keeps only one *pending* run per
 group and evicts the older one, so sharing the store queue would leave the
 release PR stale for the length of a 60-90 minute build and drop the run
-entirely on two quick pushes — and `release-retry` is precisely the workflow
+entirely on two quick pushes — and `cd-beta-retry` is precisely the workflow
 that has to run promptly. Neither calls a store API.
 
 ## GitHub Environments
@@ -759,18 +759,18 @@ Settings → Environments. Four, three of which exist only to scope secrets:
 
 | Environment | Protection | Purpose |
 | --- | --- | --- |
-| `internal` | none | Scopes the signing and store credentials used by `release-internal` |
-| `beta` | none | Scopes the credentials used by `release-beta` |
-| `production` | **Required reviewers** (at least one, "prevent self-review" on), deployment branches and tags limited to the tag pattern `v*` | Gates every store job in `release-production.yml` and a production OTA hotfix |
-| `github-pages` | GitHub creates it, allowing `main` only; **add a tag policy `v*`** | Used by the `web.yml` deploy job, which runs at the release tag.<br>Without the tag policy the deploy is rejected: "Tag … is not allowed to deploy to github-pages" |
+| `internal` | none | Scopes the signing and store credentials used by `cd-internal` |
+| `beta` | none | Scopes the credentials used by `cd-beta` |
+| `production` | **Required reviewers** (at least one, "prevent self-review" on), deployment branches and tags limited to the tag pattern `v*` | Gates every store job in `cd-production.yml` and a production OTA hotfix |
+| `github-pages` | GitHub creates it, allowing `main` only; **add a tag policy `v*`** | Used by the `ci-web.yml` deploy job, which runs at the release tag.<br>Without the tag policy the deploy is rejected: "Tag … is not allowed to deploy to github-pages" |
 
-The `production` reviewer is the release gate: nothing in `release-production.yml`
-or a production `ota-hotfix` starts until someone approves. On a private
+The `production` reviewer is the release gate: nothing in `cd-production.yml`
+or a production `cd-ota-hotfix` starts until someone approves. On a private
 repository, required reviewers need a Team plan or above.
 
 ## Rollback and halt
 
-Dispatch `release-production.yml` with the matching `action`. Nothing here needs
+Dispatch `cd-production.yml` with the matching `action`. Nothing here needs
 a new build.
 
 | Situation | `action` | iOS effect | Android effect |
@@ -791,12 +791,12 @@ one platform is bad.
 ## Hotfix
 
 **JS-only** (no native code, no plugin change, no new dependency with a native
-module): use `ota-hotfix.yml`. Full flow in [ota.md](ota.md#hotfix). The
+module): use `cd-ota-hotfix.yml`. Full flow in [ota.md](ota.md#hotfix). The
 fingerprint gate rejects anything that moved the native layer, and it is right
 to — such an update crashes every user on the channel on launch.
 
 **Anything native**: it is a normal release, just a faster one. Land the fix,
-let `release-internal` build it, merge the release PR release-please opens,
+let `cd-internal` build it, merge the release PR release-please opens,
 let beta promote, then dispatch production. The steps do not change; only the
 soak does.
 
@@ -1018,7 +1018,7 @@ Mobile Services equivalent for anything that depends on it at runtime.
 
 Each stub raises `UI.user_error!` pointing back at this section. Add a store the
 way Huawei was added: implement its lane and add a job to
-`release-production.yml` behind the `platforms` input and a toggle of its own,
-and, if the store has test tiers, jobs in `release-internal.yml` and
-`release-beta.yml` too — nothing else in the path assumes there are only two
+`cd-production.yml` behind the `platforms` input and a toggle of its own,
+and, if the store has test tiers, jobs in `cd-internal.yml` and
+`cd-beta.yml` too — nothing else in the path assumes there are only two
 stores.

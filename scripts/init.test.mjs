@@ -760,10 +760,10 @@ describe('init --yes --no-web', () => {
 
   // One paragraph disagreeing with three others is worse than all four being
   // stale, because the reader cannot tell which one to trust. The template has
-  // eleven workflow files and `--no-web` deletes `web.yml`, so the generated app
+  // eleven workflow files and `--no-web` deletes `ci-web.yml`, so the generated app
   // has ten: no "eleven" may survive the rewrite, and every count that describes
   // the ten has to have moved with it. (The `nine` below is not a file count —
-  // it is how many `uses:` are left in `release-production.yml` once the web job
+  // it is how many `uses:` are left in `cd-production.yml` once the web job
   // goes with its marker block.)
   test('rewrites every workflow-file count in docs/ci.md, not just the first', () => {
     const ci = readFileSync(path.join(root, 'docs/ci.md'), 'utf8');
@@ -772,7 +772,7 @@ describe('init --yes --no-web', () => {
     assert.match(ci, /the eleven files in/);
     assert.match(ci, /Two of the eleven are the exception/);
     assert.match(ci, /Nine of the eleven files carry/);
-    assert.match(ci, /`release-production\.yml` alone has ten\./);
+    assert.match(ci, /`cd-production\.yml` alone has ten\./);
   });
 
   test('replaced the placeholders with the answers', () => {
@@ -809,16 +809,12 @@ describe('init --yes --no-web', () => {
   });
 
   test('removes the marker blocks and the markers themselves', () => {
-    for (const rel of [
-      'app.config.ts',
-      'metro.config.js',
-      '.github/workflows/release-production.yml',
-    ]) {
+    for (const rel of ['app.config.ts', 'metro.config.js', '.github/workflows/cd-production.yml']) {
       assert.doesNotMatch(readFileSync(path.join(root, rel), 'utf8'), /init:web-(start|end)/, rel);
     }
     assert.doesNotMatch(readFileSync(path.join(root, 'app.config.ts'), 'utf8'), /^\s*web: \{/m);
     assert.doesNotMatch(
-      readFileSync(path.join(root, '.github/workflows/release-production.yml'), 'utf8'),
+      readFileSync(path.join(root, '.github/workflows/cd-production.yml'), 'utf8'),
       /^ {2}web:$/m,
     );
   });
@@ -909,7 +905,7 @@ describe('init --yes --web', () => {
     assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
     assert.ok(existsSync(path.join(root, 'playwright.config.ts')));
     assert.ok(existsSync(path.join(root, 'scripts/e2e/web.sh')));
-    assert.ok(existsSync(path.join(root, '.github/workflows/web.yml')));
+    assert.ok(existsSync(path.join(root, '.github/workflows/ci-web.yml')));
     assert.ok(existsSync(path.join(root, 'src/features/settings/NativeDemoCard.web.tsx')));
     const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
     assert.equal(pkg.scripts['build:web'], 'bash scripts/build-web.sh');
@@ -932,16 +928,12 @@ describe('init --yes --web', () => {
   });
 
   test('drops the init:web markers but keeps what they wrapped', () => {
-    for (const rel of [
-      'app.config.ts',
-      'metro.config.js',
-      '.github/workflows/release-production.yml',
-    ]) {
+    for (const rel of ['app.config.ts', 'metro.config.js', '.github/workflows/cd-production.yml']) {
       assert.doesNotMatch(readFileSync(path.join(root, rel), 'utf8'), /init:web-(start|end)/, rel);
     }
     assert.match(readFileSync(path.join(root, 'metro.config.js'), 'utf8'), /tslib\.es6\.mjs/);
     assert.match(
-      readFileSync(path.join(root, '.github/workflows/release-production.yml'), 'utf8'),
+      readFileSync(path.join(root, '.github/workflows/cd-production.yml'), 'utf8'),
       /^ {2}web:$/m,
     );
   });

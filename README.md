@@ -140,21 +140,21 @@ holds what they actually do. Job names are what the Actions graph shows.
 | Workflow        | Jobs                                    | Fires on                                                                            |
 | --------------- | --------------------------------------- | ----------------------------------------------------------------------------------- |
 | `ci.yml`        | `Checks`<br>`Unit`<br>`E2E`<br>`Badges` | Push, PR, dispatch. Each job gates the next, so a failed unit run never reaches E2E |
-| `codeql.yml`    | `Analyze`                               | Push, PR, weekly. Informational, never a required check                             |
-| `web.yml`       | `Export`                                | PR and release — the web export and Playwright suite                                |
-| `pr-title.yml`  | `Title`                                 | Conventional Commits on the PR title                                                |
-| `pr-closed.yml` | `Cleanup`                               | Cancels the closed PR's runs, drops its badges                                      |
+| `ci-codeql.yml`    | `Analyze`                               | Push, PR, weekly. Informational, never a required check                             |
+| `ci-web.yml`       | `Export`                                | PR and release — the web export and Playwright suite                                |
+| `ci-pr-title.yml`  | `Title`                                 | Conventional Commits on the PR title                                                |
+| `ci-pr-closed.yml` | `Cleanup`                               | Cancels the closed PR's runs, drops its badges                                      |
 
 **CD** — on a merge, a release, or a deliberate dispatch
 
 | Workflow                 | Jobs                                                                                                                                         | Fires on                                                                              |
 | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `release-please.yml`     | `Release`<br>`Store Notes`                                                                                                                   | Push to `main`. Maintains the version PR and drafts the store notes into it; dispatches beta and web at a cut release           |
-| `release-internal.yml`   | `Prepare`<br>`Build iOS`<br>`Build Android`<br>`Upload iOS`<br>`Upload Android`<br>`Pre-release`<br>`OTA`                                    | Push to `main`, once CI is green for that sha. TestFlight and the Play internal track |
-| `release-beta.yml`       | `Prepare`<br>`Promote iOS`<br>`Promote Android`<br>`Release`<br>`Store Notes`<br>`OTA`                                                       | Dispatched by `release-please.yml` at the tag. Promotes the internal build rather than rebuilding              |
-| `release-production.yml` | `Prepare`<br>`Release iOS`<br>`Release Android`<br>`Phased iOS`<br>`Rollout Android`<br>`Halt Android`<br>`Release`<br>`OTA`<br>`Web`        | Dispatch only, carrying the action. Phased release and staged rollout, with a halt    |
-| `release-retry.yml`      | `Retry Beta`                                                                                                                                 | A failed beta run. Retries it without a human                                         |
-| `ota-hotfix.yml`         | `Fingerprint baseline` · `Publish`                                                                                                                       | Dispatch. Ships JS without a store round trip, gated on the native fingerprint        |
+| `cd-release.yml`     | `Release`<br>`Store Notes`                                                                                                                   | Push to `main`. Maintains the version PR and drafts the store notes into it; dispatches beta and web at a cut release           |
+| `cd-internal.yml`   | `Prepare`<br>`Build iOS`<br>`Build Android`<br>`Upload iOS`<br>`Upload Android`<br>`Pre-release`<br>`OTA`                                    | Push to `main`, once CI is green for that sha. TestFlight and the Play internal track |
+| `cd-beta.yml`       | `Prepare`<br>`Promote iOS`<br>`Promote Android`<br>`Release`<br>`Store Notes`<br>`OTA`                                                       | Dispatched by `cd-release.yml` at the tag. Promotes the internal build rather than rebuilding              |
+| `cd-production.yml` | `Prepare`<br>`Release iOS`<br>`Release Android`<br>`Phased iOS`<br>`Rollout Android`<br>`Halt Android`<br>`Release`<br>`OTA`<br>`Web`        | Dispatch only, carrying the action. Phased release and staged rollout, with a halt    |
+| `cd-beta-retry.yml`      | `Retry Beta`                                                                                                                                 | A failed beta run. Retries it without a human                                         |
+| `cd-ota-hotfix.yml`         | `Fingerprint baseline` · `Publish`                                                                                                                       | Dispatch. Ships JS without a store round trip, gated on the native fingerprint        |
 
 ## Shipping
 

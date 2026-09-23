@@ -58,12 +58,12 @@ version=""
 tag=$(git tag --points-at HEAD | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
 subject=$(release_subject)
 if [ -n "$tag" ]; then version="${tag#v}"
-# The release commit itself, before release-please has tagged it. release-internal
+# The release commit itself, before release-please has tagged it. cd-internal
 # and release-please are triggered by the same push to main and run concurrently,
 # so on the one commit whose build must carry the release version the tag does not
 # exist yet, RELEASE_PR_TITLE is empty (this is a push, not a PR) and the
 # `autorelease: pending` PR has just been merged. Without this the patch-bump
-# fallback stamps 0.1.1 on a 0.2.0 release, and release-beta then looks for a
+# fallback stamps 0.1.1 on a 0.2.0 release, and cd-beta then looks for a
 # v0.2.0-build.N pre-release that was never created. release-please writes this
 # exact subject (`chore(main): release X.Y.Z`), so it is a reliable source.
 elif [ -n "$subject" ]; then

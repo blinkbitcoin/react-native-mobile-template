@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// `pnpm badges:render` — the contract the reusable `badges.yml` calls through
-// `scripts/checks/run-script.sh`, exactly the way `checks.yml` delegates
+// `pnpm badges:render` — the contract the reusable `publish-badges.yml` calls through
+// `scripts/checks/run-script.sh`, exactly the way `check-code.yml` delegates
 // typecheck and lint. That wrapper runs `pnpm run NAME` with no arguments, so
 // everything variable arrives as environment:
 //

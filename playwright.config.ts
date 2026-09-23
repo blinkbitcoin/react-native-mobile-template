@@ -29,7 +29,7 @@ function required(name: string, value: string | undefined): string {
 
 const webPreviewPort = required('WEB_PREVIEW_PORT', process.env.WEB_PREVIEW_PORT);
 // A deploy export is built for `/<repo>/` (EXPO_PUBLIC_BASE_URL, set by the
-// web workflow on a deploy and handed to this suite too); a PR export and a
+// `build-web` workflow on a deploy and handed to this suite too); a PR export and a
 // local one are built for `/`. The preview server serves `dist` under the same
 // path, so the suite tests the export as it will be served.
 const basePath = (process.env.EXPO_PUBLIC_BASE_URL ?? '').trim().replace(/\/+$/, '');

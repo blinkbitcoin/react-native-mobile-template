@@ -2,7 +2,7 @@ name: CI / Web
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-  # Dispatched by release-please.yml at the `vX.Y.Z` tag. Not `release:
+  # Dispatched by cd-release.yml at the `vX.Y.Z` tag. Not `release:
   # published`: a release created with GITHUB_TOKEN never fires it, and an
   # App-created one would also fire it for every `-build.N` pre-release.
   workflow_dispatch:
@@ -20,7 +20,7 @@ jobs:
   web:
     # The called workflow's jobs show as "<this name> / Build|Playwright|Deploy".
     name: Web
-    uses: blinkbitcoin/shared-workflows/.github/workflows/web.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/build-web.yml@v0
     permissions:
       contents: read
       # The called workflow's `deploy` job needs these; a called job can only

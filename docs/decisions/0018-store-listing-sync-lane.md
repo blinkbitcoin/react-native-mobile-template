@@ -25,8 +25,8 @@ write to a real store by accident.
   tree with no binary, version bump or review submission; `pull_metadata`
   downloads the console's copy for review. Only iOS `sync_metadata` also
   pushes `fastlane/screenshots/<locale>/**`.
-- `.github/workflows/store-metadata.yml` — the **Store listing** workflow,
-  dispatched independently of `release-production.yml`, sharing its `release`
+- `.github/workflows/cd-store-listing.yml` — the **CD / Store listing** workflow,
+  dispatched independently of `cd-production.yml`, sharing its `release`
   concurrency group. `release_production` itself is unchanged.
 
 ## Consequences

@@ -63,7 +63,7 @@ Every row is a make target; nothing here is run through pnpm directly.
 
 | Gates | |
 |---|---|
-| `make check` | Every static gate the `checks` workflow runs (no tests/builds) |
+| `make check` | Every static gate the `check-code` workflow runs (no tests/builds) |
 | `make ci` | Everything CI runs except E2E — `check` plus coverage and the script tests |
 | `make check-slow` | The minutes-long gates: prebuild output + bundle secrets (off by default in CI too) |
 | `make check-code` | typecheck + lint + format-check + knip + spell |
@@ -151,7 +151,7 @@ Every row is a make target; nothing here is run through pnpm directly.
   commit message, so the PR title is linted too.
 - **Releases are release-please's job.** Merge (squash) the release PR; never
   `sed` a version into `package.json`, `app.config.ts` or the manifest. The
-  store notes are drafted into the release PR body by `release-please.yml`
+  store notes are drafted into the release PR body by `cd-release.yml`
   from `release-notes.prompt.md`; to change them, edit the prompt (the next
   push regenerates) or the release body after merging, then preview with
   `make release-notes` — see `docs/release-runbook.md`.
@@ -163,12 +163,46 @@ Every row is a make target; nothing here is run through pnpm directly.
   expand an uncommon one on first use. A prefix made of the family's initials
   was rejected for exactly this reason; so was "ids" for identifiers in a
   status message.
-- **Docs ship with the code.** Architecture-relevant changes without a `docs/`
-  change get a warning from `make check-docs` (a dependency bump does not count,
-  and Dependabot is exempt); adding a make target without a row in the table
-  above is a hard failure, and so is a markdown table cell wider than 120
-  visible characters (break it with `<br>`) or a fenced `mermaid` block that
-  does not parse.
+- **Workflow files carry their stage in the name.** GitHub reads only the top
+  level of `.github/workflows/`, so the prefix is the only grouping there is:
+  `ci.yml` and `ci-*.yml` run on every change and display as `CI` /
+  `CI / ...`; `cd-*.yml` make releases and display as `CD / ...`. A new
+  workflow takes the prefix and the matching display name
+  (`scripts/workflow-names.test.mjs` fails otherwise). A rename updates every
+  reference in the same PR, not just the ones spelled `.yml`: `uses:` paths,
+  `gh workflow run` targets, `require-green-workflow`, `workflow_run` listeners
+  (they match the display name), the init manifest, docs, diagrams, README
+  tables and "Actions → ..." paths (the sidebar shows display names). Before
+  pushing, `git grep` the old name without its suffix. Only `CHANGELOG.md`,
+  `docs/superpowers/` and concurrency group names (renaming one changes which
+  runs queue together) may still hold it.
+- **Every PR tests everything it adds or changes, in the same PR.** That means
+  the happy path, every error path and every branch a reviewer could ask
+  about, and the PR description names the tests that cover the change. Where a
+  tool measures coverage the gate is 100%: Jest over `src/`, `plugins/` and
+  `modules/*/index.ts` (lines, branches, functions, statements). Code no tool
+  measures here is held to the same bar by review: a `node:test` file per
+  `scripts/**/*.mjs` module, an end-to-end flow per user-facing flow, a
+  `fastlane/test/` case per lane, a `scripts/*.test.mjs` assertion per
+  workflow rule. A threshold is never lowered and no file is excluded from
+  coverage to make a PR pass; if something truly cannot be tested, the PR says
+  what and why.
+- **Docs and diagrams ship in the same PR as the change, never as a
+  follow-up.** Any change to a name, input, output, job, file, flow, count or
+  default updates every doc that describes it, in the same PR: prose, tables,
+  README and AGENTS.md, and every diagram (mermaid blocks, ASCII drawings in
+  code fences, SVGs under `docs/assets/`). Before pushing, `git grep` each
+  thing the diff renamed or changed, spelled every way a reader would meet it
+  (with and without `.yml`, the display name, the job name), and read each
+  diagram that shows the part you touched; a diagram that still draws the old
+  flow is drift even when no text search finds it. The PR description names
+  the docs it updated, or says why none needed to change. Mechanically
+  enforced on top: architecture-relevant changes without a `docs/` change get
+  a warning from `make check-docs` (a dependency bump does not count, and
+  Dependabot is exempt); adding a make target without a row in the table above
+  is a hard failure, and so is a markdown table cell wider than 120 visible
+  characters (break it with `<br>`) or a fenced `mermaid` block that does not
+  parse.
 
 ## Testing map
 

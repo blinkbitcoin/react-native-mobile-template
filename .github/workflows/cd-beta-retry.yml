@@ -1,5 +1,5 @@
 name: CD / Beta Retry
-# `release-beta.yml` refuses to promote until that commit's `release-internal`
+# `cd-beta.yml` refuses to promote until that commit's `cd-internal`
 # run is green. When beta is published before internal finishes (or while it is
 # red), the beta run fails at the gate and there is nothing to re-trigger it —
 # `release: published` fires once. This workflow closes that hole: whenever an
@@ -45,18 +45,18 @@ jobs:
           # commit. A `release: published` beta run's head sha is the default
           # branch tip at publish time, so if a commit lands on main between the
           # release commit and this run going green, no beta run matches and the
-          # retry no-ops. That is accepted: the operator can re-run release-beta
+          # retry no-ops. That is accepted: the operator can re-run cd-beta
           # by hand, and matching more loosely risks re-running a beta promotion
           # for a different release.
           #
           # Not `--status failure`: a beta run that was cancelled or timed out
           # (including one evicted from a concurrency group) needs the same
           # retry, so filter on "concluded, but not successfully" instead.
-          run_id="$(gh run list --workflow release-beta.yml --commit "$HEAD_SHA" \
+          run_id="$(gh run list --workflow cd-beta.yml --commit "$HEAD_SHA" \
             --limit 20 --json databaseId,status,conclusion \
             --jq '[.[] | select(.status == "completed" and .conclusion != "success" and .conclusion != "skipped")][0].databaseId // empty')"
           if [ -z "$run_id" ]; then
-            echo "no failed release-beta run for $HEAD_SHA - nothing to retry"
+            echo "no failed cd-beta run for $HEAD_SHA - nothing to retry"
             exit 0
           fi
           # --failed re-runs only the jobs that failed, so the promotion picks
