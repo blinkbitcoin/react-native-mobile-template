@@ -176,6 +176,17 @@ Every row is a make target; nothing here is run through pnpm directly.
   pushing, `git grep` the old name without its suffix. Only `CHANGELOG.md`,
   `docs/superpowers/` and concurrency group names (renaming one changes which
   runs queue together) may still hold it.
+- **Every PR tests everything it adds or changes, in the same PR.** That means
+  the happy path, every error path and every branch a reviewer could ask
+  about, and the PR description names the tests that cover the change. Where a
+  tool measures coverage the gate is 100%: Jest over `src/`, `plugins/` and
+  `modules/*/index.ts` (lines, branches, functions, statements). Code no tool
+  measures here is held to the same bar by review: a `node:test` file per
+  `scripts/**/*.mjs` module, an end-to-end flow per user-facing flow, a
+  `fastlane/test/` case per lane, a `scripts/*.test.mjs` assertion per
+  workflow rule. A threshold is never lowered and no file is excluded from
+  coverage to make a PR pass; if something truly cannot be tested, the PR says
+  what and why.
 - **Docs and diagrams ship in the same PR as the change, never as a
   follow-up.** Any change to a name, input, output, job, file, flow, count or
   default updates every doc that describes it, in the same PR: prose, tables,
