@@ -89,7 +89,13 @@ echo "== validate-asc-key.sh"
 P256_KEY="$WORK/asc_key.p8"
 openssl ecparam -genkey -name prime256v1 2>/dev/null | openssl pkcs8 -topk8 -nocrypt >"$P256_KEY"
 RSA_PKCS1_KEY="$WORK/rsa_pkcs1.pem"
-openssl genrsa 2048 >"$RSA_PKCS1_KEY" 2>/dev/null
+# `genrsa` writes PKCS#1 on LibreSSL (macOS) and OpenSSL 1.1, but PKCS#8 on
+# OpenSSL 3 (the Linux runners) unless asked for -traditional, which the other
+# two do not know. On OpenSSL 3 without the flag this fixture was a PKCS#8 RSA
+# key: still rejected, but for a different reason than the case below names.
+openssl genrsa -traditional -out "$RSA_PKCS1_KEY" 2048 2>/dev/null ||
+  openssl genrsa -out "$RSA_PKCS1_KEY" 2048 2>/dev/null
+check "the RSA fixture really is PKCS#1" "-----BEGIN RSA PRIVATE KEY-----" "$(head -1 "$RSA_PKCS1_KEY")"
 
 GOOD_KEY_ID="ABCD123456"
 GOOD_ISSUER_ID="69a6de7d-c3a2-47e3-e053-5b8c7c11a4d1"
