@@ -9,11 +9,16 @@ version: 2
 #     `expo install --check` + `expo-doctor`, which is the authority on which
 #     version of an SDK-coupled package belongs in this SDK. Dependabot cannot
 #     see that table and would only open PRs that CI then rejects.
+#   - A 7-day cooldown on every ecosystem: a release has a week to be yanked
+#     before it is proposed here. Security updates skip the cooldown. (pnpm's
+#     own `minimumReleaseAge` is the one-day floor under a hand-run install.)
 updates:
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 5
     versioning-strategy: increase
     labels: ['dependencies']
@@ -67,6 +72,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     labels: ['dependencies', 'ci']
     commit-message:
       prefix: 'chore(ci)'
@@ -81,6 +88,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     labels: ['dependencies', 'release']
     commit-message:
       prefix: 'chore(deps)'

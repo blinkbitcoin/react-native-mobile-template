@@ -66,7 +66,7 @@ Native-facing changes (`app.config.ts`, `plugins/`, `modules/`) additionally
 need `make check-prebuild`. Release-facing changes (`fastlane/`,
 `scripts/release/`, workflow pins) need `make check-release`.
 
-Git hooks run a fast subset for you — Biome, ESLint and typos on staged files at
+Git hooks run a fast subset for you — Biome, ESLint, typos and gitleaks on staged files at
 commit time; typecheck, knip and changed-file tests at push time. They are a
 safety net, not a substitute for `make check`. Escape hatches exist
 (`git commit --no-verify`, `LEFTHOOK=0 git push`) for genuinely broken tooling;

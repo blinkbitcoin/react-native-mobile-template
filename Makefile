@@ -140,9 +140,12 @@ check-deps: ## SDK drift, vulnerability audit, lockfile provenance, licenses
 	pnpm deps:audit
 	pnpm deps:licenses
 
-check-ci: ## Lint the CI itself: actionlint (workflows) + shellcheck (scripts)
+# zizmor is the security half: injection, permissions, App token scope,
+# dangerous triggers. --offline keeps the answer independent of the network.
+# Policy and the one justified ignore: .github/zizmor.yml.
+check-ci: ## Lint the CI itself: actionlint + zizmor (workflows) + shellcheck (scripts)
 	bash scripts/shellcheck.sh
-	@if [ -d .github/workflows ]; then actionlint; else echo "no workflows yet"; fi
+	@if [ -d .github/workflows ]; then actionlint && zizmor --offline --min-severity medium .github; else echo "no workflows yet"; fi
 
 check-docs: ## Docs freshness, AGENTS.md command table, table widths, mermaid blocks
 	bash scripts/check-docs.sh
@@ -150,16 +153,25 @@ check-docs: ## Docs freshness, AGENTS.md command table, table widths, mermaid bl
 bundle-secrets-check: ## Export the bundle and assert no non-public keys leaked
 	pnpm check-bundle-secrets
 
-check-release: ## Ruby syntax + fastlane lane parse + lane unit tests
+# The skills' tests run here, in the recipe rather than as a prerequisite: they
+# need the same Ruby and bundle, and CI's Release job runs this target by name.
+# As a separate target in `check` they ran on laptops and in no CI job.
+check-release: ## Ruby syntax + fastlane lane parse + lane unit tests + skill tests
 	@bundle check >/dev/null 2>&1 || { echo "run: bundle install (see docs/release-runbook.md)"; exit 1; }
 	for f in fastlane/Fastfile fastlane/lanes/*.rb fastlane/test/*.rb; do ruby -c "$$f" || exit 1; done
 	FASTLANE_SKIP_ENV_ASSERT=1 bundle exec fastlane lanes
 	bundle exec ruby -Ifastlane/test fastlane/test/lanes_test.rb
+	bash scripts/check-skills.sh
 
-check-skills: ## Run the test suite of every skill under .claude/skills/ (offline, fakes only)
-	@set -e; found=0; for t in .claude/skills/*/tests/run.sh; do [ -f "$$t" ] || continue; found=1; echo "== $$t"; bash "$$t"; done; [ "$$found" -eq 1 ] || echo "no skills yet"
+check-skills: ## Only the skill tests (offline, fakes only; needs bundle install) - part of check-release
+	bash scripts/check-skills.sh
 
-check: check-code check-gen check-deps check-ci check-docs check-release check-skills ## Every static gate the checks workflow runs (no tests/builds)
+# History, not the working tree: a key committed and deleted later is still in
+# the repository. Allowlisted test data, each entry with its reason: .gitleaks.toml.
+check-secrets: ## Scan the whole git history for committed secrets (gitleaks)
+	gitleaks git --redact --no-banner .
+
+check: check-code check-gen check-deps check-ci check-docs check-release check-secrets ## Every static gate the checks workflow runs (no tests/builds)
 
 # The two expensive gates are not in `check` and are off by default in CI for
 # the same reason: a prebuild of both platforms and a web export are minutes
@@ -180,9 +192,8 @@ test-scripts: ## node:test for scripts/**/*.test.mjs
 unit: ## Unit + component tests
 	pnpm test && pnpm test:scripts
 
-coverage: ## Tests with coverage thresholds (what CI enforces)
+coverage: ## Tests with coverage thresholds and the empty-row check (what CI enforces)
 	pnpm test:coverage
-	pnpm check:coverage-empty
 
 # Same entry point CI calls, so what you see locally is what gh-pages gets.
 # The job results default to success here; set BADGE_UNIT/BADGE_E2E to any of
@@ -211,4 +222,4 @@ reset: clean ## clean + reinstall
 help: ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: init doctor install ports start ios android web mock-api prebuild build-web version verify-ios verify-android release-notes i18n codegen typecheck lint format format-check knip spell check-gen check-prebuild check-code check-deps check-ci check-docs check-skills bundle-secrets-check check-release check check-slow ci codeql test-scripts unit coverage badges e2e-ios e2e-android e2e-web test clean reset help
+.PHONY: init doctor install ports start ios android web mock-api prebuild build-web version verify-ios verify-android release-notes i18n codegen typecheck lint format format-check knip spell check-gen check-prebuild check-code check-deps check-ci check-docs check-skills check-secrets bundle-secrets-check check-release check check-slow ci codeql test-scripts unit coverage badges e2e-ios e2e-android e2e-web test clean reset help

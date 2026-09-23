@@ -187,7 +187,7 @@ locally means the same commands passed the same way in CI.
 
 | CI job | Scripts it runs | Local equivalent |
 | --- | --- | --- |
-| `checks.yml` | `typecheck`, `lint`, `format:check`, `knip`, `spell`, `expo-doctor`, `pnpm audit --prod`,<br>commitlint, actionlint, shellcheck, `check:docs` | `make check-code`, `make check-deps`, `make check-ci`, `make check-docs`<br>(`make check` runs all of it) |
+| `checks.yml` | `typecheck`, `lint`, `format:check`, `knip`, `spell`, `expo-doctor`, `pnpm audit --prod`,<br>commitlint, actionlint, zizmor, shellcheck, `check:docs`, `check:release`, `check:secrets` | `make check-code`, `make check-deps`, `make check-ci`, `make check-docs`,<br>`make check-release`, `make check-secrets` (`make check` runs all of it) |
 | `unit.yml` | `test:coverage`, `test:scripts` | `make coverage`, `make test-scripts` (`make unit` runs `test` + `test:scripts`) |
 | `e2e.yml` | Maestro flows in `.maestro/` against a debug build | `make e2e-ios` / `make e2e-android` (after `make mock-api`, `make start`, `make ios`/`make android`) |
 | `web.yml` | `build:web`, `test:e2e:web` | `make build-web`, `make e2e-web` |
