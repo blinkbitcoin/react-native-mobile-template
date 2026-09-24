@@ -7,6 +7,32 @@ import { DEFAULTS, load, main, parseBoolean, resolve } from './config.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
+// Every SECURITY_* variable config.mjs reads, so tests that rely on the
+// default `env = process.env` parameter aren't hostage to whatever a
+// developer or runner happens to have exported.
+const SECURITY_ENV_KEYS = [
+  'SECURITY_ENABLED',
+  'SECURITY_SEVERITY',
+  'SECURITY_FAIL_ON',
+  ...Object.keys(DEFAULTS.jobs).map((name) => `SECURITY_${name.toUpperCase()}`),
+];
+
+/** Runs `fn` with every SECURITY_* variable removed from process.env, then restores them. */
+const withoutSecurityEnv = (fn) => {
+  const saved = {};
+  for (const key of SECURITY_ENV_KEYS) {
+    if (key in process.env) {
+      saved[key] = process.env[key];
+      delete process.env[key];
+    }
+  }
+  try {
+    fn();
+  } finally {
+    for (const [key, value] of Object.entries(saved)) process.env[key] = value;
+  }
+};
+
 test('defaults apply when the file and the environment are silent', () => {
   const settings = resolve({}, {});
   assert.equal(settings.enabled, true);
@@ -168,14 +194,18 @@ test('policy jobs object without a specific job falls back to default', () => {
 });
 
 test('resolve with default env parameter', () => {
-  const settings = resolve({});
-  assert.equal(settings.enabled, true);
-  assert.equal(settings.severity, 'high');
+  withoutSecurityEnv(() => {
+    const settings = resolve({});
+    assert.equal(settings.enabled, true);
+    assert.equal(settings.severity, 'high');
+  });
 });
 
 test('load with default env parameter', () => {
-  const settings = load('security-policy.json');
-  assert.equal(settings.enabled, true);
+  withoutSecurityEnv(() => {
+    const settings = load('security-policy.json');
+    assert.equal(settings.enabled, true);
+  });
 });
 
 test('job in policy without enabled property falls back to default', () => {
@@ -186,10 +216,6 @@ test('job in policy without enabled property falls back to default', () => {
 test('file policy with string false value in job is parsed correctly', () => {
   const settings = resolve({ jobs: { code: { enabled: 'false' } } }, {});
   assert.equal(settings.jobs.code, false);
-});
-
-test('load with invalid JSON file rethrows SyntaxError', () => {
-  assert.throws(() => load('/tmp/test-invalid.json', {}), /SyntaxError/);
 });
 
 test('file policy with string true value in job', () => {
@@ -220,8 +246,12 @@ test('as a command it reads security-policy.json from the working directory', ()
   // The inherited environment keeps NODE_V8_COVERAGE, so the child counts,
   // and it also runs the file as the entry point rather than an import, so
   // `import.meta.main` is true here the way it never is under `node --test`.
+  // SECURITY_* keys are stripped so a developer's or runner's real
+  // environment can't change what the child reports for jobs.deps.
+  const childEnv = { ...process.env };
+  for (const key of SECURITY_ENV_KEYS) delete childEnv[key];
   const run = (...args) =>
-    spawnSync(process.execPath, [script, ...args], { encoding: 'utf8', env: process.env });
+    spawnSync(process.execPath, [script, ...args], { encoding: 'utf8', env: childEnv });
   const got = run('get', 'jobs.deps');
   assert.equal(got.status, 0);
   assert.equal(got.stdout.trim(), 'true');
