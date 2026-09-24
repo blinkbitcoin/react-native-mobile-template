@@ -96,6 +96,26 @@ patterns, `.gitleaks.toml` for secrets, `.github/zizmor.yml` for workflows.
 Never raise the severity threshold to hide one finding - that hides the next
 one too.
 
+### Advisories currently accepted
+
+Two osv-scanner advisories are suppressed in `osv-scanner.toml` today, both
+with no clean upgrade available:
+
+- **`uuid@7.0.3`** (GHSA-w5hq-g745-h8pq, CVSS 7.5 high) - pulled in through
+  `expo` > `@expo/config-plugins` > `xcode@3.0.1`, which hard-pins the dead
+  7.x line. Unreachable: the only call is `uuid.v4()` during `expo prebuild`,
+  never in the shipped app, and `v4()` is not even an affected function.
+- **`decode-uri-component@0.2.2`** (GHSA-vcc3-ghjq-m6fr, CVSS 6.6 medium) -
+  pulled in through `expo-router` > `query-string@7.1.3`, which cannot take
+  the ESM-only 0.5.0 fix without breaking its own `require()` call. Unlike
+  the entry above, this one **is** reachable at runtime through
+  `query-string.parse()` on an incoming deep link - a denial-of-service
+  surface the owner has knowingly accepted, not one ruled out as unreachable.
+
+See `osv-scanner.toml` for the full reasoning on each: the dependency path,
+why no upgrade is possible, the reachability verdict, and what upstream
+change would require re-evaluating the decision.
+
 ## Known limitations
 
 **The Semgrep registry packs are not content-pinned.** `code.sh` pulls
