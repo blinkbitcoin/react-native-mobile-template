@@ -85,3 +85,27 @@ test('the code scanner skips when semgrep is absent', () => {
     );
   });
 });
+
+test('the policy scanner reports a weakened install policy as a finding, not a crash', () => {
+  withDir((dir) => {
+    const result = run('policy.sh', {
+      env: { SECURITY_DIR: dir, SECURITY_POLICY_FILE: '/dev/null' },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const sarif = JSON.parse(readFileSync(path.join(dir, 'policy.sarif'), 'utf8'));
+    const rules = sarif.runs[0].results.map((r) => r.ruleId);
+    assert.ok(rules.includes('pnpm/minimum-release-age'));
+    assert.ok(rules.includes('pnpm/strict-dep-builds'));
+    assert.ok(rules.includes('pnpm/trust-policy'));
+  });
+});
+
+test('the policy scanner is clean against the real workspace file', () => {
+  withDir((dir) => {
+    const result = run('policy.sh', { env: { SECURITY_DIR: dir } });
+    assert.equal(result.status, 0, result.stderr);
+    const sarif = JSON.parse(readFileSync(path.join(dir, 'policy.sarif'), 'utf8'));
+    assert.deepEqual(sarif.runs[0].results, []);
+    assert.equal(sarif.runs[0].invocations[0].executionSuccessful, true);
+  });
+});

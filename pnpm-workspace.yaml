@@ -48,6 +48,34 @@ minimumReleaseAgeExclude:
 # inconvenient is not a guard. Shortening the window is a decision about how
 # much exposure to accept; an exclude is a decision to stop checking.
 strictDepBuilds: true
+# Refuses an install where a package's provenance is weaker than the version
+# already in the lockfile - an unsigned or unattested republish of something
+# that used to be signed. scripts/security/policy.sh asserts this line exists,
+# because weakening it is a one-line change that would otherwise pass review.
+trustPolicy: no-downgrade
+# Reasoned exclusions, name@version so each is pinned to the release actually
+# checked rather than open-ended - one per package, in the style of
+# ignoreGhsas below. pnpm's trust check compares publish dates across ALL
+# majors of a package, not within the installed major line (confirmed:
+# https://github.com/orgs/pnpm/discussions/11084, pnpm issue #10202), so an
+# old-but-fine release reads as "downgraded" purely because a later major
+# started shipping provenance attestation after this one was published.
+# `pnpm audit` returns zero advisories for all three - the block is
+# provenance-comparison noise, not a vulnerability.
+trustPolicyExclude:
+  # eslint-plugin-import's peer range still resolves to this 3.x line; the
+  # provenance-carrying 4.x line was published later, so pnpm reads that as
+  # this release's trust having dropped. Nothing about this specific publish
+  # changed.
+  - 'eslint-import-resolver-typescript@3.10.1'
+  # node-semver's 6.x line, the resolved range for several dependencies here;
+  # 7.x gained provenance after 6.3.1 shipped, tripping the same cross-major
+  # date comparison. Tracked upstream at pnpm issue #10202.
+  - 'semver@6.3.1'
+  # Predates npm's provenance requirement; the 2.x line added it later. The
+  # real ua-parser-js takeover (2021) was versions 0.7.29/0.8.0/1.0.0, patched
+  # years before this release - `pnpm audit` finds nothing against 1.0.41.
+  - 'ua-parser-js@1.0.41'
 onlyBuiltDependencies:
   - '@biomejs/biome'
   - esbuild

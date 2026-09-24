@@ -93,6 +93,7 @@ aggregates.
 | `make check-secrets` | gitleaks over the whole git history; allowlisted test data in `.gitleaks.toml` |
 | `make check-security-deps` | Known vulnerabilities and malicious packages in the lockfile (osv-scanner) |
 | `make check-security-code` | Semgrep over app source: TypeScript, secrets, OWASP packs plus `rules/` |
+| `make check-security-policy` | Assert the pnpm install policy: release cooldown, no implicit builds, no trust downgrade |
 | `make check-security-bundle` | Export the bundle, assert no non-public keys leaked |
 | `make check-codeql` | CodeQL with the same config CI uses (needs a CodeQL CLI; not in `make check`) |
 

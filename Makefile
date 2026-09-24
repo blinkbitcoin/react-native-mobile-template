@@ -196,6 +196,9 @@ check-security-code: ## Semgrep over app source: TypeScript, secrets, OWASP pack
 	bash scripts/security/code.sh
 	@command -v semgrep >/dev/null 2>&1 && semgrep --test rules/ || echo "semgrep not installed: rule tests skipped"
 
+check-security-policy: ## Assert the pnpm install policy: release cooldown, no implicit builds, no trust downgrade
+	bash scripts/security/policy.sh
+
 check: check-code check-gen check-deps check-ci check-docs check-release check-secrets ## Every static gate the check-code workflow runs (no tests/builds)
 
 # The two expensive gates are not in `check` and are off by default in CI for
@@ -247,4 +250,4 @@ reset: clean ## clean + reinstall
 help: ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: init doctor install ports dev dev-ios dev-android dev-web dev-api prebuild build-web version verify-ios verify-android release-notes gen-i18n gen-graphql check-types check-lint fix-format fix-lint check-format check-knip check-spell check-gen check-prebuild check-code check-deps check-ci check-docs check-skills check-secrets check-security-deps check-security-code check-security-bundle check-release check check-slow ci check-codeql test-scripts test-unit test-coverage gen-badges test-e2e-ios test-e2e-android test-e2e-web test clean reset help
+.PHONY: init doctor install ports dev dev-ios dev-android dev-web dev-api prebuild build-web version verify-ios verify-android release-notes gen-i18n gen-graphql check-types check-lint fix-format fix-lint check-format check-knip check-spell check-gen check-prebuild check-code check-deps check-ci check-docs check-skills check-secrets check-security-deps check-security-code check-security-policy check-security-bundle check-release check check-slow ci check-codeql test-scripts test-unit test-coverage gen-badges test-e2e-ios test-e2e-android test-e2e-web test clean reset help
