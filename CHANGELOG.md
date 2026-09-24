@@ -5,6 +5,19 @@ by [release-please](https://github.com/googleapis/release-please) from
 [Conventional Commits](https://www.conventionalcommits.org/) — edit the commit
 messages, not this file. See [docs/release-runbook.md](docs/release-runbook.md).
 
+## [0.7.0](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.6.2...v0.7.0) (2026-09-23)
+
+
+### Features
+
+* **ci:** draft the store notes into the release PR and take the LLM out of the CD lanes ([#57](https://github.com/blinkbitcoin/react-native-mobile-template/issues/57)) ([47c2d42](https://github.com/blinkbitcoin/react-native-mobile-template/commit/47c2d42f4900c2f076992bec9a4315c11a3c7f79))
+
+
+### Bug Fixes
+
+* **release:** keep the store-notes marker out of the stores, and move the prompt to the repo root ([#56](https://github.com/blinkbitcoin/react-native-mobile-template/issues/56)) ([bae8533](https://github.com/blinkbitcoin/react-native-mobile-template/commit/bae8533b5fec3e235cb26354b37c2518d7426c6e))
+* **tooling:** run every make ci gate in CI, and add zizmor and gitleaks ([#61](https://github.com/blinkbitcoin/react-native-mobile-template/issues/61)) ([05bd9be](https://github.com/blinkbitcoin/react-native-mobile-template/commit/05bd9be6b544f43e8520b94397bf01115f598676))
+
 ## [0.6.2](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.6.1...v0.6.2) (2026-09-21)
 
 
