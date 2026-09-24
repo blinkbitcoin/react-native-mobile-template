@@ -43,6 +43,25 @@ install: ## Install dependencies (pnpm + Ruby gems) and git hooks
 		bundle config set --local path vendor/bundle && bundle install; \
 	fi
 
+# A blank machine to a working one, in one step each. Idempotent, so they are
+# also the first thing to re-run when the toolchain misbehaves. `--yes` agrees
+# to the Android SDK licences and remote installers without asking (CI);
+# `--boot` also starts an emulator/simulator. See .claude/skills/native-setup.
+setup: ## Install everything for this OS: toolchain, Maestro, Android SDK + emulator, iOS (ARGS=--yes --boot)
+	bash scripts/setup/all.sh $(ARGS)
+
+setup-toolchain: ## mise + pinned tools (node, pnpm, java, ruby), watchman, then make install
+	bash scripts/setup/toolchain.sh $(ARGS)
+
+setup-android: ## Android SDK, build packages and the Pixel emulator; records ANDROID_HOME (ARGS=--yes --boot)
+	bash scripts/setup/android.sh $(ARGS)
+
+setup-ios: ## Xcode checks, iOS simulator runtime, CocoaPods (ARGS=--boot)
+	bash scripts/setup/ios.sh $(ARGS)
+
+setup-maestro: ## Maestro at the pinned version, from the checksummed release archive
+	bash scripts/setup/maestro.sh
+
 # ---------- Run ----------
 ports: ## Print the ports derived from APP_PORT_BASE
 	@node scripts/ports.mjs
@@ -260,4 +279,4 @@ reset: clean ## clean + reinstall
 help: ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: init doctor install ports dev dev-ios dev-android dev-web dev-api prebuild build-web version verify-ios verify-android release-notes gen-i18n gen-graphql check-types check-lint fix-format fix-lint check-format check-knip check-spell check-gen check-prebuild check-code check-deps check-ci check-docs check-skills check-secrets check-security check-security-deps check-security-code check-security-policy check-security-bundle check-release check check-slow ci check-codeql test-scripts test-unit test-coverage gen-badges test-e2e-ios test-e2e-android test-e2e-web test clean reset help
+.PHONY: init doctor install setup setup-toolchain setup-android setup-ios setup-maestro ports dev dev-ios dev-android dev-web dev-api prebuild build-web version verify-ios verify-android release-notes gen-i18n gen-graphql check-types check-lint fix-format fix-lint check-format check-knip check-spell check-gen check-prebuild check-code check-deps check-ci check-docs check-skills check-secrets check-security check-security-deps check-security-code check-security-policy check-security-bundle check-release check check-slow ci check-codeql test-scripts test-unit test-coverage gen-badges test-e2e-ios test-e2e-android test-e2e-web test clean reset help

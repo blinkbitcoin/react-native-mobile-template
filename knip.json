@@ -16,7 +16,7 @@
     "scripts/**/*.mjs"
   ],
   "ignoreDependencies": ["ts-node", "expo-system-ui"],
-  "ignoreBinaries": ["typos", "make"],
+  "ignoreBinaries": ["typos", "make", "mise", "shasum"],
   "jest": {
     "config": "jest.config.ts"
   },

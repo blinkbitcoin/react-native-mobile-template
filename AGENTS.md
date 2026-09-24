@@ -26,6 +26,7 @@ plugins/            Expo config plugins (with-*.ts) + their tests
 modules/            local native modules (hello-native)
 mocks/              GraphQL mock API (server.ts, msw.ts, schema.graphql)
 scripts/            check-*.sh, doctor, init, hooks/, release/ (verify, notes, version), e2e/, badges/
+scripts/setup/      make setup: toolchain, Maestro, Android SDK + emulator, iOS (setup.test.mjs)
 .maestro/           Maestro flows (native e2e); e2e/web/ is Playwright
 fastlane/           store lanes + metadata; deploy/ota/ is the update server
 docs/               architecture, local-dev, quality, testing, ci, native-extensions,
@@ -44,6 +45,11 @@ aggregates.
 | Setup | |
 |---|---|
 | `make init` | Rename this template into your app, then delete itself (template only; `docs/template-usage.md`) |
+| `make setup` | Blank machine to ready, idempotent: toolchain, deps, Maestro, Android SDK + emulator, iOS (`ARGS="--yes --boot"` for CI) |
+| `make setup-toolchain` | mise + pinned tools, watchman, then `make install` |
+| `make setup-android` | Android SDK, build packages, the emulator; records `ANDROID_HOME` in `.env.local` |
+| `make setup-ios` | Xcode checks, the iOS simulator runtime, CocoaPods |
+| `make setup-maestro` | Maestro at the pinned version, from the checksummed release |
 | `make doctor` | Check the local toolchain (run this first) |
 | `make install` | Install dependencies (pnpm + Ruby gems) and git hooks |
 | `make clean` | Remove generated native projects, caches and build output |
@@ -224,6 +230,8 @@ aggregates.
 | Units, components, router, Apollo (MSW) | `src/**/*.test.ts(x)` | `make test-unit` |
 | Config plugins | `plugins/*.test.ts` | `make test-unit` |
 | Node scripts (release, doctor, init, checks), 100% coverage | `scripts/**/*.test.mjs` | `make test-scripts` |
+| Machine setup (`make setup`), bash against fake tools | `scripts/setup/setup.test.mjs` | `make test-scripts` |
+| The native-setup skill's commands and paths | `.claude/skills/native-setup/tests/` | `make check-skills` |
 | Fastlane lanes | `fastlane/test/` | `make check-release` |
 | Native e2e | `.maestro/flows/` | `make test-e2e-ios`, `make test-e2e-android` |
 | Web e2e | `e2e/web/` | `make test-e2e-web` |
@@ -250,6 +258,8 @@ in-process; the entry itself is only an `import.meta.main` guard that sets
 - Releases (versions, build numbers, store notes, environments, rollback,
   hotfix): `docs/release-runbook.md`. Over-the-air updates and the channel
   model: `docs/ota.md`.
+- A machine that will not build or test natively: `make setup` first, then the
+  symptom table in `.claude/skills/native-setup/SKILL.md`.
 - Local setup, first run and the Metro/pod/watchman troubleshooting table:
   `docs/local-dev.md`. Tool ownership (Biome vs ESLint) and how to suppress a
   rule correctly: `docs/quality.md`. Folder map and data flow:

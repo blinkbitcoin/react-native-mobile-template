@@ -1,6 +1,42 @@
 # Local development
 
+## Setting up a machine
+
+```sh
+make setup                 # asks before accepting the Android SDK licences
+make setup ARGS="--yes"    # agrees up front (CI, or when you already have)
+```
+
+`make setup` takes a blank Mac to one that passes `make doctor` and runs both
+platforms and both E2E suites; on Linux it sets up Android only. It is five
+idempotent steps, each its own target, so re-running any of them on a ready
+machine changes nothing:
+
+| Target | What it does |
+| --- | --- |
+| `make setup-toolchain` | Installs mise if missing, `mise trust` + `mise install`, watchman (macOS), then `make install` |
+| `make setup-maestro` | Maestro at the version in `scripts/setup/versions.env`, into `~/.maestro`, without editing shell profiles |
+| `make setup-android` | SDK command-line tools, React Native's SDK pins, AGP's fallback packages, the `Pixel_10_API_36` emulator |
+| `make setup-ios` | Checks Xcode (selected, first launch, licence), installs the iOS runtime and CocoaPods |
+
+`make setup-android` records `ANDROID_HOME` in `.env.local`, and `.mise.toml`
+derives the SDK's `platform-tools`, `emulator` and `cmdline-tools` directories
+(and `~/.maestro/bin`) on `PATH` from it, so nothing goes into your shell
+profile. An `ANDROID_HOME` you set yourself (a CI runner's own SDK) wins over
+the recorded one. `ARGS=--boot` also starts the emulator (headless under `CI`)
+and a simulator.
+
+Selecting Xcode, its first-launch step and its licence need an admin password,
+so the script stops and prints the exact `sudo` command rather than running it.
+The pitfalls behind each step, and the fixes for E2E and build failures, are in
+[`.claude/skills/native-setup/SKILL.md`](../.claude/skills/native-setup/SKILL.md).
+The scripts are tested against fakes in `scripts/setup/setup.test.mjs` (part of
+`make test-scripts`).
+
 ## Toolchain
+
+`make setup-toolchain` does the following for you; it is here so you know what
+it is doing.
 
 Tool versions live in `.mise.toml` and are installed with
 [mise](https://mise.jdx.dev):
@@ -27,7 +63,8 @@ has not been told to trust.
 `typos` is pinned rather than `latest` so this repo and
 `shared-workflows` can never disagree about what counts as a typo.
 
-mise's `[env]` block also exports `EXPO_NO_TELEMETRY=1` and `APP_PORT_BASE`
+mise's `[env]` block also exports `EXPO_NO_TELEMETRY=1`, `LANG=en_US.UTF-8` when
+your shell sets no locale (fastlane and CocoaPods need UTF-8), and `APP_PORT_BASE`
 (see [Ports](#ports)), puts `node_modules/.bin` on `PATH` (so `biome`, `eslint`
 and `expo` run without a `pnpm exec` prefix), and loads `.env.local` if you have
 one — a gitignored file for per-machine overrides. There is no `.envrc`: see
