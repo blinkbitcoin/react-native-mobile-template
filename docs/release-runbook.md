@@ -392,6 +392,8 @@ part of the prompt and cannot be relaxed from it.
 | --- | --- | --- |
 | `RELEASE_NOTES_LLM_PROVIDER` | repo variable | `anthropic` or `openai`; anything else disables the pass |
 | `RELEASE_NOTES_LLM_MODEL` | repo variable | Model override |
+| `RELEASE_NOTES_LLM_EFFORT` | repo variable | `low`, `medium`, `high` or `max` (the default); any other value fails the draft |
+| `RELEASE_NOTES_LLM_EXTRA_PARAMS` | repo variable | A JSON object merged into the request, for a vendor-specific switch; may not set `model`, `messages` or `system` |
 | `OPENAI_BASE_URL` | repo variable | OpenAI-compatible endpoint |
 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | **secret** | Key for the chosen provider |
 
@@ -645,6 +647,8 @@ lane still walks end to end
 | `STORE_NOTES_INCLUDE_CHANGELOG` | `notes.mjs` in internal's `build-prepare` and in `Store Notes` (via `build-env`) | `true` appends the changelog where notes are generated |
 | `RELEASE_NOTES_LLM_PROVIDER` | `notes.mjs` in `Store Notes` (via `build-env`) | `anthropic` or `openai`; anything else disables the optional LLM pass |
 | `RELEASE_NOTES_LLM_MODEL` | `notes.mjs` in `Store Notes` (via `build-env`) | Model override for that provider |
+| `RELEASE_NOTES_LLM_EFFORT` | `notes.mjs` in `Store Notes` (via `build-env`) | Reasoning effort, `max` when unset; the same adapter as the security reviewer (`scripts/lib/llm/`) |
+| `RELEASE_NOTES_LLM_EXTRA_PARAMS` | `notes.mjs` in `Store Notes` (via `build-env`) | JSON object merged into the request |
 | `OPENAI_BASE_URL` | `notes.mjs` in `Store Notes` (via `build-env`) | OpenAI-compatible endpoint |
 | `EXPO_PUBLIC_API_URL` | the bundle, through `src/config/env.ts` (via `build-env`) | **Required for a CI build**: `env.ts` validates it as a URL and the app fails to start without it |
 | `EXPO_PUBLIC_APP_NAME` | same | **Required for a CI build** (non-empty string) |

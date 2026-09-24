@@ -1,5 +1,5 @@
 {
-  "$comment": "Security scanning settings. Every key has an environment twin that wins over this file: SECURITY_ENABLED, SECURITY_SEVERITY, SECURITY_FAIL_ON, and SECURITY_<JOB> for each job. See docs/security.md.",
+  "$comment": "Security scanning settings. Every key has an environment twin that wins over this file: SECURITY_ENABLED, SECURITY_SEVERITY, SECURITY_FAIL_ON, SECURITY_<JOB> for each job's switch, SECURITY_<JOB>_<KEY> for its options (androidPermissions -> SECURITY_BINARIES_ANDROID_PERMISSIONS) and SECURITY_LLM_<KEY> for the llm block. An invalid value fails the run. See docs/security.md.",
   "enabled": true,
   "severity": "high",
   "failOn": ["deterministic"],
@@ -7,20 +7,47 @@
     "deps": { "enabled": true },
     "code": { "enabled": true },
     "policy": { "enabled": true },
-    "sbom": {
-      "enabled": false,
-      "$comment": "Reserved for Stage 2. No scripts/security/sbom.sh exists yet - leave false until it does."
-    },
+    "sbom": { "enabled": true },
     "bundle": {
-      "enabled": false,
-      "$comment": "Reserved for Stage 2. No scripts/security/bundle.sh exists yet - leave false until it does."
+      "enabled": true,
+      "platforms": ["ios", "android"],
+      "$hosts": "Hosts the exported bundle may name over https. Empty turns the check off; once listed, any other host is a low-severity note, so a new third-party endpoint is seen in review.",
+      "hosts": [],
+      "$cleartextHosts": "Hosts an http:// URL in the bundle may name without a finding (MASTG-TEST-0233/0321). json-schema.org is a schema identifier inside a dependency and dev.apollodata.com and hostname are documentation strings in Apollo and in React Native's dev tooling; none is ever fetched by the shipped app.",
+      "cleartextHosts": [
+        "localhost",
+        "127.0.0.1",
+        "json-schema.org",
+        "dev.apollodata.com",
+        "hostname"
+      ]
     },
-    "mobile": { "enabled": false },
+    "mobile": { "enabled": true },
     "binaries": {
-      "enabled": false,
-      "$comment": "Reserved for Stage 2. No scripts/security/binaries.sh exists yet - leave false until it does."
+      "enabled": true,
+      "$androidPermissions": "Dangerous Android permissions the app is allowed to request (MASTG-TEST-0254), e.g. android.permission.CAMERA.",
+      "androidPermissions": [],
+      "$exportedComponents": "Exported activities, services and receivers allowed without a permission (MASTG-TEST-0364..0366), by class name.",
+      "exportedComponents": [],
+      "$atsExceptionDomains": "Domains allowed an App Transport Security exception for insecure HTTP (MASTG-TEST-0322).",
+      "atsExceptionDomains": []
     },
-    "review": { "enabled": false },
-    "openant": { "enabled": false }
+    "review": {
+      "$comment": "Off by default: it sends the diff to the configured LLM provider. Needs llm.provider, llm.model and the provider's API key.",
+      "enabled": false,
+      "maxDiffBytes": 200000
+    },
+    "openant": {
+      "$comment": "Off by default: it sends the codebase to the configured LLM provider and costs minutes and tokens. Runs on the release pull request only.",
+      "enabled": false,
+      "limit": 0,
+      "verify": false
+    }
+  },
+  "llm": {
+    "$comment": "Shared by review and openant. provider is openai (any OpenAI-compatible endpoint through OPENAI_BASE_URL) or anthropic; effort is low, medium, high or max.",
+    "provider": "",
+    "model": "",
+    "effort": "max"
   }
 }

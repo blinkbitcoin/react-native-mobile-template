@@ -1,0 +1,23 @@
+---
+# Reasoned suppressions for mobsfscan (make check-security-mobile). It scans a
+# fresh prebuild of android/ and ios/ in a temporary directory, so every path
+# below is relative to that prebuild. Each entry says why; an entry without a
+# reason is not mergeable (docs/security.md, "Suppressing a finding, correctly").
+#
+# A malformed file is not ignored quietly: scripts/security/mobile.sh fails the
+# run when mobsfscan warns that it could not read this configuration.
+- ignore-paths:
+    # The debug and debugOptimized source sets exist only in development
+    # builds - they are how Metro's cleartext localhost connection works - and
+    # are never part of a release variant. Scanning them reports cleartext
+    # traffic the shipped app does not allow.
+    - android/app/src/debug
+    - android/app/src/debugOptimized
+  ignore-rules:
+    # StrandHogg 1.0 and 2.0 task hijacking on MainActivity. Expo generates
+    # MainActivity with launchMode="singleTask", which expo-router's deep links
+    # rely on. The mitigation (taskAffinity="" through a config plugin) is a
+    # native change of its own and is tracked separately; until it lands this is
+    # a known, accepted risk, recorded in docs/security.md "Accepted findings".
+    - android_task_hijacking1
+    - android_task_hijacking2

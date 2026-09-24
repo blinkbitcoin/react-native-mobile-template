@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { after, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import * as anthropic from './llm/anthropic.mjs';
+import * as anthropic from '../lib/llm/anthropic.mjs';
+import * as openai from '../lib/llm/openai.mjs';
 import {
   maxTokensFor,
   renderPrompt,
@@ -13,7 +14,6 @@ import {
   TESTFLIGHT_LIMIT,
   validate,
 } from './llm/index.mjs';
-import * as openai from './llm/openai.mjs';
 import {
   buildNotes,
   cleanSection,

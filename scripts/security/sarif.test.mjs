@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { fromFindings, main, parseLine, skipped } from './sarif.mjs';
+import { fromBom, fromFindings, main, noted, parseLine, skipped } from './sarif.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -128,4 +128,60 @@ test('runs as a script', () => {
   });
   assert.equal(run.status, 0);
   assert.match(run.stdout, /skipped: r/);
+});
+
+// ---------- severity verbs, notes and the bill of materials ----------
+
+test('a line may name its severity outright', () => {
+  for (const severity of ['critical', 'high', 'medium', 'low']) {
+    assert.equal(parseLine(`${severity}\tMASTG-TEST-0226\tapp.apk\tdebuggable`).severity, severity);
+  }
+});
+
+test('a verb that only exists on Object.prototype is still an unknown verb', () => {
+  assert.throws(() => parseLine('constructor\tR\tf\tm'), /unknown verb "constructor"/);
+  assert.throws(() => parseLine('toString\tR\tf\tm'), /unknown verb "toString"/);
+});
+
+test('a noted run is clean and still carries its note', () => {
+  const doc = noted('sbom', '12 components');
+  const [invocation] = doc.runs[0].invocations;
+  assert.equal(invocation.executionSuccessful, true);
+  assert.equal(invocation.toolExecutionNotifications[0].message.text, '12 components');
+  assert.deepEqual(doc.runs[0].results, []);
+});
+
+test('a bill of materials becomes a clean run that counts its components', () => {
+  const doc = fromBom('sbom', { bomFormat: 'CycloneDX', components: [{}, {}] });
+  assert.match(
+    doc.runs[0].invocations[0].toolExecutionNotifications[0].message.text,
+    /^2 components/,
+  );
+});
+
+test('a bill that is not CycloneDX, or lists nothing, is a broken run', () => {
+  assert.throws(() => fromBom('sbom', { bomFormat: 'SPDX' }), /not a CycloneDX document/);
+  assert.throws(() => fromBom('sbom', null), /not a CycloneDX document/);
+  assert.throws(() => fromBom('sbom', { bomFormat: 'CycloneDX', components: [] }), /no components/);
+  assert.throws(() => fromBom('sbom', { bomFormat: 'CycloneDX' }), /no components/);
+});
+
+test('the CLI reads a bill from a file and fails on a bad one', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'sarif-'));
+  try {
+    const good = path.join(dir, 'good.json');
+    const bad = path.join(dir, 'bad.json');
+    writeFileSync(good, JSON.stringify({ bomFormat: 'CycloneDX', components: [{}] }));
+    writeFileSync(bad, '{');
+    const out = [];
+    const err = [];
+    const io = { log: (l) => out.push(l), error: (l) => err.push(l) };
+    assert.equal(main(['bom', 'sbom', good], io), 0);
+    assert.match(out[0], /1 components/);
+    assert.equal(main(['bom', 'sbom', bad], io), 1);
+    assert.match(err[0], /bad\.json: /);
+    assert.equal(main(['bom', 'sbom'], io), 2);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

@@ -13,12 +13,24 @@
 //
 //     node scripts/security/sarif.mjs skip osv-scanner "not installed"
 //     printf 'FAIL\tid\tfile:12\tmessage\n' | node scripts/security/sarif.mjs lines checks
+//
+// A line's first field is ok or skip (not a finding), FAIL (high), warn
+// (medium), or a severity outright: critical, high, medium or low.
 import { readFileSync } from 'node:fs';
 
 export const LEVEL_OF = { critical: 'error', high: 'error', medium: 'warning', low: 'note' };
 // The GitHub code-scanning scale: 9+ critical, 7 high, 4 medium, below that low.
 export const SECURITY_SEVERITY_OF = { critical: '9.0', high: '7.0', medium: '4.0', low: '1.0' };
-const SEVERITY_OF_VERB = { FAIL: 'high', warn: 'medium' };
+// FAIL and warn are the verify scripts' own words; a runner that knows a
+// finding's weight better than pass/fail says it outright with a severity.
+const SEVERITY_OF_VERB = {
+  FAIL: 'high',
+  warn: 'medium',
+  critical: 'critical',
+  high: 'high',
+  medium: 'medium',
+  low: 'low',
+};
 
 const document = (run) => ({
   $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
@@ -67,12 +79,27 @@ export const fromFindings = (tool, findings) =>
     }),
   });
 
+/** A clean run that still has something to say, such as how much it looked at. */
+export const noted = (tool, text) => {
+  const doc = fromFindings(tool, []);
+  doc.runs[0].invocations[0].toolExecutionNotifications = [{ level: 'note', message: { text } }];
+  return doc;
+};
+
+/** The clean run for a CycloneDX bill; throws when the bill is not one, or lists nothing. */
+export const fromBom = (tool, bom) => {
+  if (bom?.bomFormat !== 'CycloneDX') throw new Error('not a CycloneDX document');
+  const count = Array.isArray(bom.components) ? bom.components.length : 0;
+  if (count === 0) throw new Error('the bill lists no components');
+  return noted(tool, `${count} components in the bill of materials`);
+};
+
 /** One `verb<TAB>rule<TAB>file[:line]<TAB>message` line, or null when it is not a finding. */
 export const parseLine = (line) => {
   if (!line.trim()) return null;
   const [verb, ruleId, where = '', ...rest] = line.split('\t');
   if (verb === 'ok' || verb === 'skip') return null;
-  const severity = SEVERITY_OF_VERB[verb];
+  const severity = Object.hasOwn(SEVERITY_OF_VERB, verb) ? SEVERITY_OF_VERB[verb] : undefined;
   if (!severity) throw new Error(`unknown verb ${JSON.stringify(verb)} in: ${line}`);
   const match = /^(.*):(\d+)$/.exec(where);
   return {
@@ -94,12 +121,23 @@ export function main(
     log(JSON.stringify(skipped(tool, rest.join(' ')), null, 2));
     return 0;
   }
+  if (command === 'bom' && tool && rest.length === 1) {
+    try {
+      log(JSON.stringify(fromBom(tool, JSON.parse(readFileSync(rest[0], 'utf8'))), null, 2));
+      return 0;
+    } catch (cause) {
+      error(`${rest[0]}: ${cause.message}`);
+      return 1;
+    }
+  }
   if (command === 'lines' && tool) {
     const findings = readFileSync(stdin, 'utf8').split('\n').map(parseLine).filter(Boolean);
     log(JSON.stringify(fromFindings(tool, findings), null, 2));
     return 0;
   }
-  error('usage: sarif.mjs skip <tool> <reason> | sarif.mjs lines <tool> < findings');
+  error(
+    'usage: sarif.mjs skip <tool> <reason> | sarif.mjs lines <tool> < findings | sarif.mjs bom <tool> <file>',
+  );
   return 2;
 }
 

@@ -10,8 +10,14 @@
 import { readFileSync } from 'node:fs';
 
 export const SEVERITIES = ['none', 'low', 'medium', 'high', 'critical'];
+export const EFFORTS = ['low', 'medium', 'high', 'max'];
+export const PROVIDERS = ['', 'openai', 'anthropic'];
 
-/** Built-in defaults. Deterministic scanners on, LLM engines dark until a key exists. */
+/**
+ * Built-in defaults. Every deterministic scanner is on; the two LLM engines
+ * send source to a third party and cost money per run, so they stay off until
+ * a repository opts in and configures a provider and a key.
+ */
 export const DEFAULTS = {
   enabled: true,
   severity: 'high',
@@ -20,16 +26,48 @@ export const DEFAULTS = {
     deps: true,
     code: true,
     policy: true,
-    // sbom, bundle and binaries are reserved names: no scripts/security/*.sh
-    // runner exists for them yet, so they stay off until Stage 2 lands one.
-    sbom: false,
-    bundle: false,
-    mobile: false,
-    binaries: false,
+    sbom: true,
+    bundle: true,
+    mobile: true,
+    binaries: true,
     review: false,
     openant: false,
   },
 };
+
+// The tunables beside each job's `enabled`, with their type and default. One
+// schema, so every option resolves the same way the switches do: the
+// environment twin SECURITY_<JOB>_<KEY> beats security-policy.json, which beats
+// the default here, and a value of the wrong type fails the run.
+export const OPTIONS = {
+  bundle: {
+    platforms: { type: 'list', of: ['ios', 'android'], default: ['ios', 'android'] },
+    hosts: { type: 'list', default: [] },
+    cleartextHosts: { type: 'list', default: ['localhost', '127.0.0.1'] },
+  },
+  binaries: {
+    androidPermissions: { type: 'list', default: [] },
+    exportedComponents: { type: 'list', default: [] },
+    atsExceptionDomains: { type: 'list', default: [] },
+  },
+  review: {
+    maxDiffBytes: { type: 'int', default: 200000 },
+  },
+  openant: {
+    limit: { type: 'int', default: 0 },
+    verify: { type: 'bool', default: false },
+  },
+};
+
+/** The provider, model and effort both LLM jobs use, and their environment twins. */
+export const LLM = {
+  provider: { type: 'enum', of: PROVIDERS, default: '' },
+  model: { type: 'string', default: '' },
+  effort: { type: 'enum', of: EFFORTS, default: 'max' },
+};
+
+/** `androidPermissions` -> `ANDROID_PERMISSIONS`. */
+export const snake = (key) => key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toUpperCase();
 
 export const parseBoolean = (value, source) => {
   if (value === true || value === 'true') return true;
@@ -54,6 +92,68 @@ const parseList = (value) =>
         .map((part) => part.trim())
         .filter(Boolean);
 
+const describe = (value) => JSON.stringify(value);
+
+/** One value of a schema entry, from the environment's string or the file's JSON. */
+export const parseTyped = (spec, value, source) => {
+  if (spec.type === 'bool') return parseBoolean(value, source);
+  if (spec.type === 'int') {
+    const number = typeof value === 'number' ? value : Number(value);
+    if (!Number.isInteger(number) || number < 0 || value === '') {
+      throw new Error(`${source}: expected a whole number of zero or more, got ${describe(value)}`);
+    }
+    return number;
+  }
+  if (spec.type === 'list') {
+    if (!Array.isArray(value) && typeof value !== 'string') {
+      throw new Error(`${source}: expected a list, got ${describe(value)}`);
+    }
+    const list = parseList(value);
+    for (const entry of list) {
+      if (typeof entry !== 'string') {
+        throw new Error(`${source}: expected a list of strings, got ${describe(entry)}`);
+      }
+      if (spec.of && !spec.of.includes(entry)) {
+        throw new Error(
+          `${source}: expected entries from ${spec.of.join(', ')}, got ${describe(entry)}`,
+        );
+      }
+    }
+    return list;
+  }
+  if (typeof value !== 'string') {
+    throw new Error(`${source}: expected a string, got ${describe(value)}`);
+  }
+  if (spec.type === 'enum' && !spec.of.includes(value)) {
+    throw new Error(
+      `${source}: expected one of ${spec.of.map((v) => v || '(empty)').join(', ')}, got ${describe(value)}`,
+    );
+  }
+  return value;
+};
+
+// An option's key under a job that the schema does not know is a typo, and a
+// typo in an allowlist ("androidPermission") would otherwise leave the real
+// key at its default with no sign anything was wrong.
+const assertKnownKeys = (block, known, where) => {
+  for (const key of Object.keys(block ?? {})) {
+    if (key.startsWith('$') || known.includes(key)) continue;
+    throw new Error(`security-policy.json: unknown setting ${where}.${key}`);
+  }
+};
+
+const resolveBlock = (schema, fileBlock, envPrefix, where, env) =>
+  Object.fromEntries(
+    Object.entries(schema).map(([key, spec]) => {
+      const envKey = `${envPrefix}_${snake(key)}`;
+      if (env[envKey] !== undefined) return [key, parseTyped(spec, env[envKey], envKey)];
+      if (fileBlock?.[key] !== undefined) {
+        return [key, parseTyped(spec, fileBlock[key], `security-policy.json: ${where}.${key}`)];
+      }
+      return [key, spec.default];
+    }),
+  );
+
 /** Settings from a parsed policy object and an environment. */
 export const resolve = (policy = {}, env = process.env) => {
   const bool = (key, envKey, fileValue, fallback) => {
@@ -77,11 +177,34 @@ export const resolve = (policy = {}, env = process.env) => {
       ? parseSeverity(env.SECURITY_SEVERITY, 'SECURITY_SEVERITY')
       : parseSeverity(policy.severity ?? DEFAULTS.severity, 'severity');
   const failOn = parseList(env.SECURITY_FAIL_ON ?? policy.failOn ?? DEFAULTS.failOn);
+  for (const name of Object.keys(policy.jobs ?? {})) {
+    if (!(name in DEFAULTS.jobs)) throw new Error(`security-policy.json: unknown job jobs.${name}`);
+    assertKnownKeys(
+      policy.jobs[name],
+      ['enabled', ...Object.keys(OPTIONS[name] ?? {})],
+      `jobs.${name}`,
+    );
+  }
+  assertKnownKeys(policy.llm, Object.keys(LLM), 'llm');
+  const options = Object.fromEntries(
+    Object.entries(OPTIONS).map(([name, schema]) => [
+      name,
+      resolveBlock(
+        schema,
+        policy.jobs?.[name],
+        `SECURITY_${name.toUpperCase()}`,
+        `jobs.${name}`,
+        env,
+      ),
+    ]),
+  );
   return {
     enabled: bool('enabled', 'SECURITY_ENABLED', policy.enabled, DEFAULTS.enabled),
     jobs,
     severity,
     failOn,
+    options,
+    llm: resolveBlock(LLM, policy.llm, 'SECURITY_LLM', 'llm', env),
   };
 };
 

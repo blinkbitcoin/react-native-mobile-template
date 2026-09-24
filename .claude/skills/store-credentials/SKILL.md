@@ -198,9 +198,10 @@ once `--apply` finishes.
 
 ## Variables versus Secrets
 
-`push-to-github.sh`'s own class table is authoritative (a test asserts it
-matches `docs/release-runbook.md`'s "Variables and secrets" tables
-exactly). In short: variables are non-sensitive — visible in every log —
+`push-to-github.sh`'s own class table is authoritative (tests assert it
+matches `docs/release-runbook.md`'s "Variables and secrets" tables and
+every `vars.*`/`secrets.*` name the workflows read, exactly, so a new
+workflow variable needs its name in the script and a runbook row). In short: variables are non-sensitive — visible in every log —
 and everything else is a secret, including all seven `APP_REVIEW_*` values
 (a reviewer demo login is a real credential, even though the lanes also
 accept it through `env-json`-style input elsewhere).

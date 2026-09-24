@@ -184,9 +184,6 @@ check-ci: ## Lint the CI itself: actionlint + zizmor (workflows) + shellcheck (s
 check-docs: ## Docs freshness, AGENTS.md command table, table widths, mermaid blocks
 	bash scripts/check-docs.sh
 
-check-security-bundle: ## Export the bundle and assert no non-public keys leaked
-	pnpm check-bundle-secrets
-
 # The skills' tests run here, in the recipe rather than as a prerequisite: they
 # need the same Ruby and bundle, and CI's Release job runs this target by name.
 # As a separate target in `check` they ran on laptops and in no CI job.
@@ -211,14 +208,14 @@ check-secrets: ## Scan the whole git history for committed secrets (gitleaks)
 check-security: ## Every enabled security scanner, then the verdict (see docs/security.md)
 	bash scripts/security/local.sh
 
-# Security scanners are not in `make check`: external CLIs and minutes, the
-# same reason `check-codeql` is out. Each writes a SARIF into .security/ and
-# never fails on a finding; `check-security` is what applies the threshold.
+# One scanner each, then the same verdict CI applies, so every target below
+# ends in the pass/fail answer the pipeline would give for that scanner alone.
+# Each writes its SARIF into .security/; a disabled job reports "skipped".
 check-security-deps: ## Known vulnerabilities and malicious packages in the lockfile (osv-scanner)
-	bash scripts/security/deps.sh
+	bash scripts/security/local.sh deps
 
 check-security-code: ## Semgrep over app source: TypeScript, secrets, OWASP packs plus rules/
-	bash scripts/security/code.sh
+	bash scripts/security/local.sh code
 	@if command -v semgrep >/dev/null 2>&1; then \
 		semgrep --test rules/; \
 	else \
@@ -226,14 +223,32 @@ check-security-code: ## Semgrep over app source: TypeScript, secrets, OWASP pack
 	fi
 
 check-security-policy: ## Assert the pnpm install policy: release cooldown, no implicit builds, no trust downgrade
-	bash scripts/security/policy.sh
+	bash scripts/security/local.sh policy
+
+check-security-sbom: ## CycloneDX bill of materials from the lockfile into .security/sbom.cdx.json
+	bash scripts/security/local.sh sbom
+
+check-security-bundle: ## Export the bundle; flag private variable names, secrets and cleartext URLs in it
+	bash scripts/security/local.sh bundle
+
+check-security-mobile: ## mobsfscan over a fresh prebuild of android/ and ios/
+	bash scripts/security/local.sh mobile
+
+check-security-binaries: ## MASTG checks over built binaries (APK=... and/or IPA=...)
+	bash scripts/security/local.sh binaries
+
+check-security-review: ## LLM security review of the diff (off by default; needs llm.provider and a key)
+	bash scripts/security/local.sh review
+
+check-security-openant: ## OpenAnt LLM scan of the codebase (off by default; needs llm.provider and a key)
+	bash scripts/security/local.sh openant
 
 check: check-code check-gen check-deps check-ci check-docs check-release check-secrets ## Every static gate the check-code workflow runs (no tests/builds)
 
 # The two expensive gates are not in `check` and are off by default in CI for
 # the same reason: a prebuild of both platforms and a web export are minutes
 # each. Run them before a release, or when you have touched a config plugin.
-check-slow: check-prebuild check-security-bundle ## The minutes-long gates: prebuild output + bundle secrets
+check-slow: check-prebuild check-security-bundle ## The minutes-long gates: prebuild output + the bundle scan
 
 ci: check test-coverage test-scripts ## Everything CI runs except E2E (which needs a simulator)
 
@@ -279,4 +294,4 @@ reset: clean ## clean + reinstall
 help: ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: init doctor install setup setup-toolchain setup-android setup-ios setup-maestro ports dev dev-ios dev-android dev-web dev-api prebuild build-web version verify-ios verify-android release-notes gen-i18n gen-graphql check-types check-lint fix-format fix-lint check-format check-knip check-spell check-gen check-prebuild check-code check-deps check-ci check-docs check-skills check-secrets check-security check-security-deps check-security-code check-security-policy check-security-bundle check-release check check-slow ci check-codeql test-scripts test-unit test-coverage gen-badges test-e2e-ios test-e2e-android test-e2e-web test clean reset help
+.PHONY: init doctor install setup setup-toolchain setup-android setup-ios setup-maestro ports dev dev-ios dev-android dev-web dev-api prebuild build-web version verify-ios verify-android release-notes gen-i18n gen-graphql check-types check-lint fix-format fix-lint check-format check-knip check-spell check-gen check-prebuild check-code check-deps check-ci check-docs check-skills check-secrets check-security check-security-deps check-security-code check-security-policy check-security-sbom check-security-bundle check-security-mobile check-security-binaries check-security-review check-security-openant check-release check check-slow ci check-codeql test-scripts test-unit test-coverage gen-badges test-e2e-ios test-e2e-android test-e2e-web test clean reset help

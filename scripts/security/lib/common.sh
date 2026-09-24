@@ -48,3 +48,18 @@ sec_require() {
   sec_skip "$job" "$tool is not installed (mise install)"
   exit 0
 }
+
+# One resolved setting, for a runner's options and the llm block:
+#
+#   hosts="$(sec_setting options.bundle.hosts)"      # a list comes comma-joined
+#
+# The same fail-loudly rule as sec_enabled: an invalid value is the run's
+# failure, never an empty string a runner would quietly read as "none".
+sec_setting() {
+  local key="$1" value
+  if ! value="$(node scripts/security/config.mjs get "$key")"; then
+    echo "config.mjs failed resolving $key - security-policy.json or a SECURITY_* value is invalid (see the error above); that fails the run" >&2
+    exit 1
+  fi
+  printf '%s' "$value"
+}

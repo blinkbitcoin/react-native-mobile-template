@@ -1,7 +1,8 @@
 # Security scanning: design
 
 Date: 2026-09-24
-Status: approved, not yet implemented
+Status: approved; every scanner implemented (template: scripts/security/),
+shared workflow and call sites delivered separately
 Supersedes the placement and packaging decisions in
 blinkbitcoin/shared-workflows#49 and
 blinkbitcoin/react-native-mobile-template#59, which stay the record for the

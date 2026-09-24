@@ -744,7 +744,7 @@ check "an @file= path git could track is refused too" "2" "$rc"
 check_contains "...naming that path" "tracked/play.json" "$out"
 
 echo
-echo "== the class table matches docs/release-runbook.md"
+echo "== the class table matches docs/release-runbook.md and .github/workflows"
 
 RUNBOOK_VAR_CELLS="$(awk '
 /^\| Variable \|/{invar=1; next}
@@ -769,6 +769,16 @@ SCRIPT_SECRETS="$(sed -nE 's/^SECRET_NAMES="(.*)"$/\1/p' "$PUSH_TO_GITHUB" | tr 
 check "the script's variable names equal the runbook's variable table" "" "$(diff <(printf '%s\n' "$RUNBOOK_VARS") <(printf '%s\n' "$SCRIPT_VARS"))"
 check "the script's secret names equal the runbook's secret table (union with APP_REVIEW_*/OPENAI_API_KEY mentions)" "" \
   "$(diff <(printf '%s\n' "$RUNBOOK_SECRETS") <(printf '%s\n' "$SCRIPT_SECRETS"))"
+
+# The workflows are where a name is introduced, so they close the triangle:
+# a new vars.X/secrets.X fails here until the script lists it, and the two
+# checks above then demand its runbook row. GITHUB_TOKEN is GitHub's own.
+WORKFLOWS_DIR="$REPO_ROOT_OF_TEMPLATE/.github/workflows"
+WORKFLOW_VARS="$(grep -rhoE --include='*.yml' --include='*.yaml' 'vars\.[A-Z][A-Z0-9_]*' "$WORKFLOWS_DIR" | sed 's/^vars\.//' | sort -u)"
+WORKFLOW_SECRETS="$(grep -rhoE --include='*.yml' --include='*.yaml' 'secrets\.[A-Z][A-Z0-9_]*' "$WORKFLOWS_DIR" | sed 's/^secrets\.//' | grep -vx 'GITHUB_TOKEN' | sort -u)"
+
+check "the script's variable names equal every vars.* the workflows read" "" "$(diff <(printf '%s\n' "$WORKFLOW_VARS") <(printf '%s\n' "$SCRIPT_VARS"))"
+check "the script's secret names equal every secrets.* the workflows read" "" "$(diff <(printf '%s\n' "$WORKFLOW_SECRETS") <(printf '%s\n' "$SCRIPT_SECRETS"))"
 
 echo
 echo "== no 'nuke' outside a 'never'-comment"

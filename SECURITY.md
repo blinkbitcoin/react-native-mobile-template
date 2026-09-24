@@ -33,7 +33,9 @@ OTA update.
 - **Nothing secret reaches the app bundle.** Only `EXPO_PUBLIC_*` variables are
   readable at runtime, they are parsed by `src/config/env`, and everything in
   them ships to users in cleartext. `make check-security-bundle` exports the
-  bundle and fails if a non-public key leaks into it.
+  bundle and fails if a non-public variable name or a credential-shaped string
+  is in it. The full set of release-time scanners is in
+  [`docs/security.md`](docs/security.md).
 - **Runtime credentials go through `src/lib/secure-store`** (Keychain /
   Keystore), never `expo-secure-store` directly and never
   `src/lib/storage` (unencrypted key-value).

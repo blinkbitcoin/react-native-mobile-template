@@ -156,7 +156,7 @@ cut a build for this" rule, and it calls no classifier.
 emulator. `make check` is the `check-code` workflow's half of that on its own.
 
 Two gates are opt-in in CI and grouped locally as `make check-slow`:
-`check-prebuild` and the bundle-secrets check, both minutes rather than
+`check-prebuild` and the bundle scan (`make check-security-bundle`), both minutes rather than
 seconds. Enable the `prebuild-check` and `bundle-secrets` inputs on the
 `checks` call where the coverage earns the wall clock.
 

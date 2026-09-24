@@ -5,11 +5,8 @@
 // failure -- no key, HTTP error, unparseable JSON, a missing locale, a leaked
 // commit hash -- is a warning on stderr and a fall back to the deterministic
 // prose. A release must never fail because a model was unavailable.
-import * as anthropic from './anthropic.mjs';
-import * as openai from './openai.mjs';
+import { adapterFor, KEY_ENV } from '../../lib/llm/index.mjs';
 
-const PROVIDERS = { anthropic, openai };
-const KEY_ENV = { anthropic: 'ANTHROPIC_API_KEY', openai: 'OPENAI_API_KEY' };
 /** The tightest limit the text must fit before per-store cuts are applied. */
 export const TESTFLIGHT_LIMIT = 4000;
 
@@ -99,10 +96,21 @@ export function validate(raw, locales) {
 /**
  * Rewritten notes per locale, or null when the rewrite cannot be trusted.
  * `provider` is `anthropic`, `openai`, or anything else (meaning: don't).
+ * `effort` and `extraParams` are passed to the adapter as they are
+ * (scripts/lib/llm/index.mjs parses both from the environment).
  * `prompt` is the whole system prompt as a template (release-notes.prompt.md).
  */
-export async function rewriteNotes({ items, prompt, locales, provider, model, fetchImpl }) {
-  const adapter = PROVIDERS[provider];
+export async function rewriteNotes({
+  items,
+  prompt,
+  locales,
+  provider,
+  model,
+  effort,
+  extraParams,
+  fetchImpl,
+}) {
+  const adapter = adapterFor(provider);
   if (!adapter) return null;
 
   if (!process.env[KEY_ENV[provider]]) {
@@ -125,6 +133,8 @@ export async function rewriteNotes({ items, prompt, locales, provider, model, fe
       system,
       user: buildUserPrompt(items, locales),
       model,
+      effort,
+      extraParams,
       fetchImpl,
     });
   } catch (error) {

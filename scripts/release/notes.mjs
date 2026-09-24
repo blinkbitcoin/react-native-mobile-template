@@ -13,6 +13,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseEffort, parseExtraParams } from '../lib/llm/index.mjs';
 import { rewriteNotes } from './llm/index.mjs';
 
 /** Store caps, in characters -- which is how both stores count. */
@@ -321,6 +322,8 @@ export async function buildNotes({
   includeChangelog = false,
   provider,
   model,
+  effort,
+  extraParams,
   prompt,
   fetchImpl,
   rewrite = rewriteNotes,
@@ -329,7 +332,16 @@ export async function buildNotes({
   let byLocale = Object.fromEntries(locales.map((locale) => [locale, verbatim || prose]));
 
   if (!verbatim && provider && provider !== 'none') {
-    const rewritten = await rewrite({ items, prompt, locales, provider, model, fetchImpl });
+    const rewritten = await rewrite({
+      items,
+      prompt,
+      locales,
+      provider,
+      model,
+      effort,
+      extraParams,
+      fetchImpl,
+    });
     if (rewritten) byLocale = rewritten;
   }
 
@@ -475,6 +487,13 @@ async function run(argv, { cwd, env, write, error, rewrite }) {
     includeChangelog: options.includeChangelog,
     provider: env.RELEASE_NOTES_LLM_PROVIDER,
     model: env.RELEASE_NOTES_LLM_MODEL,
+    // Parsed here, before anything is sent: a typo in either is the run's
+    // failure, not a quietly shallower rewrite.
+    effort: parseEffort(env.RELEASE_NOTES_LLM_EFFORT, 'RELEASE_NOTES_LLM_EFFORT'),
+    extraParams: parseExtraParams(
+      env.RELEASE_NOTES_LLM_EXTRA_PARAMS,
+      'RELEASE_NOTES_LLM_EXTRA_PARAMS',
+    ),
     prompt: loadPrompt(),
     rewrite,
   });

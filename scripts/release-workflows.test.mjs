@@ -251,6 +251,7 @@ describe('cd-release.yml chains the release by dispatch', () => {
       'STORE_NOTES_INCLUDE_CHANGELOG',
       'RELEASE_NOTES_LLM_PROVIDER',
       'RELEASE_NOTES_LLM_MODEL',
+      'RELEASE_NOTES_LLM_EFFORT',
       'OPENAI_BASE_URL',
     ]) {
       assert.match(
@@ -259,6 +260,13 @@ describe('cd-release.yml chains the release by dispatch', () => {
         `${name} not in build-env`,
       );
     }
+    // A JSON object inside a JSON string: toJSON quotes and escapes it, where
+    // pasting it between "..." would end the build-env object at its first
+    // quote and fail the job with a parse error.
+    assert.match(
+      code,
+      /"RELEASE_NOTES_LLM_EXTRA_PARAMS":\$\{\{ toJSON\(vars\.RELEASE_NOTES_LLM_EXTRA_PARAMS \|\| ''\) \}\}/,
+    );
     for (const key of ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY']) {
       assert.match(
         code,
@@ -285,6 +293,8 @@ describe('cd-release.yml chains the release by dispatch', () => {
       for (const name of [
         'RELEASE_NOTES_LLM_PROVIDER',
         'RELEASE_NOTES_LLM_MODEL',
+        'RELEASE_NOTES_LLM_EFFORT',
+        'RELEASE_NOTES_LLM_EXTRA_PARAMS',
         'OPENAI_BASE_URL',
         'ANTHROPIC_API_KEY',
         'OPENAI_API_KEY',

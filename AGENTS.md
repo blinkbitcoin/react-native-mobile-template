@@ -27,6 +27,8 @@ modules/            local native modules (hello-native)
 mocks/              GraphQL mock API (server.ts, msw.ts, schema.graphql)
 scripts/            check-*.sh, doctor, init, hooks/, release/ (verify, notes, version), e2e/, badges/
 scripts/setup/      make setup: toolchain, Maestro, Android SDK + emulator, iOS (setup.test.mjs)
+scripts/security/   the check-security scanners, their settings resolver and the verdict
+scripts/lib/llm/    provider-portable LLM adapters (store notes, security review)
 .maestro/           Maestro flows (native e2e); e2e/web/ is Playwright
 fastlane/           store lanes + metadata; deploy/ota/ is the update server
 docs/               architecture, local-dev, quality, testing, ci, native-extensions,
@@ -82,7 +84,7 @@ aggregates.
 |---|---|
 | `make check` | Every static gate the `check-code` workflow runs (no tests/builds) |
 | `make ci` | Everything CI runs except E2E — `check` plus coverage and the script tests |
-| `make check-slow` | The minutes-long gates: prebuild output + bundle secrets (off by default in CI too) |
+| `make check-slow` | The minutes-long gates: prebuild output + the bundle scan (off by default in CI too) |
 | `make check-code` | `check-types` + `check-lint` + `check-format` + `check-knip` + `check-spell` |
 | `make check-types` | `tsc --noEmit` |
 | `make check-lint` | Biome lint + ESLint (React/Expo rules) |
@@ -101,7 +103,12 @@ aggregates.
 | `make check-security-deps` | Known vulnerabilities and malicious packages in the lockfile (osv-scanner) |
 | `make check-security-code` | Semgrep over app source: TypeScript, secrets, OWASP packs plus `rules/` |
 | `make check-security-policy` | Assert the pnpm install policy: release cooldown, no implicit builds, no trust downgrade |
-| `make check-security-bundle` | Export the bundle, assert no non-public keys leaked |
+| `make check-security-sbom` | CycloneDX bill of materials from the lockfile into `.security/sbom.cdx.json` |
+| `make check-security-bundle` | Export the bundle; flag private variable names, secrets and cleartext URLs in it |
+| `make check-security-mobile` | mobsfscan over a fresh prebuild of `android/` and `ios/` |
+| `make check-security-binaries` | MASTG checks over built binaries (`APK=...` and/or `IPA=...`) |
+| `make check-security-review` | LLM security review of the diff (off by default; needs `llm.provider` and a key) |
+| `make check-security-openant` | OpenAnt LLM scan of the codebase (off by default; needs `llm.provider` and a key) |
 | `make check-codeql` | CodeQL with the same config CI uses (needs a CodeQL CLI; not in `make check`) |
 
 | Tests | |
