@@ -15,7 +15,7 @@ pnpm exec lingui compile >/dev/null
 # now, so it has to be at least as strict as the thing it displaced.
 dirty="$(git status --porcelain -- "${paths[@]}")"
 if [ -n "$dirty" ]; then
-  echo "i18n catalogs are out of date. Run: make i18n" >&2
+  echo "i18n catalogs are out of date. Run: make gen-i18n" >&2
   printf '%s\n' "$dirty" >&2
   exit 1
 fi

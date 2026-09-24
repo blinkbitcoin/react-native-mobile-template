@@ -20,7 +20,7 @@ function module_(): HelloNativeModuleType {
     return native;
   } catch (cause) {
     throw new HelloNativeError(
-      'HelloNative is not available in this runtime (Expo Go or web). Build a dev client: make ios / make android.',
+      'HelloNative is not available in this runtime (Expo Go or web). Build a dev client: make dev-ios / make dev-android.',
       { cause },
     );
   }

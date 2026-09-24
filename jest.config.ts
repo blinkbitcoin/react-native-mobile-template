@@ -20,9 +20,9 @@ const coveragePathIgnorePatterns = [
   // Jest manual mocks: stand-ins for native modules, wired in through
   // `moduleNameMapper`. Fixtures, not app behaviour.
   '<rootDir>/src/test/mocks/',
-  // GraphQL codegen output: written by `make gen`, reviewed as a diff.
+  // GraphQL codegen output: written by `make gen-graphql`, reviewed as a diff.
   '<rootDir>/src/graphql/generated/',
-  // Compiled Lingui catalogs: written by `make i18n` from the `.po` files.
+  // Compiled Lingui catalogs: written by `make gen-i18n` from the `.po` files.
   '<rootDir>/src/i18n/locales/',
   // Pure re-export barrels. expo-router route files that only re-export the
   // screen or handler they point at carry zero statements, so including them

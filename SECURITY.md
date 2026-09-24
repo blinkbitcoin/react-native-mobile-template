@@ -32,7 +32,7 @@ OTA update.
   is public by design.
 - **Nothing secret reaches the app bundle.** Only `EXPO_PUBLIC_*` variables are
   readable at runtime, they are parsed by `src/config/env`, and everything in
-  them ships to users in cleartext. `make bundle-secrets-check` exports the
+  them ships to users in cleartext. `make check-security-bundle` exports the
   bundle and fails if a non-public key leaks into it.
 - **Runtime credentials go through `src/lib/secure-store`** (Keychain /
   Keystore), never `expo-secure-store` directly and never

@@ -4,7 +4,7 @@
 // totals stay at 100% — noise that reads as a hole, and a silent way to add an
 // untested file without moving the number. The house rule: such modules go in
 // `coveragePathIgnorePatterns` with a reason, and this check (run by
-// `make coverage`, after the Jest run) fails when one slips through.
+// `make test-coverage`, after the Jest run) fails when one slips through.
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -40,7 +40,7 @@ export function readSummary(file = SUMMARY_PATH) {
     return { summary: JSON.parse(readFileSync(file, 'utf8')) };
   } catch (e) {
     return {
-      error: `${file} is missing or unreadable (${e.message}) — run \`make coverage\`, and keep 'json-summary' in jest.config.ts's coverageReporters`,
+      error: `${file} is missing or unreadable (${e.message}) — run \`make test-coverage\`, and keep 'json-summary' in jest.config.ts's coverageReporters`,
     };
   }
 }

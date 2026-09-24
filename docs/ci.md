@@ -117,7 +117,7 @@ submission are never open against the same app at once.
 | `ci-web.yml` | `pull_request`, `workflow_dispatch` (`deploy`) | `build-web.yml` | PR = production export + Playwright smoke; a `deploy` dispatch from `cd-release.yml`<br>at the tag = the same export + Pages deploy, with `base-url` = `/<repo>` unless a custom<br>domain is set, and `+not-found.html` copied to `404.html` so a deep link boots the router |
 | `ci-pr-closed.yml` | `pull_request: closed` | `pr-closed.yml` | cancels the closed PR's in-flight runs and drops its `gh-pages` badge directory; needs `actions: write` and `contents: write` |
 | `ci-pr-title.yml` | `pull_request: edited` (only when the title changed) | `pr-title.yml` | `opened`/`synchronize` are already covered by `check-code.yml`'s `commitlint` |
-| `ci-codeql.yml` | `push` to `main`, `pull_request` to `main`, `schedule` (Mon 06:17 UTC) | `check-codeql.yml` | CodeQL advanced setup. Informational — **never** a required check.<br>Config in `.github/codeql/codeql-config.yml`; `make codeql` runs the same queries locally |
+| `ci-codeql.yml` | `push` to `main`, `pull_request` to `main`, `schedule` (Mon 06:17 UTC) | `check-codeql.yml` | CodeQL advanced setup. Informational — **never** a required check.<br>Config in `.github/codeql/codeql-config.yml`; `make check-codeql` runs the same queries locally |
 
 `push` is deliberately scoped to `main` only: a PR branch in this repo would
 otherwise fire both `push` and `pull_request` and run the whole suite twice for
@@ -183,16 +183,16 @@ skips both of its jobs. See [ota.md](ota.md).
 
 Everything CI runs has a local equivalent. The reusable workflows call
 `package.json` scripts by name (the "script contract"), which is exactly what
-the `make` targets wrap — so a green `make check && make unit && make e2e-ios`
+the `make` targets wrap — so a green `make check && make test-unit && make test-e2e-ios`
 locally means the same commands passed the same way in CI.
 
 | CI job | Scripts it runs | Local equivalent |
 | --- | --- | --- |
 | `check-code.yml` | `typecheck`, `lint`, `format:check`, `knip`, `spell`, `expo-doctor`, `pnpm audit --prod`,<br>commitlint, actionlint, zizmor, shellcheck, `check:docs`, `check:release`, `check:secrets` | `make check-code`, `make check-deps`, `make check-ci`, `make check-docs`,<br>`make check-release`, `make check-secrets` (`make check` runs all of it) |
-| `check-unit.yml` | `test:coverage`, `test:scripts` | `make coverage`, `make test-scripts` (`make unit` runs `test` + `test:scripts`);<br>both gate coverage at 100% |
-| `check-e2e.yml` | Maestro flows in `.maestro/` against a debug build | `make e2e-ios` / `make e2e-android` (after `make mock-api`, `make start`, `make ios`/`make android`) |
-| `build-web.yml` | `build:web`, `test:e2e:web` | `make build-web`, `make e2e-web` |
-| `check-codeql.yml` | no consumer script: the CodeQL action reads `.github/codeql/codeql-config.yml` | `make codeql` (same config, same suite, same packs) |
+| `check-unit.yml` | `test:coverage`, `test:scripts` | `make test-coverage`, `make test-scripts` (`make test-unit` runs `test` + `test:scripts`);<br>both gate coverage at 100% |
+| `check-e2e.yml` | Maestro flows in `.maestro/` against a debug build | `make test-e2e-ios` / `make test-e2e-android` (after `make dev-api`, `make dev`, `make dev-ios`/`make dev-android`) |
+| `build-web.yml` | `build:web`, `test:e2e:web` | `make build-web`, `make test-e2e-web` |
+| `check-codeql.yml` | no consumer script: the CodeQL action reads `.github/codeql/codeql-config.yml` | `make check-codeql` (same config, same suite, same packs) |
 
 Two script-contract details are load-bearing:
 
@@ -340,7 +340,7 @@ gh-pages
 | `coverage.svg` | `coverage/coverage-summary.json` from the `coverage` artifact — Jest's `json-summary` reporter, never scraped HTML |
 
 Rendering is this repo's job (`scripts/badges/`, `pnpm badges:render`, run
-locally with `make badges`); publishing is the workflows repo's
+locally with `make gen-badges`); publishing is the workflows repo's
 (`scripts/ci/publish-badges.sh`). That is the same seam `check-code.yml` uses for
 typecheck and lint: the reusable workflow calls a named consumer script.
 

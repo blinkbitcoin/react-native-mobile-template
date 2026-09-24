@@ -57,12 +57,15 @@ flowchart LR
 mise trust && mise install   # toolchain: Node, pnpm, Ruby, Java
 make doctor                  # verify it (one line per tool)
 make install                 # dependencies, gems, git hooks
-make mock-api                # terminal 1: GraphQL mock API
-make start                   # terminal 2: Metro for the dev client
-make ios                     # or: make android
+make dev-api                 # terminal 1: GraphQL mock API
+make dev                     # terminal 2: Metro for the dev client
+make dev-ios                 # or: make dev-android
 ```
 
-`make check && make unit` runs every gate CI runs. `make help` lists the rest.
+`make check && make test-unit` runs every gate CI runs. `make help` lists the
+rest, grouped by prefix: `check-` gates, `test-` tests, `build-` artifacts,
+`dev-` the app locally, `gen-` generated files, `fix-` rewrites in place,
+`verify-` inspects a build.
 
 > If a command is not in the Makefile, CI does not know how to run it either.
 > That is the rule the whole repo is built on, and `make ci` runs the whole of

@@ -21,7 +21,7 @@ place, so the template's adoption script can strip it completely in one pass.
   same list the adoption script's manifest consumed.
 - Non-file removals: the `app.config.ts` `web:` block, the `metro.config.js`
   web branch, `package.json` `web` / `build:web` / `test:e2e:web`, Makefile
-  `web` / `build-web` / `e2e-web`, `scripts/e2e/web.sh`,
+  `dev-web` / `build-web` / `test-e2e-web`, `scripts/e2e/web.sh`,
   `.github/workflows/ci-web.yml`, `knip.json`'s `playwright` plugin key.
 - Deployment is GitHub Pages from the gated production dispatch, not the tag
   push, so the site tracks what is actually live in the stores.
@@ -29,7 +29,7 @@ place, so the template's adoption script can strip it completely in one pass.
 ## Consequences
 
 A mobile-only app declines web once, at adoption, and never sees Playwright or
-`react-native-web` again; `make check`, `make unit` and `pnpm knip` must stay
+`react-native-web` again; `make check`, `make test-unit` and `pnpm knip` must stay
 green after the strip. The cost: a new web-only file has to join the list.
 
 ## Alternatives

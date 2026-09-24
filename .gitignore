@@ -56,11 +56,11 @@ yarn-error.*
 # generated native folders (Continuous Native Generation: never commit these)
 /ios
 /android
-# Gradle output for local modules, produced by `make android`
+# Gradle output for local modules, produced by `make dev-android`
 modules/*/android/build/
 modules/*/android/.cxx/
 
-# `make codeql` output: the database, results.sarif and the two tool logs.
+# `make check-codeql` output: the database, results.sarif and the two tool logs.
 # Hundreds of MB, and rebuilt from the tree on every run.
 /.codeql
 

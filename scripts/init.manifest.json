@@ -174,7 +174,7 @@
     "packageScripts": ["web", "build:web", "test:e2e:web"],
     "packageDependencies": ["@expo/metro-runtime", "react-dom", "react-native-web"],
     "packageDevDependencies": ["@playwright/test"],
-    "makeTargets": ["web", "build-web", "e2e-web"],
+    "makeTargets": ["dev-web", "build-web", "test-e2e-web"],
     "commitlintScopes": ["web"],
     "knipPlugins": ["playwright"],
     "markedBlocks": [
@@ -382,7 +382,7 @@
     "docScrub": {
       "globs": ["*.md", "docs/*.md", "docs/decisions/*.md", ".github/*.md"],
       "lines": [
-        "^\\s*\\|.*`make (web|build-web|e2e-web)`",
+        "^\\s*\\|.*`make (dev-web|build-web|test-e2e-web)`",
         "^\\s*\\|\\s*`(ci-web|build-web)\\.yml`",
         "^\\s*\\|.*`e2e/web/?`",
         "^\\s*\\|\\s*`playwright-report`",
@@ -395,8 +395,8 @@
       "paragraphs": [
         "PLAYWRIGHT_SKIP_EXPORT",
         "^## Playwright$",
-        "^`make e2e-web` runs",
-        "^`make web` starts the Expo web dev server"
+        "^`make test-e2e-web` runs",
+        "^`make dev-web` starts the Expo web dev server"
       ]
     }
   },

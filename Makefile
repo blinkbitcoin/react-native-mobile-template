@@ -1,5 +1,16 @@
 # Human/agent command surface. Thin wrappers over pnpm scripts and scripts/.
 # `make` or `make help` lists targets; every target has a `##` description.
+#
+# Every target belongs to a prefix family, the same way the workflow files do,
+# because `make help` sorts alphabetically and the prefix is the only grouping
+# a sorted list has: `check-` static gates, `test-` anything that runs tests,
+# `build-` produces an artifact, `dev-` runs the app locally, `gen-` writes
+# generated files, `fix-` rewrites source in place, `verify-` inspects a built
+# artifact. `check`, `test` and `ci` are the aggregates; `init`, `doctor`,
+# `install`, `clean`, `reset`, `ports`, `version`, `release-notes`, `prebuild`
+# and `help` are one-off entry points that belong to no family.
+# `prebuild` keeps Expo's own word for it on purpose: `build-native` would be
+# harder to map back to the command it runs.
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
@@ -7,7 +18,7 @@ SHELL := /bin/bash
 # `scripts/ports.mjs` is the table and the ONLY thing that derives one. mise
 # exports the base and nothing else, on purpose: a mirrored METRO_PORT in the
 # environment is indistinguishable from a deliberate per-service override, and
-# `APP_PORT_BASE=8090 make start` would then quietly stay on the default. So the
+# `APP_PORT_BASE=8090 make dev` would then quietly stay on the default. So the
 # run targets eval the helper, which also means they work in a shell with no
 # mise activated. EXPO_PUBLIC_API_URL comes from that eval too: it is baked into
 # the bundle, so .env.development stays the bare-`expo start` default.
@@ -36,19 +47,19 @@ install: ## Install dependencies (pnpm + Ruby gems) and git hooks
 ports: ## Print the ports derived from APP_PORT_BASE
 	@node scripts/ports.mjs
 
-start: ## Metro for the dev client (APP_PORT_BASE+1)
+dev: ## Metro for the dev client (APP_PORT_BASE+1)
 	@$(PORTS) && pnpm start --port "$$METRO_PORT"
 
-ios: ## Prebuild if needed, build and launch on the iOS simulator
+dev-ios: ## Prebuild if needed, build and launch on the iOS simulator
 	@$(PORTS) && pnpm ios
 
-android: ## Prebuild if needed, build and launch on an Android emulator
+dev-android: ## Prebuild if needed, build and launch on an Android emulator
 	@$(PORTS) && pnpm android
 
-web: ## Expo web dev server (web target)
+dev-web: ## Expo web dev server (web target)
 	@$(PORTS) && pnpm web
 
-mock-api: ## Local GraphQL mock API (APP_PORT_BASE+2)
+dev-api: ## Local GraphQL mock API (APP_PORT_BASE+2)
 	@$(PORTS) && pnpm mock-api
 
 prebuild: ## Regenerate ios/ and android/ locally (debugging plugins only; never commit them)
@@ -91,10 +102,10 @@ release-notes: ## Preview store notes for HEAD (TAG=vX.Y.Z uses that release bod
 	fi
 
 # ---------- Codegen ----------
-i18n: ## Extract + compile message catalogs
+gen-i18n: ## Extract + compile message catalogs
 	pnpm i18n:extract
 
-codegen: ## Regenerate typed GraphQL documents
+gen-graphql: ## Regenerate typed GraphQL documents
 	pnpm codegen
 
 # ---------- Quality gates ----------
@@ -107,23 +118,27 @@ codegen: ## Regenerate typed GraphQL documents
 # when they disagree.
 #
 # E2E is the deliberate exception: it needs a simulator or an emulator, so it
-# stays in its own targets (`make e2e-ios`, `e2e-android`, `e2e-web`).
-typecheck: ## tsc --noEmit
+# stays in its own targets (`make test-e2e-ios`, `test-e2e-android`,
+# `test-e2e-web`).
+check-types: ## tsc --noEmit
 	pnpm typecheck
 
-lint: ## Biome lint + ESLint (React/Expo rules)
+check-lint: ## Biome lint + ESLint (React/Expo rules)
 	pnpm lint
 
-format: ## Format everything with Biome (writes)
+fix-format: ## Format everything with Biome (writes)
 	pnpm format
 
-format-check: ## Check formatting without writing
+fix-lint: ## Apply Biome's and ESLint's own fixes (writes)
+	pnpm lint:fix
+
+check-format: ## Check formatting without writing
 	pnpm format:check
 
-knip: ## Unused files, exports and dependencies (default mode; production mode flags test-only exports)
+check-knip: ## Unused files, exports and dependencies (default mode; production mode flags test-only exports)
 	pnpm knip
 
-spell: ## Spell-check with typos
+check-spell: ## Spell-check with typos
 	pnpm spell
 
 check-gen: ## Generated-file drift (i18n, codegen)
@@ -133,7 +148,7 @@ check-gen: ## Generated-file drift (i18n, codegen)
 check-prebuild: ## Prebuild both platforms into a temp dir and assert plugin output
 	pnpm check-prebuild
 
-check-code: typecheck lint format-check knip spell ## Fast local gate: types + lint + format + knip + spell
+check-code: check-types check-lint check-format check-knip check-spell ## Fast local gate: types + lint + format + knip + spell
 
 check-deps: ## SDK drift, vulnerability audit, lockfile provenance, licenses
 	pnpm deps:check
@@ -150,7 +165,7 @@ check-ci: ## Lint the CI itself: actionlint + zizmor (workflows) + shellcheck (s
 check-docs: ## Docs freshness, AGENTS.md command table, table widths, mermaid blocks
 	bash scripts/check-docs.sh
 
-bundle-secrets-check: ## Export the bundle and assert no non-public keys leaked
+check-security-bundle: ## Export the bundle and assert no non-public keys leaked
 	pnpm check-bundle-secrets
 
 # The skills' tests run here, in the recipe rather than as a prerequisite: they
@@ -176,42 +191,42 @@ check: check-code check-gen check-deps check-ci check-docs check-release check-s
 # The two expensive gates are not in `check` and are off by default in CI for
 # the same reason: a prebuild of both platforms and a web export are minutes
 # each. Run them before a release, or when you have touched a config plugin.
-check-slow: check-prebuild bundle-secrets-check ## The minutes-long gates: prebuild output + bundle secrets
+check-slow: check-prebuild check-security-bundle ## The minutes-long gates: prebuild output + bundle secrets
 
-ci: check coverage test-scripts ## Everything CI runs except E2E (which needs a simulator)
+ci: check test-coverage test-scripts ## Everything CI runs except E2E (which needs a simulator)
 
 # Deliberately NOT in `make check`: the first run downloads and compiles a query
 # pack (minutes) and every run needs a CodeQL CLI, which no other gate does.
 # CI runs the same queries through .github/workflows/ci-codeql.yml.
-codeql: ## CodeQL locally with the same config CI uses (needs a CodeQL CLI)
+check-codeql: ## CodeQL locally with the same config CI uses (needs a CodeQL CLI)
 	bash scripts/codeql-local.sh
 
 test-scripts: ## node:test for scripts/**/*.test.mjs, with the 100% script coverage gate
 	pnpm test:scripts
 
-unit: ## Unit + component tests
+test-unit: ## Unit + component tests
 	pnpm test && pnpm test:scripts
 
-coverage: ## Tests with coverage thresholds and the empty-row check (what CI enforces)
+test-coverage: ## Tests with coverage thresholds and the empty-row check (what CI enforces)
 	pnpm test:coverage
 
 # Same entry point CI calls, so what you see locally is what gh-pages gets.
 # The job results default to success here; set BADGE_UNIT/BADGE_E2E to any of
 # success|failure|cancelled|skipped to see the other colours.
-badges: ## Render the CI badges into coverage/badge/ (run make coverage first)
+gen-badges: ## Render the CI badges into coverage/badge/ (run make test-coverage first)
 	@BADGE_UNIT="$${BADGE_UNIT:-success}" BADGE_E2E="$${BADGE_E2E:-success}" pnpm badges:render
 
 # ---------- End-to-end ----------
-e2e-ios: ## Maestro flows on iOS (needs: make mock-api, make start, make ios)
+test-e2e-ios: ## Maestro flows on iOS (needs: make dev-api, make dev, make dev-ios)
 	@$(PORTS) && pnpm test:e2e:ios
 
-e2e-android: ## Maestro flows on Android (needs: make mock-api, make start, make android)
+test-e2e-android: ## Maestro flows on Android (needs: make dev-api, make dev, make dev-android)
 	@$(PORTS) && pnpm test:e2e:android
 
-e2e-web: ## Web export (dev env, mock API) + Playwright smoke
+test-e2e-web: ## Web export (dev env, mock API) + Playwright smoke
 	@$(PORTS) && pnpm test:e2e:web
 
-test: unit check-code ## Unit tests + code checks
+test: test-unit check-code ## Unit tests + code checks
 
 clean: ## Remove generated native projects, caches and build output
 	rm -rf ios android .expo dist coverage node_modules/.cache
@@ -222,4 +237,4 @@ reset: clean ## clean + reinstall
 help: ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: init doctor install ports start ios android web mock-api prebuild build-web version verify-ios verify-android release-notes i18n codegen typecheck lint format format-check knip spell check-gen check-prebuild check-code check-deps check-ci check-docs check-skills check-secrets bundle-secrets-check check-release check check-slow ci codeql test-scripts unit coverage badges e2e-ios e2e-android e2e-web test clean reset help
+.PHONY: init doctor install ports dev dev-ios dev-android dev-web dev-api prebuild build-web version verify-ios verify-android release-notes gen-i18n gen-graphql check-types check-lint fix-format fix-lint check-format check-knip check-spell check-gen check-prebuild check-code check-deps check-ci check-docs check-skills check-secrets check-security-bundle check-release check check-slow ci check-codeql test-scripts test-unit test-coverage gen-badges test-e2e-ios test-e2e-android test-e2e-web test clean reset help

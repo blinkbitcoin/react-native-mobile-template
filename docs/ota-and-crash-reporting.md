@@ -82,7 +82,7 @@ Two constraints from this repo:
 
 - A DSN or app key that must reach the bundle has to be `EXPO_PUBLIC_*` and be
   added to the zod schema in `src/config/env.ts`. Anything else is stripped and
-  `make bundle-secrets-check` fails the build if a non-public key name shows up
+  `make check-security-bundle` fails the build if a non-public key name shows up
   in the exported bundle.
 - Adding a native SDK means a config plugin entry in `app.config.ts`, a new
   assertion in `scripts/check-prebuild.sh`, and a fresh dev client. See
@@ -153,7 +153,7 @@ you rely on symbolicated JavaScript frames.
    installing `expo-build-properties` and setting it there. That switch applies
    to every pod in the project, not just Firebase, and it is a common source of
    build failures in libraries that assume dynamic frameworks. Change it in its
-   own commit and run `make check-prebuild` plus a real `make ios` before
+   own commit and run `make check-prebuild` plus a real `make dev-ios` before
    anything else.
 4. Implement `CrashReporter` over `crashlytics().recordError` and
    `crashlytics().setUserId`.

@@ -329,7 +329,7 @@ for (const line of [
   "  use: { baseURL: 'http://localhost:8089' },",
   'adb reverse tcp:8081 tcp:8081',
   'url=http%3A%2F%2Flocalhost%3A8081',
-  '| `make mock-api` | Local GraphQL mock API on :4000 |',
+  '| `make dev-api` | Local GraphQL mock API on :4000 |',
   '`mocks/server.ts` starts on port 4000.',
   'the mock API on 4000 and',
 ]) {

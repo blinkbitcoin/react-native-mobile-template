@@ -59,7 +59,7 @@ release note. Mark breaking changes with `!` (`feat(app)!: ...`) or a
 
 ```sh
 make check       # every static gate CI runs (no tests, no builds)
-make unit        # unit + component tests
+make test-unit   # unit + component tests
 ```
 
 Native-facing changes (`app.config.ts`, `plugins/`, `modules/`) additionally

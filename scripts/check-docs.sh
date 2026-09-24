@@ -99,7 +99,8 @@ if [ ! -f AGENTS.md ]; then
 fi
 
 # `name: [deps] ## description` — the same shape `make help` prints, except
-# that this pattern also accepts digits in a target name (`i18n`, `e2e-ios`).
+# that this pattern also accepts digits in a target name (`gen-i18n`,
+# `test-e2e-ios`).
 documented="$(grep -oE '^[a-zA-Z0-9_-]+:[^#]*## ' Makefile | cut -d: -f1 | sort -u)"
 # Every command-table row is a `make <target>` literal, so one grep covers the
 # whole table (and any `make x` named in AGENTS.md prose).

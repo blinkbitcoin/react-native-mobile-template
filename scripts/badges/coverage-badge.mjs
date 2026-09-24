@@ -50,7 +50,7 @@ export function writeCoverageBadge({
       summary = JSON.parse(readFileSync(summaryFile, 'utf8'));
     } catch (e) {
       throw new BadgeError(
-        `coverage-badge: ${summaryFile} is missing or unreadable (${e.message}) — run \`make coverage\` first`,
+        `coverage-badge: ${summaryFile} is missing or unreadable (${e.message}) — run \`make test-coverage\` first`,
       );
     }
     result = coverageFrom(summary);

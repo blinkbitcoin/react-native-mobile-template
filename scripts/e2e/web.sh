@@ -9,7 +9,7 @@ cd "$(dirname "$0")/../.."
 
 # playwright.config.ts reads these rather than importing ports.mjs - Playwright
 # require()s a .ts config, and requiring an ES module throws. Exporting here
-# means the suite works however it is started: `make e2e-web` (which also
+# means the suite works however it is started: `make test-e2e-web` (which also
 # evaluates this), `pnpm test:e2e:web`, or CI calling the script directly.
 eval "$(node scripts/ports.mjs --sh)"
 
