@@ -32,11 +32,19 @@ shared-workflows calls the consumer's `pnpm` scripts **by name**:
 | `test:scripts` | `check-unit.yml`, input default |
 | `build:web` | `build-web.yml`, input default |
 
-These six names do not change. They are documented in shared's
-`docs/adopting-an-existing-repo.md` as the seam any consumer implements, and
-renaming them would break every consumer at once for a cosmetic gain. Where
-such a script only shells out to a make target, the target is renamed
-underneath it and the script body follows; the script's own name stays.
+These six are the names shared's `docs/adopting-an-existing-repo.md`
+documents as the seam any consumer implements. They are not the whole
+surface: `scripts/gates.test.mjs` asserts that **eighteen** script names CI
+calls exist in `package.json`, adding `typecheck`, `lint`, `format:check`,
+`spell`, `i18n:check`, `codegen:check`, `deps:check`, `deps:audit`,
+`deps:licenses`, `check-prebuild`, `check:bundle-secrets`, `test` and
+`test:coverage`.
+
+**No `pnpm` script name changes.** Renaming any of them would break a
+consumer or a gate for a cosmetic gain, and the eighteen are the reason to
+leave the whole set alone rather than only the documented six. Where such a
+script shells out to a make target, the target is renamed underneath it and
+the script body follows; the script's own name stays.
 
 ## Design
 
@@ -101,8 +109,13 @@ gates), `test-` (anything that runs tests), `build-` (produces an artifact),
 
 - `Makefile`: target names, the `check`, `check-slow`, `ci` and `test`
   aggregates, and the `##` help text on each renamed line.
-- `package.json`: the bodies of scripts that shell to make. The six contract
-  names above keep their names.
+- `package.json`: the bodies of scripts that shell to make. No script name
+  changes.
+- `scripts/init.test.mjs` and `scripts/init.manifest.json`: the `--no-web`
+  path pins target names in a `makeTargets` array, a `removeMakeTargets`
+  fixture and a `docScrub` alternation regex. A grep for `make <name>` misses
+  all three, so they are checked by hand.
+- `jest.config.ts`: names a target in a comment.
 - `AGENTS.md`: the command table. `scripts/check-docs.sh` asserts the table
   and the Makefile agree in both directions — a missing row fails, and a row
   naming a target that does not exist fails — so this file cannot drift.
