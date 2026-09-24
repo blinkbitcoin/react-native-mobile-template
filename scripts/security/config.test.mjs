@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import path from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { DEFAULTS, load, main, parseBoolean, resolve } from './config.mjs';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
 
 test('defaults apply when the file and the environment are silent', () => {
   const settings = resolve({}, {});
@@ -208,4 +213,16 @@ test('severity none is valid', () => {
 test('enabled with boolean value true from policy', () => {
   const settings = resolve({ enabled: true }, {});
   assert.equal(settings.enabled, true);
+});
+
+test('as a command it reads security-policy.json from the working directory', () => {
+  const script = path.join(here, 'config.mjs');
+  // The inherited environment keeps NODE_V8_COVERAGE, so the child counts,
+  // and it also runs the file as the entry point rather than an import, so
+  // `import.meta.main` is true here the way it never is under `node --test`.
+  const run = (...args) =>
+    spawnSync(process.execPath, [script, ...args], { encoding: 'utf8', env: process.env });
+  const got = run('get', 'jobs.deps');
+  assert.equal(got.status, 0);
+  assert.equal(got.stdout.trim(), 'true');
 });
