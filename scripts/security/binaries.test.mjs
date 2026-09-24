@@ -305,7 +305,7 @@ test('iOS: App Transport Security exceptions (MASTG-TEST-0322, MASTG-TEST-0342)'
     'MASTG-TEST-0342',
     'MASTG-TEST-0342',
   ]);
-  assert.match(findings[2].message, /legacy\.example\.com/);
+  assert.match(findings[2].message, /cleartext HTTP to legacy\.example\.com, which is not in/);
 });
 
 test('parseArgs reads flag pairs and repeats --note', () => {

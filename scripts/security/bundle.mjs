@@ -23,15 +23,17 @@ import { fromFindings } from './sarif.mjs';
 export const printableRuns = (buffer, min = 4) => {
   const runs = [];
   let start = -1;
-  for (let i = 0; i <= buffer.length; i += 1) {
-    const byte = buffer[i];
-    const printable = byte !== undefined && byte >= 0x20 && byte < 0x7f;
+  const close = (end) => {
+    if (start >= 0 && end - start >= min) runs.push(buffer.toString('latin1', start, end));
+    start = -1;
+  };
+  for (let i = 0; i < buffer.length; i += 1) {
+    const printable = buffer[i] >= 0x20 && buffer[i] < 0x7f;
     if (printable && start < 0) start = i;
-    if (!printable && start >= 0) {
-      if (i - start >= min) runs.push(buffer.toString('latin1', start, i));
-      start = -1;
-    }
+    if (!printable) close(i);
   }
+  // A run that reaches the last byte has no terminator to close it.
+  close(buffer.length);
   return runs;
 };
 

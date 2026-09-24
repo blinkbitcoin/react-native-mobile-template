@@ -97,7 +97,7 @@ test('with bundle.hosts empty any https host is fine; once listed, others are lo
   const findings = findingsFor('b', strings, { ...OPTIONS, hosts: ['api.example.com'] });
   assert.deepEqual(rules(findings), ['bundle/unlisted-host']);
   assert.equal(findings[0].severity, 'low');
-  assert.match(findings[0].message, /tracker\.example\.net/);
+  assert.match(findings[0].message, /^tracker\.example\.net is not in bundle\.hosts/);
 });
 
 test('main reads the bundles and .env.example and prints one SARIF document', () => {

@@ -432,6 +432,12 @@ test('the repository policy file resolves cleanly', () => {
   withoutSecurityEnv(() => {
     const settings = load(path.join(repoRoot, 'security-policy.json'), {});
     assert.equal(settings.jobs.binaries, true);
-    assert.ok(settings.options.bundle.cleartextHosts.includes('json-schema.org'));
+    assert.deepEqual(settings.options.bundle.cleartextHosts, [
+      'localhost',
+      '127.0.0.1',
+      'json-schema.org',
+      'dev.apollodata.com',
+      'hostname',
+    ]);
   });
 });
