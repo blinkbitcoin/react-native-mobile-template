@@ -108,6 +108,12 @@ APP_PORT_BASE=8090 make dev-api   # 8092
 APP_PORT_BASE=8090 make dev       # 8091
 ```
 
+A worktree may also live *inside* the checkout: Claude Code puts its own under
+`.claude/worktrees/<name>/`. Every tool that walks the tree (Jest, Metro,
+ESLint, Biome, knip, tsc, typos, Semgrep, CodeQL) skips that directory, so
+`make check` and `make test-unit` in the main checkout see only its own files.
+See [quality.md](quality.md#worktrees-inside-the-checkout-are-not-this-checkout).
+
 `EXPO_PUBLIC_API_URL` is the one value that is *not* exported by mise either:
 Expo bakes it into the bundle, so `.env.development` carries the mock API's
 default URL for a bare `expo start`, and the Makefile's run targets export the

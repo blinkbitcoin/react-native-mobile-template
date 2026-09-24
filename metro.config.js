@@ -1,7 +1,20 @@
 // Expo's default Metro config plus one resolver fix.
+const path = require('node:path');
 const { getDefaultConfig } = require('expo/metro-config');
 
 const config = getDefaultConfig(__dirname);
+
+// Claude Code's git worktrees under `.claude/worktrees/` are whole checkouts of
+// this repository, node_modules included, and Metro crawls everything under the
+// project root. Matched both project-relative (Expo's crawler prunes the
+// directory, like its own `ios/Pods` entry) and absolute, anchored to this
+// root: a worktree's own root is itself under `.claude/worktrees/`, so an
+// unanchored pattern would block the whole app there.
+const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+config.resolver.blockList = [
+  ...[].concat(config.resolver.blockList ?? []),
+  new RegExp(`^(?:${escapeRegExp(__dirname + path.sep)})?\\.claude[\\\\/]worktrees(?:[\\\\/]|$)`),
+];
 
 // init:web-start
 // expo-sqlite's web implementation (wa-sqlite) imports a .wasm file, which is

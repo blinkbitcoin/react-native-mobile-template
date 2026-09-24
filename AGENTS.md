@@ -146,6 +146,12 @@ aggregates.
   missing `await waitFor`, not a logging need; a deliberate one opts out with
   `allowConsole(method, matcher)` or by spying on the method. The guard and its
   test are the only `noConsole` exemptions besides the ones above.
+- **Worktrees under `.claude/worktrees/` are not this checkout.** Claude Code
+  puts whole checkouts there, node_modules included, so every tool that walks
+  the tree excludes the directory itself (Jest and Metro anchored to the root,
+  since a worktree's own root is under it too). A new tool adds its entry;
+  `scripts/worktree-ignores.test.mjs` holds the existing ones, and
+  `docs/quality.md` lists them.
 - **Routes-only rule:** files in `src/app/` compose screens from `src/features`
   and `src/components` and may not import `@apollo/client`, `@/graphql`,
   `@/services` or `@/lib`. Only `src/app/_layout.tsx` and
