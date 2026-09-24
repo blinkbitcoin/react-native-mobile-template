@@ -7,7 +7,16 @@ cd "$(dirname "$0")/../.."
 # shellcheck source=scripts/security/lib/common.sh
 source scripts/security/lib/common.sh
 
-if [ "$(node scripts/security/config.mjs get enabled)" != "true" ]; then
+# Captured into a variable rather than compared inline: `[ "$(cmd)" != x ]`
+# discards cmd's own exit status, so a malformed security-policy.json or an
+# invalid SECURITY_* value - both of which config.mjs is designed to throw
+# on - would read as an empty string, never equal "true", and this would
+# print "disabled" and exit 0 instead of failing the run.
+if ! enabled="$(node scripts/security/config.mjs get enabled)"; then
+  echo "config.mjs failed resolving enabled - security-policy.json or a SECURITY_* value is invalid (see the error above); that fails the run, it does not disable it" >&2
+  exit 1
+fi
+if [ "$enabled" != "true" ]; then
   echo "security scanning is disabled (SECURITY_ENABLED or security-policy.json)"
   exit 0
 fi

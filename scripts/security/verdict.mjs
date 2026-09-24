@@ -61,18 +61,33 @@ const resultsOf = (document) =>
       .map((result) => ({ result, rule: rules[result.ruleId] }));
   });
 
+// A suppressed result (osv-scanner.toml, .semgrepignore, an inline marker)
+// is deliberately dropped from `resultsOf` above - it must never count
+// toward severity or block a run. But dropping it with no trace anywhere
+// makes a suppression indistinguishable from a result that was never found
+// at all, which is not the same claim. Counted separately so the summary can
+// say "N suppressed" instead of going silent about them.
+const suppressedCountOf = (document) =>
+  (document.runs ?? []).reduce(
+    (total, run) =>
+      total + (run.results ?? []).filter((r) => (r.suppressions ?? []).length > 0).length,
+    0,
+  );
+
 const ranOf = (document) =>
   (document.runs ?? []).every((run) =>
     (run.invocations ?? []).every((i) => i.executionSuccessful !== false),
   );
 
-/** Counts, the highest severity seen, which jobs skipped, and every finding. */
+/** Counts, the highest severity seen, which jobs skipped, every finding, and how many were suppressed. */
 export const summarize = (entries) => {
   const counts = { critical: 0, high: 0, medium: 0, low: 0 };
   const skipped = [];
   const findings = [];
+  let suppressed = 0;
   for (const { job, document } of entries) {
     if (!ranOf(document)) skipped.push(job);
+    suppressed += suppressedCountOf(document);
     for (const { result, rule } of resultsOf(document)) {
       const severity = severityOf(result, rule);
       counts[severity] += 1;
@@ -85,7 +100,7 @@ export const summarize = (entries) => {
     }
   }
   const highest = [...ORDER].reverse().find((s) => counts[s] > 0) ?? 'none';
-  return { counts, highest, skipped, findings };
+  return { counts, highest, skipped, findings, suppressed };
 };
 
 /** The verdict, its exit code and the lines to print. */
@@ -98,7 +113,19 @@ export const verdict = ({ entries, severity, failOn }) => {
       `severity: expected one of ${SEVERITIES.join(', ')}, got ${JSON.stringify(severity)}`,
     );
   }
-  const { counts, highest, skipped, findings } = summarize(entries);
+  // A job name with no entry in ENGINE_OF makes `failOn.includes(ENGINE_OF[job])`
+  // evaluate to `failOn.includes(undefined)`, which is always false - a finding
+  // from an unrecognized job could never block, however severe, and the summary
+  // would still print it as merely "informational". Fail loudly instead, naming
+  // the file, the same treatment given an unrecognized severity above.
+  for (const { job } of entries) {
+    if (!(job in ENGINE_OF)) {
+      throw new Error(
+        `${job}.sarif: unrecognized job "${job}" has no entry in ENGINE_OF, so it could never be blocked - add it there`,
+      );
+    }
+  }
+  const { counts, highest, skipped, findings, suppressed } = summarize(entries);
   const floor = ORDER.indexOf(severity);
   // 'none' (floor < 0) reports everything as informational but never blocks;
   // any other severity drops findings below the floor from both buckets, so
@@ -123,21 +150,54 @@ export const verdict = ({ entries, severity, failOn }) => {
   for (const finding of findings) {
     lines.push(`  ${finding.severity}\t${finding.job}\t${finding.ruleId}\t${finding.message}`);
   }
-  const name = blocking.length > 0 ? 'fail' : reportable.length > 0 ? 'informational' : 'pass';
+  // A run with nothing reportable is only a "pass" when every job actually
+  // ran. If at least one job skipped (missing tool, disabled job, no key),
+  // the gate did not clear anything - "pass" is the word people and agents
+  // grep for, and a laptop missing osv-scanner and semgrep must not get it.
+  // The exit code stays 0 either way: nothing ran, so nothing blocks.
+  const name =
+    blocking.length > 0
+      ? 'fail'
+      : reportable.length > 0
+        ? 'informational'
+        : skipped.length > 0
+          ? 'skipped'
+          : 'pass';
   lines.push(
-    `security: ${name}, highest ${highest}, ${findings.length} finding(s), ${skipped.length} job(s) skipped`,
+    `security: ${name}, highest ${highest}, ${findings.length} finding(s), ${suppressed} suppressed, ${skipped.length} job(s) skipped`,
   );
-  return { verdict: name, highest, counts, lines, exitCode: blocking.length > 0 ? 1 : 0 };
+  return {
+    verdict: name,
+    highest,
+    counts,
+    suppressed,
+    lines,
+    exitCode: blocking.length > 0 ? 1 : 0,
+  };
 };
 
+// readdirSync failing (dir does not exist, or is not a directory) and
+// JSON.parse failing on one particular file are different problems with
+// different fixes - "run a scanner first" sends someone chasing the wrong
+// thing when the real issue is one bad file sitting next to good ones. The
+// thrown error is tagged so main() can tell them apart without inspecting a
+// filesystem error code that a mocked readEntries would not have anyway.
 const read = (dir) =>
   readdirSync(dir)
     .filter((name) => name.endsWith('.sarif'))
     .sort()
-    .map((name) => ({
-      job: path.basename(name, '.sarif'),
-      document: JSON.parse(readFileSync(path.join(dir, name), 'utf8')),
-    }));
+    .map((name) => {
+      const file = path.join(dir, name);
+      let document;
+      try {
+        document = JSON.parse(readFileSync(file, 'utf8'));
+      } catch (cause) {
+        const wrapped = new Error(`${file}: not valid JSON (${cause.message})`);
+        wrapped.sarifParseError = true;
+        throw wrapped;
+      }
+      return { job: path.basename(name, '.sarif'), document };
+    });
 
 /** Command-line entry; returns the exit code. */
 export function main(
@@ -148,8 +208,12 @@ export function main(
   let entries;
   try {
     entries = readEntries(dir);
-  } catch {
-    error(`no SARIF files in ${dir}: run a scanner first`);
+  } catch (err) {
+    if (err.sarifParseError) {
+      error(err.message);
+    } else {
+      error(`no SARIF files in ${dir}: run a scanner first`);
+    }
     return 2;
   }
   const settings = load('security-policy.json', env);

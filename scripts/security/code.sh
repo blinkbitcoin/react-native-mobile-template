@@ -12,8 +12,10 @@ sec_enabled code
 sec_require semgrep code
 
 out="$(sec_out_dir)"
-# No --error: a finding is reported, not thrown. --metrics off keeps the run
-# offline and tells Semgrep not to phone home with scan statistics.
+# No --error: a finding is reported, not thrown. --metrics off is telemetry
+# only - it stops Semgrep phoning home with scan statistics, it does not make
+# the run offline: --config p/... fetches each registry pack over the
+# network on every invocation (see docs/security.md's known limitations).
 semgrep scan \
   --config p/typescript --config p/secrets --config p/owasp-top-ten --config rules/ \
   --sarif --output "$out/code.sarif" --metrics off --quiet

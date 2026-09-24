@@ -19,7 +19,7 @@ just the one that failed.
 | pnpm | Dependency provenance, release age, allowed builds, audit exceptions | `pnpm-workspace.yaml` |
 | osv-scanner | Known vulnerabilities and malicious-package records in the lockfile | `osv-scanner.toml` |
 | Semgrep | Mobile-specific source patterns and the registry TypeScript/secrets/OWASP packs | `rules/`, `.semgrepignore` |
-| pnpm install policy scanner | The install-time supply-chain settings, asserted rather than trusted | `security-policy.json` |
+| pnpm install policy scanner | The install-time supply-chain settings, asserted rather than trusted | `pnpm-workspace.yaml` |
 
 The three scanners above are `make check-security*`, run separately from
 `make check` because they are external CLIs and cost minutes; see
@@ -243,6 +243,7 @@ Each gate has one supported escape hatch. Use it, with a comment saying why.
 | Vulnerability audit | `auditConfig.ignoreGhsas`, one comment **per id** — the advisory, the dependency path that pulls it in,<br>why it is unreachable from app code, and what should make us look again | `pnpm-workspace.yaml` |
 | Expo SDK version check | `expo.install.exclude` | `package.json` |
 | `minimumReleaseAge` | `minimumReleaseAgeExclude`, pinned as `name@exact-version` so the guard still applies to later releases | `pnpm-workspace.yaml` |
+| `trustPolicy: no-downgrade` | `trustPolicyExclude`, pinned as `name@exact-version` with a reason - pnpm compares publish dates<br>across every major of a package, so a later, stronger release can still read as this one having downgraded | `pnpm-workspace.yaml` |
 | Package build scripts | `onlyBuiltDependencies` or `allowBuilds`. `strictDepBuilds` forces an explicit decision | `pnpm-workspace.yaml` |
 | Coverage | Change the threshold in `jest.config.ts` or the `--test-coverage-*` flags of `test:scripts`,<br>deliberately, not silently | `jest.config.ts`, `package.json` |
 | CodeQL | `// codeql[<rule-id>]` alone on the line directly above the code,<br>with the reason in a comment *above the marker* — never between it and the code.<br>**Never** dismiss the alert in the GitHub UI or API | The code |

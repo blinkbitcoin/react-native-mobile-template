@@ -200,7 +200,11 @@ check-security-deps: ## Known vulnerabilities and malicious packages in the lock
 
 check-security-code: ## Semgrep over app source: TypeScript, secrets, OWASP packs plus rules/
 	bash scripts/security/code.sh
-	@command -v semgrep >/dev/null 2>&1 && semgrep --test rules/ || echo "semgrep not installed: rule tests skipped"
+	@if command -v semgrep >/dev/null 2>&1; then \
+		semgrep --test rules/; \
+	else \
+		echo "semgrep not installed: rule tests skipped"; \
+	fi
 
 check-security-policy: ## Assert the pnpm install policy: release cooldown, no implicit builds, no trust downgrade
 	bash scripts/security/policy.sh

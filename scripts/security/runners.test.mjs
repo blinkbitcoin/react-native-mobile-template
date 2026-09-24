@@ -146,9 +146,65 @@ test('the aggregate runs the enabled jobs and reports a verdict', () => {
       },
     });
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /security: (pass|informational)/);
+    // code and deps are both switched off, policy runs clean against the real
+    // pnpm-workspace.yaml: zero findings, but two of the three jobs skipped,
+    // so the headline must be "skipped", not "pass" - see verdict.mjs.
+    assert.match(result.stdout, /security: skipped, /);
     assert.match(result.stdout, /deps: skipped/);
   });
+});
+
+// scripts/security/local.sh:10 and lib/common.sh's sec_enabled both used to
+// read `$(node scripts/security/config.mjs get ...)` directly inside a `[ ]`
+// test, which discards the command substitution's own exit status. config.mjs
+// is deliberately designed to throw on a value it cannot parse - a malformed
+// security-policy.json, or a SECURITY_* value that is not "true"/"false"/a
+// known severity - but with the exit status discarded, `set -e` never saw the
+// failure: the captured stdout was just empty, `[ "" != "true" ]` was true,
+// and the run printed "security scanning is disabled" and exited 0. A
+// consumer with a typo in security-policy.json got a green build and no
+// scanning at all - exactly what docs/security.md promises cannot happen.
+test('an invalid SECURITY_* value fails local.sh, it does not read as disabled', () => {
+  withDir((dir) => {
+    const result = run('local.sh', { env: { SECURITY_DIR: dir, SECURITY_SEVERITY: 'nonsense' } });
+    assert.notEqual(result.status, 0);
+    assert.doesNotMatch(result.stdout, /disabled/);
+    assert.match(result.stderr, /SECURITY_SEVERITY/);
+  });
+});
+
+test('an invalid SECURITY_* value fails a per-job runner too, it does not skip it', () => {
+  withDir((dir) => {
+    // Exercises lib/common.sh's sec_enabled directly (deps.sh's only caller of
+    // it), the second call site of the same bug: SECURITY_DEPS=yes is not a
+    // boolean, and used to write a SARIF claiming deps was cleanly "disabled
+    // in security-policy.json or the environment".
+    const result = run('deps.sh', { env: { SECURITY_DIR: dir, SECURITY_DEPS: 'yes' } });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /SECURITY_DEPS/);
+    // No SARIF was written at all - the run failed before sec_skip ever ran.
+    assert.deepEqual(readdirSync(dir), []);
+  });
+});
+
+// The real security-policy.json at the repository root is swapped for
+// malformed JSON for the duration of this one test and restored in `finally`
+// regardless of outcome - config.mjs's file path is a literal
+// 'security-policy.json' resolved against the runner's cwd (always the
+// repository root after `cd "$(dirname "$0")/../.."`), so there is no
+// environment override to point it at a fixture instead.
+test('a malformed security-policy.json fails the run, it does not read as disabled', () => {
+  const policyFile = path.join(root, 'security-policy.json');
+  const original = readFileSync(policyFile, 'utf8');
+  try {
+    writeFileSync(policyFile, '{ this is not valid json');
+    const result = run('local.sh');
+    assert.notEqual(result.status, 0);
+    assert.doesNotMatch(result.stdout, /disabled/);
+    assert.match(result.stderr, /Unexpected token|JSON/);
+  } finally {
+    writeFileSync(policyFile, original);
+  }
 });
 
 test('the master switch skips every scanner without running one', () => {

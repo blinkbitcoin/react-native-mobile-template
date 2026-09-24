@@ -68,7 +68,10 @@ binary version, because the registry packs update independently upstream.
 This setup does not offer the same bit-for-bit reproducibility as `rules/`,
 which is versioned in this repository. Treat a new Semgrep finding with no
 matching source change as a possible pack update, not necessarily a
-regression.
+regression. It also means `code.sh` needs network access every run - fetching
+`p/typescript`, `p/secrets` and `p/owasp-top-ten` from the Semgrep registry is
+what `--config p/...` does. `--metrics off` only stops telemetry; it does not
+make the run offline.
 
 **`rn-secret-in-async-storage` (`rules/react-native-secrets.yaml`) has two
 deliberate gaps.** It does not match an unqualified `key` identifier, so
@@ -86,13 +89,18 @@ uninstantiable snippet code in Semgrep's own `<rule-id>.test.tsx` fixture
 convention, scanned by `semgrep --test rules/`, never meant to run as
 anything else. Four tools currently exclude `rules/` for that reason, each
 with a one-line comment: `tsconfig.json`'s `exclude`, `biome.json`'s
-`files.includes` (`!**/rules`), `eslint.config.mjs`'s `globalIgnores`, and
-`jest.config.ts`'s `testPathIgnorePatterns`. Colocating a rule with its
-fixture is the Semgrep convention worth keeping, so moving `rules/` out from
-under the app source tree would relocate this problem rather than remove it.
-A fifth tool added later that walks the repository by a similar convention
-will likely need the same one-line treatment - check for it before assuming
-a new fixture file "just works".
+`files.includes` (`!rules`), `eslint.config.mjs`'s `globalIgnores`
+(`rules/**`), and `jest.config.ts`'s `testPathIgnorePatterns`
+(`<rootDir>/rules/`). All four are anchored to the repository root, on
+purpose: a consumer's own `src/rules/` - an unrelated directory name they are
+free to use for anything - must stay linted, type-checked and tested
+normally, not silently skipped because it happens to share a name with this
+repository's Semgrep fixtures. Colocating a rule with its fixture is the
+Semgrep convention worth keeping, so moving `rules/` out from under the app
+source tree would relocate this problem rather than remove it. A fifth tool
+added later that walks the repository by a similar convention will likely
+need the same one-line, root-anchored treatment - check for it before
+assuming a new fixture file "just works".
 
 ## The current baseline
 

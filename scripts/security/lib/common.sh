@@ -21,10 +21,18 @@ sec_skip() {
   echo "::notice::$job skipped: $reason"
 }
 
-# Exits the runner early when the job is switched off.
+# Exits the runner early when the job is switched off. An invalid setting
+# (a malformed security-policy.json, or a SECURITY_* value config.mjs cannot
+# parse) must fail the run, never read as "disabled" - the command
+# substitution below would otherwise swallow config.mjs's own nonzero exit
+# and `[ "" = "true" ]` would silently take the skip branch.
 sec_enabled() {
-  local job="$1"
-  [ "$(node scripts/security/config.mjs get "jobs.$job")" = "true" ] && return 0
+  local job="$1" value
+  if ! value="$(node scripts/security/config.mjs get "jobs.$job")"; then
+    echo "config.mjs failed resolving jobs.$job - security-policy.json or a SECURITY_* value is invalid (see the error above); that fails the run, it does not disable it" >&2
+    exit 1
+  fi
+  [ "$value" = "true" ] && return 0
   sec_skip "$job" "disabled in security-policy.json or the environment"
   exit 0
 }

@@ -164,7 +164,25 @@ test('an unrecognized severity throws rather than behaving like none', () => {
   );
 });
 
-test('a suppressed result is not a finding', () => {
+// A SARIF file whose basename is not a known job (e.g. a future job renamed
+// without updating ENGINE_OF, or a stray file dropped into the output
+// directory) must never be silently unblockable. Before this test existed,
+// `failOn.includes(ENGINE_OF[f.job])` evaluated to `failOn.includes(undefined)`
+// - always false - so a critical finding from such a file printed as merely
+// "informational" and exited 0, no matter how severe.
+test('a SARIF from an unrecognized job fails loudly rather than becoming unblockable', () => {
+  assert.throws(
+    () =>
+      verdict({
+        entries: [entry('mobile-android', doc('some-scanner', [result('critical')]))],
+        severity: 'high',
+        failOn: ['deterministic'],
+      }),
+    /mobile-android\.sarif: unrecognized job "mobile-android"/,
+  );
+});
+
+test('a suppressed result is not a finding, but is visible as suppressed, not absent', () => {
   const suppressed = { ...result('critical'), suppressions: [{ kind: 'inSource' }] };
   const v = verdict({
     entries: [entry('deps', doc('osv-scanner', [suppressed]))],
@@ -173,6 +191,23 @@ test('a suppressed result is not a finding', () => {
   });
   assert.equal(v.verdict, 'pass');
   assert.equal(v.counts.critical, 0);
+  // Dropping a suppressed result from counts and findings is correct - it must
+  // never block - but dropping it with no trace at all makes a deliberate
+  // suppression indistinguishable from a vulnerability that was never found.
+  assert.equal(v.suppressed, 1);
+  assert.ok(v.lines.some((line) => /1 suppressed/.test(line)));
+});
+
+test('summarize counts suppressed results across documents and jobs', () => {
+  const suppressedOnce = { ...result('high'), suppressions: [{ kind: 'inSource' }] };
+  const suppressedTwice = { ...result('low', 'other-rule'), suppressions: [{ kind: 'external' }] };
+  const s = summarize([
+    entry('deps', doc('osv-scanner', [suppressedOnce])),
+    entry('code', doc('semgrep', [suppressedTwice, result('medium')])),
+  ]);
+  assert.equal(s.suppressed, 2);
+  // The one unsuppressed result still counts normally.
+  assert.deepEqual(s.counts, { critical: 0, high: 0, medium: 1, low: 0 });
 });
 
 test('the summary names skipped jobs so they are never read as clean', () => {
@@ -192,6 +227,43 @@ test('a job that ran and found nothing is clean', () => {
     failOn: ['deterministic'],
   });
   assert.ok(v.lines.some((line) => /deps: clean/.test(line)));
+});
+
+// On a laptop missing osv-scanner and semgrep, both jobs skip and only the
+// policy scanner runs clean - zero findings either way. Before this test
+// existed the headline still read "security: pass", the exact word a human
+// or an agent greps for to decide nothing needs attention, even though most
+// of the gate never ran. The exit code must still be 0: nothing ran, so
+// nothing blocks - only the word changes.
+test('a run with zero findings is "skipped", not "pass", when any job skipped', () => {
+  const allSkipped = verdict({
+    entries: [
+      entry('deps', doc('osv-scanner', [], false)),
+      entry('code', doc('semgrep', [], false)),
+    ],
+    severity: 'high',
+    failOn: ['deterministic'],
+  });
+  assert.equal(allSkipped.verdict, 'skipped');
+  assert.equal(allSkipped.exitCode, 0);
+  assert.ok(allSkipped.lines.some((line) => /^security: skipped, /.test(line)));
+
+  const oneSkippedOneClean = verdict({
+    entries: [entry('deps', doc('osv-scanner', [], false)), entry('policy', doc('policy', []))],
+    severity: 'high',
+    failOn: ['deterministic'],
+  });
+  assert.equal(oneSkippedOneClean.verdict, 'skipped');
+  assert.equal(oneSkippedOneClean.exitCode, 0);
+});
+
+test('a run with zero findings and nothing skipped is still "pass"', () => {
+  const v = verdict({
+    entries: [entry('deps', doc('osv-scanner', []))],
+    severity: 'high',
+    failOn: ['deterministic'],
+  });
+  assert.equal(v.verdict, 'pass');
 });
 
 test('the CLI prints the summary and returns the exit code', () => {
@@ -240,6 +312,37 @@ test('the real directory reader lists *.sarif files and parses them', () => {
     assert.ok(out.some((line) => /deps: 1 finding\(s\)/.test(line)));
     assert.ok(out.some((line) => /code: skipped/.test(line)));
     assert.ok(out.some((line) => /security: fail/.test(line)));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// A directory that does not exist and a directory that exists but holds a
+// malformed SARIF file are different problems - "run a scanner first" sends
+// someone looking for a scanner that never ran, when the real issue is one
+// bad file sitting right there. This exercises the module's own reader (no
+// injected readEntries), so the distinction has to survive the real
+// readdirSync/readFileSync/JSON.parse path, not just a mocked one.
+test('a malformed SARIF file names itself, distinct from a missing directory', () => {
+  const missing = [];
+  assert.equal(
+    main([path.join(tmpdir(), 'verdict-does-not-exist')], {
+      log: () => {},
+      error: (l) => missing.push(l),
+      env: {},
+    }),
+    2,
+  );
+  assert.match(missing[0], /run a scanner first/);
+
+  const dir = mkdtempSync(path.join(tmpdir(), 'verdict-malformed-'));
+  try {
+    writeFileSync(path.join(dir, 'code.sarif'), '{ not valid json');
+    const out = [];
+    const code = main([dir], { log: () => {}, error: (l) => out.push(l), env: {} });
+    assert.equal(code, 2);
+    assert.match(out[0], /code\.sarif: not valid JSON/);
+    assert.doesNotMatch(out[0], /run a scanner first/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
