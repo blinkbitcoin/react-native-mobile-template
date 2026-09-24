@@ -33,6 +33,7 @@ both stores from a merged pull request.
 ```mermaid
 flowchart LR
   push[push] --> checks[Checks] --> unit[Unit] --> e2e[E2E on device]
+  checks -.->|optional| sec[Security scans]
   e2e --> merge[merge to main]
   merge --> relpr[Release PR] --> build[Signed builds] --> stores[TestFlight and Play]
 ```
