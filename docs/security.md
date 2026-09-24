@@ -144,7 +144,10 @@ upper snake case:
 | `llm.model` | string | empty | `SECURITY_LLM_MODEL` |
 | `llm.effort` | `low`, `medium`, `high`, `max` | `max` | `SECURITY_LLM_EFFORT` |
 
-In the environment a list is comma-separated. A value that does not parse -
+In the environment a list is comma-separated, and an **empty** option or
+`llm` twin counts as unset, so the file or the default applies: CI passes every
+twin through `build-env`, where a repository variable nobody set arrives as an
+empty string. To empty a list, set it to `[]` in the file. A value that does not parse -
 not `true` or `false`, not a whole number, a list entry outside its set, an
 effort or provider outside the vocabulary - fails the run rather than reading
 as off, so a typo cannot silently disable a scanner. So does a key the schema

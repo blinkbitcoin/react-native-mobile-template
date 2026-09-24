@@ -441,3 +441,30 @@ test('the repository policy file resolves cleanly', () => {
     ]);
   });
 });
+
+test('an empty option or llm twin is unset, as build-env delivers an unset repository variable', () => {
+  const env = {
+    SECURITY_LLM_PROVIDER: '',
+    SECURITY_LLM_MODEL: '',
+    SECURITY_LLM_EFFORT: '',
+    SECURITY_BUNDLE_PLATFORMS: '',
+    SECURITY_REVIEW_MAX_DIFF_BYTES: '',
+    SECURITY_OPENANT_VERIFY: '',
+  };
+  const fromFile = resolve({ llm: { effort: 'high', provider: 'openai' } }, env);
+  assert.equal(fromFile.llm.effort, 'high');
+  assert.equal(fromFile.llm.provider, 'openai');
+  const defaults = resolve({}, env);
+  assert.deepEqual(defaults.llm, { provider: '', model: '', effort: 'max' });
+  assert.deepEqual(defaults.options.bundle.platforms, ['ios', 'android']);
+  assert.equal(defaults.options.review.maxDiffBytes, 200000);
+  assert.equal(defaults.options.openant.verify, false);
+  // A value that is there and wrong still fails the run.
+  assert.throws(() => resolve({}, { SECURITY_LLM_EFFORT: ' ' }), /SECURITY_LLM_EFFORT/);
+});
+
+test('the job switches and failOn keep their meaning for an empty value', () => {
+  // An empty failOn is a deliberate "nothing blocks"; an empty switch is not a boolean.
+  assert.deepEqual(resolve({}, { SECURITY_FAIL_ON: '' }).failOn, []);
+  assert.throws(() => resolve({}, { SECURITY_CODE: '' }), /SECURITY_CODE: expected true or false/);
+});
