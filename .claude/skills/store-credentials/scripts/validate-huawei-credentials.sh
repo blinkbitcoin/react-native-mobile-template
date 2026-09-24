@@ -100,7 +100,7 @@ elif has_whitespace "$CLIENT_ID"; then
   fail "HUAWEI_CLIENT_ID contains whitespace (${#CLIENT_ID} characters) - a copy/paste picked up a newline or a space"
 elif is_placeholder "$CLIENT_ID"; then
   fail "HUAWEI_CLIENT_ID is a placeholder value, not the client id from AppGallery Connect"
-elif ! printf '%s' "$CLIENT_ID" | LC_ALL=C grep -qE '^[0-9]+$'; then
+elif ! printf '%s' "$CLIENT_ID" | env LC_ALL=C grep -qE '^[0-9]+$'; then
   fail "HUAWEI_CLIENT_ID is not all digits (${#CLIENT_ID} characters) - AppGallery issues a numeric client id; check the two halves of the pair are not swapped"
 elif [ "${#CLIENT_ID}" -lt 15 ]; then
   echo "WARN: HUAWEI_CLIENT_ID is only ${#CLIENT_ID} digits - the ones AppGallery issues are longer than that, so check it was pasted whole" >&2
@@ -113,7 +113,7 @@ elif has_whitespace "$CLIENT_SECRET"; then
   fail "HUAWEI_CLIENT_SECRET contains whitespace (${#CLIENT_SECRET} characters) - a copy/paste picked up a newline or a space"
 elif is_placeholder "$CLIENT_SECRET"; then
   fail "HUAWEI_CLIENT_SECRET is a placeholder value, not the client secret from AppGallery Connect"
-elif ! printf '%s' "$CLIENT_SECRET" | LC_ALL=C grep -qE '^[0-9a-fA-F]+$'; then
+elif ! printf '%s' "$CLIENT_SECRET" | env LC_ALL=C grep -qE '^[0-9a-fA-F]+$'; then
   fail "HUAWEI_CLIENT_SECRET is not hexadecimal (${#CLIENT_SECRET} characters) - AppGallery issues a hexadecimal secret; check the two halves of the pair are not swapped"
 elif [ "${#CLIENT_SECRET}" -lt 32 ]; then
   fail "HUAWEI_CLIENT_SECRET is ${#CLIENT_SECRET} characters, under the 32 minimum - it was truncated, or only part of it was copied"
@@ -127,7 +127,7 @@ fi
 if [ -n "$APP_ID" ]; then
   if has_whitespace "$APP_ID"; then
     fail "--app-id contains whitespace"
-  elif ! printf '%s' "$APP_ID" | LC_ALL=C grep -qE '^[1-9][0-9]*$'; then
+  elif ! printf '%s' "$APP_ID" | env LC_ALL=C grep -qE '^[1-9][0-9]*$'; then
     fail "--app-id '$APP_ID' is not a numeric app id with no leading zero - HUAWEI_APP_ID is the number on the AppGallery Connect app information page, not the package name"
   fi
 fi

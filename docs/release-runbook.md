@@ -816,7 +816,16 @@ check name and a detail — and the same checklist is appended to
 `skip` means the check could not run: a tool is missing (`bundletool`, `aapt2`),
 or an input was not given (`APP_VERSION` unset, no `--cert-sha256`). The check
 name is printed either way, one line per check, so a row never silently
-disappears from the summary.
+disappears from the summary. A check that crashed before it could print a
+verdict is a `FAIL` too (`the check produced no verdict`), never a blank row.
+
+The bundle scans run `grep` in the C locale through `env LC_ALL=C grep`, not a
+`LC_ALL=C grep` prefix. With the prefix, a Homebrew bash on macOS changes its
+own locale inside a forked subshell, which calls into CoreFoundation where that
+is not fork-safe, and now and then the subshell dies with SIGSEGV:
+`FAIL dev-server: could not scan the bundle: grep failed with status 139`,
+intermittently, on a bundle that was fine. `scripts/shell-locale.test.mjs`
+keeps the prefix out of every tracked shell file.
 
 **`--strict`** turns a skip caused by a *missing tool* into a `FAIL`, so a gate
 cannot report success having verified nothing. It is on automatically whenever

@@ -130,6 +130,11 @@ aggregates.
   override and `APP_PORT_BASE=8090` stops working. `scripts/ports.test.mjs`
   fails on a bare literal and names the file; see
   [docs/local-dev.md](docs/local-dev.md).
+- **Never set a locale as a command prefix in shell code.** Write
+  `env LC_ALL=C grep ...`, not `LC_ALL=C grep ...`: with the prefix a Homebrew
+  bash on macOS switches its own locale inside `$(...)` or a pipeline and now
+  and then dies with SIGSEGV (status 139). `scripts/shell-locale.test.mjs`
+  fails on the prefix and names the line.
 - **User-visible strings go through Lingui** (`t`/`Trans` macros), then
   `make gen-i18n`. No bare literals in JSX.
 - **Secrets go through `src/lib/secure-store`**, never `expo-secure-store`

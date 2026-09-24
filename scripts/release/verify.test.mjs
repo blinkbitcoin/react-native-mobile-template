@@ -25,7 +25,16 @@ const verifyAndroid = path.join(here, 'verify-android.sh');
 // Strict mode turns itself on under CI, so the default for a test is "off"
 // unless the test is about strict mode. Anything else would make these tests
 // behave differently on a laptop and on a runner.
-const baseEnv = { ...process.env, CI: '', GITHUB_ACTIONS: '' };
+//
+// EXPO_PUBLIC_* go for the same reason: the expo-public check reads whichever
+// are set, and a shell that has run `eval "$(node scripts/ports.mjs --sh)"`
+// exports EXPO_PUBLIC_API_URL, which no fixture bundle inlines. A test that
+// wants one sets it itself.
+const baseEnv = Object.fromEntries(
+  Object.entries({ ...process.env, CI: '', GITHUB_ACTIONS: '' }).filter(
+    ([name]) => !name.startsWith('EXPO_PUBLIC_'),
+  ),
+);
 
 /** Sources the helper library and runs one snippet, returning trimmed stdout. */
 function sh(snippet, env = {}) {
@@ -296,6 +305,41 @@ test('a grep that cannot run fails the check instead of passing it', () =>
     });
     const out = sh(`PATH="${shim}:$PATH" vc_dev_server_verdict "${bundle}" text`);
     assert.match(out, /^FAIL could not scan the bundle/);
+  }));
+
+// grep reads bytes, not characters: a bundle is not valid UTF-8. The C locale
+// reaches grep through `env`, never as a `LC_ALL=C grep` prefix, which crashes
+// a forked bash on macOS now and then (see vc_grep, and
+// scripts/shell-locale.test.mjs for the guard). This pins the half a test can
+// see: grep still gets LC_ALL=C, in both places that scan a bundle.
+test('both bundle scans hand grep the C locale', () =>
+  withTempDir((dir) => {
+    const shim = path.join(dir, 'bin');
+    mkdirSync(shim);
+    // Matches exactly when it was given the C locale, and says what it got.
+    writeFileSync(
+      path.join(shim, 'grep'),
+      '#!/bin/sh\nprintf \'LC_ALL=%s\\n\' "$LC_ALL"\n[ "$LC_ALL" = C ]\n',
+      { mode: 0o755 },
+    );
+    const bundle = path.join(dir, 'main.jsbundle');
+    writeFileSync(bundle, 'var API = "https://api.example.com/graphql";\n');
+    const withShim = { LC_ALL: 'en_US.UTF-8' };
+
+    assert.equal(
+      sh(`PATH="${shim}:$PATH"; vc_grep x "${bundle}"; printf '%s' "$VC_GREP_OUTPUT"`, withShim),
+      'LC_ALL=C',
+    );
+    const env = path.join(dir, '.env.example');
+    writeFileSync(env, 'EXPO_PUBLIC_API_URL=\n');
+    // `grep -q` prints nothing, so the shim's line is the only extra output.
+    assert.deepEqual(
+      sh(`PATH="${shim}:$PATH"; vc_public_env_verdict "${bundle}" "$(cat '${env}')"`, {
+        ...withShim,
+        EXPO_PUBLIC_API_URL: 'https://api.example.com/graphql',
+      }).split('\n'),
+      ['LC_ALL=C', 'ok inlined: EXPO_PUBLIC_API_URL (not checked: none)'],
+    );
   }));
 
 test('a broken grep fails the metadata check instead of passing it', () =>
@@ -616,6 +660,17 @@ test('the checklist exits non-zero on a FAIL and zero otherwise', () => {
     sh('vc_reset; vc_skip a absent; vc_summary T && echo EXIT_OK').split('\n').pop(),
     'EXIT_OK',
   );
+});
+
+// Every verdict is computed in `$(...)`; a subshell that dies before printing
+// hands vc_verdict an empty string. That used to be recorded with an empty
+// status -- counted as neither a pass nor a failure -- which is how a crashed
+// expo-public check once showed up as ` expo-public: ` in a green run.
+test('a check that produced no verdict fails the checklist', () => {
+  const out = sh(`vc_reset; vc_verdict expo-public "$(exit 139)"; vc_summary T || echo EXIT_FAIL`);
+  assert.match(out, /^FAIL expo-public: the check produced no verdict/);
+  assert.match(out, /1 failed/);
+  assert.equal(out.split('\n').pop(), 'EXIT_FAIL');
 });
 
 test('the checklist is mirrored into GITHUB_STEP_SUMMARY when CI sets it', () =>
