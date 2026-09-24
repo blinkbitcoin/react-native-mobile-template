@@ -29,9 +29,18 @@ export const ORDER = ['low', 'medium', 'high', 'critical'];
 
 const FROM_LEVEL = { error: 'high', warning: 'medium', note: 'low' };
 
-/** GitHub's numeric scale first, the SARIF level second, medium as the last resort. */
-export const severityOf = (result) => {
-  const score = Number(result.properties?.['security-severity']);
+// SARIF puts a rule's numeric severity on tool.driver.rules[], not on the
+// result - a scanner reports "this result fired ruleId X" and expects a
+// reader to look X up. osv-scanner does exactly that: every result is
+// `level: warning` regardless of score, and the CVSS number lives only on
+// the matching rule. CodeQL uses the same convention, so a result's own
+// properties are checked first (a scanner is free to repeat the score there)
+// and the owning rule is the fallback, not a special case.
+/** GitHub's numeric scale first (result, then its rule), the SARIF level last. */
+export const severityOf = (result, rule) => {
+  const score = Number(
+    result.properties?.['security-severity'] ?? rule?.properties?.['security-severity'],
+  );
   if (Number.isFinite(score)) {
     if (score >= 9) return 'critical';
     if (score >= 7) return 'high';
@@ -41,10 +50,16 @@ export const severityOf = (result) => {
   return FROM_LEVEL[result.level] ?? 'medium';
 };
 
+const rulesOf = (run) =>
+  Object.fromEntries((run.tool?.driver?.rules ?? []).map((rule) => [rule.id, rule]));
+
 const resultsOf = (document) =>
-  (document.runs ?? []).flatMap((run) =>
-    (run.results ?? []).filter((r) => !(r.suppressions ?? []).length),
-  );
+  (document.runs ?? []).flatMap((run) => {
+    const rules = rulesOf(run);
+    return (run.results ?? [])
+      .filter((r) => !(r.suppressions ?? []).length)
+      .map((result) => ({ result, rule: rules[result.ruleId] }));
+  });
 
 const ranOf = (document) =>
   (document.runs ?? []).every((run) =>
@@ -58,8 +73,8 @@ export const summarize = (entries) => {
   const findings = [];
   for (const { job, document } of entries) {
     if (!ranOf(document)) skipped.push(job);
-    for (const result of resultsOf(document)) {
-      const severity = severityOf(result);
+    for (const { result, rule } of resultsOf(document)) {
+      const severity = severityOf(result, rule);
       counts[severity] += 1;
       findings.push({
         job,

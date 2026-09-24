@@ -21,11 +21,11 @@ const result = (severity, ruleId = 'r') => ({
   ],
 });
 
-const doc = (tool, results, successful = true) => ({
+const doc = (tool, results, successful = true, rules = []) => ({
   version: '2.1.0',
   runs: [
     {
-      tool: { driver: { name: tool } },
+      tool: { driver: { name: tool, rules } },
       results,
       invocations: [{ executionSuccessful: successful }],
     },
@@ -44,6 +44,55 @@ test('severity comes from security-severity, then from level', () => {
     severityOf({ properties: { 'security-severity': 'not a number' }, level: 'note' }),
     'low',
   );
+});
+
+// osv-scanner (and CodeQL) put the CVSS score on the rule that fired, not on
+// the result itself - every osv-scanner result is `level: warning` with no
+// properties at all. A result with no severity of its own must fall back to
+// its rule's, not to the level, or every finding grades medium regardless of
+// how severe it actually is.
+test('a result with no severity of its own falls back to its rule', () => {
+  assert.equal(
+    severityOf({ level: 'warning' }, { properties: { 'security-severity': '9.5' } }),
+    'critical',
+  );
+  assert.equal(
+    severityOf({ level: 'warning' }, { properties: { 'security-severity': '7.5' } }),
+    'high',
+  );
+});
+
+test("the result's own severity still wins over its rule's", () => {
+  assert.equal(
+    severityOf(
+      { level: 'warning', properties: { 'security-severity': '9.5' } },
+      { properties: { 'security-severity': '2.0' } },
+    ),
+    'critical',
+  );
+});
+
+test('a result with neither its own nor a rule severity still falls back to level', () => {
+  assert.equal(severityOf({ level: 'error' }, {}), 'high');
+  assert.equal(severityOf({ level: 'error' }, undefined), 'high');
+});
+
+// The unit tests above call severityOf directly with a hand-built rule; this
+// exercises the actual wiring - a SARIF document shaped exactly like
+// osv-scanner's own output, with the score on tool.driver.rules[] and the
+// result carrying only a ruleId - so a forgotten thread-through would fail
+// here even if severityOf itself were correct.
+test("summarize threads a run's rules through to grade results that carry no severity of their own", () => {
+  const bare = { ruleId: 'CVE-2026-41907', level: 'warning', message: { text: 'boom' } };
+  const s = summarize([
+    entry(
+      'deps',
+      doc('osv-scanner', [bare], true, [
+        { id: 'CVE-2026-41907', properties: { 'security-severity': '7.5' } },
+      ]),
+    ),
+  ]);
+  assert.deepEqual(s.counts, { critical: 0, high: 1, medium: 0, low: 0 });
 });
 
 test('every job maps to an engine class', () => {

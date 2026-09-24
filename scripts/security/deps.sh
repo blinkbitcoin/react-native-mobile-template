@@ -13,5 +13,5 @@ sec_require osv-scanner deps
 out="$(sec_out_dir)"
 # --format sarif is osv-scanner's own SARIF; exit 1 means "findings", which is
 # not a failure here. Anything above 1 is a real error and set -e catches it.
-osv-scanner scan source --lockfile pnpm-lock.yaml --format sarif --output "$out/deps.sarif" || [ $? -eq 1 ]
+osv-scanner scan source --lockfile pnpm-lock.yaml --format sarif --output-file "$out/deps.sarif" || [ $? -eq 1 ]
 echo "deps: wrote $out/deps.sarif"
