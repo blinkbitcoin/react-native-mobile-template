@@ -13,7 +13,8 @@
 #      scripts/release/verify.test.mjs able to test the decisions themselves
 #      instead of only the happy path of a 90 MB build.
 #
-# A status is one of: ok | warn | skip | FAIL. Only FAIL fails the gate.
+# A status is one of: ok | warn | skip | FAIL. Only FAIL fails the gate, and a
+# verdict whose status is anything else is recorded as a FAIL (see vc_verdict).
 # `skip` means "this check could not run" (a tool is missing, an input was not
 # given) and is deliberately not a failure: the gates have to be usable on a
 # laptop that has no bundletool.
@@ -53,10 +54,18 @@ vc_warn() { vc_record warn "$@"; }
 vc_skip() { vc_record skip "$@"; }
 vc_fail() { vc_record FAIL "$@"; }
 
-# Turns `<status> <detail>` from a pure helper into a checklist line.
+# Turns `<status> <detail>` from a pure helper into a checklist line. A status
+# the checklist does not know -- a lowercase `fail`, a typo, an empty verdict
+# from a helper that printed nothing -- is a FAIL: vc_record counts only the
+# four statuses above, so passing one through would record the line and let
+# the gate pass. Failing closed is what keeps a typo from shipping a release.
 vc_verdict() { # <check> <verdict>
-  local check="$1" verdict="$2"
-  vc_record "${verdict%% *}" "$check" "${verdict#* }"
+  local check="$1" verdict="$2" status
+  status="${verdict%% *}"
+  case "$status" in
+    ok | warn | skip | FAIL) vc_record "$status" "$check" "${verdict#* }" ;;
+    *) vc_fail "$check" "unknown verdict status '$status' in: $verdict" ;;
+  esac
 }
 
 vc_expect() { # <check> <expected> <actual>
@@ -679,8 +688,8 @@ vc_cert_verdict() { # <expected> <actual>
 vc_debug_signing_verdict() { # <signer DN>
   case "$1" in
     *'CN=Android Debug'*) printf 'ok signed by the Android debug certificate (%s)' "$1" ;;
-    '') printf 'fail expected the Android debug certificate (CN=Android Debug), got no signer' ;;
-    *) printf 'fail expected the Android debug certificate (CN=Android Debug), got: %s' "$1" ;;
+    '') printf 'FAIL expected the Android debug certificate (CN=Android Debug), got no signer' ;;
+    *) printf 'FAIL expected the Android debug certificate (CN=Android Debug), got: %s' "$1" ;;
   esac
 }
 

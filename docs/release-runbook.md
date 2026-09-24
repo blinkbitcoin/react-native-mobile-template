@@ -527,8 +527,10 @@ the promotions in `cd-beta`, and the release, phased and rollout lanes in
 **The unsigned tier still builds and still verifies.** Gradle falls back to the
 debug keystore (`plugins/with-android-release-signing.ts` does that and warns),
 and the iOS lane archives without a signing identity. `verify-android.sh`
-reports `signing-cert` as `skip` and checks everything else; `verify-ios.sh`
-takes `--no-signing` and verifies the `.app` inside the archive. What is not
+reports `signing-cert` as `skip`, checks everything else, and is passed
+`--expect-debug-signing`, so an APK that is unsigned or signed by anything but
+the SDK's debug certificate fails `debug-signing`; `verify-ios.sh` takes
+`--no-signing` and verifies the `.app` inside the archive. What is not
 produced is an `.ipa`, so the `ios-ipa` artifact upload is skipped too.
 
 | Runs from the first push | Waits for `STORE_UPLOADS_ENABLED=true` |
@@ -812,7 +814,9 @@ make verify-android AAB=artifacts/android/app-release.aab APK=artifacts/android/
 
 Each check prints one line — `ok`, `warn`, `skip` or `FAIL`, followed by the
 check name and a detail — and the same checklist is appended to
-`$GITHUB_STEP_SUMMARY` when CI set it. **Only `FAIL` fails the gate** (exit 1).
+`$GITHUB_STEP_SUMMARY` when CI set it. **Only `FAIL` fails the gate** (exit 1),
+and a check that reports any other status — a typo, a lowercase `fail`, nothing
+at all — is recorded as a `FAIL`, so a mistake in a check can never pass it.
 `skip` means the check could not run: a tool is missing (`bundletool`, `aapt2`),
 or an input was not given (`APP_VERSION` unset, no `--cert-sha256`). The check
 name is printed either way, one line per check, so a row never silently
@@ -841,8 +845,9 @@ bytecode and carries no development markers; and, with `--dsym`, that the
 dSYM's UUIDs cover the binary's. The `ios verify` lane passes the archive's own
 `dSYMs/` directory, so that last check runs in CI without being asked.
 
-`verify-android.sh <aab> <apk> [--cert-sha256 <fp>]` reads the APK with `aapt2`
-and the AAB with `bundletool`, checks both against `APP_VERSION` /
+`verify-android.sh <aab> <apk> [--cert-sha256 <fp>] [--expect-debug-signing]
+[--strict]` reads the APK with `aapt2` and the AAB with `bundletool`, checks
+both against `APP_VERSION` /
 `APP_BUILD_NUMBER` / `ANDROID_PACKAGE` **and against each other** (an APK built
 from a different bundle than the one being uploaded is the mistake this exists
 to catch), refuses a debuggable build or a `minSdkVersion` below 24, refuses any
@@ -851,7 +856,10 @@ to catch), refuses a debuggable build or a `minSdkVersion` below 24, refuses any
 override), checks the OTA meta-data the same way iOS does — including
 `expo.modules.updates.EXPO_RUNTIME_VERSION` and the `expo-channel-name` entry in
 `UPDATES_CONFIGURATION_REQUEST_HEADERS_KEY` — and compares the APK's SHA-256
-with `artifacts.apkSha256` in `build-info.json`.
+with `artifacts.apkSha256` in `build-info.json`. With `--expect-debug-signing`
+(the `android verify` lane passes it when signing is skipped) it also requires
+the APK's signer to be the Android SDK's debug certificate (`CN=Android Debug`)
+and fails `debug-signing` for a release certificate or no signer at all.
 
 That last one is no longer a permanent `skip`: the `android build` lane now
 records `artifacts.aabSha256` and `artifacts.apkSha256` (the AAB it produced and
