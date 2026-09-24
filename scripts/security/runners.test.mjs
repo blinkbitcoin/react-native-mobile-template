@@ -73,3 +73,15 @@ test('a missing tool is a failure under CI', () => {
     assert.match(result.stderr, /osv-scanner is not installed/);
   });
 });
+
+test('the code scanner skips when semgrep is absent', () => {
+  withDir((dir) => {
+    const result = run('code.sh', { env: { SECURITY_DIR: dir, PATH: withoutScanners(dir) } });
+    assert.equal(result.status, 0, result.stderr);
+    const sarif = JSON.parse(readFileSync(path.join(dir, 'code.sarif'), 'utf8'));
+    assert.match(
+      sarif.runs[0].invocations[0].toolExecutionNotifications[0].message.text,
+      /semgrep is not installed/,
+    );
+  });
+});

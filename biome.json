@@ -10,6 +10,7 @@
       "!**/dist",
       "!**/coverage",
       "!**/.workflows",
+      "!**/rules",
       "!src/graphql/generated",
       "!src/i18n/locales/**/messages.ts",
       "!**/*.po"

@@ -1,0 +1,11 @@
+# Generated, vendored or not-our-source paths. Everything else is scanned.
+node_modules/
+ios/
+android/
+dist/
+coverage/
+.expo/
+src/i18n/locales/
+src/graphql/__generated__/
+*.test.ts
+*.test.tsx
