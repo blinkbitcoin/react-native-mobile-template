@@ -340,6 +340,42 @@ Makefile and the pre-push hook both run `pnpm knip`, which resolves the binary
 from `node_modules/.bin` precisely because no script of that name exists. That
 is the supported path. Leave it alone.
 
+## Worktrees inside the checkout are not this checkout
+
+Claude Code creates git worktrees under `.claude/worktrees/<name>/`, inside the
+repository. Each is a whole checkout with its own `node_modules`, so a tool that
+walks the tree finds a second copy of every file. Without an exclusion, Jest
+runs every worktree's suites too and fails with "Invalid hook call" (a second
+React), and ESLint reports errors in files nobody changed.
+
+`.git/info/exclude` hides the directory from git, but it is per clone and not
+every tool reads it, so each one names it itself:
+
+| Tool | Where | Entry |
+| --- | --- | --- |
+| Jest (both projects) | `jest.config.ts` | `<rootDir>/\.claude/worktrees/` in `testPathIgnorePatterns`,<br>`modulePathIgnorePatterns` and `coveragePathIgnorePatterns` |
+| Metro | `metro.config.js` | a `resolver.blockList` entry, anchored to the project root |
+| ESLint | `eslint.config.mjs` | `.claude/worktrees/**` in `globalIgnores` |
+| Biome | `biome.json` | `!!.claude/worktrees` in `files.includes` |
+| knip | `knip.json` | none: its globs skip dot-directories and it reads `.gitignore`;<br>an `ignore` entry only draws a "Remove from ignore" hint |
+| tsc | `tsconfig.json` | `.claude/worktrees` in `exclude` |
+| typos | `typos.toml` | `.claude/worktrees/` in `extend-exclude` |
+| Semgrep | `.semgrepignore` | `.claude/worktrees/` |
+| CodeQL | `.github/codeql/codeql-config.yml` | `paths-ignore` (and so `make check-codeql`'s index filters) |
+| git | `.gitignore` | `/.claude/worktrees/` |
+
+Jest and Metro match absolute paths, and a worktree's own root is itself under
+`.claude/worktrees/`. An unanchored pattern such as `/\.claude/worktrees/` would
+therefore ignore every test, or the whole app, when run *from* a worktree; both
+entries are anchored to the root for that reason. Biome's entry is `!!` rather
+than `!` so its scanner never indexes the directory either: otherwise it finds
+the worktree's `biome.json` and stops with "Found a nested root configuration".
+
+`scripts/worktree-ignores.test.mjs` (`make test-scripts`) holds every entry in
+place, and checks the Jest, Metro and ESLint ones by what they match, including
+from a root that is itself a worktree. A new tool that walks the tree adds its
+entry here and an assertion there.
+
 ## Commit conventions
 
 Conventional Commits with a closed scope list, enforced by commitlint in the

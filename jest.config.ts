@@ -1,6 +1,18 @@
 import type { Config } from 'jest';
 
 /**
+ * Claude Code puts git worktrees under `.claude/worktrees/<name>/`: whole
+ * checkouts of this repository, each with its own node_modules. Jest's crawl
+ * does not read `.gitignore`, so without this it runs every worktree's suites
+ * as well, against a second copy of React ("Invalid hook call"). Anchored to
+ * `<rootDir>` because a worktree's own root is itself under `.claude/worktrees/`
+ * - an unanchored `/\.claude/worktrees/` would ignore every test there.
+ * `modulePathIgnorePatterns` keeps their package.json files and `__mocks__`
+ * out of the module map, which otherwise reports them as naming collisions.
+ */
+const worktrees = '<rootDir>/\\.claude/worktrees/';
+
+/**
  * Every entry is a claim that the file has no behaviour a test could assert.
  * The thresholds below are 100%, so anything not on this list has to be tested.
  *
@@ -11,6 +23,8 @@ import type { Config } from 'jest';
 const coveragePathIgnorePatterns = [
   // Jest's own default, which declaring this option would otherwise drop.
   '/node_modules/',
+  // Other checkouts of this repository, not files of this one.
+  worktrees,
   // Ambient type declarations: erased at build time, no runtime statements.
   '\\.d\\.ts$',
   // Jest setup files: every suite runs them, but they execute before this
@@ -96,7 +110,9 @@ const config: Config = {
         '/scripts/',
         '<rootDir>/rules/',
         '/\\.workflows/',
+        worktrees,
       ],
+      modulePathIgnorePatterns: [worktrees],
       coveragePathIgnorePatterns,
     },
     {
@@ -107,6 +123,7 @@ const config: Config = {
       // file because `src/test/setup.ts` pulls in RNTL and MSW.
       setupFilesAfterEnv: ['<rootDir>/src/test/setup.plugins.ts'],
       testMatch: ['<rootDir>/plugins/**/*.test.ts'],
+      modulePathIgnorePatterns: [worktrees],
       // `.tsx` is in the pattern even though no plugin suite uses JSX: coverage
       // options are global, so this project also instruments the app's untested
       // `.tsx` files (e.g. platform variants) and needs a transform for them.

@@ -111,6 +111,11 @@ modules/*/android/.cxx/
 *.dSYM.zip
 mapping.txt
 
+# Claude Code's git worktrees: whole checkouts of this repository, each with
+# its own node_modules. Every tool that walks the tree excludes them too; see
+# docs/quality.md.
+/.claude/worktrees/
+
 # shared-workflows self-checkout (also added to .git/info/exclude by its setup action)
 /.workflows
 
