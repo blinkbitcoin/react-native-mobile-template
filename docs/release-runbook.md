@@ -168,8 +168,11 @@ automation here on purpose.
 ### 5. Dispatch the production release
 
 **Actions → CD / Production → Run workflow**, `tag: vX.Y.Z`,
-`action: release`. A reviewer on the `production` environment has to approve
-before any store job starts. It then:
+`action: release`. First the `Security` job checks the release's own binaries
+(the tag's `.apk`/`.ipa`), a fresh prebuild, the exported bundle, and writes a
+bill of materials ([security.md](security.md)); a blocking finding stops the
+dispatch there, before any store sees the build. A reviewer on the `production`
+environment has to approve before any store job starts. It then:
 
 - submits to the App Store (phased release on by default) and rolls out on Play
   at `play_rollout_percent` (default `10`),
@@ -628,6 +631,8 @@ lane still walks end to end
 | `ANDROID_SIGNING_ENABLED` | repo variable; `build-android` in `cd-internal` | `true` signs with the upload keystore.<br>Unset falls back to the debug keystore, which needs no Play account |
 | `STORE_UPLOADS_ENABLED` | repo variable; every store job in all three release workflows | `true` turns on TestFlight and Play uploads.<br>Unset means off, and the store credentials below<br>are only needed once it is on — see<br>[Before you have store accounts](#before-you-have-store-accounts) |
 | `HUAWEI_UPLOADS_ENABLED` | repo variable; every Huawei job in all three release<br>workflows and the three Huawei lanes via `env-json` | `true` turns on the Huawei AppGallery upload,<br>on top of `STORE_UPLOADS_ENABLED`. Unset means off<br>and no Huawei job runs — see [Huawei AppGallery](#huawei-appgallery) |
+| `SECURITY_ENABLED` | repo variable; the `security` job in `ci.yml` and `cd-production.yml` | `false` turns the security scanners off for the repository.<br>Unset means on; which scanners run is `security-policy.json`'s decision ([security.md](security.md)) |
+| `SECURITY_LLM_PROVIDER`, `SECURITY_LLM_MODEL`,<br>`SECURITY_LLM_EFFORT`, `SECURITY_LLM_EXTRA_PARAMS` | repo variables; `ci.yml`'s `security` job via `build-env` | The provider, model and effort of the two LLM scanners, which are off in `security-policy.json` until you turn them on.<br>`OPENAI_BASE_URL` is shared with the store notes |
 | `HUAWEI_APP_ID` | every Huawei job in all three release workflows,<br>via `env-json` | The numeric app id under the AppGallery Connect<br>app record's information page. An identifier, not a<br>credential, so it is a variable and appears in the log |
 | `HUAWEI_SUBMIT_DELAY_SECONDS` | the three Huawei lanes via `env-json` | Optional. Whole seconds to wait between the upload<br>and the submit; default `60`. Raise it if AppGallery<br>refuses the submit because the bundle is still compiling |
 | `HUAWEI_FEEDBACK_EMAIL` | `android upload_huawei_internal` and<br>`android promote_huawei_beta` via `env-json` | Optional. The address AppGallery shows testers for<br>feedback; omitted from the submit when unset. It is an<br>unmasked workflow input, acceptable because AppGallery<br>publishes it to testers anyway — move it to `secrets:`<br>on the two jobs if you would rather it stayed out of logs |
@@ -686,7 +691,7 @@ you want a reviewer between a token and production.
 | `HUAWEI_CLIENT_ID` | every Huawei lane job: internal, beta and release | AppGallery Connect → Users and permissions → API key → Connect API → Create; the client id half of the pair |
 | `HUAWEI_CLIENT_SECRET` | same three jobs | Same page, the client secret half. It is shown exactly once |
 | `OTA_PUBLISH_TOKEN` | every `ota-*` job | One of the update server's `EOO_TOKENS`; scope per environment |
-| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | `Store Notes` in `cd-release.yml` (`notes.mjs`) | Only needed when `RELEASE_NOTES_LLM_PROVIDER` selects that provider. The notes fall back to deterministic prose without them |
+| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | `Store Notes` in `cd-release.yml` (`notes.mjs`), and the `Review` and `OpenAnt` steps of `ci.yml`'s `security` job | Only needed when `RELEASE_NOTES_LLM_PROVIDER` or `SECURITY_LLM_PROVIDER` selects that provider.<br>The notes fall back to deterministic prose without them, and the two scanners report skipped |
 | `APP_REVIEW_EMAIL`, `APP_REVIEW_FIRST_NAME`, `APP_REVIEW_LAST_NAME`, `APP_REVIEW_PHONE` | iOS `promote_beta` and `release_production` lanes | The contact Apple reaches for review questions |
 | `APP_REVIEW_DEMO_USER`, `APP_REVIEW_DEMO_PASSWORD` | same | A working login for the reviewer; omit both if the app needs no account |
 | `APP_REVIEW_NOTES` | same | Free-text notes for the reviewer |

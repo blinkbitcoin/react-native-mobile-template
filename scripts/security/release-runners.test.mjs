@@ -202,7 +202,10 @@ test('bundle: bundle.platforms narrows the export', () => {
 
 test('bundle: an empty platform list is a skip, not an empty pass', () => {
   withDir((dir) => {
-    const result = run('bundle.sh', { env: { SECURITY_DIR: dir, SECURITY_BUNDLE_PLATFORMS: '' } });
+    // In the file: an empty environment twin means unset, not an empty list.
+    const policy = path.join(dir, 'policy.json');
+    writeFileSync(policy, JSON.stringify({ jobs: { bundle: { platforms: [] } } }));
+    const result = run('bundle.sh', { env: { SECURITY_DIR: dir, SECURITY_POLICY_FILE: policy } });
     assert.equal(result.status, 0, result.stderr);
     assert.match(note(sarif(dir, 'bundle')), /bundle\.platforms is empty/);
   });

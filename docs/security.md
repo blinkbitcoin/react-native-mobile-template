@@ -4,18 +4,18 @@
 `make check-security-<job>` runs one scanner and the same verdict, so a single
 scanner on a laptop still ends in the pass/fail answer CI would give.
 
-**Nothing in `.github/workflows/` calls these yet.** The reusable
-`check-security.yml` in shared-workflows runs them in CI; the call sites in
-`ci.yml` and `cd-production.yml` land in a separate change once `v0` carries
-the jobs they need. Until then the scanners run only when someone types
-`make check-security*`.
+In CI the same scripts run through the reusable `check-security.yml` from
+shared-workflows: the `security` job in `ci.yml` on every change, and the
+`security` job in `cd-production.yml` before any store job on
+`action=release`. `SECURITY_ENABLED=false` as a repository variable turns both
+off.
 
 ## What runs, and where
 
 Nine scanners, placed by what each reads: source is there on every pull
 request, the built binaries only once a release is built.
 
-| Job | Make target | Reads | Runs in CI (once wired) |
+| Job | Make target | Reads | Runs in CI |
 | --- | --- | --- | --- |
 | `deps` | `check-security-deps` | `pnpm-lock.yaml` (osv-scanner) | every pull request, every push to `main` |
 | `code` | `check-security-code` | app source, `rules/` (Semgrep CE) | every pull request, every push to `main` |
@@ -26,6 +26,11 @@ request, the built binaries only once a release is built.
 | `mobile` | `check-security-mobile` | a fresh prebuild of `android/` and `ios/` (mobsfscan) | the production dispatch |
 | `binaries` | `check-security-binaries` | the release's `.apk` and `.ipa` (OWASP MASTG checks) | the production dispatch, before any store job |
 | `sbom` | `check-security-sbom` | `pnpm-lock.yaml`; writes `.security/sbom.cdx.json` | the production dispatch |
+
+The release pull request is the one cd-release.yml keeps open; its CI is a
+`workflow_dispatch` on the `release-please--` branch, so `ci.yml` recognises it
+by `github.ref_name`. On the production dispatch the store jobs wait for the
+`security` job and do not start if it fails.
 
 The deterministic scanners can block a run; the two LLM jobs annotate unless
 `failOn` names them (see "Turning things off" below). An LLM that refuses a
@@ -87,6 +92,12 @@ until a repository turns them on:
    `anthropic`. `llm.model` names the model; OpenAnt requires one.
 3. The key as a secret: `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`.
 
+In CI, step 2 is the repository variables `SECURITY_LLM_PROVIDER`,
+`SECURITY_LLM_MODEL`, `SECURITY_LLM_EFFORT`, `SECURITY_LLM_EXTRA_PARAMS` and
+`OPENAI_BASE_URL`, which `ci.yml` passes through `build-env`, and step 3 is a
+repository secret. The production dispatch carries none of them: model calls
+stay out of the CD lanes, and the release pull request is where they run.
+
 `llm.effort` (`low`, `medium`, `high`, `max`; `max` by default) is sent to the
 reviewer apart from the model: Anthropic's `output_config.effort` with
 adaptive thinking, or an OpenAI-compatible `reasoning_effort` (where `max`
@@ -133,7 +144,10 @@ upper snake case:
 | `llm.model` | string | empty | `SECURITY_LLM_MODEL` |
 | `llm.effort` | `low`, `medium`, `high`, `max` | `max` | `SECURITY_LLM_EFFORT` |
 
-In the environment a list is comma-separated. A value that does not parse -
+In the environment a list is comma-separated, and an **empty** option or
+`llm` twin counts as unset, so the file or the default applies: CI passes every
+twin through `build-env`, where a repository variable nobody set arrives as an
+empty string. To empty a list, set it to `[]` in the file. A value that does not parse -
 not `true` or `false`, not a whole number, a list entry outside its set, an
 effort or provider outside the vocabulary - fails the run rather than reading
 as off, so a typo cannot silently disable a scanner. So does a key the schema

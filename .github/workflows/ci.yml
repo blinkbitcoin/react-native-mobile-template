@@ -87,6 +87,45 @@ jobs:
       build-env: '{"EXPO_PUBLIC_API_URL":"http://localhost:8082/graphql"}'
       e2e-setup-script: scripts/e2e/ci-mock-api-up.sh
       e2e-teardown-script: scripts/e2e/ci-mock-api-down.sh
+  security:
+    name: Security
+    needs: checks
+    # SECURITY_ENABLED is the per-repository master switch, opt-out because a
+    # generated app gets the deterministic scanners on. A skipped job is green,
+    # so turning it off never holds up require-green-workflow: ci.yml. Which
+    # scanners actually run is security-policy.json's decision; the inputs below
+    # only say what this tier allows.
+    if: ${{ needs.checks.outputs.docs-only != 'true' && vars.SECURITY_ENABLED != 'false' }}
+    # The verdict job uploads SARIF to code scanning. A called workflow can only
+    # narrow the caller's token, so a grant smaller than this is not a failed
+    # step but a startup_failure of the whole run.
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    uses: blinkbitcoin/shared-workflows/.github/workflows/check-security.yml@v0
+    with:
+      # The diff review runs on pull requests, and on the release pull request,
+      # whose CI is the workflow_dispatch cd-release.yml starts on its branch -
+      # so it is recognised by github.ref_name. github.head_ref is empty there.
+      review: ${{ github.event_name == 'pull_request' || startsWith(github.ref_name, 'release-please--') }}
+      # The release pull request is the last stop before a tag: it adds the
+      # minutes-long bundle scan and OpenAnt, and reviews everything since the
+      # last release rather than one pull request's diff.
+      bundle: ${{ startsWith(github.ref_name, 'release-please--') }}
+      openant: ${{ startsWith(github.ref_name, 'release-please--') }}
+      review-full-range: ${{ startsWith(github.ref_name, 'release-please--') }}
+      # Non-secret only. The provider and model are repository variables; the
+      # keys travel as secrets below and reach only the two LLM scan steps.
+      build-env: >-
+        {"SECURITY_LLM_PROVIDER":"${{ vars.SECURITY_LLM_PROVIDER }}",
+        "SECURITY_LLM_MODEL":"${{ vars.SECURITY_LLM_MODEL }}",
+        "SECURITY_LLM_EFFORT":"${{ vars.SECURITY_LLM_EFFORT }}",
+        "SECURITY_LLM_EXTRA_PARAMS":${{ toJSON(vars.SECURITY_LLM_EXTRA_PARAMS || '') }},
+        "OPENAI_BASE_URL":"${{ vars.OPENAI_BASE_URL }}"}
+    secrets:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
   badges:
     name: Badges
     needs: [checks, unit, e2e]

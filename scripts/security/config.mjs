@@ -142,11 +142,18 @@ const assertKnownKeys = (block, known, where) => {
   }
 };
 
+// An empty environment twin is an unset one. CI hands every twin over through
+// build-env as `"KEY":"${{ vars.KEY }}"`, and an unset repository variable
+// arrives there as "" - reading that as a value would fail every run of a
+// repository that simply has not set it. A non-empty value that does not parse
+// still fails the run; to empty a list, set it to [] in the file.
 const resolveBlock = (schema, fileBlock, envPrefix, where, env) =>
   Object.fromEntries(
     Object.entries(schema).map(([key, spec]) => {
       const envKey = `${envPrefix}_${snake(key)}`;
-      if (env[envKey] !== undefined) return [key, parseTyped(spec, env[envKey], envKey)];
+      if (env[envKey] !== undefined && env[envKey] !== '') {
+        return [key, parseTyped(spec, env[envKey], envKey)];
+      }
       if (fileBlock?.[key] !== undefined) {
         return [key, parseTyped(spec, fileBlock[key], `security-policy.json: ${where}.${key}`)];
       }
