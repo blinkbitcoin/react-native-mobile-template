@@ -728,7 +728,7 @@ test('toolchain: with a yes, the mise installer runs and its ~/.local/bin is use
   const r = s.run('toolchain.sh', ['--yes'], { FAKE_OS: 'Linux' });
   assert.equal(r.status, 0, r.output);
   assert.ok(existsSync(path.join(s.home, '.local/bin/mise')));
-  assert.ok(s.calls('curl').some((c) => c.includes('https://mise.run')));
+  assert.deepEqual(s.calls('curl'), ['curl -fsSL https://mise.run']);
 });
 
 test('toolchain: an installer that leaves no mise behind is reported, not ignored', () => {
