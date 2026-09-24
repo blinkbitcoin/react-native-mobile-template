@@ -71,6 +71,9 @@ modules/*/android/.cxx/
 /test-results
 /.maestro/output
 
+# Local security scan output (make check-security)
+/.security
+
 # Ruby gems for fastlane/cocoapods (Gemfile.lock is committed, the gems are not)
 # No trailing path: a git worktree commonly symlinks `vendor` at the bundle the
 # main clone already installed, and `/vendor/bundle` does not match a symlink

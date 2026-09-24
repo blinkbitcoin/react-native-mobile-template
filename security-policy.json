@@ -1,0 +1,17 @@
+{
+  "$comment": "Security scanning settings. Every key has an environment twin that wins over this file: SECURITY_ENABLED, SECURITY_SEVERITY, SECURITY_FAIL_ON, and SECURITY_<JOB> for each job. See docs/security.md.",
+  "enabled": true,
+  "severity": "high",
+  "failOn": ["deterministic"],
+  "jobs": {
+    "deps": { "enabled": true },
+    "code": { "enabled": true },
+    "policy": { "enabled": true },
+    "sbom": { "enabled": true },
+    "bundle": { "enabled": true },
+    "mobile": { "enabled": false },
+    "binaries": { "enabled": true },
+    "review": { "enabled": false },
+    "openant": { "enabled": false }
+  }
+}
