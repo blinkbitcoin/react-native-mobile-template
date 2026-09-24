@@ -1,7 +1,9 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 import { logger } from '@/lib/logger';
 import { updates } from '@/services/updates';
 import { renderWithProviders } from '@/test/render';
+import { buildTheme } from '@/theme/tokens';
 import { DevMenu } from './DevMenu';
 
 // The OTA block only renders in a build configured for updates, so the whole
@@ -79,4 +81,26 @@ test('the update info line reports the running update metadata', async () => {
       enabled: false,
     }),
   );
+});
+
+test('the menu is quiet: small caps section headings and outlined buttons', async () => {
+  await renderWithProviders(<DevMenu />);
+  const { colors } = buildTheme('light');
+
+  for (const heading of ['Theme', 'Language', 'Channel']) {
+    // <Trans> renders its string in a nested, unstyled Text: the style is one up.
+    const text = screen.getByText(heading);
+    const styled = text.props.style ? text : text.parent;
+    expect(StyleSheet.flatten(styled?.props.style)).toMatchObject({
+      textTransform: 'uppercase',
+      color: colors.muted,
+    });
+  }
+  // Every action here is secondary: outlined on the page colour, never filled.
+  for (const id of ['settings-theme-dark', 'settings-lang-es', 'settings-trigger-error']) {
+    expect(StyleSheet.flatten(screen.getByTestId(id).props.style)).toMatchObject({
+      backgroundColor: colors.background,
+      borderColor: colors.border,
+    });
+  }
 });

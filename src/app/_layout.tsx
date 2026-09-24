@@ -1,9 +1,9 @@
 import { useLingui } from '@lingui/react/macro';
 import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 // Side-effect import: registers the UNAUTHENTICATED → signOut hook for every
 // variant, including production builds that never mount the dev menu.
 import '@/services/auth';
+import { NavigationTheme } from '../components/NavigationTheme';
 import { Providers } from '../components/Providers';
 import { installGlobalErrorHandler } from '../lib/global-error-handler';
 
@@ -29,8 +29,9 @@ function RootStack() {
 export default function RootLayout() {
   return (
     <Providers>
-      <StatusBar style="auto" />
-      <RootStack />
+      <NavigationTheme>
+        <RootStack />
+      </NavigationTheme>
     </Providers>
   );
 }

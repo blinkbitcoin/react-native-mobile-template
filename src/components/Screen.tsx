@@ -35,5 +35,5 @@ export function Screen({
 const useStyles = createStyles((theme) => ({
   safe: { flex: 1, backgroundColor: theme.colors.background },
   body: { flex: 1 },
-  content: { flexGrow: 1, padding: theme.spacing.md, gap: theme.spacing.sm },
+  content: { flexGrow: 1, padding: theme.spacing.lg, gap: theme.spacing.md },
 }));

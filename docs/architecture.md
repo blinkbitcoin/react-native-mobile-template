@@ -11,7 +11,7 @@ below follows from that.
 | --- | --- | --- |
 | `src/app/` | Expo Router routes | File-based routing. Routes only compose screens (see below) |
 | `src/features/` | Screen-level feature code | `HomeScreen`, `DetailsScreen`, `SettingsScreen`, the dev menu, the native demo card |
-| `src/components/` | Shared presentational components | `AppText`, `Button`, `Card`, `Screen`, `ErrorFallback`, `Providers` |
+| `src/components/` | Shared presentational components | `AppText`, `Button`, `Card`, `Screen`, `TabIcon`, `NavigationTheme`, `ErrorFallback`, `Providers` |
 | `src/graphql/` | Apollo client, cache, links, generated documents | `generated/` is written by `make gen-graphql` and is never edited by hand |
 | `src/services/` | Cross-feature runtime services | `auth.ts`, `updates.ts` |
 | `src/lib/` | Thin wrappers over platform APIs | `logger`, `secure-store`, `storage`, `errors`, `crash-reporting`, `native-intent` |
