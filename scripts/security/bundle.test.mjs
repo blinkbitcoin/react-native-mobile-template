@@ -46,10 +46,7 @@ test('bundleUri keeps the path inside the export, whatever temporary directory h
 });
 
 test('a clean bundle has no findings', () => {
-  assert.deepEqual(
-    findingsFor('b', ['https://api.example.com', 'http://localhost:8081'], OPTIONS),
-    [],
-  );
+  assert.deepEqual(findingsFor('b', ['https://api.example.com', 'http://localhost'], OPTIONS), []);
 });
 
 test('a private variable name in the bundle is high', () => {
