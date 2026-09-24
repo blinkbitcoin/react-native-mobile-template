@@ -5,13 +5,19 @@ AsyncStorage.setItem('auth_token', token);
 AsyncStorage.setItem('last_screen', name);
 
 // ruleid: rn-cleartext-fetch
-const endpoint = 'http://api.example.com/graphql';
+fetch('http://api.example.com/graphql');
+
+// ruleid: rn-cleartext-fetch
+const client = axios.create({ baseURL: 'http://api.example.com', timeout: 5000 });
 
 // ok: rn-cleartext-fetch
-const local = 'http://localhost:8080/graphql';
+fetch('http://localhost:8080/graphql');
 
 // ok: rn-cleartext-fetch
-const secure = 'https://api.example.com/graphql';
+fetch('https://api.example.com/graphql');
+
+// ok: rn-cleartext-fetch
+const icon = <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" />;
 
 // ruleid: rn-webview-injected-javascript
 const withToken = <WebView source={{ uri: url }} injectedJavaScript={`window.__TOKEN__ = "${authToken}";`} />;
