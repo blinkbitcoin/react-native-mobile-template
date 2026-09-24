@@ -126,3 +126,19 @@ test('the policy scanner reports a near-miss value, not just a missing one', () 
     }
   });
 });
+
+test('the aggregate runs the enabled jobs and reports a verdict', () => {
+  withDir((dir) => {
+    const result = run('local.sh', {
+      env: {
+        SECURITY_DIR: dir,
+        SECURITY_CODE: 'false',
+        SECURITY_DEPS: 'false',
+        SECURITY_POLICY: 'true',
+      },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /security: (pass|informational)/);
+    assert.match(result.stdout, /deps: skipped/);
+  });
+});

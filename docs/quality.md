@@ -17,6 +17,14 @@ just the one that failed.
 | gitleaks | Secrets committed anywhere in the git history | `.gitleaks.toml` |
 | commitlint | Commit and PR-title conventions | `commitlint.config.mjs` |
 | pnpm | Dependency provenance, release age, allowed builds, audit exceptions | `pnpm-workspace.yaml` |
+| osv-scanner | Known vulnerabilities and malicious-package records in the lockfile | `osv-scanner.toml` |
+| Semgrep | Mobile-specific source patterns and the registry TypeScript/secrets/OWASP packs | `rules/`, `.semgrepignore` |
+| pnpm install policy scanner | The install-time supply-chain settings, asserted rather than trusted | `security-policy.json` |
+
+The three scanners above are `make check-security*`, run separately from
+`make check` because they are external CLIs and cost minutes; see
+[security.md](security.md) for what each reads, how to turn one off, and how
+to suppress a finding correctly.
 
 Nothing is enabled in two linters at once. `eslint.config.mjs` turns off every
 preset rule that duplicates a Biome rule, and `biome.json` turns off the two
