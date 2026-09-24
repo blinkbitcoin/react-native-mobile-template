@@ -16,8 +16,8 @@ wrong one is the usual source of pain.
 
 Two rules apply to all four:
 
-- Anything with a native layer needs a fresh dev client. `make ios` or
-  `make android` after the change, not just a Metro reload.
+- Anything with a native layer needs a fresh dev client. `make dev-ios` or
+  `make dev-android` after the change, not just a Metro reload.
 - A native change needs a prebuild assertion. See `make check-prebuild` below.
 
 ## Walkthrough: `modules/hello-native`
@@ -52,7 +52,7 @@ modules:
   absent (web, Expo Go, Jest), so a top-level import would take the whole
   bundle down.
 - A failure is rethrown as `HelloNativeError` with a message that names the
-  fix: "Build a dev client: make ios / make android". The original loader error
+  fix: "Build a dev client: make dev-ios / make dev-android". The original loader error
   stays attached as `cause`.
 - Input validation happens in TypeScript, before the bridge:
   `hello('')` throws rather than crossing over.
@@ -178,7 +178,7 @@ safe-area-context.
 2. Write the mod or the module, with a test.
 3. Extend `scripts/check-prebuild.sh` with an assertion on the generated
    output.
-4. `make check-prebuild`, then `make ios` or `make android` for a real dev
+4. `make check-prebuild`, then `make dev-ios` or `make dev-android` for a real dev
    client.
 5. Add or extend a Maestro flow if it is user visible.
 6. Update the docs. `make check-docs` warns when `plugins/`, `modules/` or

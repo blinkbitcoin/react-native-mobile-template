@@ -138,26 +138,26 @@ describe('rewriteJson', () => {
 
 describe('removeMakeTargets', () => {
   const makefile = [
-    'start: ## Metro',
+    'dev: ## Metro',
     '\tpnpm start',
     '',
-    'web: ## Expo web dev server',
+    'dev-web: ## Expo web dev server',
     '\tpnpm web',
     '',
-    'unit: ## Tests',
+    'test-unit: ## Tests',
     '\tpnpm test',
     '',
-    '.PHONY: start web unit',
+    '.PHONY: dev dev-web test-unit',
     '',
   ].join('\n');
 
   test('removes the recipe, one blank line and the .PHONY word', () => {
-    const after = removeMakeTargets(makefile, ['web']);
-    assert.doesNotMatch(after, /^web:/m);
+    const after = removeMakeTargets(makefile, ['dev-web']);
+    assert.doesNotMatch(after, /^dev-web:/m);
     assert.doesNotMatch(after, /pnpm web/);
-    assert.match(after, /^\.PHONY: start unit$/m);
-    assert.match(after, /^start: ## Metro$/m);
-    assert.match(after, /^unit: ## Tests$/m);
+    assert.match(after, /^\.PHONY: dev test-unit$/m);
+    assert.match(after, /^dev: ## Metro$/m);
+    assert.match(after, /^test-unit: ## Tests$/m);
     // No double blank line left behind.
     assert.doesNotMatch(after, /\n\n\n/);
   });
@@ -843,10 +843,10 @@ describe('init --yes --no-web', async () => {
 
   test('drops the web make targets, the commitlint scope and the knip plugin', () => {
     const makefile = readFileSync(path.join(root, 'Makefile'), 'utf8');
-    for (const target of ['web', 'build-web', 'e2e-web']) {
+    for (const target of ['dev-web', 'build-web', 'test-e2e-web']) {
       assert.doesNotMatch(makefile, new RegExp(`^${target}:`, 'm'), target);
     }
-    assert.match(makefile, /^ios:/m);
+    assert.match(makefile, /^dev-ios:/m);
     assert.doesNotMatch(readFileSync(path.join(root, 'commitlint.config.mjs'), 'utf8'), /'web',/);
     assert.equal(
       JSON.parse(readFileSync(path.join(root, 'knip.json'), 'utf8')).playwright,
@@ -865,11 +865,11 @@ describe('init --yes --no-web', async () => {
   // two pin the removal down to the line.
   test('removes exactly these lines from docs/testing.md', () => {
     assert.deepEqual(removedLines(REPO, root, 'docs/testing.md'), [
-      '| E2E, web | Playwright | `e2e/web/` | `make e2e-web` |',
+      '| E2E, web | Playwright | `e2e/web/` | `make test-e2e-web` |',
       // Not web: the suite it names is one of the files init deletes.
       '| `scripts/init.test.mjs` | The template rename and web-removal script behind `make init` |',
       '## Playwright',
-      '`make e2e-web` runs `scripts/e2e/web.sh`, which exports the site with',
+      '`make test-e2e-web` runs `scripts/e2e/web.sh`, which exports the site with',
       '`pnpm build:web` (a production export, the flavour that deploys) and then runs',
       'the suite in `e2e/web/`.',
       '`playwright.config.ts` starts two web servers for it: the mock API and',
@@ -910,11 +910,11 @@ describe('init --yes --no-web', async () => {
       '.maestro/           Maestro flows (native e2e); e2e/web/ is Playwright',
       '                    release-runbook, ota, ota-and-crash-reporting, template-usage, decisions/',
       '| `make init` | Rename this template into your app, then delete itself (template only; `docs/template-usage.md`) |',
-      '| `make web` | Expo web dev server |',
+      '| `make dev-web` | Expo web dev server |',
       '| `make build-web` | Static web export into `dist/` |',
-      '| `make e2e-web` | Web export (dev env, mock API) + Playwright smoke |',
+      '| `make test-e2e-web` | Web export (dev env, mock API) + Playwright smoke |',
       '  ci release deps deps-dev docs e2e web`. Squash merges take the PR title as the',
-      '| Web e2e | `e2e/web/` | `make e2e-web` |',
+      '| Web e2e | `e2e/web/` | `make test-e2e-web` |',
     ]);
   });
 });
@@ -932,7 +932,7 @@ describe('init --yes --web', async () => {
     const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
     assert.equal(pkg.scripts['build:web'], 'bash scripts/build-web.sh');
     assert.ok(pkg.dependencies['react-native-web']);
-    assert.match(readFileSync(path.join(root, 'Makefile'), 'utf8'), /^e2e-web:/m);
+    assert.match(readFileSync(path.join(root, 'Makefile'), 'utf8'), /^test-e2e-web:/m);
     assert.match(readFileSync(path.join(root, 'app.config.ts'), 'utf8'), /^\s*web: \{/m);
   });
 
@@ -1137,7 +1137,7 @@ const MINI_MANIFEST = {
     ],
     docScrub: {
       globs: ['*.md'],
-      lines: ['make web'],
+      lines: ['make dev-web'],
       bullets: ['WEB_BULLET'],
       paragraphs: ['WEB_PARAGRAPH'],
     },
@@ -1163,7 +1163,7 @@ const MINI_FILES = {
     'Run `make init` first.',
     '<!-- init:usage-end -->',
     '',
-    '| `make web` | web |',
+    '| `make dev-web` | web |',
     '',
     '- `make init` renames it',
     '- WEB_BULLET item',

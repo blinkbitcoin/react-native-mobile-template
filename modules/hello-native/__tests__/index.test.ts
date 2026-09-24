@@ -27,9 +27,9 @@ test('missing native module rejects and throws helpfully', async () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports -- the wrapper has to be re-required inside the isolated module registry
     const isolated = require('..') as typeof import('..');
 
-    expect(() => isolated.hello('x')).toThrow(/make ios/);
+    expect(() => isolated.hello('x')).toThrow(/make dev-ios/);
     await expect(isolated.getBuildStamp()).rejects.toThrow(isolated.HelloNativeError);
-    await expect(isolated.getBuildStamp()).rejects.toThrow(/make ios/);
+    await expect(isolated.getBuildStamp()).rejects.toThrow(/make dev-ios/);
     expect(isolated.platformName).toBe('unavailable');
 
     // The underlying loader failure stays attached for diagnosis.

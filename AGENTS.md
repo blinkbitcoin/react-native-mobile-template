@@ -34,7 +34,12 @@ docs/               architecture, local-dev, quality, testing, ci, native-extens
 
 ## Commands
 
-Every row is a make target; nothing here is run through pnpm directly.
+Every row is a make target; nothing here is run through pnpm directly. Targets
+are grouped by prefix, the same way the workflow files are: `check-` is a static
+gate, `test-` runs tests, `build-` produces an artifact, `dev-` runs the app
+locally, `gen-` writes generated files, `fix-` rewrites source in place,
+`verify-` inspects a built artifact. `check`, `test` and `ci` are the
+aggregates.
 
 | Setup | |
 |---|---|
@@ -48,31 +53,36 @@ Every row is a make target; nothing here is run through pnpm directly.
 | Run | |
 |---|---|
 | `make ports` | Print the ports derived from `APP_PORT_BASE` |
-| `make start` | Metro for the dev client (`APP_PORT_BASE`+1) |
-| `make ios` | Prebuild if needed, build and launch on the iOS simulator |
-| `make android` | Prebuild if needed, build and launch on an Android emulator |
-| `make web` | Expo web dev server |
-| `make mock-api` | Local GraphQL mock API (`APP_PORT_BASE`+2) |
+| `make dev` | Metro for the dev client (`APP_PORT_BASE`+1) |
+| `make dev-ios` | Prebuild if needed, build and launch on the iOS simulator |
+| `make dev-android` | Prebuild if needed, build and launch on an Android emulator |
+| `make dev-web` | Expo web dev server |
+| `make dev-api` | Local GraphQL mock API (`APP_PORT_BASE`+2) |
 | `make prebuild` | Regenerate `ios/`/`android/` locally (plugin debugging only) |
 | `make build-web` | Static web export into `dist/` |
 
 | Codegen | |
 |---|---|
-| `make i18n` | Extract + compile Lingui catalogs |
-| `make codegen` | Regenerate typed GraphQL documents |
+| `make gen-i18n` | Extract + compile Lingui catalogs |
+| `make gen-graphql` | Regenerate typed GraphQL documents |
+| `make gen-badges` | Render the CI badges into `coverage/badge/` (after `make test-coverage`) |
+
+| Fixers | |
+|---|---|
+| `make fix-format` | Format everything with Biome (writes) |
+| `make fix-lint` | Apply Biome's and ESLint's own fixes (writes) |
 
 | Gates | |
 |---|---|
 | `make check` | Every static gate the `check-code` workflow runs (no tests/builds) |
 | `make ci` | Everything CI runs except E2E — `check` plus coverage and the script tests |
 | `make check-slow` | The minutes-long gates: prebuild output + bundle secrets (off by default in CI too) |
-| `make check-code` | typecheck + lint + format-check + knip + spell |
-| `make typecheck` | `tsc --noEmit` |
-| `make lint` | Biome lint + ESLint (React/Expo rules) |
-| `make format` | Format everything with Biome (writes) |
-| `make format-check` | Check formatting without writing |
-| `make knip` | Unused files, exports and dependencies |
-| `make spell` | Spell-check with typos |
+| `make check-code` | `check-types` + `check-lint` + `check-format` + `check-knip` + `check-spell` |
+| `make check-types` | `tsc --noEmit` |
+| `make check-lint` | Biome lint + ESLint (React/Expo rules) |
+| `make check-format` | Check formatting without writing (`make fix-format` writes) |
+| `make check-knip` | Unused files, exports and dependencies |
+| `make check-spell` | Spell-check with typos |
 | `make check-gen` | Generated-file drift (i18n, codegen) |
 | `make check-deps` | SDK drift, audit, lockfile provenance, licenses |
 | `make check-ci` | actionlint + zizmor (workflows) + shellcheck (scripts) |
@@ -81,19 +91,18 @@ Every row is a make target; nothing here is run through pnpm directly.
 | `make check-prebuild` | Prebuild both platforms in a temp dir, assert plugin output |
 | `make check-release` | Ruby syntax + fastlane lane parse + lane unit tests + skill tests |
 | `make check-secrets` | gitleaks over the whole git history; allowlisted test data in `.gitleaks.toml` |
-| `make bundle-secrets-check` | Export the bundle, assert no non-public keys leaked |
-| `make codeql` | CodeQL with the same config CI uses (needs a CodeQL CLI; not in `make check`) |
+| `make check-security-bundle` | Export the bundle, assert no non-public keys leaked |
+| `make check-codeql` | CodeQL with the same config CI uses (needs a CodeQL CLI; not in `make check`) |
 
 | Tests | |
 |---|---|
 | `make test` | Unit tests + code checks |
-| `make unit` | Unit + component tests |
+| `make test-unit` | Unit + component tests |
 | `make test-scripts` | `node:test` for `scripts/**/*.test.mjs`, with the 100% coverage gate over `scripts/**/*.mjs` |
-| `make coverage` | Tests with the coverage thresholds and the empty-row check CI enforces |
-| `make badges` | Render the CI badges into `coverage/badge/` (after `make coverage`) |
-| `make e2e-ios` | Maestro flows on iOS (needs mock-api, start, ios) |
-| `make e2e-android` | Maestro flows on Android (needs mock-api, start, android) |
-| `make e2e-web` | Web export (dev env, mock API) + Playwright smoke |
+| `make test-coverage` | Tests with the coverage thresholds and the empty-row check CI enforces |
+| `make test-e2e-ios` | Maestro flows on iOS (needs `dev-api`, `dev`, `dev-ios`) |
+| `make test-e2e-android` | Maestro flows on Android (needs `dev-api`, `dev`, `dev-android`) |
+| `make test-e2e-web` | Web export (dev env, mock API) + Playwright smoke |
 
 | Release | |
 |---|---|
@@ -106,7 +115,7 @@ Every row is a make target; nothing here is run through pnpm directly.
 
 - **Native output is never committed.** `ios/` and `android/` are gitignored
   prebuild output. `src/graphql/generated/**` and `src/i18n/locales/*/messages.ts`
-  *are* committed, but only ever as the output of `make codegen` / `make i18n` —
+  *are* committed, but only ever as the output of `make gen-graphql` / `make gen-i18n` —
   never hand-edited; `make check-gen` fails on drift.
 - **Never `cp -R generated/. .`** when scaffolding from a generator: it clobbers
   `.git/`. Use `rsync -a --exclude .git generated/ .`.
@@ -118,7 +127,7 @@ Every row is a make target; nothing here is run through pnpm directly.
   fails on a bare literal and names the file; see
   [docs/local-dev.md](docs/local-dev.md).
 - **User-visible strings go through Lingui** (`t`/`Trans` macros), then
-  `make i18n`. No bare literals in JSX.
+  `make gen-i18n`. No bare literals in JSX.
 - **Secrets go through `src/lib/secure-store`**, never `expo-secure-store`
   directly; key-value state through `src/lib/storage`. Biome's
   `noRestrictedImports` enforces both.
@@ -140,7 +149,7 @@ Every row is a make target; nothing here is run through pnpm directly.
 - **A native change is three things:** the config plugin or local module, a docs
   update, and a passing `make check-prebuild`. Changing `app.config.ts`,
   `plugins/` or `modules/` without all three will not merge.
-- **Simulator builds:** run `expo run:ios` / `make ios` in the background and
+- **Simulator builds:** run `expo run:ios` / `make dev-ios` in the background and
   poll the log — the process becomes Metro and never exits. Launch the dev
   client by deep link; the simulator cannot find Metro over Bonjour.
 - **Branch per change, off `main`**, one logical change per branch; use a git
@@ -208,18 +217,18 @@ Every row is a make target; nothing here is run through pnpm directly.
 
 | Layer | Where | Run with |
 |---|---|---|
-| Units, components, router, Apollo (MSW) | `src/**/*.test.ts(x)` | `make unit` |
-| Config plugins | `plugins/*.test.ts` | `make unit` |
+| Units, components, router, Apollo (MSW) | `src/**/*.test.ts(x)` | `make test-unit` |
+| Config plugins | `plugins/*.test.ts` | `make test-unit` |
 | Node scripts (release, doctor, init, checks), 100% coverage | `scripts/**/*.test.mjs` | `make test-scripts` |
 | Fastlane lanes | `fastlane/test/` | `make check-release` |
-| Native e2e | `.maestro/flows/` | `make e2e-ios`, `make e2e-android` |
-| Web e2e | `e2e/web/` | `make e2e-web` |
+| Native e2e | `.maestro/flows/` | `make test-e2e-ios`, `make test-e2e-android` |
+| Web e2e | `e2e/web/` | `make test-e2e-web` |
 
 Coverage (`jest.config.ts`) is 100% lines, branches, functions and statements,
 globally. New code needs a test in the same commit. A file with nothing to
 assert goes in `coveragePathIgnorePatterns` **with a one-line reason**; an entry
 without one is not mergeable, and a native module's TS wrapper does not qualify
-just because the native half is Swift/Kotlin. `make coverage` (and CI, through
+just because the native half is Swift/Kotlin. `make test-coverage` (and CI, through
 `test:coverage`) also fails on any file with zero statements (`scripts/check-coverage-empty.mjs`), so a re-export
 barrel cannot lift the number while testing nothing.
 

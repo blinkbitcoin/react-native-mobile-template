@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Local Android E2E: assumes `make android` already installed the dev build on a
-# running emulator and Metro is running (make start). CI uses
+# Local Android E2E: assumes `make dev-android` already installed the dev build on a
+# running emulator and Metro is running (make dev). CI uses
 # shared-workflows. `adb reverse` makes the host's Metro and mock API
 # reachable from the emulator on the same ports.
 set -euo pipefail

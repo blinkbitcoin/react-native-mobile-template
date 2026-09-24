@@ -30,7 +30,7 @@ when the result differs from what is committed.
 
 Metro, Jest and the web export all just import a module, so there is no
 transformer and no test-environment special case. The price is a generated file
-in git plus a drift check: forgetting `make i18n` after adding a string fails
+in git plus a drift check: forgetting `make gen-i18n` after adding a string fails
 `make check-gen` rather than failing at runtime. Translators still get `.po`.
 
 ## Alternatives

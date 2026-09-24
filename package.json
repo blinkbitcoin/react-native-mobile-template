@@ -110,7 +110,7 @@
     "check:release": "make check-release",
     "check:ci": "make check-ci",
     "check:secrets": "make check-secrets",
-    "check:bundle-secrets": "make bundle-secrets-check",
+    "check:bundle-secrets": "make check-security-bundle",
     "mock-api": "tsx mocks/server.ts",
     "deps:check": "bash scripts/check-deps.sh",
     "deps:doctor": "expo-doctor",

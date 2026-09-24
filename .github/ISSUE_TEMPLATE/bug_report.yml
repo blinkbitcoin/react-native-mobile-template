@@ -20,8 +20,8 @@ body:
     attributes:
       label: Steps to reproduce
       placeholder: |
-        1. make mock-api
-        2. make start
+        1. make dev-api
+        2. make dev
         3. ...
     validations:
       required: true

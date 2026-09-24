@@ -2,7 +2,7 @@
 // APP_PORT_BASE (default 8080) plus a fixed offset, so a second worktree of the
 // template runs side by side with one variable:
 //
-//   APP_PORT_BASE=8090 make mock-api     # 8092 instead of 8082
+//   APP_PORT_BASE=8090 make dev-api     # 8092 instead of 8082
 //
 // The Metro offset is +1 on purpose: 8081 is Expo's own default and the port
 // the `expo-development-client` deep link assumes, so the default base keeps
@@ -30,12 +30,12 @@ export const SERVICES = {
   metro: {
     offset: 1,
     env: 'METRO_PORT',
-    what: 'Metro / the Expo dev server (`make start`)',
+    what: 'Metro / the Expo dev server (`make dev`)',
   },
   mockApi: {
     offset: 2,
     env: 'MOCK_API_PORT',
-    what: 'the graphql-yoga mock API (`make mock-api`)',
+    what: 'the graphql-yoga mock API (`make dev-api`)',
   },
   webPreview: {
     offset: 3,

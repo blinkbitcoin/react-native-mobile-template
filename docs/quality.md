@@ -71,11 +71,11 @@ Add a rule to one side only, and record which side in the config comment.
 
 | Target | Runs | Owns |
 | --- | --- | --- |
-| `make typecheck` | `tsc --noEmit` | Types. `strict`, plus `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`,<br>`verbatimModuleSyntax`, `noImplicitOverride`, `noFallthroughCasesInSwitch` |
-| `make lint` | `biome lint .` then `eslint . --max-warnings=0` | Lint, both halves. Warnings are failures |
-| `make format-check` | `biome format .` | Formatting. `make format` writes |
-| `make knip` | `knip` | Unused files, exports, dependencies |
-| `make spell` | `typos` | Spelling, Markdown included |
+| `make check-types` | `tsc --noEmit` | Types. `strict`, plus `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`,<br>`verbatimModuleSyntax`, `noImplicitOverride`, `noFallthroughCasesInSwitch` |
+| `make check-lint` | `biome lint .` then `eslint . --max-warnings=0` | Lint, both halves. Warnings are failures |
+| `make check-format` | `biome format .` | Formatting. `make fix-format` writes |
+| `make check-knip` | `knip` | Unused files, exports, dependencies |
+| `make check-spell` | `typos` | Spelling, Markdown included |
 | `make check-code` | the five above | The fast local gate |
 | `make check-gen` | `pnpm i18n:check`, `pnpm codegen:check` | Drift in generated catalogs and generated GraphQL documents |
 | `make check-deps` | `pnpm deps:check`, `pnpm deps:audit`, `pnpm deps:licenses` | Expo SDK drift (`scripts/check-deps.sh`: `expo install --check` is advisory, a CI warning;<br>`expo-doctor`'s other checks block), high-severity vulnerabilities in production dependencies,<br>lockfile provenance (`scripts/check-lockfile.sh`), and the license allowlist (`scripts/check-licenses.mjs`) |
@@ -90,9 +90,9 @@ Not in `make check`, because each is slow or needs a build:
 | --- | --- |
 | `make check-slow` | The two below, grouped. Off by default in CI too (`prebuild-check`, `bundle-secrets`) |
 | `make check-prebuild` | Two prebuilds into temp directories, asserting the config plugin output |
-| `make bundle-secrets-check` | Exports the bundle and asserts no non-public key leaked into it |
-| `make codeql` | CodeQL's `security-and-quality` suite over the whole tree — see below |
-| `make test`, `make unit`, `make coverage`, `make test-scripts` | See [testing.md](testing.md); the last is `node:test` with a 100% coverage gate over `scripts/**/*.mjs` |
+| `make check-security-bundle` | Exports the bundle and asserts no non-public key leaked into it |
+| `make check-codeql` | CodeQL's `security-and-quality` suite over the whole tree — see below |
+| `make test`, `make test-unit`, `make test-coverage`, `make test-scripts` | See [testing.md](testing.md); the last is `node:test` with a 100% coverage gate over `scripts/**/*.mjs` |
 
 ## `make check` is the CI gate set, and that is enforced
 
@@ -105,7 +105,7 @@ make ci     # everything CI runs except E2E
 ```
 
 E2E is the deliberate exception: it needs a simulator or an emulator, so it
-stays in `make e2e-ios`, `make e2e-android` and `make e2e-web`.
+stays in `make test-e2e-ios`, `make test-e2e-android` and `make test-e2e-web`.
 
 **This is checked, not asserted.** It used to be asserted — the Makefile headed
 this section "each is what CI runs" — while four gates ran here and in no CI job
@@ -119,7 +119,7 @@ The `Checks / Contract` job, the first job of every CI run, reads this repo's
 
 - a script CI calls that `make ci` cannot reach;
 - a target `make ci` reaches that no CI step runs, such as a check that runs
-  only in `make coverage`.
+  only in `make test-coverage`.
 
 It is this repo's PR that fails, never shared-workflows': that repo defines the
 contract and never checks out a consumer. So adding a gate here means adding
@@ -155,7 +155,7 @@ The thirteen gates already share one job, one checkout and one `pnpm install`.
 Splitting them across parallel jobs would pay that setup again per job to
 parallelise gates that mostly take seconds.
 
-`make lint` and `make check-code` are what the pre-push hook and the CI
+`make check-lint` and `make check-code` are what the pre-push hook and the CI
 `checks` job cover between them. The CI mapping table is in [ci.md](ci.md).
 
 ## What `make check-docs` checks
@@ -266,7 +266,7 @@ so an ignore added to get a PR green is an ignore that was never needed.
 
 CodeQL runs two ways from one config file, `.github/codeql/codeql-config.yml`:
 `.github/workflows/ci-codeql.yml` hands that path to
-`github/codeql-action/init`, and `make codeql` parses the suite, the packs and
+`github/codeql-action/init`, and `make check-codeql` parses the suite, the packs and
 the `paths-ignore` list out of the same file. One file, so a local "clean" and a
 CI "clean" mean the same thing.
 
@@ -276,7 +276,7 @@ on a settings page. It is **informational**: leave `codeql` out of the required
 checks, because a pack download that times out must not be able to block a
 merge. Alerts land under Security → Code scanning.
 
-`make codeql` needs a CodeQL CLI, which nothing else here does and `make check`
+`make check-codeql` needs a CodeQL CLI, which nothing else here does and `make check`
 therefore does not run it. Either route works:
 
 ```
@@ -318,7 +318,7 @@ firing elsewhere still reports.
 
 ## knip runs in default mode
 
-`make knip` runs `knip`, not `knip --strict`. Production mode resolves only the
+`make check-knip` runs `knip`, not `knip --strict`. Production mode resolves only the
 production graph, which means it flags exports used solely by tests as unused
 unless every test file is marked with `!` patterns. That trade is not worth it
 here. Default mode still catches unused files, unused exports and unused

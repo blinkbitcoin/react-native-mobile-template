@@ -23,13 +23,13 @@ serves both the local server and MSW.
 - `codegen.ts` → `src/graphql/generated/` (never edited, drift-checked by
   `make check-gen`), `fragmentMasking: false`, `useTypeImports: true`.
 - `mocks/` — `schema.graphql` + `resolvers.ts` → `executable-schema.ts`, served
-  by graphql-yoga (`make mock-api`, Maestro) and `msw.ts` (Jest, Playwright).
+  by graphql-yoga (`make dev-api`, Maestro) and `msw.ts` (Jest, Playwright).
 
 ## Consequences
 
 One schema means the mock cannot drift from what tests assert, and a typed
 document with plain `useQuery` keeps the client visible. Contributors must run
-`make codegen` after touching a `.graphql` file and reviewers see a generated
+`make gen-graphql` after touching a `.graphql` file and reviewers see a generated
 diff. Cache persistence is a snapshot, not a normalized offline store.
 
 ## Alternatives

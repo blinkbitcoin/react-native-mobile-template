@@ -12,7 +12,7 @@ pnpm codegen >/dev/null
 # assertion in the reusable workflow's fallback, which CI used to run instead.
 dirty="$(git status --porcelain -- "${paths[@]}")"
 if [ -n "$dirty" ]; then
-  echo "GraphQL generated code is out of date. Run: make codegen" >&2
+  echo "GraphQL generated code is out of date. Run: make gen-graphql" >&2
   printf '%s\n' "$dirty" >&2
   exit 1
 fi

@@ -31,7 +31,7 @@ design sketch assumed: `eslint-config-expo@^57` and its plugins peer on v9.
 
 Adding a rule means picking its owner and checking the other tool for a twin;
 the overlap list needs revisiting on every `eslint-config-expo` bump, and two
-tools still run in `make lint`. In exchange each diagnostic appears once.
+tools still run in `make check-lint`. In exchange each diagnostic appears once.
 
 ## Alternatives
 

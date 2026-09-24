@@ -20,7 +20,7 @@ has not been told to trust.
 | ruby | 3.3 | fastlane and CocoaPods |
 | actionlint | 1.7.12 | `make check-ci` |
 | shellcheck | 0.11.0 | `make check-ci` |
-| typos | 1.50.1 | `make spell` |
+| typos | 1.50.1 | `make check-spell` |
 | zizmor | 1.30.1 | `make check-ci` |
 | gitleaks | 8.30.1 | `make check-secrets`, the pre-commit hook |
 
@@ -52,13 +52,13 @@ anyone why a build fails.
 ```sh
 make install      # pnpm deps, Ruby gems (vendor/bundle) and the git hooks
 make ports        # what every port will be (see "Ports" below)
-make mock-api     # terminal 1: the GraphQL mock API
-make start        # terminal 2: Metro for the dev client
-make ios          # terminal 3: prebuild if needed, build, launch the simulator
-make android      # or the Android emulator
+make dev-api      # terminal 1: the GraphQL mock API
+make dev          # terminal 2: Metro for the dev client
+make dev-ios      # terminal 3: prebuild if needed, build, launch the simulator
+make dev-android  # or the Android emulator
 ```
 
-`make web` starts the Expo web dev server instead, and `make build-web`
+`make dev-web` starts the Expo web dev server instead, and `make build-web`
 produces the static export in `dist/`.
 
 Environment defaults come from `.env.development` (committed, all public
@@ -66,7 +66,7 @@ values). `.env.example` is the documented list of every variable, public and
 build-time. Only `EXPO_PUBLIC_*` reaches app code; see
 [architecture.md](architecture.md).
 
-The first `make ios` or `make android` runs a prebuild and, on iOS, a pod
+The first `make dev-ios` or `make dev-android` runs a prebuild and, on iOS, a pod
 install, so it takes a while. Later runs are incremental.
 
 ## Ports
@@ -78,8 +78,8 @@ the first by moving a single variable:
 | Variable | Default | Offset | What listens |
 | --- | --- | --- | --- |
 | `APP_PORT_BASE` | `8080` | — | the base every other port derives from |
-| `METRO_PORT` | `8081` | +1 | Metro / the Expo dev server (`make start`) |
-| `MOCK_API_PORT` | `8082` | +2 | the graphql-yoga mock API (`make mock-api`) |
+| `METRO_PORT` | `8081` | +1 | Metro / the Expo dev server (`make dev`) |
+| `MOCK_API_PORT` | `8082` | +2 | the graphql-yoga mock API (`make dev-api`) |
 | `WEB_PREVIEW_PORT` | `8083` | +3 | `expo serve dist`, the Playwright preview server (web target) |
 
 Metro's offset is `+1` on purpose: `8081` is Expo's own default and the port the
@@ -94,7 +94,7 @@ three *outputs*. Keeping one producer is not tidiness: a mirrored
 deliberate override, and `APP_PORT_BASE=8090` would then quietly do nothing.
 
 So the three service variables are normally unset, and setting one by hand
-(`MOCK_API_PORT=4444 make mock-api`) means exactly what it says — override this
+(`MOCK_API_PORT=4444 make dev-api`) means exactly what it says — override this
 one service, leave the rest on the base. Run `make ports` to see what any
 combination resolves to.
 
@@ -103,9 +103,9 @@ To run a second worktree alongside this one:
 ```sh
 git worktree add ../rnmt-feature -b feature origin/main
 cd ../rnmt-feature && mise trust
-APP_PORT_BASE=8090 make ports      # 8091 / 8092 / 8093
-APP_PORT_BASE=8090 make mock-api   # 8092
-APP_PORT_BASE=8090 make start      # 8091
+APP_PORT_BASE=8090 make ports     # 8091 / 8092 / 8093
+APP_PORT_BASE=8090 make dev-api   # 8092
+APP_PORT_BASE=8090 make dev       # 8091
 ```
 
 `EXPO_PUBLIC_API_URL` is the one value that is *not* exported by mise either:
@@ -119,7 +119,7 @@ it to `ALLOWED` there with a reason.
 
 ## The dev client and the deep link
 
-This app uses `expo-dev-client`, not Expo Go. `make start` runs
+This app uses `expo-dev-client`, not Expo Go. `make dev` runs
 `expo start --dev-client`.
 
 The dev client's launcher screen discovers Metro over Bonjour, and Bonjour does
@@ -211,13 +211,13 @@ commits already passed the hook once.
 | --- | --- |
 | Metro serves stale JS, or a module resolves oddly | `pnpm start --clear`, or `make clean` for the caches and generated projects |
 | `Watchman` errors, or file changes are not picked up | `watchman watch-del-all`, then restart Metro. `make doctor` checks watchman is installed |
-| iOS build fails on a pod that was just added | `make prebuild`, which reruns pod install, or delete `ios/` and let `make ios` regenerate it |
+| iOS build fails on a pod that was just added | `make prebuild`, which reruns pod install, or delete `ios/` and let `make dev-ios` regenerate it |
 | `make check-deps` warns about Expo SDK drift | `pnpm expo install --check` is the fix path, once `minimumReleaseAge` lets the patch in. The drift is a warning,<br>not a failure: `scripts/check-deps.sh` says why. Genuine exceptions go in `expo.install.exclude` in `package.json` |
 | A `pnpm install` fails on a package that is too new | `minimumReleaseAge` in `pnpm-workspace.yaml` is 1 day.<br>Wait, or add an exact `name@version` entry to `minimumReleaseAgeExclude` with a comment saying why |
-| `Cannot find native module 'HelloNative'` | You are on web or in Expo Go. Build a dev client: `make ios` or `make android` |
+| `Cannot find native module 'HelloNative'` | You are on web or in Expo Go. Build a dev client: `make dev-ios` or `make dev-android` |
 | The app cannot reach the API on Android | The emulator needs `10.0.2.2`. See above |
 | The dev client sits on its launcher screen | Open the `expo-development-client` deep link. See above |
-| Type errors in `src/graphql/generated/` | Do not edit it. Run `make codegen`.<br>It imports `@graphql-typed-document-node/core`, which is why that package is a direct dependency |
+| Type errors in `src/graphql/generated/` | Do not edit it. Run `make gen-graphql`.<br>It imports `@graphql-typed-document-node/core`, which is why that package is a direct dependency |
 | A release Android build dies in `createBundleReleaseJsAndAssets` with "Cannot find module 'babel-preset-expo'" | `publicHoistPattern` in `pnpm-workspace.yaml` exists for this. Do not remove that entry. See [quality.md](quality.md) |
 | `make check-release` says to run `bundle install` | You skipped the Ruby half of `make install` (`NO_BUNDLE=1`, or an older clone).<br>Re-run `make install`. Ruby gems are not committed |
 

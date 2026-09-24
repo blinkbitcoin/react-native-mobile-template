@@ -5,7 +5,7 @@
 `resolvers.ts` implements. Change the schema here and every consumer — generated types, the local
 server, and the tests — moves with it in one step.
 
-There are two ways to run that schema. `pnpm mock-api` (or `make mock-api`) starts a
+There are two ways to run that schema. `pnpm mock-api` (or `make dev-api`) starts a
 [graphql-yoga](https://the-guild.dev/graphql/yoga-server) server on `$MOCK_API_PORT`
 (`APP_PORT_BASE` + 2; `make ports` prints it, `docs/local-dev.md` explains it), which is what
 simulators and devices point at through `EXPO_PUBLIC_API_URL`. Jest (and Playwright,
@@ -16,6 +16,6 @@ Node-only — `executable-schema.ts` reads the SDL with `node:fs` — so nothing
 them, or `node:fs` would end up in the React Native bundle.
 
 To move to a real API: point the `schema` field in `codegen.ts` at the live endpoint (or at a
-downloaded SDL file) and regenerate with `make codegen`. Keep `mocks/` around for tests — resolvers
+downloaded SDL file) and regenerate with `make gen-graphql`. Keep `mocks/` around for tests — resolvers
 that mirror your production schema give Jest a fast, deterministic, network-free backend, and the
 `pnpm mock-api` server stays useful for offline UI work.

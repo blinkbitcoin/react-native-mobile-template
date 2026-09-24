@@ -111,8 +111,8 @@ The web target is opt-in. Answering "no" deletes the files listed in
 `docs/web-files.txt` (`assets/favicon.png`, `e2e/web/`, `playwright.config.ts`,
 `src/app/+html.tsx`, `src/features/settings/NativeDemoCard.web.tsx`) plus
 `scripts/e2e/web.sh`, `.github/workflows/ci-web.yml` and the web ADR; drops the
-`web`, `build:web` and `test:e2e:web` package scripts, the `web`, `build-web`
-and `e2e-web` make targets, the `react-dom`, `react-native-web`,
+`web`, `build:web` and `test:e2e:web` package scripts, the `dev-web`,
+`build-web` and `test-e2e-web` make targets, the `react-dom`, `react-native-web`,
 `@expo/metro-runtime` and `@playwright/test` dependencies, the commitlint `web`
 scope — from `commitlint.config.mjs` and from the four places the enum is
 spelled out for readers (`AGENTS.md`, `CONTRIBUTING.md`, `docs/quality.md`,
@@ -123,7 +123,7 @@ and `.github/workflows/cd-production.yml`, the web rows from the docs, the
 the bug-report issue template, and the web-variant case from
 `src/features/settings/NativeDemoCard.test.tsx`.
 
-Answering "yes" keeps all of it, and `make e2e-web` keeps working.
+Answering "yes" keeps all of it, and `make test-e2e-web` keeps working.
 
 ## 4. What to do next
 

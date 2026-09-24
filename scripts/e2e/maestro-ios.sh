@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Local iOS E2E: assumes `make ios` already installed the dev build on a booted
-# simulator and Metro is running (make start). CI uses shared-workflows.
+# Local iOS E2E: assumes `make dev-ios` already installed the dev build on a booted
+# simulator and Metro is running (make dev). CI uses shared-workflows.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 # Assigns METRO_PORT, MOCK_API_PORT and the rest from APP_PORT_BASE

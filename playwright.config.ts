@@ -2,13 +2,13 @@
 // `pnpm test:e2e:web` exports the site first (`expo export --platform web
 // --dev`); the `--dev` flag makes Expo read `.env.development`, so the bundle
 // talks to the mock API that the first web server below starts. Both ports come
-// from `scripts/ports.mjs`, so `APP_PORT_BASE=8090 make e2e-web` moves the whole
+// from `scripts/ports.mjs`, so `APP_PORT_BASE=8090 make test-e2e-web` moves the whole
 // suite out of the way of another worktree.
 import { defineConfig } from '@playwright/test';
 
 // The ports still come from `scripts/ports.mjs` — the shell evaluates it and
 // exports them (`scripts/e2e/web.sh`, and the `PORTS` macro behind
-// `make e2e-web`), and this file reads what it exported.
+// `make test-e2e-web`), and this file reads what it exported.
 //
 // It does not import the module, and cannot: Playwright loads a `.ts` config
 // through `require()`, this package.json has no `"type": "module"`, and
@@ -20,7 +20,7 @@ import { defineConfig } from '@playwright/test';
 function required(name: string, value: string | undefined): string {
   if (!value) {
     throw new Error(
-      `${name} is not set. Run the web suite through 'make e2e-web' or ` +
+      `${name} is not set. Run the web suite through 'make test-e2e-web' or ` +
         `scripts/e2e/web.sh, which export the ports from scripts/ports.mjs.`,
     );
   }

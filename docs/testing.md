@@ -6,18 +6,18 @@ Five runners, each with a job. Nothing here needs a network.
 
 | Layer | Runner | Lives in | Run with |
 | --- | --- | --- | --- |
-| Unit (pure TS) | Jest, `app` project (jest-expo) | `src/**/*.test.ts` | `make unit` |
-| Component | Jest, RNTL 14 | `src/**/*.test.tsx` | `make unit` |
-| Router | Jest, `renderRouter` from `expo-router/testing-library` | `src/routes.test.tsx`,<br>`src/features/**` | `make unit` |
-| Apollo with a real schema | Jest, MSW over the `mocks/` executable schema | anything that renders a query | `make unit` |
-| Native module wrapper | Jest, the manual mock in `modules/hello-native/src/__mocks__/` | `modules/hello-native/__tests__/` | `make unit` |
-| Config plugins | Jest, `plugins` project (plain node) | `plugins/*.test.ts` | `make unit` |
+| Unit (pure TS) | Jest, `app` project (jest-expo) | `src/**/*.test.ts` | `make test-unit` |
+| Component | Jest, RNTL 14 | `src/**/*.test.tsx` | `make test-unit` |
+| Router | Jest, `renderRouter` from `expo-router/testing-library` | `src/routes.test.tsx`,<br>`src/features/**` | `make test-unit` |
+| Apollo with a real schema | Jest, MSW over the `mocks/` executable schema | anything that renders a query | `make test-unit` |
+| Native module wrapper | Jest, the manual mock in `modules/hello-native/src/__mocks__/` | `modules/hello-native/__tests__/` | `make test-unit` |
+| Config plugins | Jest, `plugins` project (plain node) | `plugins/*.test.ts` | `make test-unit` |
 | Node scripts | `node:test` | `scripts/**/*.test.mjs` | `make test-scripts` |
 | Fastlane lanes | minitest | `fastlane/test/lanes_test.rb` | `make check-release` |
-| E2E, native | Maestro | `.maestro/flows/` | `make e2e-ios`, `make e2e-android` |
-| E2E, web | Playwright | `e2e/web/` | `make e2e-web` |
+| E2E, native | Maestro | `.maestro/flows/` | `make test-e2e-ios`, `make test-e2e-android` |
+| E2E, web | Playwright | `e2e/web/` | `make test-e2e-web` |
 
-`make test` is `make unit` plus `make check-code`. `make coverage` is what CI
+`make test` is `make test-unit` plus `make check-code`. `make test-coverage` is what CI
 enforces.
 
 ### The two Jest projects
@@ -69,7 +69,7 @@ wanted never starts. Run `make ci` before pushing anything that touches
 
 ## Coverage
 
-`make coverage` enforces **100% of lines, branches, functions and statements**,
+`make test-coverage` enforces **100% of lines, branches, functions and statements**,
 globally. There are no per-zone thresholds: with the global bar at 100% they
 would all be redundant.
 
@@ -147,7 +147,7 @@ A re-export barrel or a type-only module has zero statements. istanbul prints
 it as 0% in every column while the totals stay at 100%, so it is a silent way
 to add an untested file without moving the number.
 
-`test:coverage` runs `scripts/check-coverage-empty.mjs` after Jest, so `make coverage` and
+`test:coverage` runs `scripts/check-coverage-empty.mjs` after Jest, so `make test-coverage` and
 CI's Unit job both make the check. It reads
 `coverage/coverage-summary.json` — which is why `json-summary` is in
 `coverageReporters` — and fails naming any file with `statements.total === 0`.
@@ -272,7 +272,7 @@ The native module wrapper is tested against its manual mock
 (`jest.mock('../src/HelloNativeModule')`), which covers the happy path, and
 against a factory that throws, which covers the "native module absent" path.
 Both matter: the wrapper's contract is that a missing module produces a
-`HelloNativeError` naming `make ios` / `make android`, synchronously from
+`HelloNativeError` naming `make dev-ios` / `make dev-android`, synchronously from
 `hello()` and as a rejection from `getBuildStamp()`.
 
 Config plugin tests call the plugin, pull the registered mod off
@@ -286,10 +286,10 @@ and that running the mod twice is idempotent. See
 Local runs assume the app is already installed and Metro is running:
 
 ```sh
-make mock-api    # terminal 1
-make start       # terminal 2
-make ios         # terminal 3, then
-make e2e-ios     # or make e2e-android
+make dev-api       # terminal 1
+make dev           # terminal 2
+make dev-ios       # terminal 3, then
+make test-e2e-ios  # or make test-e2e-android
 ```
 
 `scripts/e2e/maestro-ios.sh` and `scripts/e2e/maestro-android.sh` wait for the
@@ -342,7 +342,7 @@ And the iOS suite no longer covers the Metro dev path; Android still does.
 
 ## Playwright
 
-`make e2e-web` runs `scripts/e2e/web.sh`, which exports the site with
+`make test-e2e-web` runs `scripts/e2e/web.sh`, which exports the site with
 `pnpm build:web` (a production export, the flavour that deploys) and then runs
 the suite in `e2e/web/`.
 `playwright.config.ts` starts two web servers for it: the mock API and
