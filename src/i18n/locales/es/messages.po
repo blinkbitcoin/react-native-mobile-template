@@ -13,16 +13,16 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#: src/features/settings/DevMenu.tsx:81
+#: src/features/settings/DevMenu.tsx:94
 msgid "Channel"
 msgstr "Canal"
 
-#: src/features/settings/DevMenu.tsx:59
+#: src/features/settings/DevMenu.tsx:61
 msgid "Dark"
 msgstr "Oscuro"
 
 #: src/app/_layout.tsx:24
-#: src/features/details/DetailsScreen.tsx:9
+#: src/features/details/DetailsScreen.tsx:10
 msgid "Details"
 msgstr "Detalles"
 
@@ -36,11 +36,15 @@ msgstr "Ir al inicio"
 msgid "Home"
 msgstr "Inicio"
 
-#: src/features/settings/DevMenu.tsx:71
+#: src/features/details/DetailsScreen.tsx:14
+msgid "Identifier"
+msgstr "Identificador"
+
+#: src/features/settings/DevMenu.tsx:74
 msgid "Language"
 msgstr "Idioma"
 
-#: src/features/settings/DevMenu.tsx:54
+#: src/features/settings/DevMenu.tsx:55
 msgid "Light"
 msgstr "Claro"
 
@@ -60,7 +64,7 @@ msgstr "Ajustes"
 msgid "Something went wrong"
 msgstr "Algo salió mal"
 
-#: src/features/settings/DevMenu.tsx:64
+#: src/features/settings/DevMenu.tsx:67
 msgid "System"
 msgstr "Sistema"
 
@@ -72,7 +76,7 @@ msgstr "Toca siete veces para mostrar el menú de desarrollo"
 msgid "Theme"
 msgstr "Tema"
 
-#: src/features/settings/DevMenu.tsx:124
+#: src/features/settings/DevMenu.tsx:143
 msgid "Trigger error"
 msgstr "Provocar error"
 

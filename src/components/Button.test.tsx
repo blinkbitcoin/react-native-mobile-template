@@ -1,5 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { type StyleProp, StyleSheet, type ViewStyle } from 'react-native';
+import { renderWithProviders } from '@/test/render';
+import { buildTheme } from '../theme/tokens';
 import { Button } from './Button';
 
 // Pressable feeds `pressed` from Pressability, which listens on the responder
@@ -55,4 +57,27 @@ test('dims itself while it is being pressed', async () => {
   });
 
   expect(opacityOf('go')).toBe(0.6);
+});
+
+const styleOf = (testID: string) =>
+  StyleSheet.flatten(screen.getByTestId(testID).props.style as StyleProp<ViewStyle>);
+
+test('is filled by default and outlined as a secondary action', async () => {
+  await renderWithProviders(
+    <>
+      <Button title="Main" testID="main" onPress={jest.fn()} />
+      <Button title="Other" testID="other" variant="secondary" onPress={jest.fn()} />
+    </>,
+  );
+  const { colors } = buildTheme('light');
+
+  // Filled: the button is ink-coloured and its label is the inverse.
+  expect(styleOf('main')).toMatchObject({ backgroundColor: colors.primary });
+  expect(StyleSheet.flatten(screen.getByText('Main').props.style).color).toBe(colors.onPrimary);
+  // Outlined: page-coloured with a hairline-grey border and ink text.
+  expect(styleOf('other')).toMatchObject({
+    backgroundColor: colors.background,
+    borderColor: colors.border,
+  });
+  expect(StyleSheet.flatten(screen.getByText('Other').props.style).color).toBe(colors.text);
 });

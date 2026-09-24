@@ -310,7 +310,8 @@ mock API, open the `expo-development-client` deep link (see
 3. Drive the UI by `testID`, never by copy: the app is localized, and an
    assertion on English text breaks the moment the locale changes. The existing
    ids follow `screen-element`, for example `tab-home`, `tab-settings`
-   (both set with `tabBarButtonTestID`), `home-title`,
+   (both set with `tabBarButtonTestID`), `tab-home-icon`, `tab-settings-icon`
+   (the tab bar icons, hidden from accessibility), `home-title`,
    `home-open-details`, `details-id`, `settings-theme-dark`,
    `settings-trigger-error`, `native-hello`, `native-build-stamp`,
    `error-retry`.

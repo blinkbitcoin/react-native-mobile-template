@@ -13,16 +13,16 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#: src/features/settings/DevMenu.tsx:81
+#: src/features/settings/DevMenu.tsx:94
 msgid "Channel"
 msgstr "Channel"
 
-#: src/features/settings/DevMenu.tsx:59
+#: src/features/settings/DevMenu.tsx:61
 msgid "Dark"
 msgstr "Dark"
 
 #: src/app/_layout.tsx:24
-#: src/features/details/DetailsScreen.tsx:9
+#: src/features/details/DetailsScreen.tsx:10
 msgid "Details"
 msgstr "Details"
 
@@ -36,11 +36,15 @@ msgstr "Go home"
 msgid "Home"
 msgstr "Home"
 
-#: src/features/settings/DevMenu.tsx:71
+#: src/features/details/DetailsScreen.tsx:14
+msgid "Identifier"
+msgstr "Identifier"
+
+#: src/features/settings/DevMenu.tsx:74
 msgid "Language"
 msgstr "Language"
 
-#: src/features/settings/DevMenu.tsx:54
+#: src/features/settings/DevMenu.tsx:55
 msgid "Light"
 msgstr "Light"
 
@@ -60,7 +64,7 @@ msgstr "Settings"
 msgid "Something went wrong"
 msgstr "Something went wrong"
 
-#: src/features/settings/DevMenu.tsx:64
+#: src/features/settings/DevMenu.tsx:67
 msgid "System"
 msgstr "System"
 
@@ -72,7 +76,7 @@ msgstr "Tap seven times to reveal the developer menu"
 msgid "Theme"
 msgstr "Theme"
 
-#: src/features/settings/DevMenu.tsx:124
+#: src/features/settings/DevMenu.tsx:143
 msgid "Trigger error"
 msgstr "Trigger error"
 

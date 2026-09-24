@@ -1,6 +1,6 @@
 import { Trans, useLingui } from '@lingui/react/macro';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { constants } from '@/config/constants';
@@ -46,52 +46,68 @@ export function DevMenu() {
         {`${constants.version} (${constants.buildNumber})`}
       </AppText>
 
-      <AppText variant="caption">
+      <AppText variant="caption" style={styles.section}>
         <Trans>Theme</Trans>
       </AppText>
       <View style={styles.row}>
         <Button
+          variant="secondary"
           title={t`Light`}
           testID="settings-theme-light"
           onPress={() => setPreference('light')}
         />
         <Button
+          variant="secondary"
           title={t`Dark`}
           testID="settings-theme-dark"
           onPress={() => setPreference('dark')}
         />
         <Button
+          variant="secondary"
           title={t`System`}
           testID="settings-theme-system"
           onPress={() => setPreference('system')}
         />
       </View>
 
-      <AppText variant="caption">
+      <AppText variant="caption" style={styles.section}>
         <Trans>Language</Trans>
       </AppText>
       <View style={styles.row}>
-        <Button title="English" testID="settings-lang-en" onPress={() => activateLocale('en')} />
-        <Button title="Español" testID="settings-lang-es" onPress={() => activateLocale('es')} />
+        <Button
+          variant="secondary"
+          title="English"
+          testID="settings-lang-en"
+          onPress={() => activateLocale('en')}
+        />
+        <Button
+          variant="secondary"
+          title="Español"
+          testID="settings-lang-es"
+          onPress={() => activateLocale('es')}
+        />
       </View>
 
       {constants.otaEnabled ? (
         <>
-          <AppText variant="caption">
+          <AppText variant="caption" style={styles.section}>
             <Trans>Channel</Trans>
           </AppText>
           <View style={styles.row}>
             <Button
+              variant="secondary"
               title="internal"
               testID="settings-channel-internal"
               onPress={() => switchChannel('internal')}
             />
             <Button
+              variant="secondary"
               title="beta"
               testID="settings-channel-beta"
               onPress={() => switchChannel('beta')}
             />
             <Button
+              variant="secondary"
               title="production"
               testID="settings-channel-production"
               onPress={() => switchChannel('production')}
@@ -109,11 +125,13 @@ export function DevMenu() {
       </AppText>
       <View style={styles.row}>
         <Button
+          variant="secondary"
           title="Sign in"
           testID="settings-auth-sign-in"
           onPress={() => run('sign-in', signIn)}
         />
         <Button
+          variant="secondary"
           title="Sign out"
           testID="settings-auth-sign-out"
           onPress={() => run('sign-out', signOut)}
@@ -121,6 +139,7 @@ export function DevMenu() {
       </View>
 
       <Button
+        variant="secondary"
         title={t`Trigger error`}
         testID="settings-trigger-error"
         onPress={() => setBoom(true)}
@@ -131,13 +150,20 @@ export function DevMenu() {
 
 const useStyles = createStyles((theme) => ({
   container: {
-    marginTop: theme.spacing.md,
+    marginTop: theme.spacing.sm,
     padding: theme.spacing.md,
     gap: theme.spacing.sm,
-    borderRadius: theme.radii.md,
-    borderWidth: 1,
+    borderRadius: theme.radii.lg,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
+  },
+  // Section headings inside the menu: small caps-style labels above each row.
+  section: {
+    marginTop: theme.spacing.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    fontWeight: '600',
   },
   row: { flexDirection: 'row', gap: theme.spacing.sm, flexWrap: 'wrap' },
 }));
