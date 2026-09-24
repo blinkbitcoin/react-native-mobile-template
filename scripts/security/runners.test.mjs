@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
@@ -140,5 +148,16 @@ test('the aggregate runs the enabled jobs and reports a verdict', () => {
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /security: (pass|informational)/);
     assert.match(result.stdout, /deps: skipped/);
+  });
+});
+
+test('the master switch skips every scanner without running one', () => {
+  withDir((dir) => {
+    const result = run('local.sh', { env: { SECURITY_DIR: dir, SECURITY_ENABLED: 'false' } });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /disabled/);
+    // No scanner ran, so no job wrote a SARIF and the verdict never printed.
+    assert.deepEqual(readdirSync(dir), []);
+    assert.doesNotMatch(result.stdout, /security: (pass|fail|informational)/);
   });
 });

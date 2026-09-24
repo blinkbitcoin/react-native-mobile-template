@@ -28,8 +28,10 @@ flakes gets disabled or teaches people to merge past red.
   `make check-security` runs it.
 
 Tunables live in `security-policy.json`, one file in the repository, with an
-environment variable able to override any of them. Everything runs locally
-through `make check-security*`, so CI and a laptop execute the same scripts.
+environment variable able to override any of them. `make check-security*` is
+what a laptop runs today and what a reusable workflow will call once it
+lands, so the two are designed to give the same answer - CI does not call it
+yet (Consequences).
 
 Jev is excluded: a closed, waitlisted decision model whose own documentation
 says adversarial input moves its verdicts, offering no detection an LLM
@@ -38,9 +40,16 @@ reviewer or gitleaks lacks.
 ## Consequences
 
 A first run produces a baseline of findings; each gets a reasoned ignore in
-its scanner's own config, never a threshold change. Scanners are external
-CLIs, so `make check-security` is minutes and stays out of `make check` and
-`make ci`, like `check-codeql`. A repository that finds it overkill sets
+its scanner's own config, never a threshold change. That baseline is not
+hypothetical: as of this record, `make check-security` fails on this
+repository - osv-scanner reports `uuid@7.0.3` (CVE-2026-41907, CVSS 7.5,
+high), and it is deliberately left unresolved pending the repository owner's
+choice between accepting the risk and adding a reasoned ignore to
+`osv-scanner.toml` (`docs/security.md`, "Suppressing a finding, correctly").
+Scanners are external CLIs, so `make check-security` is minutes and stays out
+of `make check` and `make ci`, like `check-codeql`; unlike `check-codeql` it
+also has no CI caller yet at all, on any workflow - wiring it in is a later,
+separate stage. A repository that finds the whole feature overkill sets
 `SECURITY_ENABLED=false`.
 
 ## Alternatives

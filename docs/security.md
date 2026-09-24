@@ -1,20 +1,29 @@
 # Security scanning
 
-`make check-security` runs every enabled scanner and prints one verdict. CI
-runs the same scripts, so the answer is the same in both places.
+`make check-security` runs every enabled scanner and prints one verdict.
+**Nothing in `.github/workflows/` calls it today.** `ci.yml` calls
+`check-code`, `check-unit` and `check-e2e`; the only security-flavoured
+workflow that exists is the pre-existing, unrelated `ci-codeql.yml`. The
+reusable `check-security.yml` workflow and its call sites in this repository
+are a later, separate stage that cannot land until `v0` in shared-workflows
+carries the file. Until that stage merges, these three scanners run **only**
+when a human or an agent types `make check-security*` on a laptop; `main`
+and every pull request are not yet protected by them.
 
 ## What runs, and where
 
-| Scanner | Make target | Reads | Runs in CI |
+| Scanner | Make target | Reads | Runs |
 | --- | --- | --- | --- |
-| osv-scanner | `check-security-deps` | `pnpm-lock.yaml` | every pull request |
-| Semgrep CE | `check-security-code` | app source, `rules/` | every pull request |
-| pnpm policy | `check-security-policy` | `pnpm-workspace.yaml` | every pull request |
+| osv-scanner | `check-security-deps` | `pnpm-lock.yaml` | local only (`make check-security-deps`) |
+| Semgrep CE | `check-security-code` | app source, `rules/` | local only (`make check-security-code`) |
+| pnpm policy | `check-security-policy` | `pnpm-workspace.yaml` | local only (`make check-security-policy`) |
 
-gitleaks and zizmor are security gates too, but they are fast and binary, so
-they stay in `make check` as `check-secrets` and `check-ci`. The line is:
-`check` owns reproducible pass/fail gates, `check-security*` owns the
-SARIF-producing scanners that cost minutes.
+gitleaks and zizmor are security gates too, and unlike the three above they
+already run in CI, inside `make check` as `check-secrets` and `check-ci` -
+they are fast and binary, so putting them there cost nothing. The line for
+the rest is: `check` owns reproducible pass/fail gates that already run in
+CI, `check-security*` owns the SARIF-producing scanners that cost minutes and
+are, for now, local-only.
 
 ## Turning things off
 
@@ -36,8 +45,10 @@ off, so a typo cannot silently disable a scanner.
 A scanner with nothing to scan - no tool installed, no binary, no key - writes
 a SARIF whose run says `executionSuccessful: false` and carries the reason.
 The verdict prints `skipped: <reason>` for it and never counts it as clean.
-Locally a missing tool is a skip; under CI it is a failure, because a
-pipeline that quietly scans nothing is worse than one that is red.
+This is designed so that, once a pipeline calls these scripts, a missing
+tool is a skip on a laptop but a failure under `CI=true`, because a pipeline
+that quietly scans nothing is worse than one that is red. No workflow
+exercises that `CI=true` path today - see the note at the top of this file.
 
 ## Suppressing a finding, correctly
 
@@ -68,6 +79,20 @@ a word boundary between the credential word and the rest of the name, so
 `authToken` and `auth_token` match but `authtoken` does not. Both are
 precision trade-offs against false positives on ordinary React Native code,
 not coverage gaps to be closed by loosening the pattern.
+
+**`rules/` needs its own exclusion in every tool that discovers files by a
+generic convention.** `rules/react-native-secrets.test.tsx` is deliberately
+uninstantiable snippet code in Semgrep's own `<rule-id>.test.tsx` fixture
+convention, scanned by `semgrep --test rules/`, never meant to run as
+anything else. Four tools currently exclude `rules/` for that reason, each
+with a one-line comment: `tsconfig.json`'s `exclude`, `biome.json`'s
+`files.includes` (`!**/rules`), `eslint.config.mjs`'s `globalIgnores`, and
+`jest.config.ts`'s `testPathIgnorePatterns`. Colocating a rule with its
+fixture is the Semgrep convention worth keeping, so moving `rules/` out from
+under the app source tree would relocate this problem rather than remove it.
+A fifth tool added later that walks the repository by a similar convention
+will likely need the same one-line treatment - check for it before assuming
+a new fixture file "just works".
 
 ## The current baseline
 
