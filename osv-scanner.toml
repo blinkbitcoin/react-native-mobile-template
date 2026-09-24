@@ -1,0 +1,12 @@
+# Reasoned ignores for osv-scanner. One entry per advisory: what it is, why it
+# cannot be reached from this app, and what should make us look again. An entry
+# with no reason is not mergeable (docs/quality.md, "Suppressing something,
+# correctly"). These mirror auditConfig.ignoreGhsas in pnpm-workspace.yaml.
+
+[[IgnoredVulns]]
+id = "GHSA-w3rx-r6r6-pgpr"
+reason = "image-size <=2.0.2 ICNS infinite loop. Reached only by metro at bundle time, over assets already in this repo; the app binary does not ship metro. Blocked from patching by minimumReleaseAge and by metro's ^1.0.2 range. Re-evaluate when an Expo SDK bump moves metro off image-size 1.x."
+
+[[IgnoredVulns]]
+id = "GHSA-5p2g-fcmc-qvqq"
+reason = "image-size <=2.0.2 JXL/HEIF infinite loop. Same single caller, same reachability argument and same blockers as GHSA-w3rx-r6r6-pgpr; listed separately so a fix for one cannot keep the other suppressed."

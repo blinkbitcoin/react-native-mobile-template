@@ -186,6 +186,12 @@ check-skills: ## Only the skill tests (offline, fakes only; needs bundle install
 check-secrets: ## Scan the whole git history for committed secrets (gitleaks)
 	gitleaks git --redact --no-banner .
 
+# Security scanners are not in `make check`: external CLIs and minutes, the
+# same reason `check-codeql` is out. Each writes a SARIF into .security/ and
+# never fails on a finding; `check-security` is what applies the threshold.
+check-security-deps: ## Known vulnerabilities and malicious packages in the lockfile (osv-scanner)
+	bash scripts/security/deps.sh
+
 check: check-code check-gen check-deps check-ci check-docs check-release check-secrets ## Every static gate the check-code workflow runs (no tests/builds)
 
 # The two expensive gates are not in `check` and are off by default in CI for
@@ -237,4 +243,4 @@ reset: clean ## clean + reinstall
 help: ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: init doctor install ports dev dev-ios dev-android dev-web dev-api prebuild build-web version verify-ios verify-android release-notes gen-i18n gen-graphql check-types check-lint fix-format fix-lint check-format check-knip check-spell check-gen check-prebuild check-code check-deps check-ci check-docs check-skills check-secrets check-security-bundle check-release check check-slow ci check-codeql test-scripts test-unit test-coverage gen-badges test-e2e-ios test-e2e-android test-e2e-web test clean reset help
+.PHONY: init doctor install ports dev dev-ios dev-android dev-web dev-api prebuild build-web version verify-ios verify-android release-notes gen-i18n gen-graphql check-types check-lint fix-format fix-lint check-format check-knip check-spell check-gen check-prebuild check-code check-deps check-ci check-docs check-skills check-secrets check-security-deps check-security-bundle check-release check check-slow ci check-codeql test-scripts test-unit test-coverage gen-badges test-e2e-ios test-e2e-android test-e2e-web test clean reset help
