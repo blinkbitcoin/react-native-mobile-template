@@ -13,7 +13,6 @@
 // that keeps its artifacts elsewhere.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   BadgeError,
   coverageFrom,
@@ -63,8 +62,11 @@ export function writeCoverageBadge({
   return result;
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
-  const argv = process.argv.slice(2);
+/** Command-line entry; returns the exit code. */
+export function main(
+  argv = process.argv.slice(2),
+  { log = console.log, error = console.error } = {},
+) {
   try {
     const status = parseStatus(argv);
     const { message, detail } = writeCoverageBadge({
@@ -72,10 +74,13 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
       summaryFile: argValue(argv, '--summary', SUMMARY_PATH),
       status,
     });
-    console.log(`coverage-badge: ${message} (${detail})`);
+    log(`coverage-badge: ${message} (${detail})`);
+    return 0;
   } catch (e) {
     if (!(e instanceof BadgeError)) throw e;
-    console.error(e.message);
-    process.exit(1);
+    error(e.message);
+    return 1;
   }
 }
+
+if (import.meta.main) process.exitCode = main();

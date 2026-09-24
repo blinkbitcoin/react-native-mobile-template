@@ -1,10 +1,20 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   DEPENDENCY_KEYS,
   isStructuralManifestChange,
+  main,
+  readAtRef,
+  readWorkingCopy,
   structuralManifests,
 } from './manifest-structural.mjs';
+
+const SCRIPT = fileURLToPath(new URL('./manifest-structural.mjs', import.meta.url));
 
 const base = {
   name: 'app',
@@ -104,4 +114,78 @@ test('structuralManifests keeps only the files whose change is structural', () =
     ),
     ['b/package.json'],
   );
+});
+
+test('readAtRef parses the file git shows at the ref', () => {
+  const calls = [];
+  const exec = (command, args) => {
+    calls.push([command, ...args]);
+    return '{"name":"app"}';
+  };
+  assert.deepEqual(readAtRef('origin/main', 'package.json', exec), { name: 'app' });
+  assert.deepEqual(calls, [['git', 'show', 'origin/main:package.json']]);
+});
+
+test('readAtRef reads a file absent at the ref as undefined', () => {
+  const exec = () => {
+    throw new Error('fatal: path does not exist');
+  };
+  assert.equal(readAtRef('origin/main', 'package.json', exec), undefined);
+});
+
+test('readWorkingCopy parses the file, and a missing or broken one is undefined', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'manifest-structural-'));
+  try {
+    const good = path.join(dir, 'good.json');
+    const broken = path.join(dir, 'broken.json');
+    writeFileSync(good, '{"name":"app"}');
+    writeFileSync(broken, '{');
+    assert.deepEqual(readWorkingCopy(good), { name: 'app' });
+    assert.equal(readWorkingCopy(broken), undefined);
+    assert.equal(readWorkingCopy(path.join(dir, 'absent.json')), undefined);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('main without a base ref prints the usage and exits 2', () => {
+  const errors = [];
+  assert.equal(main([], { error: (line) => errors.push(line) }), 2);
+  assert.deepEqual(errors, ['usage: manifest-structural.mjs <base-ref> <package.json>...']);
+});
+
+test('main prints only the manifests whose change is structural', () => {
+  const printed = [];
+  const at = { 'a/package.json': base, 'b/package.json': base };
+  const now = {
+    'a/package.json': { ...base, version: '2.0.0' },
+    'b/package.json': { ...base, scripts: { test: 'vitest' } },
+  };
+  const seenRefs = [];
+  const code = main(['origin/main', 'a/package.json', 'b/package.json'], {
+    log: (line) => printed.push(line),
+    readAt: (ref, file) => {
+      seenRefs.push(ref);
+      return at[file];
+    },
+    readNow: (file) => now[file],
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(printed, ['b/package.json']);
+  assert.deepEqual(seenRefs, ['origin/main', 'origin/main']);
+});
+
+// The command line, end to end: HEAD against the working copy is offline and
+// fast. The environment is inherited so a coverage run sees the child too.
+test('as a command it compares against the ref through git', () => {
+  const run = (args) =>
+    spawnSync(process.execPath, [SCRIPT, ...args], { encoding: 'utf8', env: process.env });
+  const usage = run([]);
+  assert.equal(usage.status, 2);
+  assert.match(usage.stderr, /usage: manifest-structural\.mjs/);
+
+  const absent = run(['HEAD', 'no/such/package.json']);
+  assert.equal(absent.status, 0, absent.stderr);
+  // Missing on both sides still counts as structural (a missing side always does).
+  assert.equal(absent.stdout, 'no/such/package.json\n');
 });

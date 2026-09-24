@@ -11,8 +11,6 @@
 // prints the paths whose change against <base-ref> is structural.
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 /** Keys whose changes are dependency bookkeeping, never structure. */
 export const DEPENDENCY_KEYS = [
@@ -62,10 +60,10 @@ export function structuralManifests(files, readAt, readNow) {
   return files.filter((file) => isStructuralManifestChange(readAt(file), readNow(file)));
 }
 
-function readAtRef(ref, file) {
+export function readAtRef(ref, file, exec = execFileSync) {
   try {
     return JSON.parse(
-      execFileSync('git', ['show', `${ref}:${file}`], {
+      exec('git', ['show', `${ref}:${file}`], {
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'ignore'], // absent at that ref: no git noise
       }),
@@ -75,7 +73,7 @@ function readAtRef(ref, file) {
   }
 }
 
-function readWorkingCopy(file) {
+export function readWorkingCopy(file) {
   try {
     return JSON.parse(readFileSync(file, 'utf8'));
   } catch {
@@ -83,13 +81,20 @@ function readWorkingCopy(file) {
   }
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
-  const [base, ...files] = process.argv.slice(2);
+/** Command-line entry; returns the exit code. */
+export function main(
+  argv = process.argv.slice(2),
+  { log = console.log, error = console.error, readAt = readAtRef, readNow = readWorkingCopy } = {},
+) {
+  const [base, ...files] = argv;
   if (!base) {
-    console.error('usage: manifest-structural.mjs <base-ref> <package.json>...');
-    process.exit(2);
+    error('usage: manifest-structural.mjs <base-ref> <package.json>...');
+    return 2;
   }
-  for (const file of structuralManifests(files, (f) => readAtRef(base, f), readWorkingCopy)) {
-    console.log(file);
+  for (const file of structuralManifests(files, (f) => readAt(base, f), readNow)) {
+    log(file);
   }
+  return 0;
 }
+
+if (import.meta.main) process.exitCode = main();

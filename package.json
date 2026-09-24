@@ -86,7 +86,7 @@
     "build:web": "bash scripts/build-web.sh",
     "prebuild": "expo prebuild --clean",
     "doctor": "node scripts/doctor.mjs",
-    "test:scripts": "node --test \"scripts/**/*.test.mjs\"",
+    "test:scripts": "node --test --experimental-test-coverage --test-coverage-lines=100 --test-coverage-branches=100 --test-coverage-functions=100 \"scripts/**/*.test.mjs\"",
     "test": "jest",
     "test:coverage": "jest --coverage && pnpm check:coverage-empty",
     "check:coverage-empty": "node scripts/check-coverage-empty.mjs",

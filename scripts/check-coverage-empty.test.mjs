@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -8,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import {
   emptyCoverageFiles,
   formatEmptyFiles,
+  main,
   readSummary,
   summaryFiles,
 } from './check-coverage-empty.mjs';
@@ -84,4 +86,61 @@ test('readSummary reports a malformed report rather than throwing', async (t) =>
   assert.equal(summary, undefined);
   assert.match(error, /is missing or unreadable/);
   assert.match(error, /json-summary/);
+});
+
+/** Captures what `main` writes, instead of letting it reach the test output. */
+const capture = () => {
+  const out = [];
+  const err = [];
+  return { out, err, io: { log: (line) => out.push(line), error: (line) => err.push(line) } };
+};
+
+test('main passes a summary with no empty rows and counts its files', async (t) => {
+  const { out, err, io } = capture();
+  const clean = {
+    total: fixture.total,
+    '/repo/src/lib/storage.ts': fixture['/repo/src/lib/storage.ts'],
+  };
+  const dir = await mkdtemp(path.join(tmpdir(), 'coverage-empty-main-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const file = path.join(dir, 'clean.json');
+  writeFileSync(file, JSON.stringify(clean));
+  assert.equal(main(file, io), 0);
+  assert.deepEqual(out, ['coverage: no empty rows (1 files)']);
+  assert.deepEqual(err, []);
+});
+
+test('main fails with one line per empty file', () => {
+  const { out, err, io } = capture();
+  assert.equal(main(FIXTURE, io), 1);
+  assert.deepEqual(out, []);
+  assert.equal(err.length, 2);
+  assert.match(err[0], /has no statements to cover/);
+});
+
+test('main fails when the summary is missing', () => {
+  const { err, io } = capture();
+  assert.equal(main(path.join(here, 'fixtures/absent.json'), io), 1);
+  assert.match(err[0], /is missing or unreadable/);
+});
+
+test('as a command it reads coverage/coverage-summary.json from the working directory', async (t) => {
+  const cwd = await mkdtemp(path.join(tmpdir(), 'coverage-empty-cwd-'));
+  t.after(() => rm(cwd, { recursive: true, force: true }));
+  const run = () =>
+    spawnSync(process.execPath, [path.join(here, 'check-coverage-empty.mjs')], {
+      cwd,
+      encoding: 'utf8',
+      env: process.env, // keeps NODE_V8_COVERAGE, so the child counts toward coverage
+    });
+
+  const missing = run();
+  assert.equal(missing.status, 1);
+  assert.match(missing.stderr, /coverage\/coverage-summary\.json is missing/);
+
+  mkdirSync(path.join(cwd, 'coverage'));
+  writeFileSync(path.join(cwd, 'coverage/coverage-summary.json'), readFileSync(FIXTURE));
+  const empty = run();
+  assert.equal(empty.status, 1);
+  assert.match(empty.stderr, /has no statements to cover/);
 });

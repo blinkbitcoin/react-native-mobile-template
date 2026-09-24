@@ -15,8 +15,6 @@
 // writes the red placeholder. A skipped Unit — a docs-only change, a cancelled
 // upstream — renders no coverage badge at all, so publishing leaves the
 // branch's existing one untouched instead of blanking it.
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { BadgeError } from './badge.mjs';
 import { BADGE_DIR, SUMMARY_PATH, writeCoverageBadge } from './coverage-badge.mjs';
 import { writeStatusBadge } from './status-badge.mjs';
@@ -59,12 +57,16 @@ export function renderBadges(env = process.env) {
   return written;
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
+/** Command-line entry; returns the exit code. */
+export function main(env = process.env, { error = console.error } = {}) {
   try {
-    renderBadges();
+    renderBadges(env);
+    return 0;
   } catch (e) {
     if (!(e instanceof BadgeError)) throw e;
-    console.error(e.message);
-    process.exit(1);
+    error(e.message);
+    return 1;
   }
 }
+
+if (import.meta.main) process.exitCode = main();

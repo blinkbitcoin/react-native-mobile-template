@@ -20,10 +20,11 @@ export function compareVersions(a, b) {
   return 0;
 }
 
-export function checkTool(tool) {
+/** `run` is injectable, like `checkCommand`'s, so a test controls the output. */
+export function checkTool(tool, run = execSync) {
   let output;
   try {
-    output = execSync(tool.command, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    output = run(tool.command, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   } catch (error) {
     output = error.stdout ?? '';
     if (!output) return { ok: false, reason: 'not found' };
@@ -57,43 +58,58 @@ export function checkCommand(entry, run = execSync) {
   }
 }
 
-function main() {
+/** scripts/doctor.requirements.json, parsed. */
+export function readRequirements() {
   const here = path.dirname(fileURLToPath(import.meta.url));
-  const req = JSON.parse(readFileSync(path.join(here, 'doctor.requirements.json'), 'utf8'));
+  return JSON.parse(readFileSync(path.join(here, 'doctor.requirements.json'), 'utf8'));
+}
+
+/**
+ * Command-line entry; returns the exit code. Everything it touches is
+ * injectable so a test decides what is installed and what is set.
+ */
+export function main({
+  req = readRequirements(),
+  platform = process.platform,
+  env = process.env,
+  run = execSync,
+  write = (text) => process.stdout.write(text),
+} = {}) {
   let failures = 0;
   for (const tool of req.tools) {
-    if (tool.platform && tool.platform !== process.platform) continue;
-    const result = checkTool(tool);
+    if (tool.platform && tool.platform !== platform) continue;
+    const result = checkTool(tool, run);
     if (result.ok) {
-      process.stdout.write(`ok    ${tool.name} ${result.version}\n`);
+      write(`ok    ${tool.name} ${result.version}\n`);
     } else if (tool.optional) {
-      process.stdout.write(`warn  ${tool.name}: ${result.reason}. Fix: ${tool.hint}\n`);
+      write(`warn  ${tool.name}: ${result.reason}. Fix: ${tool.hint}\n`);
     } else {
       failures++;
-      process.stdout.write(`FAIL  ${tool.name}: ${result.reason}. Fix: ${tool.hint}\n`);
+      write(`FAIL  ${tool.name}: ${result.reason}. Fix: ${tool.hint}\n`);
     }
   }
   for (const entry of req.commands ?? []) {
-    const result = checkCommand(entry);
+    const result = checkCommand(entry, run);
     if (result.ok) {
-      process.stdout.write(`ok    ${entry.name}\n`);
+      write(`ok    ${entry.name}\n`);
     } else {
       failures++;
-      process.stdout.write(`FAIL  ${entry.name}: ${result.reason}. Fix: ${entry.hint}\n`);
+      write(`FAIL  ${entry.name}: ${result.reason}. Fix: ${entry.hint}\n`);
     }
   }
   for (const v of req.env) {
-    if (process.env[v.name]) process.stdout.write(`ok    $${v.name}=${process.env[v.name]}\n`);
+    if (env[v.name]) write(`ok    $${v.name}=${env[v.name]}\n`);
     else {
       failures++;
-      process.stdout.write(`FAIL  $${v.name} is not set. Fix: ${v.hint}\n`);
+      write(`FAIL  $${v.name} is not set. Fix: ${v.hint}\n`);
     }
   }
   if (failures > 0) {
-    process.stdout.write(`\n${failures} problem(s). Fix them and re-run: make doctor\n`);
-    process.exit(1);
+    write(`\n${failures} problem(s). Fix them and re-run: make doctor\n`);
+    return 1;
   }
-  process.stdout.write('\nAll good.\n');
+  write('\nAll good.\n');
+  return 0;
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) main();
+if (import.meta.main) process.exitCode = main();

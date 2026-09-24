@@ -7,7 +7,6 @@
 // `make coverage`, after the Jest run) fails when one slips through.
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 export const SUMMARY_PATH = 'coverage/coverage-summary.json';
 
@@ -46,16 +45,23 @@ export function readSummary(file = SUMMARY_PATH) {
   }
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
-  const { summary, error } = readSummary();
-  if (error) {
-    console.error(error);
-    process.exit(1);
+/** Command-line entry; returns the exit code. */
+export function main(
+  summaryFile = SUMMARY_PATH,
+  { log = console.log, error = console.error } = {},
+) {
+  const { summary, error: unreadable } = readSummary(summaryFile);
+  if (unreadable) {
+    error(unreadable);
+    return 1;
   }
   const empty = emptyCoverageFiles(summary);
   if (empty.length > 0) {
-    for (const line of formatEmptyFiles(empty)) console.error(line);
-    process.exit(1);
+    for (const line of formatEmptyFiles(empty)) error(line);
+    return 1;
   }
-  console.log(`coverage: no empty rows (${summaryFiles(summary).length} files)`);
+  log(`coverage: no empty rows (${summaryFiles(summary).length} files)`);
+  return 0;
 }
+
+if (import.meta.main) process.exitCode = main();

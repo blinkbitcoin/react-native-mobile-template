@@ -186,7 +186,7 @@ ci: check coverage test-scripts ## Everything CI runs except E2E (which needs a 
 codeql: ## CodeQL locally with the same config CI uses (needs a CodeQL CLI)
 	bash scripts/codeql-local.sh
 
-test-scripts: ## node:test for scripts/**/*.test.mjs
+test-scripts: ## node:test for scripts/**/*.test.mjs, with the 100% script coverage gate
 	pnpm test:scripts
 
 unit: ## Unit + component tests

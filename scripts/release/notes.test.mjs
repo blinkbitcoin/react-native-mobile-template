@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -23,6 +23,7 @@ import {
   extractStoreSection,
   limitText,
   loadPrompt,
+  main,
   parseArgs,
   parseBody,
   parseCommits,
@@ -32,6 +33,7 @@ import {
   STORE_LIMITS,
   TRUNCATION_SUFFIX,
   toStoreNotes,
+  USAGE,
 } from './notes.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -642,6 +644,8 @@ test('a flag without a value, and two sources at once, both fail loudly', () => 
   assert.throws(() => parseArgs([]), /is required/);
   assert.throws(() => parseArgs(['--nope']), /unknown argument/);
   assert.deepEqual(parseArgs(['--from-commits', 'v1..HEAD']).range, 'v1..HEAD');
+  assert.equal(parseArgs(['--from-commits']).range, '');
+  assert.equal(parseArgs(['--from-commits', '--include-changelog']).includeChangelog, true);
 });
 
 test('locales come from the ios metadata directories, ignoring the non-locales', () => {
@@ -728,5 +732,216 @@ test('notes-store.txt falls back to the first locale when en-US is not requested
   assert.equal(
     readFileSync(path.join(out, 'notes-store.txt'), 'utf8'),
     `${notes['sv-SE'].testflight}\n`,
+  );
+});
+
+// ---------- main, in process ----------
+
+/** Runs `main` with its output captured; returns the exit code and both streams. */
+async function runMain(argv, io = {}) {
+  const out = [];
+  const err = [];
+  const code = await main(argv, {
+    env: { RELEASE_NOTES_LLM_PROVIDER: '' },
+    write: (text) => out.push(text),
+    error: (line) => err.push(line),
+    ...io,
+  });
+  return { code, out: out.join(''), err };
+}
+
+const releaseBody = path.join(here, 'fixtures', 'release-body.md');
+
+test('main prints the usage for -h and exits 0', async () => {
+  const { code, out, err } = await runMain(['-h']);
+  assert.equal(code, 0);
+  assert.equal(out, `${USAGE}\n`);
+  assert.deepEqual(err, []);
+});
+
+test('main resolves --from-body against cwd and writes both files into --out', async () => {
+  const out = tempDir();
+  const { code, err } = await runMain(
+    ['--from-body', 'release-body.md', '--out', out, '--locales', 'en-US'],
+    { cwd: path.join(here, 'fixtures') },
+  );
+  assert.equal(code, 0);
+  assert.deepEqual(err, [`store notes written to ${out} (en-US)`]);
+  const notes = JSON.parse(readFileSync(path.join(out, 'store-notes.json'), 'utf8'));
+  assert.equal(
+    readFileSync(path.join(out, 'notes-store.txt'), 'utf8'),
+    `${notes['en-US'].testflight}\n`,
+  );
+});
+
+test('main takes the locales from the environment it is given', async () => {
+  const { code, out } = await runMain(['--from-body', releaseBody], {
+    env: { NOTES_LOCALES: 'de,fr-FR' },
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(Object.keys(JSON.parse(out)), ['de', 'fr-FR']);
+});
+
+test('main renders an empty commit range from --from-commits', async () => {
+  const { code, out } = await runMain(['--from-commits', 'HEAD..HEAD', '--locales', 'en-US']);
+  assert.equal(code, 0);
+  assert.equal(JSON.parse(out)['en-US'].testflight, renderNotes([]));
+});
+
+test('main hands the provider and model from its environment to the rewrite', async () => {
+  const seen = [];
+  const { code, out } = await runMain(['--from-body', releaseBody, '--locales', 'en-US'], {
+    env: { RELEASE_NOTES_LLM_PROVIDER: 'openai', RELEASE_NOTES_LLM_MODEL: 'gpt-5-mini' },
+    rewrite: async (request) => {
+      seen.push(request);
+      return { 'en-US': 'Rewritten.' };
+    },
+  });
+  assert.equal(code, 0);
+  assert.equal(seen[0].provider, 'openai');
+  assert.equal(seen[0].model, 'gpt-5-mini');
+  assert.equal(JSON.parse(out)['en-US'].play, 'Rewritten.');
+});
+
+test('a rewrite that cannot be trusted leaves the deterministic prose', async () => {
+  const items = parseBody(body);
+  const notes = await buildNotes({
+    items,
+    locales: ['en-US'],
+    provider: 'anthropic',
+    rewrite: async () => null,
+  });
+  assert.equal(notes['en-US'], renderNotes(items));
+});
+
+test('main reports a bad argument on stderr and exits 1', async () => {
+  const { code, out, err } = await runMain(['--nope']);
+  assert.equal(code, 1);
+  assert.equal(out, '');
+  assert.deepEqual(err, ['unknown argument: --nope']);
+});
+
+test('main reports a failure that is not an Error as itself', async () => {
+  const { code, err } = await runMain(['--from-body', releaseBody, '--locales', 'en-US'], {
+    env: { RELEASE_NOTES_LLM_PROVIDER: 'anthropic' },
+    rewrite: async () => {
+      throw 'provider exploded';
+    },
+  });
+  assert.equal(code, 1);
+  assert.deepEqual(err, ['provider exploded']);
+});
+
+test('the cli exits 1 with the reason on a bad argument', () => {
+  const result = spawnSync(process.execPath, [script, '--nope'], {
+    encoding: 'utf8',
+    env: { ...process.env, RELEASE_NOTES_LLM_PROVIDER: '' },
+  });
+  assert.equal(result.status, 1);
+  assert.equal(result.stderr, 'unknown argument: --nope\n');
+});
+
+// ---------- llm adapters: every failure shape ----------
+
+test('the anthropic adapter sends an empty key rather than "undefined" and honours a model', async () => {
+  const calls = [];
+  await withEnv({ ANTHROPIC_API_KEY: '' }, () =>
+    withFetch(stubFetch({ content: [{ type: 'text', text: 'ok' }] }, calls), () =>
+      anthropic.complete({ system: 's', user: 'u', model: 'claude-haiku-5' }),
+    ),
+  );
+  assert.equal(calls[0].init.headers['x-api-key'], '');
+  assert.equal(JSON.parse(calls[0].init.body).model, 'claude-haiku-5');
+});
+
+test('the anthropic adapter throws on an HTTP failure', async () => {
+  await assert.rejects(
+    withFetch(stubFetch({}, [], false), () => anthropic.complete({ system: 's', user: 'u' })),
+    /anthropic: HTTP 500/,
+  );
+});
+
+test('the anthropic adapter throws when the response has no text block', async () => {
+  for (const payload of [
+    {},
+    null,
+    { content: 'not a list' },
+    { content: [null, { type: 'tool_use' }] },
+    { content: [{ type: 'text', text: 42 }] },
+  ]) {
+    await assert.rejects(
+      withFetch(stubFetch(payload, []), () => anthropic.complete({ system: 's', user: 'u' })),
+      /anthropic: no text block in response/,
+      JSON.stringify(payload),
+    );
+  }
+});
+
+test('the openai adapter sends an empty bearer and the default model and endpoint', async () => {
+  const calls = [];
+  await withEnv({ OPENAI_API_KEY: '', OPENAI_BASE_URL: '' }, () =>
+    withFetch(stubFetch({ choices: [{ message: { content: 'ok' } }] }, calls), () =>
+      openai.complete({ system: 's', user: 'u', maxTokens: 10 }),
+    ),
+  );
+  assert.equal(calls[0].url, 'https://api.openai.com/v1/chat/completions');
+  assert.equal(calls[0].init.headers.authorization, 'Bearer ');
+  const sent = JSON.parse(calls[0].init.body);
+  assert.equal(sent.model, 'gpt-5');
+  assert.equal(sent.max_completion_tokens, 10);
+});
+
+test('the openai adapter throws when the response has no message content', async () => {
+  for (const payload of [
+    null,
+    {},
+    { choices: [] },
+    { choices: [{}] },
+    { choices: [{ message: {} }] },
+  ]) {
+    await assert.rejects(
+      withFetch(stubFetch(payload, []), () => openai.complete({ system: 's', user: 'u' })),
+      /openai: no message content in response/,
+      JSON.stringify(payload),
+    );
+  }
+});
+
+// ---------- edge cases of the deterministic pipeline ----------
+
+test('a line with nothing left after cleaning is dropped, not rendered empty', () => {
+  assert.equal(cleanText(''), '');
+  assert.equal(cleanText('Done!'), 'Done!');
+  assert.deepEqual(parseBody('### Features\n\n* (#12)\n* real thing'), [
+    { group: 'New', text: 'Real thing.' },
+  ]);
+  assert.deepEqual(parseCommits(['', '  ', 'fix: (#12)']), []);
+});
+
+test('a revert of a subject that is not conventional keeps the subject', () => {
+  assert.deepEqual(parseCommits(['revert: something plain']), [
+    { group: 'Other', text: 'Reverted something plain.' },
+  ]);
+});
+
+test('no items means no changelog, and a missing prompt file is an empty prompt', () => {
+  assert.equal(renderChangelog([]), '');
+  assert.equal(loadPrompt(path.join(tempDir(), 'absent.prompt.md')), '');
+});
+
+test('locale discovery falls back to en-US when the metadata has no locale directory', () => {
+  const dir = tempDir();
+  mkdirSync(path.join(dir, 'review_information'));
+  assert.deepEqual(discoverLocales(dir), ['en-US']);
+  assert.deepEqual(discoverLocales(path.join(dir, 'absent')), ['en-US']);
+});
+
+test('an empty or over-long rewrite is rejected', () => {
+  assert.deepEqual(validate(JSON.stringify({ 'en-US': '  ' }), ['en-US']), {
+    error: 'en-US: empty',
+  });
+  assert.deepEqual(
+    validate(JSON.stringify({ 'en-US': 'a'.repeat(TESTFLIGHT_LIMIT + 1) }), ['en-US']),
+    { error: `en-US: longer than ${TESTFLIGHT_LIMIT} characters` },
   );
 });

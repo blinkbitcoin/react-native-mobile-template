@@ -92,7 +92,7 @@ Not in `make check`, because each is slow or needs a build:
 | `make check-prebuild` | Two prebuilds into temp directories, asserting the config plugin output |
 | `make bundle-secrets-check` | Exports the bundle and asserts no non-public key leaked into it |
 | `make codeql` | CodeQL's `security-and-quality` suite over the whole tree — see below |
-| `make test`, `make unit`, `make coverage` | See [testing.md](testing.md) |
+| `make test`, `make unit`, `make coverage`, `make test-scripts` | See [testing.md](testing.md); the last is `node:test` with a 100% coverage gate over `scripts/**/*.mjs` |
 
 ## `make check` is the CI gate set, and that is enforced
 
@@ -236,7 +236,7 @@ Each gate has one supported escape hatch. Use it, with a comment saying why.
 | Expo SDK version check | `expo.install.exclude` | `package.json` |
 | `minimumReleaseAge` | `minimumReleaseAgeExclude`, pinned as `name@exact-version` so the guard still applies to later releases | `pnpm-workspace.yaml` |
 | Package build scripts | `onlyBuiltDependencies` or `allowBuilds`. `strictDepBuilds` forces an explicit decision | `pnpm-workspace.yaml` |
-| Coverage | Change the threshold in `jest.config.ts`, deliberately, not silently | `jest.config.ts` |
+| Coverage | Change the threshold in `jest.config.ts` or the `--test-coverage-*` flags of `test:scripts`,<br>deliberately, not silently | `jest.config.ts`, `package.json` |
 | CodeQL | `// codeql[<rule-id>]` alone on the line directly above the code,<br>with the reason in a comment *above the marker* — never between it and the code.<br>**Never** dismiss the alert in the GitHub UI or API | The code |
 
 Rules of thumb: suppress the narrowest scope that works, put the reason in the

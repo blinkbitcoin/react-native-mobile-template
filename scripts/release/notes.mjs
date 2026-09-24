@@ -425,13 +425,36 @@ export function resolveLocales(options, env = process.env) {
   return fromEnv.length ? fromEnv : discoverLocales();
 }
 
-export async function main(argv, { cwd = process.cwd() } = {}) {
+/**
+ * Command-line entry; returns the exit code. Any failure is one line on stderr
+ * and exit 1. `rewrite` is the LLM pass, injectable like `buildNotes`'s.
+ */
+export async function main(
+  argv = process.argv.slice(2),
+  {
+    cwd = process.cwd(),
+    env = process.env,
+    write = (text) => process.stdout.write(text),
+    error = console.error,
+    rewrite = rewriteNotes,
+  } = {},
+) {
+  try {
+    await run(argv, { cwd, env, write, error, rewrite });
+    return 0;
+  } catch (failure) {
+    error(String(failure.message ?? failure));
+    return 1;
+  }
+}
+
+async function run(argv, { cwd, env, write, error, rewrite }) {
   if (argv.includes('--help') || argv.includes('-h')) {
-    process.stdout.write(`${USAGE}\n`);
-    return null;
+    write(`${USAGE}\n`);
+    return;
   }
   const options = parseArgs(argv);
-  const locales = resolveLocales(options);
+  const locales = resolveLocales(options, env);
 
   let items = [];
   let verbatim = '';
@@ -450,29 +473,24 @@ export async function main(argv, { cwd = process.cwd() } = {}) {
     locales,
     verbatim,
     includeChangelog: options.includeChangelog,
-    provider: process.env.RELEASE_NOTES_LLM_PROVIDER,
-    model: process.env.RELEASE_NOTES_LLM_MODEL,
+    provider: env.RELEASE_NOTES_LLM_PROVIDER,
+    model: env.RELEASE_NOTES_LLM_MODEL,
     prompt: loadPrompt(),
+    rewrite,
   });
   const notes = toStoreNotes(byLocale);
   const primary = notes['en-US'] ? 'en-US' : locales[0];
   const json = `${JSON.stringify(notes, null, 2)}\n`;
 
   if (!options.out || options.out === '-') {
-    process.stdout.write(json);
-    return notes;
+    write(json);
+    return;
   }
   const outDir = path.resolve(cwd, options.out);
   mkdirSync(outDir, { recursive: true });
   writeFileSync(path.join(outDir, 'store-notes.json'), json);
   writeFileSync(path.join(outDir, 'notes-store.txt'), `${notes[primary].testflight}\n`);
-  console.error(`store notes written to ${outDir} (${locales.join(', ')})`);
-  return notes;
+  error(`store notes written to ${outDir} (${locales.join(', ')})`);
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
-  main(process.argv.slice(2)).catch((error) => {
-    console.error(String(error.message ?? error));
-    process.exit(1);
-  });
-}
+if (import.meta.main) process.exitCode = await main();
