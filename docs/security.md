@@ -1,29 +1,105 @@
 # Security scanning
 
-`make check-security` runs every enabled scanner and prints one verdict.
-**Nothing in `.github/workflows/` calls it today.** `ci.yml` calls
-`check-code`, `check-unit` and `check-e2e`; the only security-flavoured
-workflow that exists is the pre-existing, unrelated `ci-codeql.yml`. The
-reusable `check-security.yml` workflow and its call sites in this repository
-are a later, separate stage that cannot land until `v0` in shared-workflows
-carries the file. Until that stage merges, these three scanners run **only**
-when a human or an agent types `make check-security*` on a laptop; `main`
-and every pull request are not yet protected by them.
+`make check-security` runs every enabled scanner and prints one verdict. Each
+`make check-security-<job>` runs one scanner and the same verdict, so a single
+scanner on a laptop still ends in the pass/fail answer CI would give.
+
+**Nothing in `.github/workflows/` calls these yet.** The reusable
+`check-security.yml` in shared-workflows runs them in CI; the call sites in
+`ci.yml` and `cd-production.yml` land in a separate change once `v0` carries
+the jobs they need. Until then the scanners run only when someone types
+`make check-security*`.
 
 ## What runs, and where
 
-| Scanner | Make target | Reads | Runs |
-| --- | --- | --- | --- |
-| osv-scanner | `check-security-deps` | `pnpm-lock.yaml` | local only (`make check-security-deps`) |
-| Semgrep CE | `check-security-code` | app source, `rules/` | local only (`make check-security-code`) |
-| pnpm policy | `check-security-policy` | `pnpm-workspace.yaml` | local only (`make check-security-policy`) |
+Nine scanners, placed by what each reads: source is there on every pull
+request, the built binaries only once a release is built.
 
-gitleaks and zizmor are security gates too, and unlike the three above they
-already run in CI, inside `make check` as `check-secrets` and `check-ci` -
-they are fast and binary, so putting them there cost nothing. The line for
-the rest is: `check` owns reproducible pass/fail gates that already run in
-CI, `check-security*` owns the SARIF-producing scanners that cost minutes and
-are, for now, local-only.
+| Job | Make target | Reads | Runs in CI (once wired) |
+| --- | --- | --- | --- |
+| `deps` | `check-security-deps` | `pnpm-lock.yaml` (osv-scanner) | every pull request, every push to `main` |
+| `code` | `check-security-code` | app source, `rules/` (Semgrep CE) | every pull request, every push to `main` |
+| `policy` | `check-security-policy` | `pnpm-workspace.yaml` | every pull request, every push to `main` |
+| `review` | `check-security-review` | the diff (an LLM, off by default) | pull requests; the release pull request reviews everything since the last release tag |
+| `bundle` | `check-security-bundle` | the exported JavaScript bundle | the release pull request, and the production dispatch |
+| `openant` | `check-security-openant` | the codebase (knostic/OpenAnt, an LLM, off by default) | the release pull request |
+| `mobile` | `check-security-mobile` | a fresh prebuild of `android/` and `ios/` (mobsfscan) | the production dispatch |
+| `binaries` | `check-security-binaries` | the release's `.apk` and `.ipa` (OWASP MASTG checks) | the production dispatch, before any store job |
+| `sbom` | `check-security-sbom` | `pnpm-lock.yaml`; writes `.security/sbom.cdx.json` | the production dispatch |
+
+The deterministic scanners can block a run; the two LLM jobs annotate unless
+`failOn` names them (see "Turning things off" below). An LLM that refuses a
+prompt, or answers differently twice, must not be able to hold a release.
+
+gitleaks and zizmor are security gates too, and unlike the scanners above they
+already run in CI, inside `make check` as `check-secrets` and `check-ci`. The
+line: `check` owns fast, reproducible pass/fail gates; `check-security*` owns
+the SARIF-producing scanners that cost minutes.
+
+### What each new scanner looks for
+
+- **`bundle`** exports the bundle for each platform in `bundle.platforms` and
+  reads its strings. A build-time or release variable's name (anything
+  `.env.example` names that is not `EXPO_PUBLIC_*`) is high; a
+  credential-shaped string (private key, Stripe, Google, AWS, GitHub, Slack,
+  Anthropic, OpenAI) is critical; an `http://` URL is medium
+  (MASTG-TEST-0233/0321) unless its host is in `bundle.cleartextHosts`; with
+  `bundle.hosts` set, any other https host is low, so a new endpoint is seen.
+- **`binaries`** reads the universal APK with `aapt2` and `apksigner` and the
+  IPA with `plistlib` and `openssl`, and names every rule by its MASTG test:
+  debuggable (0226, critical), cleartext traffic in the manifest or the network
+  security config (0235), user-installed certificate authorities trusted (0286),
+  v1-only signing (0224), a signing key under 2048 bits (0225), backups with no
+  rules (0262), a dangerous permission not in `binaries.androidPermissions`
+  (0254), an exported component with no permission not in
+  `binaries.exportedComponents` (0364-0366), `get-task-allow` (0261, critical),
+  App Transport Security allowing arbitrary loads or cleartext to a domain not
+  in `binaries.atsExceptionDomains` (0322), and an exception below TLS 1.2
+  (0342). Locally: `make check-security-binaries APK=... IPA=...`, either or
+  both.
+- **`mobile`** prebuilds both platforms into a temporary copy, the way
+  `make check-prebuild` does, and runs mobsfscan over it. Reasoned
+  suppressions live in `.mobsf`.
+- **`sbom`** is a record rather than a scan: a CycloneDX bill of every
+  component the lockfile pins, kept as a workflow artifact of the production
+  run so a later advisory can be checked against exactly what shipped.
+- **`review`** sends the diff, with `security-review.prompt.md` as the
+  instructions, to the configured provider and validates the answer before it
+  becomes a finding: every finding must name a file in the diff, a line and a
+  known severity, or the whole answer is dropped. Generated files and the
+  lockfile are left out; files beyond `review.maxDiffBytes` are named as
+  unreviewed rather than silently cut.
+- **`openant`** runs [OpenAnt](https://github.com/knostic/OpenAnt), pinned by
+  commit in `scripts/security/openant.sh`, with dynamic (Docker) testing off.
+  CI builds it from that commit; on a laptop, build it yourself and put
+  `openant` on `PATH`.
+
+## Turning the LLM jobs on
+
+Both LLM jobs use one provider, set in the `llm` block of
+`security-policy.json` or through its environment twins, and both are off
+until a repository turns them on:
+
+1. `"review": { "enabled": true }` and/or `"openant": { "enabled": true }`
+   under `jobs`.
+2. `llm.provider`: `openai` for OpenAI or any OpenAI-compatible endpoint (Kimi,
+   Grok, Qwen, GLM, DeepSeek, OpenRouter - set `OPENAI_BASE_URL`), or
+   `anthropic`. `llm.model` names the model; OpenAnt requires one.
+3. The key as a secret: `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`.
+
+`llm.effort` (`low`, `medium`, `high`, `max`; `max` by default) is sent to the
+reviewer apart from the model: Anthropic's `output_config.effort` with
+adaptive thinking, or an OpenAI-compatible `reasoning_effort` (where `max`
+asks for `high`, the most that schema has). Vendor-specific switches go in
+`SECURITY_LLM_EXTRA_PARAMS`, a JSON object merged into the request (it may not
+set `model`, `messages` or `system`). OpenAnt takes no effort setting.
+
+A missing provider, key, model or prompt makes the job write "skipped" with
+the reason, never "clean", and a model that does not answer, refuses, or
+answers with something that does not validate does the same: a model being
+down must never fail a pull request. The store-notes rewrite shares the same
+adapters (`scripts/lib/llm/`), with `RELEASE_NOTES_LLM_EFFORT` and
+`RELEASE_NOTES_LLM_EXTRA_PARAMS` as its own two settings.
 
 ## Turning things off
 
@@ -36,12 +112,37 @@ Three layers, resolved in one order: an environment variable wins over
 | Turn one scanner off | `SECURITY_CODE=false`, or `"jobs": { "code": { "enabled": false } }` |
 | Change what fails a run | `"severity": "critical"`, or `SECURITY_SEVERITY=critical` |
 | Give an engine class teeth | `"failOn": ["deterministic", "review"]` |
+| Change one scanner's option | `"jobs": { "bundle": { "hosts": ["api.example.com"] } }`, or `SECURITY_BUNDLE_HOSTS=api.example.com` |
+| Pick the LLM provider | `"llm": { "provider": "openai", "model": "kimi-k3" }`, or `SECURITY_LLM_PROVIDER` and `SECURITY_LLM_MODEL` |
 
-A value that is not `true` or `false` fails the run rather than reading as
-off, so a typo cannot silently disable a scanner. The same is true of
-`severity` (must be one of `none`, `low`, `medium`, `high`, `critical`) and
-of every entry in `failOn` (must be a known engine class): a dropped letter
-in `SECURITY_FAIL_ON=deterministc` fails the run, it does not quietly leave
+Every option has an environment twin named `SECURITY_<JOB>_<KEY>`, the key in
+upper snake case:
+
+| Option | Type | Default | Environment twin |
+| --- | --- | --- | --- |
+| `jobs.bundle.platforms` | list of `ios`, `android` | both | `SECURITY_BUNDLE_PLATFORMS` |
+| `jobs.bundle.hosts` | list | empty (check off) | `SECURITY_BUNDLE_HOSTS` |
+| `jobs.bundle.cleartextHosts` | list | `localhost`, `127.0.0.1` | `SECURITY_BUNDLE_CLEARTEXT_HOSTS` |
+| `jobs.binaries.androidPermissions` | list | empty | `SECURITY_BINARIES_ANDROID_PERMISSIONS` |
+| `jobs.binaries.exportedComponents` | list | empty | `SECURITY_BINARIES_EXPORTED_COMPONENTS` |
+| `jobs.binaries.atsExceptionDomains` | list | empty | `SECURITY_BINARIES_ATS_EXCEPTION_DOMAINS` |
+| `jobs.review.maxDiffBytes` | whole number | `200000` | `SECURITY_REVIEW_MAX_DIFF_BYTES` |
+| `jobs.openant.limit` | whole number, `0` for none | `0` | `SECURITY_OPENANT_LIMIT` |
+| `jobs.openant.verify` | boolean | `false` | `SECURITY_OPENANT_VERIFY` |
+| `llm.provider` | `openai`, `anthropic` or empty | empty | `SECURITY_LLM_PROVIDER` |
+| `llm.model` | string | empty | `SECURITY_LLM_MODEL` |
+| `llm.effort` | `low`, `medium`, `high`, `max` | `max` | `SECURITY_LLM_EFFORT` |
+
+In the environment a list is comma-separated. A value that does not parse -
+not `true` or `false`, not a whole number, a list entry outside its set, an
+effort or provider outside the vocabulary - fails the run rather than reading
+as off, so a typo cannot silently disable a scanner. So does a key the schema
+does not know (`androidPermission` for `androidPermissions`), which would
+otherwise leave the real key at its default with no sign anything was wrong.
+Keys starting with `$` are comments. The same is true of `severity` (must be
+one of `none`, `low`, `medium`, `high`, `critical`) and of every entry in
+`failOn` (must be a known engine class): a dropped letter in
+`SECURITY_FAIL_ON=deterministc` fails the run, it does not quietly leave
 nothing able to block.
 
 An **empty** `failOn` (`SECURITY_FAIL_ON=`, or `"failOn": []`) is different -
@@ -83,16 +184,25 @@ distinguishable from a vulnerability nobody ever found.
 A scanner with nothing to scan - no tool installed, no binary, no key - writes
 a SARIF whose run says `executionSuccessful: false` and carries the reason.
 The verdict prints `skipped: <reason>` for it and never counts it as clean.
-This is designed so that, once a pipeline calls these scripts, a missing
-tool is a skip on a laptop but a failure under `CI=true`, because a pipeline
-that quietly scans nothing is worse than one that is red. No workflow
-exercises that `CI=true` path today - see the note at the top of this file.
+A missing tool is a skip on a laptop but a failure under `CI=true`, because a
+pipeline that quietly scans nothing is worse than one that is red. The same
+goes for a partial run: `binaries` without `aapt2`, or a review whose diff
+outgrew `review.maxDiffBytes`, reports the part that did not run as skipped
+even when the rest found nothing.
+
+A job switched off in `security-policy.json` behaves differently in the two
+places. Locally, `make check-security` still runs its script, which writes
+"skipped: disabled", so with `review` and `openant` off by default the local
+headline reads `skipped`. In CI the job is not started at all, so it is
+absent from the verdict and the headline can read `pass`.
 
 ## Suppressing a finding, correctly
 
 Each scanner reads its own config, and every suppression carries a reason:
 `osv-scanner.toml` for advisories, `.semgrepignore` and `rules/` for source
-patterns, `.gitleaks.toml` for secrets, `.github/zizmor.yml` for workflows.
+patterns, `.mobsf` for mobsfscan, `.gitleaks.toml` for secrets,
+`.github/zizmor.yml` for workflows, and the allowlists under `jobs.bundle` and
+`jobs.binaries` in `security-policy.json` for the bundle and binary checks.
 Never raise the severity threshold to hide one finding - that hides the next
 one too.
 
@@ -112,7 +222,19 @@ with no clean upgrade available:
   `query-string.parse()` on an incoming deep link - a denial-of-service
   surface the owner has knowingly accepted, not one ruled out as unreachable.
 
-See `osv-scanner.toml` for the full reasoning on each: the dependency path,
+### Accepted findings in the other scanners
+
+- **mobsfscan `android_task_hijacking1` and `android_task_hijacking2`**
+  (StrandHogg 1.0 and 2.0, CWE-1021) on `MainActivity`, suppressed in
+  `.mobsf`. Expo generates the activity with `launchMode="singleTask"`, which
+  expo-router's deep links rely on. The mitigation, `taskAffinity=""` through
+  a config plugin, is a native change of its own and not made yet; until it
+  lands this is a known, accepted risk.
+- **The Android debug source sets** (`android/app/src/debug*`) are left out of
+  the mobsfscan run: they allow Metro's cleartext localhost connection and are
+  never part of a release variant.
+
+See `osv-scanner.toml` for the full reasoning on each advisory: the dependency path,
 why no upgrade is possible, the reachability verdict, and what upstream
 change would require re-evaluating the decision.
 
@@ -171,12 +293,26 @@ assuming a new fixture file "just works".
 
 ## The current baseline
 
-A first `make check-security` run on this repository finds 11 Semgrep
-findings (6 mutable GitHub Actions tags, 3 service-account strings in docs
-paths, 2 minimum-release-age policy findings) and 2 osv-scanner advisories:
-`uuid@7.0.3` (CVE-2026-41907, CVSS 7.5, high) and `decode-uri-component@0.2.2`
-(CVSS 6.6, medium). Because a high-severity advisory exists, `make
-check-security` currently fails (`verdict.mjs` exits 1; Make reports its own
-generic nonzero status on top of that). That is the gate working, not a bug -
-each finding needs a reasoned ignore in its own scanner's config (see
-"Suppressing a finding, correctly" above), never a raised threshold.
+`make check-security` on this repository, with every deterministic scanner
+installed and `APK` pointing at the v0.6.2 release's universal APK, reports
+no finding at or above `high`, so nothing blocks:
+
+- `deps`, `policy`, `bundle`, `sbom`: clean (the bill lists 1,502 components;
+  the four accepted advisories above are filtered out).
+- `code`: 11 Semgrep findings, the highest medium (mutable GitHub Actions
+  tags, service-account strings in docs paths, the minimum-release-age policy
+  pattern).
+- `mobile`: 8 mobsfscan findings, the highest medium: `allowBackup` on the
+  main manifest (the backup rules the app ships are what MASTG-TEST-0262
+  checks, and `binaries` finds them), plus the hardening notes mobsfscan
+  always raises (root detection, tapjacking, certificate transparency, pinning,
+  screenshots, SafetyNet, ATS local networking).
+- `binaries`: 3 medium findings, `MASTG-TEST-0254`: the release manifest asks
+  for `SYSTEM_ALERT_WINDOW`, `READ_EXTERNAL_STORAGE` and
+  `WRITE_EXTERNAL_STORAGE` (the last two capped at API 32). None is allowlisted
+  in `binaries.androidPermissions`: each needs either a reason there or
+  removing from the manifest, and that decision is the app owner's.
+
+Each finding that turns out to be acceptable gets a reasoned entry in its own
+scanner's configuration (see "Suppressing a finding, correctly" above), never
+a raised threshold.

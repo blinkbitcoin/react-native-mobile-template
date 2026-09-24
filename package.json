@@ -116,7 +116,6 @@
     "deps:check": "bash scripts/check-deps.sh",
     "deps:doctor": "expo-doctor",
     "deps:audit": "pnpm audit --audit-level=high --prod && bash scripts/check-lockfile.sh",
-    "deps:licenses": "node scripts/check-licenses.mjs",
-    "check-bundle-secrets": "bash scripts/check-bundle-secrets.sh"
+    "deps:licenses": "node scripts/check-licenses.mjs"
   }
 }

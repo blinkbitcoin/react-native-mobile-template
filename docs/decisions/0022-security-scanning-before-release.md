@@ -20,8 +20,11 @@ production dispatch. Deterministic scanners can block; an LLM reviewer
 annotates until a consumer explicitly gives it teeth, because a gate that
 flakes gets disabled or teaches people to merge past red.
 
-- `scripts/security/deps.sh`, `code.sh`, `policy.sh` - one scanner each, one
-  SARIF each, never failing on their own finding.
+- `scripts/security/deps.sh`, `code.sh`, `policy.sh`, `sbom.sh`, `bundle.sh`,
+  `mobile.sh`, `binaries.sh`, `review.sh`, `openant.sh` - one scanner each,
+  one SARIF each, never failing on their own finding. The two LLM jobs share
+  one provider-portable adapter (`scripts/lib/llm/`) with the store notes and
+  are off until a repository configures a provider and a key.
 - `scripts/security/verdict.mjs` - merges the SARIFs and applies the
   threshold; the only script allowed to fail a run.
 - `scripts/security/local.sh` - runs every enabled scanner, then the verdict;
@@ -40,12 +43,10 @@ reviewer or gitleaks lacks.
 ## Consequences
 
 A first run produces a baseline of findings; each gets a reasoned ignore in
-its scanner's own config, never a threshold change. That baseline is not
-hypothetical: as of this record, `make check-security` fails on this
-repository - osv-scanner reports `uuid@7.0.3` (CVE-2026-41907, CVSS 7.5,
-high), and it is deliberately left unresolved pending the repository owner's
-choice between accepting the risk and adding a reasoned ignore to
-`osv-scanner.toml` (`docs/security.md`, "Suppressing a finding, correctly").
+its scanner's own config, never a threshold change. The baseline this record
+started from (`uuid@7.0.3` failing the run) has since been accepted with a
+reasoned ignore; the current one is in `docs/security.md`, "The current
+baseline".
 Scanners are external CLIs, so `make check-security` is minutes and stays out
 of `make check` and `make ci`, like `check-codeql`; unlike `check-codeql` it
 also has no CI caller yet at all, on any workflow - wiring it in is a later,

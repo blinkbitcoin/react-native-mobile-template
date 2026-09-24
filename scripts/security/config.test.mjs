@@ -4,7 +4,17 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { DEFAULTS, load, main, parseBoolean, resolve } from './config.mjs';
+import {
+  DEFAULTS,
+  LLM,
+  load,
+  main,
+  OPTIONS,
+  parseBoolean,
+  parseTyped,
+  resolve,
+  snake,
+} from './config.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../..');
@@ -17,6 +27,10 @@ const SECURITY_ENV_KEYS = [
   'SECURITY_SEVERITY',
   'SECURITY_FAIL_ON',
   ...Object.keys(DEFAULTS.jobs).map((name) => `SECURITY_${name.toUpperCase()}`),
+  ...Object.entries(OPTIONS).flatMap(([job, schema]) =>
+    Object.keys(schema).map((key) => `SECURITY_${job.toUpperCase()}_${snake(key)}`),
+  ),
+  ...Object.keys(LLM).map((key) => `SECURITY_LLM_${snake(key)}`),
 ];
 
 /** Runs `fn` with every SECURITY_* variable removed from process.env, then restores them. */
@@ -297,4 +311,127 @@ test('every job enabled by default has a runner on disk', () => {
       `DEFAULTS.jobs.${name} is true but scripts/security/${name}.sh does not exist`,
     );
   }
+});
+
+// ---------- options and the llm block ----------
+
+test('every option and the llm block resolve to their defaults', () => {
+  const settings = resolve({}, {});
+  assert.deepEqual(settings.options.bundle, {
+    platforms: ['ios', 'android'],
+    hosts: [],
+    cleartextHosts: ['localhost', '127.0.0.1'],
+  });
+  assert.equal(settings.options.review.maxDiffBytes, 200000);
+  assert.deepEqual(settings.options.openant, { limit: 0, verify: false });
+  assert.deepEqual(settings.llm, { provider: '', model: '', effort: 'max' });
+});
+
+test('the deterministic jobs are on by default and the two LLM jobs are off', () => {
+  const { jobs } = resolve({}, {});
+  for (const name of ['sbom', 'bundle', 'mobile', 'binaries']) assert.equal(jobs[name], true);
+  assert.equal(jobs.review, false);
+  assert.equal(jobs.openant, false);
+});
+
+test('snake turns a camelCase key into its environment spelling', () => {
+  assert.equal(snake('androidPermissions'), 'ANDROID_PERMISSIONS');
+  assert.equal(snake('maxDiffBytes'), 'MAX_DIFF_BYTES');
+  assert.equal(snake('limit'), 'LIMIT');
+});
+
+test('an option comes from the file, and its environment twin wins over the file', () => {
+  const policy = { jobs: { binaries: { androidPermissions: ['android.permission.CAMERA'] } } };
+  assert.deepEqual(resolve(policy, {}).options.binaries.androidPermissions, [
+    'android.permission.CAMERA',
+  ]);
+  const env = { SECURITY_BINARIES_ANDROID_PERMISSIONS: 'a, b' };
+  assert.deepEqual(resolve(policy, env).options.binaries.androidPermissions, ['a', 'b']);
+});
+
+test('the llm block follows the same order', () => {
+  const policy = { llm: { provider: 'anthropic', model: 'claude-opus-5', effort: 'high' } };
+  assert.deepEqual(resolve(policy, {}).llm, policy.llm);
+  const settings = resolve(policy, { SECURITY_LLM_PROVIDER: 'openai', SECURITY_LLM_EFFORT: 'low' });
+  assert.equal(settings.llm.provider, 'openai');
+  assert.equal(settings.llm.effort, 'low');
+  assert.equal(settings.llm.model, 'claude-opus-5');
+});
+
+test('parseTyped reads every type from a string and from JSON', () => {
+  assert.equal(parseTyped({ type: 'int' }, '42', 'x'), 42);
+  assert.equal(parseTyped({ type: 'int' }, 7, 'x'), 7);
+  assert.equal(parseTyped({ type: 'bool' }, 'true', 'x'), true);
+  assert.deepEqual(parseTyped({ type: 'list' }, '', 'x'), []);
+  assert.deepEqual(parseTyped({ type: 'list', of: ['ios'] }, ['ios'], 'x'), ['ios']);
+  assert.equal(parseTyped({ type: 'string' }, 'any', 'x'), 'any');
+  assert.equal(parseTyped({ type: 'enum', of: ['', 'a'] }, '', 'x'), '');
+});
+
+test('an option of the wrong type fails the run, naming where it came from', () => {
+  const cases = [
+    [{ type: 'int' }, 'lots', /x: expected a whole number/],
+    [{ type: 'int' }, '-1', /whole number/],
+    [{ type: 'int' }, '1.5', /whole number/],
+    [{ type: 'int' }, '', /whole number/],
+    [{ type: 'list' }, 3, /x: expected a list, got 3/],
+    [{ type: 'list' }, [1], /expected a list of strings, got 1/],
+    [{ type: 'list', of: ['ios', 'android'] }, 'ios,web', /entries from ios, android, got "web"/],
+    [{ type: 'string' }, 5, /expected a string, got 5/],
+    [{ type: 'enum', of: ['', 'openai'] }, 'gemini', /one of \(empty\), openai, got "gemini"/],
+  ];
+  for (const [spec, value, message] of cases) {
+    assert.throws(() => parseTyped(spec, value, 'x'), message);
+  }
+});
+
+test('an invalid option reaches the error with its source', () => {
+  assert.throws(
+    () => resolve({ jobs: { review: { maxDiffBytes: 'big' } } }, {}),
+    /security-policy.json: jobs.review.maxDiffBytes: expected a whole number/,
+  );
+  assert.throws(
+    () => resolve({}, { SECURITY_OPENANT_LIMIT: 'all' }),
+    /SECURITY_OPENANT_LIMIT: expected a whole number/,
+  );
+  assert.throws(() => resolve({}, { SECURITY_LLM_EFFORT: 'extreme' }), /SECURITY_LLM_EFFORT/);
+});
+
+test('a key the schema does not know is a typo, and fails the run', () => {
+  assert.throws(
+    () => resolve({ jobs: { binaries: { androidPermission: [] } } }, {}),
+    /unknown setting jobs.binaries.androidPermission/,
+  );
+  assert.throws(
+    () => resolve({ jobs: { deps: { hosts: [] } } }, {}),
+    /unknown setting jobs.deps.hosts/,
+  );
+  assert.throws(() => resolve({ jobs: { lint: { enabled: true } } }, {}), /unknown job jobs.lint/);
+  assert.throws(() => resolve({ llm: { temperature: 1 } }, {}), /unknown setting llm.temperature/);
+});
+
+test('a key starting with $ is a comment, not a setting', () => {
+  const settings = resolve(
+    { llm: { $comment: 'x' }, jobs: { bundle: { $hosts: 'why', enabled: true } } },
+    {},
+  );
+  assert.equal(settings.jobs.bundle, true);
+});
+
+test('get prints an option list comma-joined and an empty setting as an empty line', () => {
+  const lines = [];
+  assert.equal(
+    main(['get', 'options.bundle.platforms'], { log: (l) => lines.push(l), env: {} }),
+    0,
+  );
+  assert.equal(main(['get', 'llm.provider'], { log: (l) => lines.push(l), env: {} }), 0);
+  assert.deepEqual(lines, ['ios,android', '']);
+});
+
+test('the repository policy file resolves cleanly', () => {
+  withoutSecurityEnv(() => {
+    const settings = load(path.join(repoRoot, 'security-policy.json'), {});
+    assert.equal(settings.jobs.binaries, true);
+    assert.ok(settings.options.bundle.cleartextHosts.includes('json-schema.org'));
+  });
 });

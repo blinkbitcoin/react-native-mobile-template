@@ -145,6 +145,10 @@ test('the aggregate runs the enabled jobs and reports a verdict', () => {
         SECURITY_CODE: 'false',
         SECURITY_DEPS: 'false',
         SECURITY_POLICY: 'true',
+        // The minutes-long jobs have their own tests below; here they would
+        // only make the aggregate slow.
+        SECURITY_BUNDLE: 'false',
+        SECURITY_MOBILE: 'false',
       },
     });
     assert.equal(result.status, 0, result.stderr);

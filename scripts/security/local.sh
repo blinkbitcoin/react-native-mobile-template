@@ -2,6 +2,12 @@
 # Every enabled scanner, then the verdict - the same scripts and the same
 # verdict CI runs, so a green laptop means a green pipeline. Locally a missing
 # tool is a skip; under CI it is a failure.
+#
+#   bash scripts/security/local.sh              every job
+#   bash scripts/security/local.sh bundle       one job, then its own verdict
+#
+# Each `make check-security-<job>` target is the second form, so a single
+# scanner run on a laptop still ends in the same pass/fail answer CI gives.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 # shellcheck source=scripts/security/lib/common.sh
@@ -21,11 +27,29 @@ if [ "$enabled" != "true" ]; then
   exit 0
 fi
 
+all_jobs=(deps code policy sbom bundle mobile binaries review openant)
+if [ $# -eq 0 ]; then
+  jobs=("${all_jobs[@]}")
+else
+  jobs=("$@")
+  for job in "${jobs[@]}"; do
+    case " ${all_jobs[*]} " in
+      *" $job "*) ;;
+      *)
+        echo "unknown security job: $job (expected one of: ${all_jobs[*]})" >&2
+        exit 2
+        ;;
+    esac
+  done
+fi
+
 out="$(sec_out_dir)"
+# Only this run's SARIF reaches the verdict: a stale file from an earlier run
+# of another job would otherwise be judged as if it had just been produced.
 rm -f "$out"/*.sarif
-# Only the source-side jobs exist so far. The binary and LLM jobs join this
-# list in their own stages; each is responsible for its own skip line.
-for job in deps code policy; do
+# A disabled job still runs its script: the script is what writes the skipped
+# SARIF, so the verdict prints "skipped: disabled" rather than nothing at all.
+for job in "${jobs[@]}"; do
   bash "scripts/security/$job.sh"
 done
 

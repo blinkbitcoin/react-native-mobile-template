@@ -20,11 +20,16 @@ just the one that failed.
 | osv-scanner | Known vulnerabilities and malicious-package records in the lockfile | `osv-scanner.toml` |
 | Semgrep | Mobile-specific source patterns and the registry TypeScript/secrets/OWASP packs | `rules/`, `.semgrepignore` |
 | pnpm install policy scanner | The install-time supply-chain settings, asserted rather than trusted | `pnpm-workspace.yaml` |
+| pnpm sbom | A CycloneDX bill of materials from the lockfile | `security-policy.json` (`jobs.sbom`) |
+| Bundle scanner | Private variable names, credential-shaped strings and cleartext URLs in the exported bundle | `security-policy.json` (`jobs.bundle`) |
+| mobsfscan | Mobile-specific misconfiguration in a fresh prebuild of `android/` and `ios/` | `.mobsf` |
+| Binary checks | OWASP MASTG tests over the release's built APK and IPA | `security-policy.json` (`jobs.binaries`) |
+| LLM reviewer and OpenAnt | Security review of the diff, and an LLM scan of the codebase; both off by default | `security-review.prompt.md`, `security-policy.json` (`llm`) |
 
-The three scanners above are `make check-security*`, run separately from
-`make check` because they are external CLIs and cost minutes; see
-[security.md](security.md) for what each reads, how to turn one off, and how
-to suppress a finding correctly.
+The scanners from osv-scanner down are `make check-security*`, run separately
+from `make check` because they are external CLIs and cost minutes; see
+[security.md](security.md) for what each reads, where each runs, how to turn
+one off, and how to suppress a finding correctly.
 
 Nothing is enabled in two linters at once. `eslint.config.mjs` turns off every
 preset rule that duplicates a Biome rule, and `biome.json` turns off the two
@@ -96,9 +101,9 @@ Not in `make check`, because each is slow or needs a build:
 
 | Target | Runs |
 | --- | --- |
-| `make check-slow` | The two below, grouped. Off by default in CI too (`prebuild-check`, `bundle-secrets`) |
+| `make check-slow` | The two below, grouped. Off by default in `check-code.yml` too (`prebuild-check`, `bundle-secrets`) |
 | `make check-prebuild` | Two prebuilds into temp directories, asserting the config plugin output |
-| `make check-security-bundle` | Exports the bundle and asserts no non-public key leaked into it |
+| `make check-security-bundle` | Exports the bundle and fails on a private variable name or a credential-shaped string in it<br>(the `bundle` scanner; [security.md](security.md)) |
 | `make check-codeql` | CodeQL's `security-and-quality` suite over the whole tree — see below |
 | `make test`, `make test-unit`, `make test-coverage`, `make test-scripts` | See [testing.md](testing.md); the last is `node:test` with a 100% coverage gate over `scripts/**/*.mjs` |
 
