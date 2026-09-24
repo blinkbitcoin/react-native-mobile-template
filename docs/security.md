@@ -116,6 +116,15 @@ See `osv-scanner.toml` for the full reasoning on each: the dependency path,
 why no upgrade is possible, the reachability verdict, and what upstream
 change would require re-evaluating the decision.
 
+Unlike a Semgrep or gitleaks suppression, an osv-scanner ignore leaves no
+trace in run output: `osv-scanner` drops an `IgnoredVulns` match from its
+SARIF entirely rather than emitting it with a suppression marker, so
+`verdict.mjs` has nothing to count and `make check-security-deps` simply
+reports `deps: clean` - the summary line's suppressed count stays `0`
+regardless. `osv-scanner.toml` and this section are therefore the only
+places these two accepted risks are visible; do not read a clean `deps`
+run, on its own, as nothing being carried.
+
 ## Known limitations
 
 **The Semgrep registry packs are not content-pinned.** `code.sh` pulls
