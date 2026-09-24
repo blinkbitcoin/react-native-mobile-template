@@ -16,8 +16,8 @@ src/graphql/__generated__/
 # real credential.
 fastlane/test/
 # A decoy Google service-account key (fake project id "decoy-project-123456",
-# key id "0000...dead") used to test scripts/security/check-bundle-secrets;
-# not a real credential.
+# key id "0000...dead"). tests/run.sh feeds it to scripts/validate-play-json.sh
+# to exercise that validator; not a real credential.
 .claude/skills/store-credentials/tests/fixtures/
 # A copy of AndroidManifest.xml used only to test scripts/release's OTA
 # fixture-parsing code, not the app's real (generated, uncommitted) manifest.
