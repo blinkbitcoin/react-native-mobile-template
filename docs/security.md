@@ -38,7 +38,45 @@ Three layers, resolved in one order: an environment variable wins over
 | Give an engine class teeth | `"failOn": ["deterministic", "review"]` |
 
 A value that is not `true` or `false` fails the run rather than reading as
-off, so a typo cannot silently disable a scanner.
+off, so a typo cannot silently disable a scanner. The same is true of
+`severity` (must be one of `none`, `low`, `medium`, `high`, `critical`) and
+of every entry in `failOn` (must be a known engine class): a dropped letter
+in `SECURITY_FAIL_ON=deterministc` fails the run, it does not quietly leave
+nothing able to block.
+
+An **empty** `failOn` (`SECURITY_FAIL_ON=`, or `"failOn": []`) is different -
+it is a legitimate choice for a consumer who wants every scanner advisory
+only, so it is allowed. But nothing can block with an empty `failOn`,
+whatever severity turns up, so the summary line says so explicitly
+(`failOn is empty: nothing can block`) rather than letting the run read as an
+ordinary pass.
+
+## Reading the summary line
+
+The last line of every run is one of four words, in order of how bad the
+news is:
+
+| Headline | Meaning |
+| --- | --- |
+| `security: fail` | A finding at or above the threshold came from an engine class in `failOn`. Exit code 1. |
+| `security: informational` | Findings exist, none of them blocking (below the threshold, or from an engine class not in `failOn`). Exit code 0. |
+| `security: skipped` | No blocking or reportable findings, but at least one job did not run (a missing tool, a disabled job).<br>Exit code 0 - nothing ran, so nothing could have blocked - but this is not the same claim as `pass`. |
+| `security: pass` | Every job ran, and found nothing reportable. Exit code 0. |
+
+`pass` is a claim that the whole gate ran and found nothing; `skipped` is a
+claim that most or all of it did not run at all. Turning a scanner off -
+`SECURITY_CODE=false`, a missing tool on a laptop with no `mise install`,
+`SECURITY_ENABLED` left set from a previous run - trades `pass` for
+`skipped` for as long as that job stays off, and the two must never be
+confused for each other, which is why `verdict.mjs` prints a different word
+for each rather than folding `skipped` into `pass` once nothing is left to
+report.
+
+The line also carries a suppressed count: `N suppressed` names how many
+results a scanner's own config already dropped (`osv-scanner.toml`,
+`.semgrepignore`, an inline marker) - dropped from blocking correctly, but
+counted rather than vanishing without a trace, so a suppression stays
+distinguishable from a vulnerability nobody ever found.
 
 ## Skipped is not clean
 

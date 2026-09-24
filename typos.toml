@@ -7,3 +7,7 @@ unparseable = "unparseable"
 ba = "ba"
 # Ruby File::WRONLY (open flag), used for 0600 key files in fastlane/lanes/shared.rb
 WRONLY = "WRONLY"
+# Deliberate one-dropped-letter typo, used as the reproduction case and test
+# fixture for verdict.mjs's failOn validation (a mistyped engine class must
+# fail the run, not silently disarm it) - not a real word, never fix it.
+deterministc = "deterministc"

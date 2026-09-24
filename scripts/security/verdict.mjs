@@ -27,6 +27,9 @@ export const ENGINE_OF = {
 
 export const ORDER = ['low', 'medium', 'high', 'critical'];
 
+/** The only engine classes failOn may legitimately name - derived from ENGINE_OF, not a second list to drift. */
+export const ENGINE_CLASSES = [...new Set(Object.values(ENGINE_OF))];
+
 const FROM_LEVEL = { error: 'high', warning: 'medium', note: 'low' };
 
 // SARIF puts a rule's numeric severity on tool.driver.rules[], not on the
@@ -113,6 +116,20 @@ export const verdict = ({ entries, severity, failOn }) => {
       `severity: expected one of ${SEVERITIES.join(', ')}, got ${JSON.stringify(severity)}`,
     );
   }
+  // Same reasoning as severity: `config.mjs`'s parseList accepts any string,
+  // so a dropped letter ("deterministc") or an unrelated word never reaches
+  // ENGINE_CLASSES and `failOn.includes(...)` just quietly never matches -
+  // every finding reads as informational and nothing can ever block, exactly
+  // the fail-open this module exists to prevent for severity. An *empty*
+  // failOn is different: it is a legitimate "everything is advisory" choice,
+  // so it is allowed here and made visible in the summary line below instead.
+  for (const entry of failOn) {
+    if (!ENGINE_CLASSES.includes(entry)) {
+      throw new Error(
+        `failOn: unrecognized engine class ${JSON.stringify(entry)}, expected one of ${ENGINE_CLASSES.join(', ')}`,
+      );
+    }
+  }
   // A job name with no entry in ENGINE_OF makes `failOn.includes(ENGINE_OF[job])`
   // evaluate to `failOn.includes(undefined)`, which is always false - a finding
   // from an unrecognized job could never block, however severe, and the summary
@@ -163,8 +180,13 @@ export const verdict = ({ entries, severity, failOn }) => {
         : skipped.length > 0
           ? 'skipped'
           : 'pass';
+  // An empty failOn is a legitimate "everything is advisory" choice, but it
+  // must never look like an ordinary pass: nothing in this run could have
+  // blocked, whatever it found, and that fact belongs on the one line most
+  // likely to be the only one read.
+  const failOnNote = failOn.length === 0 ? ', failOn is empty: nothing can block' : '';
   lines.push(
-    `security: ${name}, highest ${highest}, ${findings.length} finding(s), ${suppressed} suppressed, ${skipped.length} job(s) skipped`,
+    `security: ${name}, highest ${highest}, ${findings.length} finding(s), ${suppressed} suppressed, ${skipped.length} job(s) skipped${failOnNote}`,
   );
   return {
     verdict: name,
@@ -188,9 +210,22 @@ const read = (dir) =>
     .sort()
     .map((name) => {
       const file = path.join(dir, name);
+      // Kept as two separate steps, each with its own tagged error: a file
+      // that cannot be read (permissions, a symlink to nowhere) and a file
+      // that reads fine but is not valid JSON are different problems with
+      // different fixes, and reporting a permission error as "not valid
+      // JSON" would send someone straight past the actual cause.
+      let raw;
+      try {
+        raw = readFileSync(file, 'utf8');
+      } catch (cause) {
+        const wrapped = new Error(`${file}: could not be read (${cause.message})`);
+        wrapped.sarifReadError = true;
+        throw wrapped;
+      }
       let document;
       try {
-        document = JSON.parse(readFileSync(file, 'utf8'));
+        document = JSON.parse(raw);
       } catch (cause) {
         const wrapped = new Error(`${file}: not valid JSON (${cause.message})`);
         wrapped.sarifParseError = true;
@@ -209,7 +244,7 @@ export function main(
   try {
     entries = readEntries(dir);
   } catch (err) {
-    if (err.sarifParseError) {
+    if (err.sarifParseError || err.sarifReadError) {
       error(err.message);
     } else {
       error(`no SARIF files in ${dir}: run a scanner first`);

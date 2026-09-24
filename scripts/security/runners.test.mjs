@@ -97,7 +97,7 @@ test('the code scanner skips when semgrep is absent', () => {
 test('the policy scanner reports a weakened install policy as a finding, not a crash', () => {
   withDir((dir) => {
     const result = run('policy.sh', {
-      env: { SECURITY_DIR: dir, SECURITY_POLICY_FILE: '/dev/null' },
+      env: { SECURITY_DIR: dir, SECURITY_POLICY_TARGET_FILE: '/dev/null' },
     });
     assert.equal(result.status, 0, result.stderr);
     const sarif = JSON.parse(readFileSync(path.join(dir, 'policy.sarif'), 'utf8'));
@@ -124,7 +124,9 @@ test('the policy scanner reports a near-miss value, not just a missing one', () 
     try {
       const file = path.join(fixtureDir, 'pnpm-workspace.yaml');
       writeFileSync(file, 'trustPolicy: no-downgrade-x\n');
-      const result = run('policy.sh', { env: { SECURITY_DIR: dir, SECURITY_POLICY_FILE: file } });
+      const result = run('policy.sh', {
+        env: { SECURITY_DIR: dir, SECURITY_POLICY_TARGET_FILE: file },
+      });
       assert.equal(result.status, 0, result.stderr);
       const sarif = JSON.parse(readFileSync(path.join(dir, 'policy.sarif'), 'utf8'));
       const rules = sarif.runs[0].results.map((r) => r.ruleId);
@@ -187,24 +189,30 @@ test('an invalid SECURITY_* value fails a per-job runner too, it does not skip i
   });
 });
 
-// The real security-policy.json at the repository root is swapped for
-// malformed JSON for the duration of this one test and restored in `finally`
-// regardless of outcome - config.mjs's file path is a literal
-// 'security-policy.json' resolved against the runner's cwd (always the
-// repository root after `cd "$(dirname "$0")/../.."`), so there is no
-// environment override to point it at a fixture instead.
+// Points SECURITY_POLICY_FILE at a throwaway fixture rather than touching the
+// tracked security-policy.json at the repository root. An earlier version of
+// this test wrote malformed JSON straight into that real file and restored it
+// in `finally` - which raced verdict.test.mjs and config.test.mjs, both of
+// which read the same file through main()'s default path whenever `node
+// --test` ran them in parallel. SECURITY_POLICY_FILE is the override
+// config.mjs's `load` now honours, precisely so no test has to touch the real
+// file: 10 failures in 25 runs, gone.
 test('a malformed security-policy.json fails the run, it does not read as disabled', () => {
-  const policyFile = path.join(root, 'security-policy.json');
-  const original = readFileSync(policyFile, 'utf8');
-  try {
-    writeFileSync(policyFile, '{ this is not valid json');
-    const result = run('local.sh');
-    assert.notEqual(result.status, 0);
-    assert.doesNotMatch(result.stdout, /disabled/);
-    assert.match(result.stderr, /Unexpected token|JSON/);
-  } finally {
-    writeFileSync(policyFile, original);
-  }
+  withDir((dir) => {
+    const fixtureDir = mkdtempSync(path.join(tmpdir(), 'security-policy-json-fixture-'));
+    try {
+      const file = path.join(fixtureDir, 'security-policy.json');
+      writeFileSync(file, '{ this is not valid json');
+      const result = run('local.sh', {
+        env: { SECURITY_DIR: dir, SECURITY_POLICY_FILE: file },
+      });
+      assert.notEqual(result.status, 0);
+      assert.doesNotMatch(result.stdout, /disabled/);
+      assert.match(result.stderr, /Unexpected token|JSON/);
+    } finally {
+      rmSync(fixtureDir, { recursive: true, force: true });
+    }
+  });
 });
 
 test('the master switch skips every scanner without running one', () => {

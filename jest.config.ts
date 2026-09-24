@@ -85,9 +85,10 @@ const config: Config = {
       // `AsyncStorage.setItem(...)` with no import, never a Jest suite.
       // Anchored to the repository root, unlike the bare `/plugins/`-style
       // entries above: a consumer's own nested `src/rules/` (an unrelated
-      // directory name they are free to use) must stay linted normally,
-      // matching the root-anchored `rules` entries in tsconfig.json and
-      // eslint.config.mjs.
+      // directory name they are free to use) must still be tested,
+      // type-checked and linted normally, matching the root-anchored `rules`
+      // entries in `tsconfig.json`'s `exclude`, `biome.json`'s
+      // `files.includes`, and `eslint.config.mjs`'s `globalIgnores`.
       testPathIgnorePatterns: [
         '/node_modules/',
         '/e2e/',

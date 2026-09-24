@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
@@ -162,6 +162,62 @@ test('an unrecognized severity throws rather than behaving like none', () => {
       }),
     /severity: expected one of none, low, medium, high, critical, got "bogus"/,
   );
+});
+
+// config.mjs's parseList accepts any comma-separated string, so a dropped
+// letter (SECURITY_FAIL_ON=deterministc) or a stray value never reaches
+// ENGINE_CLASSES - failOn.includes(...) just quietly never matches, every
+// finding reads as informational, and nothing can ever block, however
+// severe. Same fail-open class as the unrecognized-severity case above,
+// same fix: throw, naming the bad value, rather than silently disarming
+// the gate.
+test('an unrecognized failOn entry throws rather than silently disarming the gate', () => {
+  assert.throws(
+    () =>
+      verdict({
+        entries: [entry('deps', doc('osv-scanner', [result('high')]))],
+        severity: 'high',
+        failOn: ['deterministc'],
+      }),
+    /failOn: unrecognized engine class "deterministc", expected one of/,
+  );
+});
+
+test('every failOn entry must be a known engine class, not just the first', () => {
+  assert.throws(
+    () =>
+      verdict({
+        entries: [entry('deps', doc('osv-scanner', [result('high')]))],
+        severity: 'high',
+        failOn: ['deterministic', 'not-a-class'],
+      }),
+    /failOn: unrecognized engine class "not-a-class"/,
+  );
+});
+
+// An empty failOn is a legitimate choice - a consumer who wants every
+// scanner advisory-only - but it must never look like an ordinary pass: a
+// high finding is still found and still printed, it is simply guaranteed
+// never to block, and that has to be visible on the one line most likely to
+// be the only one read.
+test('an empty failOn is allowed, but never blocks, and says so in the summary', () => {
+  const v = verdict({
+    entries: [entry('deps', doc('osv-scanner', [result('critical')]))],
+    severity: 'high',
+    failOn: [],
+  });
+  assert.equal(v.exitCode, 0);
+  assert.equal(v.verdict, 'informational');
+  assert.ok(v.lines.some((line) => /failOn is empty: nothing can block/.test(line)));
+});
+
+test('a non-empty failOn carries no such note', () => {
+  const v = verdict({
+    entries: [entry('deps', doc('osv-scanner', [result('critical')]))],
+    severity: 'high',
+    failOn: ['deterministic'],
+  });
+  assert.ok(!v.lines.some((line) => /failOn is empty/.test(line)));
 });
 
 // A SARIF file whose basename is not a known job (e.g. a future job renamed
@@ -344,6 +400,34 @@ test('a malformed SARIF file names itself, distinct from a missing directory', (
     assert.match(out[0], /code\.sarif: not valid JSON/);
     assert.doesNotMatch(out[0], /run a scanner first/);
   } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// A file readFileSync cannot open at all (permissions, a dangling symlink)
+// and a file that opens fine but is not valid JSON are different problems -
+// conflating them, as an earlier version of read() did by wrapping both in
+// one try, sent "not valid JSON" for a permission error that has nothing to
+// do with JSON. Root bypasses file-mode permission checks entirely, so this
+// skips rather than false-passing when the test runs as root (some CI
+// containers do).
+test('an unreadable SARIF file names itself, distinct from a malformed one', (t) => {
+  if (process.getuid?.() === 0) {
+    t.skip('running as root: file-mode permissions are not enforced');
+    return;
+  }
+  const dir = mkdtempSync(path.join(tmpdir(), 'verdict-unreadable-'));
+  const file = path.join(dir, 'code.sarif');
+  try {
+    writeFileSync(file, JSON.stringify(doc('semgrep', [])));
+    chmodSync(file, 0o000);
+    const out = [];
+    const code = main([dir], { log: () => {}, error: (l) => out.push(l), env: {} });
+    assert.equal(code, 2);
+    assert.match(out[0], /code\.sarif: could not be read/);
+    assert.doesNotMatch(out[0], /not valid JSON/);
+  } finally {
+    chmodSync(file, 0o644);
     rmSync(dir, { recursive: true, force: true });
   }
 });

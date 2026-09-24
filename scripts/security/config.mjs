@@ -83,11 +83,17 @@ export const resolve = (policy = {}, env = process.env) => {
   };
 };
 
+// SECURITY_POLICY_FILE overrides the path, the same override policy.sh
+// already uses for its own target file. Tests point it at a temp fixture so
+// nothing ever has to write to the tracked security-policy.json on disk -
+// two node:test files reading and writing that one real file concurrently
+// is a race, not a test.
 /** Settings from the policy file on disk; a missing file is the defaults. */
 export const load = (file = 'security-policy.json', env = process.env) => {
+  const path = env.SECURITY_POLICY_FILE ?? file;
   let policy = {};
   try {
-    policy = JSON.parse(readFileSync(file, 'utf8'));
+    policy = JSON.parse(readFileSync(path, 'utf8'));
   } catch (error) {
     if (error.code !== 'ENOENT') throw error;
   }
