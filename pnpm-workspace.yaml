@@ -57,24 +57,29 @@ trustPolicy: no-downgrade
 # checked rather than open-ended - one per package, in the style of
 # ignoreGhsas below. pnpm's trust check compares publish dates across ALL
 # majors of a package, not within the installed major line (confirmed:
-# https://github.com/orgs/pnpm/discussions/11084, pnpm issue #10202), so an
-# old-but-fine release reads as "downgraded" purely because a later major
-# started shipping provenance attestation after this one was published.
+# https://github.com/orgs/pnpm/discussions/11084, pnpm issue #10202): if any
+# version published *before* this one carried stronger trust evidence, this
+# one reads as "downgraded" - even a provenance-bearing release of a
+# different, later major, if that release happened to publish earlier.
 # `pnpm audit` returns zero advisories for all three - the block is
 # provenance-comparison noise, not a vulnerability.
 trustPolicyExclude:
-  # eslint-plugin-import's peer range still resolves to this 3.x line; the
-  # provenance-carrying 4.x line was published later, so pnpm reads that as
-  # this release's trust having dropped. Nothing about this specific publish
-  # changed.
+  # eslint-plugin-import's peer range still resolves to this 3.x line
+  # (published 2025-04-21); the provenance-carrying 4.3.2 published
+  # 2025-04-07, two weeks earlier, so pnpm reads that earlier, stronger
+  # evidence as this release's trust having dropped. Nothing about this
+  # specific publish changed.
   - 'eslint-import-resolver-typescript@3.10.1'
-  # node-semver's 6.x line, the resolved range for several dependencies here;
-  # 7.x gained provenance after 6.3.1 shipped, tripping the same cross-major
-  # date comparison. Tracked upstream at pnpm issue #10202.
+  # node-semver's 6.x line, the resolved range for several dependencies here
+  # (published 2023-07-10); provenance-bearing 7.5.1 published 2023-05-12,
+  # two months earlier, tripping the same cross-major date comparison.
+  # Tracked upstream at pnpm issue #10202.
   - 'semver@6.3.1'
-  # Predates npm's provenance requirement; the 2.x line added it later. The
-  # real ua-parser-js takeover (2021) was versions 0.7.29/0.8.0/1.0.0, patched
-  # years before this release - `pnpm audit` finds nothing against 1.0.41.
+  # Predates npm's provenance requirement (published 2025-08-19);
+  # provenance-bearing 2.0.0 published 2024-11-18, nine months earlier. The
+  # real ua-parser-js takeover (2021, GHSA-pjwm-rvh2-c87w) was versions
+  # 0.7.29/0.8.0/1.0.0, which are unpublished entirely - `pnpm audit` finds
+  # nothing against 1.0.41.
   - 'ua-parser-js@1.0.41'
 onlyBuiltDependencies:
   - '@biomejs/biome'

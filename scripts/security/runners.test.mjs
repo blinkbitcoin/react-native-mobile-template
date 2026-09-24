@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
@@ -107,5 +107,22 @@ test('the policy scanner is clean against the real workspace file', () => {
     const sarif = JSON.parse(readFileSync(path.join(dir, 'policy.sarif'), 'utf8'));
     assert.deepEqual(sarif.runs[0].results, []);
     assert.equal(sarif.runs[0].invocations[0].executionSuccessful, true);
+  });
+});
+
+test('the policy scanner reports a near-miss value, not just a missing one', () => {
+  withDir((dir) => {
+    const fixtureDir = mkdtempSync(path.join(tmpdir(), 'security-policy-fixture-'));
+    try {
+      const file = path.join(fixtureDir, 'pnpm-workspace.yaml');
+      writeFileSync(file, 'trustPolicy: no-downgrade-x\n');
+      const result = run('policy.sh', { env: { SECURITY_DIR: dir, SECURITY_POLICY_FILE: file } });
+      assert.equal(result.status, 0, result.stderr);
+      const sarif = JSON.parse(readFileSync(path.join(dir, 'policy.sarif'), 'utf8'));
+      const rules = sarif.runs[0].results.map((r) => r.ruleId);
+      assert.ok(rules.includes('pnpm/trust-policy'));
+    } finally {
+      rmSync(fixtureDir, { recursive: true, force: true });
+    }
   });
 });
