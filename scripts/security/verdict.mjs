@@ -10,7 +10,7 @@
 // answer the pipeline will give.
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { load } from './config.mjs';
+import { load, SEVERITIES } from './config.mjs';
 
 /** Which engine class each job belongs to. failOn names classes, not jobs. */
 export const ENGINE_OF = {
@@ -75,6 +75,14 @@ export const summarize = (entries) => {
 
 /** The verdict, its exit code and the lines to print. */
 export const verdict = ({ entries, severity, failOn }) => {
+  // This is the only module allowed to fail a run, so it does not trust a
+  // caller to have validated severity already: an unrecognized value throws
+  // rather than silently behaving like 'none' (report, never block).
+  if (!SEVERITIES.includes(severity)) {
+    throw new Error(
+      `severity: expected one of ${SEVERITIES.join(', ')}, got ${JSON.stringify(severity)}`,
+    );
+  }
   const { counts, highest, skipped, findings } = summarize(entries);
   const floor = ORDER.indexOf(severity);
   // 'none' (floor < 0) reports everything as informational but never blocks;

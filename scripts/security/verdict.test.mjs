@@ -103,6 +103,18 @@ test('severity none never fails', () => {
   assert.equal(v.exitCode, 0);
 });
 
+test('an unrecognized severity throws rather than behaving like none', () => {
+  assert.throws(
+    () =>
+      verdict({
+        entries: [entry('deps', doc('osv-scanner', [result('critical')]))],
+        severity: 'bogus',
+        failOn: ['deterministic'],
+      }),
+    /severity: expected one of none, low, medium, high, critical, got "bogus"/,
+  );
+});
+
 test('a suppressed result is not a finding', () => {
   const suppressed = { ...result('critical'), suppressions: [{ kind: 'inSource' }] };
   const v = verdict({
