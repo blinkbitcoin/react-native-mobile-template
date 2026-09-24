@@ -20,6 +20,7 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, test } from 'node:test';
+import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -207,8 +208,22 @@ function sandbox({ catalog = {} } = {}) {
     readFileSync(log, 'utf8')
       .split('\n')
       .filter((line) => line.startsWith(`${prefix} `));
+  /**
+   * The calls matching `pattern`, once one has reached the log. A fake the
+   * script starts with `nohup … &` can log after the script has exited, so
+   * reading at once races it; this waits up to five seconds instead.
+   */
+  const callsOnceLogged = async (prefix, pattern) => {
+    const deadline = Date.now() + 5000;
+    let found = [];
+    while (!found.length && Date.now() < deadline) {
+      found = calls(prefix).filter((line) => pattern.test(line));
+      if (!found.length) await delay(20);
+    }
+    return found;
+  };
   const resetLog = () => writeFileSync(log, '');
-  return { work, repo, home, sdk, bin, env, run, calls, resetLog, log };
+  return { work, repo, home, sdk, bin, env, run, calls, callsOnceLogged, resetLog, log };
 }
 
 const installsOf = (calls) => calls('android').map((line) => line.split(' ').at(-1));
@@ -381,13 +396,17 @@ test('android: without node_modules it says to install first', () => {
   assert.match(r.output, /libs.versions.toml is missing. Run: make setup-toolchain/);
 });
 
-test('android: --boot starts the emulator, waits for boot and turns animations off', () => {
+test('android: --boot starts the emulator, waits for boot and turns animations off', async () => {
   const s = sandbox();
   assert.equal(s.run('android.sh', ['--yes']).status, 0);
   s.resetLog();
   const r = s.run('android.sh', ['--boot'], { CI: 'true' });
   assert.equal(r.status, 0, r.output);
-  assert.match(s.calls('emulator').join('\n'), /-avd Pixel_10_API_36 .*-no-window/);
+  // Awaited before resetLog below, so a late write cannot land in the next run's log.
+  assert.match(
+    (await s.callsOnceLogged('emulator', / -avd /)).join('\n'),
+    /-avd Pixel_10_API_36 .*-no-window/,
+  );
   assert.equal(
     s.calls('adb').filter((c) => /animation_scale|animator_duration_scale/.test(c)).length,
     3,
