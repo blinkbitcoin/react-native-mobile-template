@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { DEFAULTS, load, main, parseBoolean, resolve } from './config.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(here, '../..');
 
 // Every SECURITY_* variable config.mjs reads, so tests that rely on the
 // default `env = process.env` parameter aren't hostage to whatever a
@@ -255,4 +257,44 @@ test('as a command it reads security-policy.json from the working directory', ()
   const got = run('get', 'jobs.deps');
   assert.equal(got.status, 0);
   assert.equal(got.stdout.trim(), 'true');
+});
+
+// The defect this guards against: security-policy.json shipped sbom, bundle
+// and binaries as enabled while DEFAULTS (and the fallback every consumer
+// gets with no policy file at all) agreed - both wrong, in the same
+// direction, so a reviewer comparing the two files saw no disagreement. Only
+// comparing against the actual runners on disk (the next test) would have
+// caught it; this test catches the narrower case of the two settings
+// sources silently drifting apart from each other.
+test('security-policy.json and DEFAULTS agree, key for key', () => {
+  const policy = JSON.parse(readFileSync(path.join(repoRoot, 'security-policy.json'), 'utf8'));
+  const policyNames = Object.keys(policy.jobs).sort();
+  const defaultNames = Object.keys(DEFAULTS.jobs).sort();
+  assert.deepEqual(
+    policyNames,
+    defaultNames,
+    'security-policy.json and DEFAULTS.jobs must name exactly the same jobs',
+  );
+  for (const name of defaultNames) {
+    assert.equal(
+      policy.jobs[name].enabled,
+      DEFAULTS.jobs[name],
+      `jobs.${name}.enabled in security-policy.json disagrees with DEFAULTS.jobs.${name}`,
+    );
+  }
+});
+
+// The invariant that matters: a job on by default must have code that runs
+// it. This is what would have caught sbom/bundle/binaries shipping enabled
+// with no scripts/security/sbom.sh, bundle.sh or binaries.sh - and, unlike
+// pinning today's true/false values, it keeps working as later stages add a
+// runner and flip its job on.
+test('every job enabled by default has a runner on disk', () => {
+  for (const [name, enabled] of Object.entries(DEFAULTS.jobs)) {
+    if (!enabled) continue;
+    assert.ok(
+      existsSync(path.join(here, `${name}.sh`)),
+      `DEFAULTS.jobs.${name} is true but scripts/security/${name}.sh does not exist`,
+    );
+  }
 });
