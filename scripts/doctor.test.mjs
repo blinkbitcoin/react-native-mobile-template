@@ -222,6 +222,6 @@ test('as a command it checks the real requirements and fails when nothing is on 
     env: { ...process.env, PATH: '', APP_PORT_BASE: '' },
   });
   assert.equal(result.status, 1);
-  assert.match(result.stdout, /^FAIL {2}node: not found\. Fix: mise install$/m);
+  assert.match(result.stdout, /^FAIL {2}node: not found\. Fix: make setup-toolchain$/m);
   assert.match(result.stdout, /problem\(s\)\. Fix them and re-run: make doctor/);
 });

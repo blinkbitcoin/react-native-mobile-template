@@ -1,19 +1,34 @@
 {
   "tools": [
-    { "name": "node", "command": "node --version", "minimum": "24.0.0", "hint": "mise install" },
-    { "name": "pnpm", "command": "pnpm --version", "minimum": "12.0.0", "hint": "mise install" },
+    {
+      "name": "node",
+      "command": "node --version",
+      "minimum": "24.0.0",
+      "hint": "make setup-toolchain"
+    },
+    {
+      "name": "pnpm",
+      "command": "pnpm --version",
+      "minimum": "12.0.0",
+      "hint": "make setup-toolchain"
+    },
     {
       "name": "java",
       "command": "java -version 2>&1",
       "minimum": "17.0.0",
-      "hint": "mise install (temurin-17)"
+      "hint": "make setup-toolchain (temurin-17 via mise)"
     },
-    { "name": "ruby", "command": "ruby --version", "minimum": "3.3.0", "hint": "mise install" },
+    {
+      "name": "ruby",
+      "command": "ruby --version",
+      "minimum": "3.3.0",
+      "hint": "make setup-toolchain"
+    },
     {
       "name": "watchman",
       "command": "watchman --version",
       "minimum": "2024.0.0",
-      "hint": "brew install watchman"
+      "hint": "make setup-toolchain (brew install watchman)"
     },
     {
       "name": "xcodebuild",
@@ -26,20 +41,20 @@
       "name": "pod",
       "command": "pod --version",
       "minimum": "1.16.0",
-      "hint": "gem install cocoapods (inside mise's ruby)",
+      "hint": "make setup-ios",
       "platform": "darwin"
     },
     {
       "name": "adb",
       "command": "adb --version",
       "minimum": "1.0.41",
-      "hint": "Install Android Studio > SDK Manager > Android SDK Platform-Tools; export ANDROID_HOME=$HOME/Library/Android/sdk and add $ANDROID_HOME/platform-tools to PATH"
+      "hint": "make setup-android, then activate mise (or add $ANDROID_HOME/platform-tools to PATH)"
     },
     {
       "name": "maestro",
       "command": "maestro --version",
       "minimum": "2.10.0",
-      "hint": "curl -fsSL https://get.maestro.mobile.dev | bash",
+      "hint": "make setup-maestro",
       "optional": true
     }
   ],
@@ -51,5 +66,10 @@
       "hint": "make install (or: bundle config set --local path vendor/bundle && bundle install)"
     }
   ],
-  "env": [{ "name": "ANDROID_HOME", "hint": "export ANDROID_HOME=$HOME/Library/Android/sdk" }]
+  "env": [
+    {
+      "name": "ANDROID_HOME",
+      "hint": "make setup-android (records it in .env.local)"
+    }
+  ]
 }

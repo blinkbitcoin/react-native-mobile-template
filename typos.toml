@@ -11,3 +11,6 @@ WRONLY = "WRONLY"
 # fixture for verdict.mjs's failOn validation (a mistyped engine class must
 # fail the run, not silently disarm it) - not a real word, never fix it.
 deterministc = "deterministc"
+# Apple's unique device identifier: `xcrun simctl` names simulators by UDID
+udid = "udid"
+UDID = "UDID"

@@ -1,6 +1,10 @@
 # Agent Skills
 
-Agent skills that ship with this template, each under its own subdirectory. The four skills are:
+Agent skills that ship with this template, each under its own subdirectory.
+
+- **native-setup**: Setting up a laptop or CI runner for Android and iOS (`make setup`), and the symptom → cause → fix table for toolchain, build and Maestro E2E failures.
+
+The four store skills are:
 
 - **store-setup**: The entry point. Picks the mode (guided, browser-pause, browser-full), keeps the resumable 49-step checklist in `.store-setup/state.json`, and holds the identifiers gate every console step waits on. The last eight steps are Huawei AppGallery, an optional extra store gated on `toggle-uploads`.
 - **store-consoles**: The `apple-*`, `google-*` and `huawei-*` steps that can only happen inside App Store Connect, the Apple Developer portal, Google Play Console, Google Cloud or AppGallery Connect, as exact click-paths — driven in the browser or handed to the human.

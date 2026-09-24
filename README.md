@@ -55,13 +55,17 @@ flowchart LR
 ## Getting started
 
 ```sh
-mise trust && mise install   # toolchain: Node, pnpm, Ruby, Java
+make setup                   # blank machine → ready: toolchain, deps, Maestro, Android SDK + emulator, iOS
 make doctor                  # verify it (one line per tool)
-make install                 # dependencies, gems, git hooks
 make dev-api                 # terminal 1: GraphQL mock API
 make dev                     # terminal 2: Metro for the dev client
 make dev-ios                 # or: make dev-android
 ```
+
+`make setup` is idempotent (re-run it when the toolchain misbehaves) and asks
+before accepting the Android SDK licences; `ARGS=--yes` agrees up front, for CI.
+The pitfalls it guards against, symptom by symptom, are in
+[`.claude/skills/native-setup`](.claude/skills/native-setup/SKILL.md).
 
 `make check && make test-unit` runs every gate CI runs. `make help` lists the
 rest, grouped by prefix: `check-` gates, `test-` tests, `build-` artifacts,
