@@ -14,6 +14,10 @@ typos = "1.50.1"
 # Same pins as shared-workflows (packages/dev-config/versions.json).
 zizmor = "1.30.1"
 gitleaks = "8.30.1"
+# Security scanners. Pinned for the same reason as the linters above: CI and a
+# laptop must agree about what counts as a finding.
+osv-scanner = "2.6.0"
+semgrep = "1.177.0"
 
 [env]
 # Expo telemetry off everywhere. ANDROID_HOME is deliberately not set here: it is

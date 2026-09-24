@@ -14,8 +14,10 @@ export default defineConfig([
     'coverage/**',
     'vendor/bundle/**', // Ruby gems installed by `bundle install` (fastlane, cocoapods)
     '.workflows/**',
+    '.claude/worktrees/**', // other checkouts of this repository, see docs/quality.md
     'src/graphql/generated/**',
     'src/i18n/locales/**/messages.ts',
+    'rules/**', // Semgrep fixtures: deliberately vulnerable code, scanned by semgrep --test, not ESLint
   ]),
   ...(Array.isArray(expoConfig) ? expoConfig : [expoConfig]),
   {

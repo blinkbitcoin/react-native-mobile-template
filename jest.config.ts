@@ -1,6 +1,18 @@
 import type { Config } from 'jest';
 
 /**
+ * Claude Code puts git worktrees under `.claude/worktrees/<name>/`: whole
+ * checkouts of this repository, each with its own node_modules. Jest's crawl
+ * does not read `.gitignore`, so without this it runs every worktree's suites
+ * as well, against a second copy of React ("Invalid hook call"). Anchored to
+ * `<rootDir>` because a worktree's own root is itself under `.claude/worktrees/`
+ * - an unanchored `/\.claude/worktrees/` would ignore every test there.
+ * `modulePathIgnorePatterns` keeps their package.json files and `__mocks__`
+ * out of the module map, which otherwise reports them as naming collisions.
+ */
+const worktrees = '<rootDir>/\\.claude/worktrees/';
+
+/**
  * Every entry is a claim that the file has no behaviour a test could assert.
  * The thresholds below are 100%, so anything not on this list has to be tested.
  *
@@ -11,6 +23,8 @@ import type { Config } from 'jest';
 const coveragePathIgnorePatterns = [
   // Jest's own default, which declaring this option would otherwise drop.
   '/node_modules/',
+  // Other checkouts of this repository, not files of this one.
+  worktrees,
   // Ambient type declarations: erased at build time, no runtime statements.
   '\\.d\\.ts$',
   // Jest setup files: every suite runs them, but they execute before this
@@ -78,13 +92,27 @@ const config: Config = {
       // those up and fail on `import.meta` - a consumer's Unit job going red
       // over a file the consumer does not own. It is the seventh entry in the
       // guide's `.workflows/` ignore list, added when that repo grew tests.
+      // `<rootDir>/rules/` holds Semgrep's own `<rule-id>.test.tsx` fixture
+      // convention (paired with `<rule-id>.yaml`, asserted by
+      // `semgrep --test rules/` and `make check-security-code`) -
+      // deliberately uninstantiable snippets like a bare
+      // `AsyncStorage.setItem(...)` with no import, never a Jest suite.
+      // Anchored to the repository root, unlike the bare `/plugins/`-style
+      // entries above: a consumer's own nested `src/rules/` (an unrelated
+      // directory name they are free to use) must still be tested,
+      // type-checked and linted normally, matching the root-anchored `rules`
+      // entries in `tsconfig.json`'s `exclude`, `biome.json`'s
+      // `files.includes`, and `eslint.config.mjs`'s `globalIgnores`.
       testPathIgnorePatterns: [
         '/node_modules/',
         '/e2e/',
         '/plugins/',
         '/scripts/',
+        '<rootDir>/rules/',
         '/\\.workflows/',
+        worktrees,
       ],
+      modulePathIgnorePatterns: [worktrees],
       coveragePathIgnorePatterns,
     },
     {
@@ -95,6 +123,7 @@ const config: Config = {
       // file because `src/test/setup.ts` pulls in RNTL and MSW.
       setupFilesAfterEnv: ['<rootDir>/src/test/setup.plugins.ts'],
       testMatch: ['<rootDir>/plugins/**/*.test.ts'],
+      modulePathIgnorePatterns: [worktrees],
       // `.tsx` is in the pattern even though no plugin suite uses JSX: coverage
       // options are global, so this project also instruments the app's untested
       // `.tsx` files (e.g. platform variants) and needs a transform for them.

@@ -11,6 +11,7 @@ all).
 | Get the app running on a simulator or emulator for the first time | [local-dev.md](local-dev.md) |
 | Understand the folder layout, data flow, providers and env model | [architecture.md](architecture.md) |
 | Know which linter owns a rule, or why a gate failed | [quality.md](quality.md) |
+| Run the security scanners, or turn one off | [security.md](security.md) |
 | Write a test, add a Maestro flow, or read a failed CI run | [testing.md](testing.md) |
 | Add a native capability, a config plugin or a local Expo module | [native-extensions.md](native-extensions.md) |
 | Wire a crash reporter, or find the OTA and crash-reporting overview | [ota-and-crash-reporting.md](ota-and-crash-reporting.md) |
@@ -30,6 +31,7 @@ all).
 | [architecture.md](architecture.md) | Folder map, the routes-only rule, data flow, config and env flow, provider order,<br>error handling, storage split, the updates channel model |
 | [local-dev.md](local-dev.md) | Toolchain via mise, `make doctor`, first run, the dev-client deep link, prebuild debugging, a troubleshooting table |
 | [quality.md](quality.md) | Biome and ESLint ownership, every gate in `make check`, how to suppress a rule correctly, commit conventions, git hooks |
+| [security.md](security.md) | What `make check-security` runs, the three scanners and what each reads,<br>turning scanning off, and how to suppress a finding correctly |
 | [testing.md](testing.md) | The test layers, coverage rules, RNTL notes, adding a Maestro flow, Playwright, forensics artifacts |
 | [native-extensions.md](native-extensions.md) | Config plugin vs local Expo module vs build properties,<br>the `hello-native` and `with-build-stamp` walkthroughs, capability recipes |
 | [ota-and-crash-reporting.md](ota-and-crash-reporting.md) | The `CrashReporter` adapter slot, Sentry and Crashlytics recipes, where dSYMs live, pointer to the OTA doc |

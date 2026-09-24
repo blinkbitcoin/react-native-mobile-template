@@ -27,6 +27,7 @@ flowchart TD
   subgraph CI["CI — every change"]
     direction LR
     checks["Checks"] --> unit["Unit"] --> e2e["E2E"] --> badges["Badges"]
+    checks -.->|"SECURITY_ENABLED<br/>(not wired into CI yet)"| sec["Security scans"]
   end
 
   CI -->|"push to main"| rp["CD / Release<br/>(release-please, then Store Notes<br/>drafted into the release PR)"]
@@ -79,6 +80,14 @@ Two edges are worth reading twice. `Prepare` in **CD / Internal** waits for CI
 to conclude green for the same commit, so a red `main` never reaches a build or
 a store. And `E2E` sits behind `Unit`, so a failed unit run never pays for a
 twenty-minute Android suite or a macOS runner.
+
+Dotted edges are the configurable ones: a feature that exists, drawn where it
+belongs, with the variable that turns it on. `Security scans` is dotted twice
+over — it is off unless `SECURITY_ENABLED` says otherwise, **and** no workflow
+calls it yet. Today it runs only from `make check-security` on a laptop; the
+reusable `check-security.yml` and its call sites are a later stage, and this
+edge becomes solid when they land. What each scanner reads, how to disable one,
+and what "skipped" means are in [security.md](security.md).
 
 The Huawei AppGallery jobs hang off the Google Play ones on purpose: each of
 them `needs` its tier's Android store job, so AppGallery never receives a
