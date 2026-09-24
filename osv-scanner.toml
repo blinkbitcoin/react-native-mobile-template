@@ -1,0 +1,20 @@
+# Reasoned ignores for osv-scanner. One entry per advisory: what it is, why it
+# cannot be reached from this app, and what should make us look again. An entry
+# with no reason is not mergeable (docs/quality.md, "Suppressing something,
+# correctly"). These mirror auditConfig.ignoreGhsas in pnpm-workspace.yaml.
+
+[[IgnoredVulns]]
+id = "GHSA-w3rx-r6r6-pgpr"
+reason = "image-size <=2.0.2 ICNS infinite loop. Reached only by metro at bundle time, over assets already in this repo; the app binary does not ship metro. Blocked from patching by minimumReleaseAge and by metro's ^1.0.2 range. Re-evaluate when an Expo SDK bump moves metro off image-size 1.x."
+
+[[IgnoredVulns]]
+id = "GHSA-5p2g-fcmc-qvqq"
+reason = "image-size <=2.0.2 JXL/HEIF infinite loop. Same single caller, same reachability argument and same blockers as GHSA-w3rx-r6r6-pgpr; listed separately so a fix for one cannot keep the other suppressed."
+
+[[IgnoredVulns]]
+id = "GHSA-w5hq-g745-h8pq"
+reason = "uuid@7.0.3, CVE-2026-41907, CVSS 7.5 high, affecting v3()/v5()/v6(). Path: expo > @expo/config-plugins > xcode@3.0.1 > uuid@7.0.3; xcode is the only dependent in the tree and hard-pins \"uuid\": \"^7.0.3\". No in-range fix can exist: uuid 7.0.3 (2020) was the last 7.x release ever published, and the patched releases (11.1.1, 12.0.1, 13.0.1) are forced majors past xcode's own range - there is no version to move to without xcode itself changing its dependency. Unreachable: xcode's sole call into this package is uuid.v4() at pbxProject.js:90, invoked during `expo prebuild` on a developer machine or CI runner - never inside the shipped app binary, and never over externally supplied input. The advisory is scoped to v3(), v5() and v6(); v4() is not affected. Re-evaluate if @expo/config-plugins ever moves xcode off the uuid 7.x line, or if xcode starts calling v3()/v5()/v6()."
+
+[[IgnoredVulns]]
+id = "GHSA-vcc3-ghjq-m6fr"
+reason = "decode-uri-component@0.2.2, CVE-2026-45822, CVSS 6.6 medium: a malformed URI component causes a hang or crash - a denial of service, not code execution or data disclosure. Path: expo-router@57.0.21 > query-string@7.1.3 > decode-uri-component@0.2.2; expo-router is the only dependent of query-string, and query-string hard-pins \"decode-uri-component\": \"^0.2.2\". No clean upgrade exists: the fix, 0.5.0, is ESM-only (\"type\": \"module\", no \"main\") while query-string/index.js calls it via require('decode-uri-component'); forcing the override breaks require() resolution and crashes on the first deep link parsed. Every query-string release through the current 9.5.1 still declares \"decode-uri-component\": \"^0.4.1\" and has never adopted 0.5.0. Reachable, and accepted rather than absent: expo-router's build/react-navigation/core/getStateFromPath.js:499 calls queryString.parse(query) on an incoming deep link, and query-string/index.js:233 calls decodeComponent(value) on that same parse path (stringify never touches decode-uri-component). The owner has accepted this as a residual DoS surface reachable through a deep link. Re-evaluate if expo-router moves off query-string@7.x, or if query-string adopts a decode-uri-component release past 0.4.x."

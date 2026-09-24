@@ -71,6 +71,9 @@ modules/*/android/.cxx/
 /test-results
 /.maestro/output
 
+# Local security scan output (make check-security)
+/.security
+
 # Ruby gems for fastlane/cocoapods (Gemfile.lock is committed, the gems are not)
 # No trailing path: a git worktree commonly symlinks `vendor` at the bundle the
 # main clone already installed, and `/vendor/bundle` does not match a symlink
@@ -107,6 +110,11 @@ modules/*/android/.cxx/
 *.xcarchive
 *.dSYM.zip
 mapping.txt
+
+# Claude Code's git worktrees: whole checkouts of this repository, each with
+# its own node_modules. Every tool that walks the tree excludes them too; see
+# docs/quality.md.
+/.claude/worktrees/
 
 # shared-workflows self-checkout (also added to .git/info/exclude by its setup action)
 /.workflows

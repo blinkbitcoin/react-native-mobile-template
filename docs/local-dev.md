@@ -108,6 +108,12 @@ APP_PORT_BASE=8090 make dev-api   # 8092
 APP_PORT_BASE=8090 make dev       # 8091
 ```
 
+A worktree may also live *inside* the checkout: Claude Code puts its own under
+`.claude/worktrees/<name>/`. Every tool that walks the tree (Jest, Metro,
+ESLint, Biome, knip, tsc, typos, Semgrep, CodeQL) skips that directory, so
+`make check` and `make test-unit` in the main checkout see only its own files.
+See [quality.md](quality.md#worktrees-inside-the-checkout-are-not-this-checkout).
+
 `EXPO_PUBLIC_API_URL` is the one value that is *not* exported by mise either:
 Expo bakes it into the bundle, so `.env.development` carries the mock API's
 default URL for a bare `expo start`, and the Makefile's run targets export the
@@ -214,11 +220,13 @@ commits already passed the hook once.
 | iOS build fails on a pod that was just added | `make prebuild`, which reruns pod install, or delete `ios/` and let `make dev-ios` regenerate it |
 | `make check-deps` warns about Expo SDK drift | `pnpm expo install --check` is the fix path, once `minimumReleaseAge` lets the patch in. The drift is a warning,<br>not a failure: `scripts/check-deps.sh` says why. Genuine exceptions go in `expo.install.exclude` in `package.json` |
 | A `pnpm install` fails on a package that is too new | `minimumReleaseAge` in `pnpm-workspace.yaml` is 1 day.<br>Wait, or add an exact `name@version` entry to `minimumReleaseAgeExclude` with a comment saying why |
+| A `pnpm install` fails with a trust-policy / provenance-downgrade error | `trustPolicy: no-downgrade` in `pnpm-workspace.yaml`.<br>pnpm compares publish dates across every major of a package, so a later, stronger release can still read as a downgrade.<br>Confirm with `pnpm audit` that the package is not actually vulnerable, then add an exact `name@version` entry<br>to `trustPolicyExclude` with a comment saying why |
 | `Cannot find native module 'HelloNative'` | You are on web or in Expo Go. Build a dev client: `make dev-ios` or `make dev-android` |
 | The app cannot reach the API on Android | The emulator needs `10.0.2.2`. See above |
 | The dev client sits on its launcher screen | Open the `expo-development-client` deep link. See above |
 | Type errors in `src/graphql/generated/` | Do not edit it. Run `make gen-graphql`.<br>It imports `@graphql-typed-document-node/core`, which is why that package is a direct dependency |
 | A release Android build dies in `createBundleReleaseJsAndAssets` with "Cannot find module 'babel-preset-expo'" | `publicHoistPattern` in `pnpm-workspace.yaml` exists for this. Do not remove that entry. See [quality.md](quality.md) |
+| A script fails now and then with status 139, e.g. `grep failed with status 139` from `make verify-ios` | A `LC_ALL=C cmd` prefix crashing a Homebrew bash in a forked subshell (CoreFoundation is not fork-safe).<br>Write `env LC_ALL=C cmd`; `scripts/shell-locale.test.mjs` enforces it. See [release-runbook.md](release-runbook.md) |
 | `make check-release` says to run `bundle install` | You skipped the Ruby half of `make install` (`NO_BUNDLE=1`, or an older clone).<br>Re-run `make install`. Ruby gems are not committed |
 
 ## Editors

@@ -51,3 +51,4 @@ paths-ignore:
   - coverage # jest reports
   - vendor/bundle # fastlane's gems
   - .workflows # the workflows repo, checked out beside us on a runner
+  - .claude/worktrees # other checkouts of this repository (Claude Code worktrees)

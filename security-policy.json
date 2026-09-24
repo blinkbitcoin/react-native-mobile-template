@@ -1,0 +1,26 @@
+{
+  "$comment": "Security scanning settings. Every key has an environment twin that wins over this file: SECURITY_ENABLED, SECURITY_SEVERITY, SECURITY_FAIL_ON, and SECURITY_<JOB> for each job. See docs/security.md.",
+  "enabled": true,
+  "severity": "high",
+  "failOn": ["deterministic"],
+  "jobs": {
+    "deps": { "enabled": true },
+    "code": { "enabled": true },
+    "policy": { "enabled": true },
+    "sbom": {
+      "enabled": false,
+      "$comment": "Reserved for Stage 2. No scripts/security/sbom.sh exists yet - leave false until it does."
+    },
+    "bundle": {
+      "enabled": false,
+      "$comment": "Reserved for Stage 2. No scripts/security/bundle.sh exists yet - leave false until it does."
+    },
+    "mobile": { "enabled": false },
+    "binaries": {
+      "enabled": false,
+      "$comment": "Reserved for Stage 2. No scripts/security/binaries.sh exists yet - leave false until it does."
+    },
+    "review": { "enabled": false },
+    "openant": { "enabled": false }
+  }
+}

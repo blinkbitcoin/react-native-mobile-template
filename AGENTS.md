@@ -91,6 +91,10 @@ aggregates.
 | `make check-prebuild` | Prebuild both platforms in a temp dir, assert plugin output |
 | `make check-release` | Ruby syntax + fastlane lane parse + lane unit tests + skill tests |
 | `make check-secrets` | gitleaks over the whole git history; allowlisted test data in `.gitleaks.toml` |
+| `make check-security` | Every enabled security scanner, then the verdict (see `docs/security.md`) |
+| `make check-security-deps` | Known vulnerabilities and malicious packages in the lockfile (osv-scanner) |
+| `make check-security-code` | Semgrep over app source: TypeScript, secrets, OWASP packs plus `rules/` |
+| `make check-security-policy` | Assert the pnpm install policy: release cooldown, no implicit builds, no trust downgrade |
 | `make check-security-bundle` | Export the bundle, assert no non-public keys leaked |
 | `make check-codeql` | CodeQL with the same config CI uses (needs a CodeQL CLI; not in `make check`) |
 
@@ -126,6 +130,11 @@ aggregates.
   override and `APP_PORT_BASE=8090` stops working. `scripts/ports.test.mjs`
   fails on a bare literal and names the file; see
   [docs/local-dev.md](docs/local-dev.md).
+- **Never set a locale as a command prefix in shell code.** Write
+  `env LC_ALL=C grep ...`, not `LC_ALL=C grep ...`: with the prefix a Homebrew
+  bash on macOS switches its own locale inside `$(...)` or a pipeline and now
+  and then dies with SIGSEGV (status 139). `scripts/shell-locale.test.mjs`
+  fails on the prefix and names the line.
 - **User-visible strings go through Lingui** (`t`/`Trans` macros), then
   `make gen-i18n`. No bare literals in JSX.
 - **Secrets go through `src/lib/secure-store`**, never `expo-secure-store`
@@ -142,6 +151,12 @@ aggregates.
   missing `await waitFor`, not a logging need; a deliberate one opts out with
   `allowConsole(method, matcher)` or by spying on the method. The guard and its
   test are the only `noConsole` exemptions besides the ones above.
+- **Worktrees under `.claude/worktrees/` are not this checkout.** Claude Code
+  puts whole checkouts there, node_modules included, so every tool that walks
+  the tree excludes the directory itself (Jest and Metro anchored to the root,
+  since a worktree's own root is under it too). A new tool adds its entry;
+  `scripts/worktree-ignores.test.mjs` holds the existing ones, and
+  `docs/quality.md` lists them.
 - **Routes-only rule:** files in `src/app/` compose screens from `src/features`
   and `src/components` and may not import `@apollo/client`, `@/graphql`,
   `@/services` or `@/lib`. Only `src/app/_layout.tsx` and
