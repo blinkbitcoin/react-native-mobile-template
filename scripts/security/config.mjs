@@ -20,10 +20,12 @@ export const DEFAULTS = {
     deps: true,
     code: true,
     policy: true,
-    sbom: true,
-    bundle: true,
+    // sbom, bundle and binaries are reserved names: no scripts/security/*.sh
+    // runner exists for them yet, so they stay off until Stage 2 lands one.
+    sbom: false,
+    bundle: false,
     mobile: false,
-    binaries: true,
+    binaries: false,
     review: false,
     openant: false,
   },
