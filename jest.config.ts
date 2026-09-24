@@ -78,11 +78,23 @@ const config: Config = {
       // those up and fail on `import.meta` - a consumer's Unit job going red
       // over a file the consumer does not own. It is the seventh entry in the
       // guide's `.workflows/` ignore list, added when that repo grew tests.
+      // `<rootDir>/rules/` holds Semgrep's own `<rule-id>.test.tsx` fixture
+      // convention (paired with `<rule-id>.yaml`, asserted by
+      // `semgrep --test rules/` and `make check-security-code`) -
+      // deliberately uninstantiable snippets like a bare
+      // `AsyncStorage.setItem(...)` with no import, never a Jest suite.
+      // Anchored to the repository root, unlike the bare `/plugins/`-style
+      // entries above: a consumer's own nested `src/rules/` (an unrelated
+      // directory name they are free to use) must still be tested,
+      // type-checked and linted normally, matching the root-anchored `rules`
+      // entries in `tsconfig.json`'s `exclude`, `biome.json`'s
+      // `files.includes`, and `eslint.config.mjs`'s `globalIgnores`.
       testPathIgnorePatterns: [
         '/node_modules/',
         '/e2e/',
         '/plugins/',
         '/scripts/',
+        '<rootDir>/rules/',
         '/\\.workflows/',
       ],
       coveragePathIgnorePatterns,

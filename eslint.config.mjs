@@ -16,6 +16,7 @@ export default defineConfig([
     '.workflows/**',
     'src/graphql/generated/**',
     'src/i18n/locales/**/messages.ts',
+    'rules/**', // Semgrep fixtures: deliberately vulnerable code, scanned by semgrep --test, not ESLint
   ]),
   ...(Array.isArray(expoConfig) ? expoConfig : [expoConfig]),
   {

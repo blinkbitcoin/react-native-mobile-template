@@ -26,8 +26,9 @@ enforces.
 
 - `app`: the `jest-expo` preset, `src/test/env.ts` and `src/test/setup.ts`, the
   `@/*` path alias, and module mocks for `expo-secure-store`,
-  `expo-sqlite/kv-store` and `expo-updates`. It ignores `/plugins/`, `/e2e/`
-  and `/scripts/`.
+  `expo-sqlite/kv-store` and `expo-updates`. It ignores `/plugins/`, `/e2e/`,
+  `/scripts/` and `/rules/` (Semgrep's own `<rule-id>.test.tsx` fixture
+  convention, asserted by `semgrep --test rules/`, never a Jest suite).
 - `plugins`: plain node, matching `plugins/**/*.test.ts`. Config plugins run
   inside the Expo CLI, not in a React Native runtime, so they get no preset.
   Its only setup file is `src/test/setup.plugins.ts`, which installs the
@@ -59,6 +60,10 @@ suites include:
 | `scripts/release/build-info.test.mjs` | The per-build provenance record |
 | `scripts/coverage-completeness.test.mjs` | Loads every `scripts/**/*.mjs` module, so one no test imports still counts |
 | `scripts/release/shared-copies.test.mjs` | Our `resolve-version.sh` and `build-info.sh` against shared-workflows' copies, read from `$WORKFLOWS_DIR`.<br>CI always compares; locally they skip unless `WORKFLOWS_DIR` points at a checkout |
+| `scripts/security/config.test.mjs` | Settings resolution: environment, then `security-policy.json`, then defaults |
+| `scripts/security/sarif.test.mjs` | The SARIF document builders: a skipped run and a findings run |
+| `scripts/security/verdict.test.mjs` | Merging SARIF documents, the severity threshold and the `failOn` engine gate |
+| `scripts/security/runners.test.mjs` | The bash runners (`deps.sh`, `code.sh`, `policy.sh`, `local.sh`): enabled, disabled and missing-tool paths |
 
 These run in `make ci` (and in CI's Unit job), **not** in `make check`, which
 is the static gates only. The port guard in `scripts/ports.test.mjs` and the
