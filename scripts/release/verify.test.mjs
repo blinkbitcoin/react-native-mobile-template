@@ -772,19 +772,71 @@ test('the debug certificate is recognised whatever the rest of the DN says', () 
   }
 });
 
+/**
+ * Records one debug-signing verdict for a signer DN, then summarises. The last
+ * line says whether vc_summary failed the gate and what VC_FAILURES counted, so
+ * a test asserts the gate's decision and not only the line it printed.
+ */
+function debugSigningGate(dn) {
+  return sh(
+    `vc_reset; vc_verdict debug-signing "$(vc_debug_signing_verdict '${dn}')"; ` +
+      'if vc_summary T >/dev/null; then echo "passed failures=$VC_FAILURES"; ' +
+      'else echo "failed failures=$VC_FAILURES"; fi',
+  ).split('\n');
+}
+
 test('a release certificate fails the debug-signing check by name', () => {
-  const out = sh(
-    `vc_reset; vc_verdict debug-signing "$(vc_debug_signing_verdict 'CN=Blink Upload, O=Blink, C=SV')" || true`,
-  );
-  assert.match(out, /^fail debug-signing/);
-  assert.match(out, /CN=Android Debug/, 'the message must say what was expected');
-  assert.match(out, /CN=Blink Upload/, 'and what was found');
+  const out = debugSigningGate('CN=Blink Upload, O=Blink, C=SV');
+  assert.match(out[0], /^FAIL debug-signing: /);
+  assert.match(out[0], /CN=Android Debug/, 'the message must say what was expected');
+  assert.match(out[0], /CN=Blink Upload/, 'and what was found');
+  assert.equal(out.at(-1), 'failed failures=1', 'and the gate must fail on it');
 });
 
 test('an unsigned apk fails debug-signing rather than reporting an empty signer', () => {
-  const out = sh(`vc_reset; vc_verdict debug-signing "$(vc_debug_signing_verdict '')" || true`);
-  assert.match(out, /^fail debug-signing/);
-  assert.match(out, /got no signer/);
+  const out = debugSigningGate('');
+  assert.match(out[0], /^FAIL debug-signing: .*got no signer/);
+  assert.equal(out.at(-1), 'failed failures=1', 'and the gate must fail on it');
+});
+
+test('the debug certificate passes the gate it is asserted in', () => {
+  assert.equal(debugSigningGate('CN=Android Debug, O=Android, C=US').at(-1), 'passed failures=0');
+});
+
+// A verdict helper that prints a status the checklist does not know -- the
+// lowercase `fail` debug-signing once printed -- used to be recorded and
+// counted as nothing, so the gate passed. An unknown status is a FAIL now. (An
+// empty verdict fails too, with its own message: see 'a check that produced
+// no verdict fails the checklist'.)
+test('a verdict with an unknown status fails the gate instead of passing it', () => {
+  for (const verdict of ['fail lowercase', 'FAILED typo', 'error something', ' leading', 'ok']) {
+    const out = sh(
+      `vc_reset; vc_verdict thing '${verdict}'; vc_summary T >/dev/null || echo "failures=$VC_FAILURES"`,
+    ).split('\n');
+    if (verdict === 'ok') {
+      // A bare status with no detail is still a known status.
+      assert.deepEqual(out, ['ok thing: ok'], verdict);
+      continue;
+    }
+    assert.match(out[0], /^FAIL thing: unknown verdict status /, JSON.stringify(verdict));
+    assert.ok(out[0].includes(verdict), `the original verdict must be shown: ${out[0]}`);
+    assert.equal(out.at(-1), 'failures=1', JSON.stringify(verdict));
+  }
+});
+
+test('a verdict with a known status is recorded as that status', () => {
+  const out = sh(
+    "vc_reset; vc_verdict a 'ok fine'; vc_verdict b 'warn odd'; vc_verdict c 'skip absent'; " +
+      "vc_verdict d 'FAIL broken'; " +
+      'echo "failures=$VC_FAILURES warnings=$VC_WARNINGS skips=$VC_SKIPS"',
+  ).split('\n');
+  assert.deepEqual(out, [
+    'ok a: fine',
+    'warn b: odd',
+    'skip c: absent',
+    'FAIL d: broken',
+    'failures=1 warnings=1 skips=1',
+  ]);
 });
 
 test('summary cells escape a pipe so the job-summary table survives a path', () =>
@@ -1290,5 +1342,59 @@ test('verify-android.sh --strict refuses to pass a check it could not run', () =
     assert.equal(status, 1);
     for (const check of ANDROID_TOOL_CHECKS) {
       assert.match(stdout, new RegExp(`^FAIL ${check}: requires `, 'm'), `${check}\n${stdout}`);
+    }
+  }));
+
+/**
+ * An apksigner that verifies anything and prints the given signer, in the
+ * `Signer #1 certificate DN:` shape the real one uses. An empty DN prints no DN
+ * line at all, which is what an APK with no v1-v3 signer looks like to the gate.
+ */
+function withFakeApksigner(dir, dn) {
+  const bin = path.join(dir, 'fake-bin');
+  mkdirSync(bin, { recursive: true });
+  const lines = [
+    ...(dn ? [`Signer #1 certificate DN: ${dn}`] : []),
+    `Signer #1 certificate SHA-256 digest: ${'ab'.repeat(32)}`,
+  ];
+  writeFileSync(
+    path.join(bin, 'apksigner'),
+    `#!/bin/sh\n${lines.map((line) => `echo '${line}'`).join('\n')}\n`,
+    { mode: 0o755 },
+  );
+  const env = withoutAndroidTools(dir);
+  return { ...env, PATH: `${bin}:${env.PATH}` };
+}
+
+/** The failure count from the gate's closing tally line. */
+function failedCount(stdout) {
+  const match = stdout.match(/ — \d+ checks, (\d+) failed,/);
+  assert.ok(match, `no tally line in:\n${stdout}`);
+  return Number(match[1]);
+}
+
+// The unsigned tier's assertion, end to end: the lane passes
+// --expect-debug-signing, and a release-signed or unsigned APK must be counted
+// as a failure by the gate, not only printed. The hand-made artifacts fail
+// other checks too (nothing can read them), so the debug-signed run is the
+// baseline: anything else must fail exactly one check more than it does.
+test('verify-android.sh --expect-debug-signing fails the gate on anything but the debug certificate', () =>
+  withTempDir((dir) => {
+    const [aab, apk] = fakeAndroidArtifacts(dir);
+    const args = [aab, apk, '--expect-debug-signing'];
+
+    const debug = run(
+      verifyAndroid,
+      args,
+      withFakeApksigner(dir, 'CN=Android Debug, O=Android, C=US'),
+    );
+    assert.match(debug.stdout, /^ok debug-signing: /m, debug.stdout);
+    const baseline = failedCount(debug.stdout);
+
+    for (const dn of ['CN=Blink Upload, O=Blink, C=SV', '']) {
+      const other = run(verifyAndroid, args, withFakeApksigner(dir, dn));
+      assert.match(other.stdout, /^FAIL debug-signing: /m, other.stdout);
+      assert.equal(failedCount(other.stdout), baseline + 1, other.stdout);
+      assert.equal(other.status, 1, other.stdout);
     }
   }));

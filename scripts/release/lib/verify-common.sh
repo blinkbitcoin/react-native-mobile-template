@@ -13,7 +13,8 @@
 #      scripts/release/verify.test.mjs able to test the decisions themselves
 #      instead of only the happy path of a 90 MB build.
 #
-# A status is one of: ok | warn | skip | FAIL. Only FAIL fails the gate.
+# A status is one of: ok | warn | skip | FAIL. Only FAIL fails the gate, and a
+# verdict whose status is anything else is recorded as a FAIL (see vc_verdict).
 # `skip` means "this check could not run" (a tool is missing, an input was not
 # given) and is deliberately not a failure: the gates have to be usable on a
 # laptop that has no bundletool.
@@ -53,19 +54,26 @@ vc_warn() { vc_record warn "$@"; }
 vc_skip() { vc_record skip "$@"; }
 vc_fail() { vc_record FAIL "$@"; }
 
-# Turns `<status> <detail>` from a pure helper into a checklist line.
+# Turns `<status> <detail>` from a pure helper into a checklist line. Anything
+# that is not a known status fails closed, because vc_record counts only the
+# four statuses above and would otherwise record the line and let the gate pass:
 #
-# Every verdict is computed in `$(...)`. When that subshell dies before it
-# prints -- a crash, a signal -- the verdict is empty, and an empty status would
-# be recorded as neither a pass nor a failure: a check that never ran, counted
-# as one that did not fail. It is a failure.
+# - An empty verdict. Every verdict is computed in `$(...)`; when that subshell
+#   dies before it prints -- a crash, a signal -- the check never ran, and that
+#   is not the same as a check that did not fail.
+# - A status the checklist does not know -- a lowercase `fail`, a typo. That is
+#   what let `debug-signing` pass a release-signed APK.
 vc_verdict() { # <check> <verdict>
-  local check="$1" verdict="$2"
+  local check="$1" verdict="$2" status
   if [ -z "$verdict" ]; then
     vc_fail "$check" 'the check produced no verdict (it exited or crashed before printing one)'
     return 0
   fi
-  vc_record "${verdict%% *}" "$check" "${verdict#* }"
+  status="${verdict%% *}"
+  case "$status" in
+    ok | warn | skip | FAIL) vc_record "$status" "$check" "${verdict#* }" ;;
+    *) vc_fail "$check" "unknown verdict status '$status' in: $verdict" ;;
+  esac
 }
 
 vc_expect() { # <check> <expected> <actual>
@@ -702,8 +710,8 @@ vc_cert_verdict() { # <expected> <actual>
 vc_debug_signing_verdict() { # <signer DN>
   case "$1" in
     *'CN=Android Debug'*) printf 'ok signed by the Android debug certificate (%s)' "$1" ;;
-    '') printf 'fail expected the Android debug certificate (CN=Android Debug), got no signer' ;;
-    *) printf 'fail expected the Android debug certificate (CN=Android Debug), got: %s' "$1" ;;
+    '') printf 'FAIL expected the Android debug certificate (CN=Android Debug), got no signer' ;;
+    *) printf 'FAIL expected the Android debug certificate (CN=Android Debug), got: %s' "$1" ;;
   esac
 }
 
