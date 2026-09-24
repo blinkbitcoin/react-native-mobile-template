@@ -51,13 +51,15 @@ jobs:
     if: ${{ needs.checks.outputs.docs-only != 'true' }}
     uses: blinkbitcoin/shared-workflows/.github/workflows/check-e2e.yml@v0
     with:
-      # This repo is public, so standard runners - macOS included - are free
-      # and E2E_IOS is set to true: there is no reason to skip the coverage.
-      # An app generated from this template is usually private, where macOS
-      # bills at 10x, which is why the workflow default is still off. Either
-      # way a single PR can opt in with the `e2e:ios` label (the `labeled`
-      # trigger above is what makes the label alone start a run).
-      ios: ${{ vars.E2E_IOS == 'true' || contains(github.event.pull_request.labels.*.name, 'e2e:ios') }}
+      # iOS runs on a push to main (and a manual run) when the repo variable
+      # E2E_IOS is true, and on a PR only when it carries the `e2e:ios` label
+      # (the `labeled` trigger above is what makes the label alone start a
+      # run). So every merge is covered while a PR waits only for Android,
+      # which takes about a third as long. This repo is public, so macOS runners
+      # are free and E2E_IOS is true here. An app generated from this template
+      # is usually private, where macOS bills at 10x, which is why the workflow
+      # default is still off. scripts/ci-e2e-ios.test.mjs evaluates this line.
+      ios: ${{ (github.event_name != 'pull_request' && vars.E2E_IOS == 'true') || contains(github.event.pull_request.labels.*.name, 'e2e:ios') }}
       macos-runner: ${{ vars.WORKFLOWS_MACOS_RUNNER || 'macos-26' }}
       # Android only. The iOS suite runs a Release build below, which embeds the
       # bundle and has no dev launcher, so check-e2e.yml forces dev-client off there.

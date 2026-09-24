@@ -26,7 +26,8 @@ flowchart TD
 
   subgraph CI["CI — every change"]
     direction LR
-    checks["Checks"] --> unit["Unit"] --> e2e["E2E"] --> badges["Badges"]
+    checks["Checks"] --> unit["Unit"] --> e2e["E2E Android"] --> badges["Badges"]
+    unit -.->|"E2E_IOS on a push to main,<br/>e2e:ios label on a PR"| e2eios["E2E iOS"] -.-> badges
     checks -.->|"SECURITY_ENABLED<br/>(not wired into CI yet)"| sec["Security scans"]
   end
 
@@ -220,29 +221,38 @@ Two script-contract details are load-bearing:
   `.env.production`'s API URL on a deploy run, so `e2e/web/fixtures.ts`
   redirects the page's GraphQL calls to the mock API rather than rebuilding.
 
-## E2E: iOS is opt-in, and this repo opts in
+## E2E: iOS runs on main, and on a PR only when asked
 
 macOS GitHub-hosted runners bill at 10x **on a private repo**, which is why
 `check-e2e.yml`'s `ios` input defaults to `false` — the safe default for the app
 repos generated from this template. **On a public repo standard runners are
-free, macOS included**, so this repo sets `E2E_IOS=true` and runs the iOS suite
-on every push. There is no cost argument for skipping it here.
+free, macOS included**, so this repo sets `E2E_IOS=true`. There is no cost
+argument for skipping it here.
 
 What is still true either way is wall-clock: iOS takes roughly three times as
-long as Android. `ci.yml` passes:
+long as Android. So even here a PR does not run it by default; every push to
+`main` does. `ci.yml` passes:
 
 ```yaml
-ios: ${{ vars.E2E_IOS == 'true' || contains(github.event.pull_request.labels.*.name, 'e2e:ios') }}
+ios: ${{ (github.event_name != 'pull_request' && vars.E2E_IOS == 'true') || contains(github.event.pull_request.labels.*.name, 'e2e:ios') }}
 ```
 
 Two independent ways in:
 
 - **Repo variable** — set `E2E_IOS=true` (Settings → Secrets and variables →
-  Actions → Variables) to run iOS on every push and PR.
-- **PR label** — add the `e2e:ios` label to a single PR. The `labeled` trigger
-  in `ci.yml` is what makes adding the label start a fresh run; a label change
-  is not a `synchronize` event, so without it the label would only take effect
-  on the next push.
+  Actions → Variables) to run iOS on every push to `main` and every manual run
+  of CI. It does not reach PRs.
+- **PR label** — add the `e2e:ios` label to a single PR to run iOS on it, with
+  or without the variable. The `labeled` trigger in `ci.yml` is what makes
+  adding the label start a fresh run; a label change is not a `synchronize`
+  event, so without it the label would only take effect on the next push. The
+  label stays on the PR, so later pushes run iOS too. A new repo has no such
+  label; create it once with
+  `gh label create e2e:ios --description "Run the iOS E2E suite on this PR"`.
+
+`scripts/ci-e2e-ios.test.mjs` evaluates that expression for each of those
+events, so a change to it that lets iOS back onto every PR fails `make
+test-scripts`.
 
 Android runs on every non-docs-only run (`android` defaults to `true`).
 
