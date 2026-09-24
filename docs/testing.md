@@ -26,8 +26,9 @@ enforces.
 
 - `app`: the `jest-expo` preset, `src/test/env.ts` and `src/test/setup.ts`, the
   `@/*` path alias, and module mocks for `expo-secure-store`,
-  `expo-sqlite/kv-store` and `expo-updates`. It ignores `/plugins/`, `/e2e/`
-  and `/scripts/`.
+  `expo-sqlite/kv-store` and `expo-updates`. It ignores `/plugins/`, `/e2e/`,
+  `/scripts/` and `/rules/` (Semgrep's own `<rule-id>.test.tsx` fixture
+  convention, asserted by `semgrep --test rules/`, never a Jest suite).
 - `plugins`: plain node, matching `plugins/**/*.test.ts`. Config plugins run
   inside the Expo CLI, not in a React Native runtime, so they get no preset.
   Its only setup file is `src/test/setup.plugins.ts`, which installs the

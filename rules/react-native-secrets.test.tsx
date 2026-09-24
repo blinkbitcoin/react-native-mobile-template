@@ -47,7 +47,7 @@ const BASE_URL = 'http://api.example.com/graphql';
 fetch(BASE_URL);
 
 // ok: rn-cleartext-fetch
-fetch('http://localhost:8080/graphql');
+fetch('http://localhost:1234/graphql');
 
 // ok: rn-cleartext-fetch
 fetch('https://api.example.com/graphql');

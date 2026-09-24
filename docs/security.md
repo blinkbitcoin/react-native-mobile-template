@@ -75,7 +75,8 @@ A first `make check-security` run on this repository finds 11 Semgrep
 findings (6 mutable GitHub Actions tags, 3 service-account strings in docs
 paths, 2 minimum-release-age policy findings) and 2 osv-scanner advisories:
 `uuid@7.0.3` (CVE-2026-41907, CVSS 7.5, high) and `decode-uri-component@0.2.2`
-(CVSS 6.6, medium). Because a high-severity advisory exists,
-`make check-security` currently exits 1. That is the gate working, not a bug -
+(CVSS 6.6, medium). Because a high-severity advisory exists, `make
+check-security` currently fails (`verdict.mjs` exits 1; Make reports its own
+generic nonzero status on top of that). That is the gate working, not a bug -
 each finding needs a reasoned ignore in its own scanner's config (see
 "Suppressing a finding, correctly" above), never a raised threshold.
