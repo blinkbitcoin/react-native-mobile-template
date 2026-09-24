@@ -78,10 +78,40 @@ jobs:
 
   # ---- action=release -------------------------------------------------------
 
+  # The release gate: the binaries this dispatch is about to submit, checked
+  # before any store sees them. The tag's own assets are what is read - the
+  # same files the stores receive - plus a fresh prebuild, the exported bundle
+  # and a bill of materials. No LLM environment here: model calls stay out of
+  # the CD lanes (ADR 0021); the release pull request is where they run.
+  security:
+    name: Security
+    needs: prepare
+    if: ${{ inputs.action == 'release' && vars.SECURITY_ENABLED != 'false' }}
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    uses: blinkbitcoin/shared-workflows/.github/workflows/check-security.yml@v0
+    with:
+      ref: ${{ inputs.tag }}
+      release-tag: ${{ inputs.tag }}
+      # The source scanners already ran on every pull request and on the
+      # release pull request, against this same commit.
+      deps: false
+      code: false
+      policy: false
+      binaries: true
+      mobile: true
+      bundle: true
+      sbom: true
+
+  # Every store job below waits on `security`. `!failure() && !cancelled()`,
+  # not the implicit success(): a gate that was switched off is skipped, and a
+  # skipped need would otherwise skip the release with it.
   ios-release:
     name: Release iOS
-    needs: prepare
-    if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && (inputs.action == 'release' && inputs.platforms != 'android') }}
+    needs: [prepare, security]
+    if: ${{ !failure() && !cancelled() && vars.STORE_UPLOADS_ENABLED == 'true' && (inputs.action == 'release' && inputs.platforms != 'android') }}
     uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@v0
     permissions:
       contents: read
@@ -118,8 +148,8 @@ jobs:
 
   android-release:
     name: Release Android
-    needs: prepare
-    if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && (inputs.action == 'release' && inputs.platforms != 'ios') }}
+    needs: [prepare, security]
+    if: ${{ !failure() && !cancelled() && vars.STORE_UPLOADS_ENABLED == 'true' && (inputs.action == 'release' && inputs.platforms != 'ios') }}
     uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@v0
     permissions:
       contents: read
@@ -146,8 +176,8 @@ jobs:
   # it back into an artifact the lane job can download.
   huawei-binary:
     name: Stage Huawei binary
-    needs: prepare
-    if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && vars.HUAWEI_UPLOADS_ENABLED == 'true' && (inputs.action == 'release' && inputs.platforms != 'ios') }}
+    needs: [prepare, security]
+    if: ${{ !failure() && !cancelled() && vars.STORE_UPLOADS_ENABLED == 'true' && vars.HUAWEI_UPLOADS_ENABLED == 'true' && (inputs.action == 'release' && inputs.platforms != 'ios') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

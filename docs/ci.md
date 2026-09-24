@@ -28,7 +28,7 @@ flowchart TD
     direction LR
     checks["Checks"] --> unit["Unit"] --> e2e["E2E Android"] --> badges["Badges"]
     unit -.->|"E2E_IOS on a push to main,<br/>e2e:ios label on a PR"| e2eios["E2E iOS"] -.-> badges
-    checks -.->|"SECURITY_ENABLED<br/>(not wired into CI yet)"| sec["Security scans"]
+    checks -.->|"SECURITY_ENABLED"| sec["Security<br/>(source scanners; + bundle, OpenAnt<br/>on the release PR)"]
   end
 
   CI -->|"push to main"| rp["CD / Release<br/>(release-please, then Store Notes<br/>drafted into the release PR)"]
@@ -59,8 +59,9 @@ flowchart TD
 
   subgraph prod["CD / Production"]
     direction LR
-    rel["Release iOS<br/>Release Android"] --> roll["Phased / Rollout"] --> done["Complete or Halt"]
-    pbin["Stage Huawei binary"] -->|"downloads *.aab from the tag"| phuawei["Release Huawei"]
+    psec["Security<br/>(binaries, prebuild, bundle, SBOM)"] --> rel["Release iOS<br/>Release Android"] --> roll["Phased / Rollout"] --> done["Complete or Halt"]
+    psec --> pbin["Stage Huawei binary"]
+    pbin -->|"downloads *.aab from the tag"| phuawei["Release Huawei"]
     rel --> phuawei
   end
 
@@ -83,12 +84,14 @@ a store. And `E2E` sits behind `Unit`, so a failed unit run never pays for a
 twenty-minute Android suite or a macOS runner.
 
 Dotted edges are the configurable ones: a feature that exists, drawn where it
-belongs, with the variable that turns it on. `Security scans` is dotted twice
-over — it is off unless `SECURITY_ENABLED` says otherwise, **and** no workflow
-calls it yet. Today it runs only from `make check-security` on a laptop; the
-reusable `check-security.yml` and its call sites are a later stage, and this
-edge becomes solid when they land. What each scanner reads, how to disable one,
-and what "skipped" means are in [security.md](security.md).
+belongs, with the variable that turns it on. `Security` is on unless the
+repository variable `SECURITY_ENABLED` is `false`, and `security-policy.json`
+decides which scanners inside it run. On a pull request it runs the source
+scanners (and the LLM review, once configured); on the release pull request it
+adds the bundle scan and OpenAnt. On the production dispatch a second
+`Security` job checks the release's own binaries, and every store job waits for
+it. What each scanner reads, how to disable one, and what "skipped" means are in
+[security.md](security.md).
 
 The Huawei AppGallery jobs hang off the Google Play ones on purpose: each of
 them `needs` its tier's Android store job, so AppGallery never receives a
@@ -123,7 +126,7 @@ submission are never open against the same app at once.
 
 | File | Trigger | Calls | Notes |
 | --- | --- | --- | --- |
-| `ci.yml` | `push` to `main` (all paths), `pull_request` (`opened`, `synchronize`, `reopened`, `labeled`), `workflow_dispatch` | `check-code.yml`, `check-unit.yml`, `check-e2e.yml`, `publish-badges.yml` | `unit` and `e2e` both `needs: checks` and skip when `checks` reports<br>`docs-only` — on a push as well as a PR; `badges` runs under `always()`<br>and publishes this branch's badges (see [Badges](#badges)) |
+| `ci.yml` | `push` to `main` (all paths), `pull_request` (`opened`, `synchronize`, `reopened`, `labeled`), `workflow_dispatch` | `check-code.yml`, `check-unit.yml`, `check-e2e.yml`, `check-security.yml`, `publish-badges.yml` | `unit`, `e2e` and `security` all `needs: checks` and skip when `checks` reports<br>`docs-only` — on a push as well as a PR; `security` also skips when `SECURITY_ENABLED`<br>is `false` ([security.md](security.md)); `badges` runs under `always()`<br>and publishes this branch's badges (see [Badges](#badges)) |
 | `ci-web.yml` | `pull_request`, `workflow_dispatch` (`deploy`) | `build-web.yml` | PR = production export + Playwright smoke; a `deploy` dispatch from `cd-release.yml`<br>at the tag = the same export + Pages deploy, with `base-url` = `/<repo>` unless a custom<br>domain is set, and `+not-found.html` copied to `404.html` so a deep link boots the router |
 | `ci-pr-closed.yml` | `pull_request: closed` | `pr-closed.yml` | cancels the closed PR's in-flight runs and drops its `gh-pages` badge directory; needs `actions: write` and `contents: write` |
 | `ci-pr-title.yml` | `pull_request: edited` (only when the title changed) | `pr-title.yml` | `opened`/`synchronize` are already covered by `check-code.yml`'s `commitlint` |
@@ -180,7 +183,7 @@ break. The expensive half, the native matrix, still skips.
 | `cd-release.yml` | `push` to `main` (all paths), `workflow_dispatch` | `googleapis/release-please-action@v5`, `pr-release-notes.yml` | Keeps one release PR open, dispatches `ci.yml` on its branch and drafts the<br>`## Store notes` section into its body (the only job that may call an LLM).<br>On a cut release, dispatches `cd-beta.yml` and `web.yml` at the tag |
 | `cd-internal.yml` | `push` to `main` (skipping `docs/**`, `**.md`), `workflow_dispatch` | `build-prepare.yml`, `build-ios.yml`, `build-android.yml`,<br>`publish-store.yml`, `publish-github-release.yml`, `publish-ota.yml` | The only workflow that builds binaries |
 | `cd-beta.yml` | `workflow_dispatch` (`tag`), from `cd-release.yml` or by hand | `build-prepare.yml`, `publish-store.yml`, `publish-github-release.yml`, `publish-ota.yml` | Promotes the binary internal already built and tested. Never builds |
-| `cd-production.yml` | `workflow_dispatch` (`tag`, `action`) | `build-prepare.yml`, `publish-store.yml`, `publish-github-release.yml`, `publish-ota.yml`, `build-web.yml` | `action` selects release, rollout, halt, resume or complete |
+| `cd-production.yml` | `workflow_dispatch` (`tag`, `action`) | `build-prepare.yml`, `check-security.yml`, `publish-store.yml`, `publish-github-release.yml`, `publish-ota.yml`, `build-web.yml` | `action` selects release, rollout, halt, resume or complete;<br>on `release` the store jobs wait for `security` |
 | `cd-beta-retry.yml` | `workflow_run` on a completed `CD / Internal` (its display name) for `main` | nothing: it re-runs a failed beta run with `gh` | Closes the hole where the beta dispatch arrives once, before internal is green |
 | `cd-ota-hotfix.yml` | `workflow_dispatch` (`channel`, `ref`, rollout) | `publish-ota.yml` | JavaScript-only fixes. The fingerprint gate rejects anything native |
 | `cd-store-listing.yml` | `workflow_dispatch` (`direction`, `platforms`, `dry_run`) | `publish-store.yml` (twice: iOS and Android) | The store *page*, not a release: `sync_metadata` pushes `fastlane/metadata/**`<br>to App Store Connect and Play, `pull_metadata` reports what they hold. Both<br>jobs run on the `production` environment, behind its reviewers, and are gated<br>on `STORE_METADATA_SYNC_ENABLED` |

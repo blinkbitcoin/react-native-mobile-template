@@ -443,3 +443,130 @@ describe('the release path without a store account', () => {
     });
   }
 });
+
+// The security gate has two callers. Each tier turns on what exists there -
+// source on every change, the release's built binaries at the production
+// dispatch - and the production store jobs cannot start until it has passed.
+// Both halves are easy to break invisibly: a `needs:` that loses `security`
+// ships an unchecked release, and a condition that uses the implicit
+// success() makes every dispatch with the gate switched off skip its stores.
+describe('the security gate', () => {
+  const dir = path.join(root, '.github/workflows');
+  const code = (file) =>
+    readFileSync(path.join(dir, file), 'utf8')
+      .split('\n')
+      .filter((l) => !l.trimStart().startsWith('#'))
+      .join('\n');
+  const RELEASE_PR = "startsWith(github.ref_name, 'release-please--')";
+
+  describe('ci.yml', () => {
+    const jobs = parseJobs('ci.yml');
+    const body = () => jobs.security.body.filter((l) => !l.trimStart().startsWith('#')).join('\n');
+
+    test('calls check-security.yml after checks, and is skipped for docs or by the master switch', () => {
+      assert.ok(jobs.security, 'ci.yml has no security job');
+      assert.match(
+        jobs.security.uses,
+        /shared-workflows\/\.github\/workflows\/check-security\.yml@v0$/,
+      );
+      assert.equal(jobs.security.needs, 'checks');
+      assert.match(jobs.security.if, /needs\.checks\.outputs\.docs-only != 'true'/);
+      assert.match(jobs.security.if, /vars\.SECURITY_ENABLED != 'false'/);
+    });
+
+    test('grants exactly what the verdict needs to upload to code scanning', () => {
+      assert.match(
+        body(),
+        /permissions:\n\s+contents: read\n\s+actions: read\n\s+security-events: write/,
+      );
+    });
+
+    test('recognises the release pull request by its branch, never by head_ref', () => {
+      // cd-release.yml starts the release PR's CI with `gh workflow run --ref`:
+      // a workflow_dispatch, where github.head_ref is empty.
+      assert.doesNotMatch(body(), /head_ref/);
+      for (const input of ['bundle', 'openant', 'review-full-range']) {
+        assert.ok(
+          body().includes(`${input}: \${{ ${RELEASE_PR} }}`),
+          `${input} is not switched on by the release pull request's branch`,
+        );
+      }
+      assert.ok(
+        body().includes(`review: \${{ github.event_name == 'pull_request' || ${RELEASE_PR} }}`),
+        'review does not run on pull requests and the release pull request',
+      );
+    });
+
+    test('leaves the source scanners at their default (on) and the production-only ones off', () => {
+      for (const input of ['deps', 'code', 'policy', 'binaries', 'mobile', 'sbom', 'release-tag']) {
+        assert.doesNotMatch(body(), new RegExp(`^\\s+${input}:`, 'm'), `ci.yml sets ${input}`);
+      }
+    });
+
+    test('passes the LLM settings as build-env and the keys as secrets', () => {
+      for (const name of [
+        'SECURITY_LLM_PROVIDER',
+        'SECURITY_LLM_MODEL',
+        'SECURITY_LLM_EFFORT',
+        'OPENAI_BASE_URL',
+      ]) {
+        assert.ok(body().includes(`"${name}":"\${{ vars.${name} }}"`), `${name} not in build-env`);
+      }
+      assert.ok(
+        body().includes(
+          `"SECURITY_LLM_EXTRA_PARAMS":\${{ toJSON(vars.SECURITY_LLM_EXTRA_PARAMS || '') }}`,
+        ),
+      );
+      for (const key of ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY']) {
+        assert.ok(body().includes(`${key}: \${{ secrets.${key} }}`), `${key} not passed`);
+      }
+    });
+  });
+
+  describe('cd-production.yml', () => {
+    const jobs = parseJobs('cd-production.yml');
+    const body = () => jobs.security.body.filter((l) => !l.trimStart().startsWith('#')).join('\n');
+
+    test('runs on action=release, after prepare, against the tag', () => {
+      assert.ok(jobs.security, 'cd-production.yml has no security job');
+      assert.match(jobs.security.uses, /check-security\.yml@v0$/);
+      assert.equal(jobs.security.needs, 'prepare');
+      assert.match(jobs.security.if, /inputs\.action == 'release'/);
+      assert.match(jobs.security.if, /vars\.SECURITY_ENABLED != 'false'/);
+      const tag = `\${{ inputs.tag }}`;
+      assert.ok(body().includes(`ref: ${tag}`));
+      assert.ok(body().includes(`release-tag: ${tag}`));
+    });
+
+    test('turns on the binary-side scanners and off the source ones', () => {
+      for (const input of ['binaries', 'mobile', 'bundle', 'sbom']) {
+        assert.match(body(), new RegExp(`^\\s+${input}: true$`, 'm'), `${input} is not on`);
+      }
+      for (const input of ['deps', 'code', 'policy']) {
+        assert.match(body(), new RegExp(`^\\s+${input}: false$`, 'm'), `${input} is not off`);
+      }
+    });
+
+    test('carries no LLM environment', () => {
+      assert.doesNotMatch(
+        code('cd-production.yml'),
+        /SECURITY_LLM|review:|openant:|OPENAI_API_KEY|ANTHROPIC_API_KEY/,
+      );
+    });
+
+    test('every job that submits a binary waits on it, and survives it being switched off', () => {
+      for (const name of ['ios-release', 'android-release', 'huawei-binary']) {
+        assert.match(
+          jobs[name].needs,
+          /\bsecurity\b/,
+          `${name} does not wait for the security gate`,
+        );
+        assert.match(
+          jobs[name].if,
+          /^\$\{\{ !failure\(\) && !cancelled\(\) && /,
+          `${name} uses the implicit success(), so a switched-off gate would skip the release`,
+        );
+      }
+    });
+  });
+});
