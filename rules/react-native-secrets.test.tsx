@@ -1,8 +1,29 @@
 // ruleid: rn-secret-in-async-storage
 AsyncStorage.setItem('auth_token', token);
 
+// ruleid: rn-secret-in-async-storage
+AsyncStorage.setItem(authToken, token);
+
+// ruleid: rn-secret-in-async-storage
+AsyncStorage.setItem(apiKey, token);
+
+// ruleid: rn-secret-in-async-storage
+AsyncStorage.setItem(accessKey, token);
+
+// ruleid: rn-secret-in-async-storage
+AsyncStorage.setItem(sessionToken, token);
+
+// ruleid: rn-secret-in-async-storage
+AsyncStorage.setItem(userPassword, token);
+
+// ruleid: rn-secret-in-async-storage
+AsyncStorage.setItem(privateKey, token);
+
 // ok: rn-secret-in-async-storage
 AsyncStorage.setItem('last_screen', name);
+
+// ok: rn-secret-in-async-storage
+AsyncStorage.setItem(lastScreen, name);
 
 // ok: rn-secret-in-async-storage
 AsyncStorage.setItem(keyExtractor, value);
