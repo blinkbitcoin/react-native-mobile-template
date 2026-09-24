@@ -243,7 +243,7 @@ check_contains "a 31-character name written with a trailing newline still fails"
 # I2: code points are counted, not bytes - under a "C" locale a 30-character
 # name using a multi-byte character must still pass.
 node -e "process.stdout.write('é'.repeat(30) + '\n')" >"$LIMIT_TREE/fastlane/metadata/ios/en-US/name.txt"
-out=$(LC_ALL=C REPO_ROOT="$LIMIT_TREE" "$CHECK_METADATA" --platform ios 2>&1)
+out=$(env LC_ALL=C REPO_ROOT="$LIMIT_TREE" "$CHECK_METADATA" --platform ios 2>&1)
 check_not_contains "a 30-character 'e-acute' name passes under LC_ALL=C" "name.txt" "$out"
 node -e "process.stdout.write('A'.repeat(30))" >"$LIMIT_TREE/fastlane/metadata/ios/en-US/name.txt"
 

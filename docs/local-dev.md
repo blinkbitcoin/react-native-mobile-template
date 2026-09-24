@@ -219,6 +219,7 @@ commits already passed the hook once.
 | The dev client sits on its launcher screen | Open the `expo-development-client` deep link. See above |
 | Type errors in `src/graphql/generated/` | Do not edit it. Run `make gen-graphql`.<br>It imports `@graphql-typed-document-node/core`, which is why that package is a direct dependency |
 | A release Android build dies in `createBundleReleaseJsAndAssets` with "Cannot find module 'babel-preset-expo'" | `publicHoistPattern` in `pnpm-workspace.yaml` exists for this. Do not remove that entry. See [quality.md](quality.md) |
+| A script fails now and then with status 139, e.g. `grep failed with status 139` from `make verify-ios` | A `LC_ALL=C cmd` prefix crashing a Homebrew bash in a forked subshell (CoreFoundation is not fork-safe).<br>Write `env LC_ALL=C cmd`; `scripts/shell-locale.test.mjs` enforces it. See [release-runbook.md](release-runbook.md) |
 | `make check-release` says to run `bundle install` | You skipped the Ruby half of `make install` (`NO_BUNDLE=1`, or an older clone).<br>Re-run `make install`. Ruby gems are not committed |
 
 ## Editors

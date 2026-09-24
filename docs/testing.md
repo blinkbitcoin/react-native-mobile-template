@@ -57,11 +57,13 @@ suites include:
 | `scripts/release/verify.test.mjs` | The artifact verification helpers |
 | `scripts/release/fingerprint.test.mjs` | The fingerprint and OTA plumbing |
 | `scripts/release/build-info.test.mjs` | The per-build provenance record |
+| `scripts/shell-locale.test.mjs` | The guard against `LC_ALL=C cmd` locale prefixes in tracked shell code (see `AGENTS.md`) |
 | `scripts/coverage-completeness.test.mjs` | Loads every `scripts/**/*.mjs` module, so one no test imports still counts |
 | `scripts/release/shared-copies.test.mjs` | Our `resolve-version.sh` and `build-info.sh` against shared-workflows' copies, read from `$WORKFLOWS_DIR`.<br>CI always compares; locally they skip unless `WORKFLOWS_DIR` points at a checkout |
 
 These run in `make ci` (and in CI's Unit job), **not** in `make check`, which
-is the static gates only. The port guard in `scripts/ports.test.mjs` and the
+is the static gates only. The port guard in `scripts/ports.test.mjs`, the
+locale-prefix guard in `scripts/shell-locale.test.mjs` and the
 `make init` manifest coverage live here, so a change that passes `make check`
 can still fail Unit on the runner — and Unit gates E2E, so the E2E run you
 wanted never starts. Run `make ci` before pushing anything that touches

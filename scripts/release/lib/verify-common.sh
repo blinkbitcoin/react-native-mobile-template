@@ -54,8 +54,17 @@ vc_skip() { vc_record skip "$@"; }
 vc_fail() { vc_record FAIL "$@"; }
 
 # Turns `<status> <detail>` from a pure helper into a checklist line.
+#
+# Every verdict is computed in `$(...)`. When that subshell dies before it
+# prints -- a crash, a signal -- the verdict is empty, and an empty status would
+# be recorded as neither a pass nor a failure: a check that never ran, counted
+# as one that did not fail. It is a failure.
 vc_verdict() { # <check> <verdict>
   local check="$1" verdict="$2"
+  if [ -z "$verdict" ]; then
+    vc_fail "$check" 'the check produced no verdict (it exited or crashed before printing one)'
+    return 0
+  fi
   vc_record "${verdict%% *}" "$check" "${verdict#* }"
 }
 
@@ -139,13 +148,25 @@ vc_fail_group() { # <detail> <check>...
 # the second reads as a clean bundle -- a green check produced by a tool that
 # never ran. Callers get the matches in VC_GREP_OUTPUT, grep's stderr in
 # VC_GREP_ERROR, and 0/1/>=2 as the return code.
+#
+# grep runs in the C locale (bytes, not characters: a bundle is not valid
+# UTF-8), and that locale is handed to it by `env`, never as a `LC_ALL=C grep`
+# prefix. With the prefix, bash itself switches locale for the one command and
+# switches back afterwards, and on macOS a bash linked against gettext (the
+# Homebrew one, first on PATH wherever Homebrew is installed) does that through
+# libintl_setlocale, which asks CoreFoundation for the preferred languages.
+# Inside `$(...)` that runs in a forked child, where CoreFoundation is not
+# fork-safe: the child dies with SIGSEGV now and then, and the check reads
+# `grep failed with status 139` -- a crash in bash, not in grep, and nothing to
+# do with the bundle. `env` sets the variable only for grep's own process, so
+# bash never changes locale. scripts/shell-locale.test.mjs keeps the prefix out.
 VC_GREP_OUTPUT=''
 VC_GREP_ERROR=''
 
 vc_grep() { # <extended regex> <file>
   local rc=0 err
   err="$(mktemp)"
-  VC_GREP_OUTPUT="$(LC_ALL=C grep -aoE -e "$1" -- "$2" 2>"$err")" || rc=$?
+  VC_GREP_OUTPUT="$(env LC_ALL=C grep -aoE -e "$1" -- "$2" 2>"$err")" || rc=$?
   VC_GREP_ERROR="$(tr '\n' ' ' <"$err" 2>/dev/null || true)"
   rm -f "$err"
   return "$rc"
@@ -450,7 +471,9 @@ vc_public_env_verdict() { # <bundle path> <.env.example content>
       continue
     fi
     rc=0
-    LC_ALL=C grep -aqF -e "$value" -- "$1" || rc=$?
+    # `env`, not a `LC_ALL=C` prefix: this runs inside the gates' `$(...)`, and
+    # the prefix can crash bash there (see vc_grep).
+    env LC_ALL=C grep -aqF -e "$value" -- "$1" || rc=$?
     if [ "$rc" -ge 2 ]; then
       printf 'FAIL could not scan the bundle for %s (grep status %s)\n' "$name" "$rc"
       return 0
