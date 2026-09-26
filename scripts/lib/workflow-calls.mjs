@@ -2,7 +2,9 @@
 // interface each called workflow declares. A call and its callee live in two
 // repositories, so nothing but a test reading both notices when an input is
 // renamed, a secret is dropped, or a required input stops being passed: the
-// run fails at startup on main, after the change merged.
+// run fails at startup on main, after the change merged. An output is worse: a
+// renamed one reads as empty, so a `!= 'false'` gate on it runs every time and
+// nothing fails at all.
 import { parse } from 'yaml';
 
 /** The one repository these workflows call into. */
@@ -31,9 +33,24 @@ export function pinsIn(text) {
   return pins;
 }
 
+// `needs.<job>.outputs.<name>`, wherever the file says it: an `if:`, a
+// `with:` value or a step. Read from the text, because an expression is only
+// a string to the YAML parser.
+const OUTPUT_READ = /\bneeds\.([\w-]+)\.outputs\.([\w-]+)/g;
+
+/** The output names `text` reads from `job`, sorted and without repeats. */
+function outputsReadFrom(text, job) {
+  const names = new Set();
+  for (const [, from, name] of text.matchAll(OUTPUT_READ)) {
+    if (from === job) names.add(name);
+  }
+  return [...names].sort();
+}
+
 /**
  * Every job in a caller workflow that calls a shared workflow:
- * `{ job, workflow, ref, with, secrets, inheritsSecrets }`.
+ * `{ job, workflow, ref, with, secrets, inheritsSecrets, reads }`, `reads`
+ * being the outputs of that job the rest of the file uses.
  */
 export function callsIn(text) {
   const jobs = parse(text)?.jobs ?? {};
@@ -50,19 +67,24 @@ export function callsIn(text) {
       with: spec.with ?? {},
       secrets: spec.secrets === 'inherit' ? {} : (spec.secrets ?? {}),
       inheritsSecrets: spec.secrets === 'inherit',
+      reads: outputsReadFrom(text, job),
     });
   }
   return calls;
 }
 
 /**
- * The inputs and secrets a reusable workflow declares under
+ * The inputs, secrets and outputs a reusable workflow declares under
  * `on.workflow_call`, or null when it is not callable at all.
  */
 export function interfaceOf(text) {
   const call = parse(text)?.on?.workflow_call;
   if (call === undefined) return null;
-  return { inputs: call?.inputs ?? {}, secrets: call?.secrets ?? {} };
+  return {
+    inputs: call?.inputs ?? {},
+    secrets: call?.secrets ?? {},
+    outputs: call?.outputs ?? {},
+  };
 }
 
 /** An expression is decided at run time, so its type cannot be checked here. */
@@ -79,7 +101,7 @@ const ACCEPTS = {
 /**
  * Why `call` does not fit `face`, one sentence per problem, or none. A secret
  * the callee declares as required must be passed unless the caller inherits
- * them all.
+ * them all, and every output the caller reads must be declared.
  */
 export function contractProblems(call, face) {
   const where = `${call.job} -> ${call.workflow}`;
@@ -113,6 +135,11 @@ export function contractProblems(call, face) {
       if (secret?.required === true && !Object.hasOwn(call.secrets, name)) {
         problems.push(`${where}: required secret ${name} is not passed`);
       }
+    }
+  }
+  for (const name of call.reads) {
+    if (!Object.hasOwn(face.outputs, name)) {
+      problems.push(`${where}: output ${name} is read but not declared by the called workflow`);
     }
   }
   return problems;
