@@ -39,7 +39,18 @@ jobs:
   unit:
     name: Unit
     needs: checks
-    if: ${{ needs.checks.outputs.docs-only != 'true' }}
+    # checks' `changes` job says whether any changed file can affect the unit
+    # suite; a docs-only change is `false` here too. `!= 'false'`, never
+    # `== 'true'`: an output that never arrived runs the suite.
+    #
+    # The gap, accepted: `test:scripts` holds guards that read the whole tree
+    # (ports.test.mjs, shell-locale.test.mjs), and the built-in unit list
+    # ignores .maestro/, e2e/, fastlane/ and the Gemfile, among others. A
+    # change to those alone skips the guards, and a violation it adds surfaces
+    # on the next change that runs Unit. unit-ignore-globs can only widen that
+    # list, never narrow it; see docs/ci.md. scripts/ci-suite-gates.test.mjs
+    # evaluates this line.
+    if: ${{ needs.checks.outputs.unit-changed != 'false' }}
     uses: blinkbitcoin/shared-workflows/.github/workflows/check-unit.yml@53689ee348f2b077d9c474d0e8e7c7fb0b37c83f # v0.14.0
   e2e:
     name: E2E
@@ -47,8 +58,18 @@ jobs:
     # green run that costs the minute or two unit takes; on a red one it saves a
     # full E2E - fifteen to twenty-five minutes of Android, and macOS at ten
     # times the rate when iOS is on - to learn what unit already knew.
+    #
+    # A *skipped* unit must not stop it: a change to Maestro flows alone skips
+    # unit and is exactly what E2E has to run. `needs` adds an implicit
+    # success(), which a skipped job is not, so the gate spells the result out
+    # under !cancelled() instead. A test-only change skips E2E itself
+    # (e2e-changed). scripts/ci-suite-gates.test.mjs evaluates this expression.
     needs: [checks, unit]
-    if: ${{ needs.checks.outputs.docs-only != 'true' }}
+    if: >-
+      !cancelled() &&
+      needs.checks.result == 'success' &&
+      contains(fromJSON('["success", "skipped"]'), needs.unit.result) &&
+      needs.checks.outputs.e2e-changed != 'false'
     uses: blinkbitcoin/shared-workflows/.github/workflows/check-e2e.yml@53689ee348f2b077d9c474d0e8e7c7fb0b37c83f # v0.14.0
     with:
       # iOS runs on a push to main (and a manual run) when the repo variable
@@ -131,15 +152,20 @@ jobs:
     name: Badges
     needs: [checks, unit, e2e]
     # always(), so a red Unit still gets a red badge. A cancelled upstream job
-    # says nothing about the branch, and a docs-only change never ran the jobs
-    # the badges describe - in both cases the published badges stay as they are.
-    # publish-badges.yml itself also skips release events and fork PRs (no push token).
+    # says nothing about the branch, and a change both suites skipped - docs
+    # only, or fastlane/ alone - never ran the jobs the badges describe: in
+    # each case the published badges stay as they are. When one suite runs and
+    # the other skips, publish-badges.sh keeps the skipped one's published
+    # badge, and a skipped Unit renders no coverage badge. publish-badges.yml
+    # also skips release events and fork PRs (no push token).
+    # scripts/ci-suite-gates.test.mjs evaluates this expression.
     if: >-
       always() &&
       needs.checks.result != 'cancelled' &&
       needs.unit.result != 'cancelled' &&
       needs.e2e.result != 'cancelled' &&
-      needs.checks.outputs.docs-only != 'true'
+      needs.checks.outputs.docs-only != 'true' &&
+      !(needs.unit.result == 'skipped' && needs.e2e.result == 'skipped')
     permissions:
       contents: write # publish-badges.sh pushes the gh-pages branch
     uses: blinkbitcoin/shared-workflows/.github/workflows/publish-badges.yml@53689ee348f2b077d9c474d0e8e7c7fb0b37c83f # v0.14.0

@@ -22,7 +22,7 @@ runs the CD logic against the pinned shared code:
 - `.github/workflows/*.yml` — every shared `uses:` is `@<sha> # vX.Y.Z`, all the same.
 - `.github/dependabot.yml` — the `shared-workflows` group moves every pin in one PR, without the cooldown.
 - `.github/zizmor.yml` — `hash-pin` for shared-workflows, `ref-pin` for the rest.
-- `scripts/workflow-contract.test.mjs` — every call against the inputs and secrets its workflow declares at the pin.
+- `scripts/workflow-contract.test.mjs` — every call against the inputs, secrets and outputs its workflow declares at the pin.
 - `scripts/release/cd-notes.test.mjs` — cd-release's build-env, the shared `build-env.sh`, `pr-notes.sh` and `notes.sh`,
   and our `notes.mjs`, end to end, then read back the way the release lanes read it.
 

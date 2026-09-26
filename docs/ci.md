@@ -26,7 +26,7 @@ flowchart TD
 
   subgraph CI["CI — every change"]
     direction LR
-    checks["Checks"] --> unit["Unit"] --> e2e["E2E Android"] --> badges["Badges"]
+    checks["Checks"] -->|"unit-changed"| unit["Unit"] -->|"e2e-changed; runs past<br/>a skipped Unit, not a failed one"| e2e["E2E Android"] --> badges["Badges"]
     unit -.->|"E2E_IOS on a push to main,<br/>e2e:ios label on a PR"| e2eios["E2E iOS"] -.-> badges
     checks -.->|"SECURITY_ENABLED"| sec["Security<br/>(source scanners; + bundle, OpenAnt<br/>on the release PR)"]
   end
@@ -81,7 +81,10 @@ flowchart TD
 Two edges are worth reading twice. `Prepare` in **CD / Internal** waits for CI
 to conclude green for the same commit, so a red `main` never reaches a build or
 a store. And `E2E` sits behind `Unit`, so a failed unit run never pays for a
-twenty-minute Android suite or a macOS runner.
+twenty-minute Android suite or a macOS runner. A *skipped* unit run does not
+hold it back: each suite skips a change it cannot affect, so a Maestro-flows-only
+change skips `Unit` and still runs `E2E` (see
+[Skipping a suite the change cannot affect](#skipping-a-suite-the-change-cannot-affect)).
 
 Dotted edges are the configurable ones: a feature that exists, drawn where it
 belongs, with the variable that turns it on. `Security` is on unless the
@@ -126,8 +129,8 @@ submission are never open against the same app at once.
 
 | File | Trigger | Calls | Notes |
 | --- | --- | --- | --- |
-| `ci.yml` | `push` to `main` (all paths), `pull_request` (`opened`, `synchronize`, `reopened`, `labeled`), `workflow_dispatch` | `check-code.yml`, `check-unit.yml`, `check-e2e.yml`, `check-security.yml`, `publish-badges.yml` | `unit`, `e2e` and `security` all `needs: checks` and skip when `checks` reports<br>`docs-only` — on a push as well as a PR; `security` also skips when `SECURITY_ENABLED`<br>is `false` ([security.md](security.md)); `badges` runs under `always()`<br>and publishes this branch's badges (see [Badges](#badges)) |
-| `ci-web.yml` | `pull_request`, `workflow_dispatch` (`deploy`) | `build-web.yml` | PR = production export + Playwright smoke; a `deploy` dispatch from `cd-release.yml`<br>at the tag = the same export + Pages deploy, with `base-url` = `/<repo>` unless a custom<br>domain is set, and `+not-found.html` copied to `404.html` so a deep link boots the router |
+| `ci.yml` | `push` to `main` (all paths), `pull_request` (`opened`, `synchronize`, `reopened`, `labeled`), `workflow_dispatch` | `check-code.yml`, `check-unit.yml`, `check-e2e.yml`, `check-security.yml`, `publish-badges.yml` | `unit`, `e2e` and `security` all `needs: checks`. `unit` skips when `checks` reports<br>`unit-changed` false, `e2e` when it reports `e2e-changed` false, on a push as well as a PR<br>([Skipping a suite](#skipping-a-suite-the-change-cannot-affect)); `security` skips on `docs-only`<br>and when `SECURITY_ENABLED` is `false` ([security.md](security.md)); `badges` runs under<br>`always()` and publishes this branch's badges (see [Badges](#badges)) |
+| `ci-web.yml` | `pull_request`, `workflow_dispatch` (`deploy`) | `build-web.yml` | PR = production export + Playwright smoke, skipped by the called workflow's `Changes` job<br>when `web-changed` is false; a `deploy` dispatch from `cd-release.yml` at the tag = the same<br>export + Pages deploy (never skipped: a dispatch has no diff base, so the classifier fails open),<br>with `base-url` = `/<repo>` unless a custom domain is set, and `+not-found.html` copied to<br>`404.html` so a deep link boots the router |
 | `ci-pr-closed.yml` | `pull_request: closed` | `pr-closed.yml` | cancels the closed PR's in-flight runs and drops its `gh-pages` badge directory; needs `actions: write` and `contents: write` |
 | `ci-pr-title.yml` | `pull_request: edited` (only when the title changed) | `pr-title.yml` | `opened`/`synchronize` are already covered by `check-code.yml`'s `commitlint` |
 | `ci-codeql.yml` | `push` to `main`, `pull_request` to `main`, `schedule` (Mon 06:17 UTC) | `check-codeql.yml` | CodeQL advanced setup. Informational — **never** a required check.<br>Config in `.github/codeql/codeql-config.yml`; `make check-code-scanning` runs the same queries locally |
@@ -169,18 +172,68 @@ repo at the workflows version `ci.yml` pins, and fails this repo's PR in either
 direction. See
 [quality.md](quality.md#make-check-is-the-ci-gate-set-and-that-is-enforced).
 
-What that costs: only `unit` and `e2e` skip on a docs-only change.
+What that costs: only `unit`, `e2e` and `security` skip on a docs-only change.
 `check-code.yml`'s `code` job has no `docs-only` gate, so a documentation push to
 `main` now runs typecheck, lint, format, knip, spell and audit — a couple of
 minutes that used to be zero, because the workflow did not trigger at all.
 That is the trade: those are exactly the checks a documentation change can
 break. The expensive half, the native matrix, still skips.
 
+### Skipping a suite the change cannot affect
+
+The same `changes` job also classifies the diff per suite, and each suite's
+gate reads its own class rather than `docs-only`:
+
+| Output | Gates | `false` when every changed file is docs or one of |
+| --- | --- | --- |
+| `unit-changed` | `unit` | `.maestro/`, `e2e/`, `playwright.config.*`, `fastlane/`, `Gemfile`, `Gemfile.lock` |
+| `e2e-changed` | `e2e` | `__tests__/`, `__snapshots__/`, `*.test.*`, `jest.config.*`, `e2e/web/`, `playwright.config.*`, `fastlane/` |
+| `web-changed` | `ci-web.yml`'s Build, E2E and Deploy | `.maestro/`, `__snapshots__/`, `jest.config.*`, `fastlane/`, `Gemfile`, `Gemfile.lock` |
+
+The lists are shared-workflows' (its `docs/consumer-guide.md`, "The suite
+classes"), and each is an *ignore* list: a path on none of them, a new directory
+included, runs the suite. Nothing under `.github/` is on any of them, so a
+change to a caller workflow or a Dependabot pin bump runs everything. The
+`*-ignore-globs` inputs can add to a list; nothing can take away from one.
+
+Every gate is `!= 'false'`, never `== 'true'`: an output that never arrived,
+or a diff the classifier could not read, runs the suite. Three consequences
+follow:
+
+- **E2E survives a skipped Unit.** `needs: [checks, unit]` adds an implicit
+  `success()`, which a skipped job is not, so a flows-only change would skip
+  the one suite it can affect. `e2e` therefore gates on `!cancelled()`, a green
+  `checks`, and a `unit` result of `success` *or* `skipped`: a failed unit run
+  still keeps E2E from starting.
+- **The web export gates itself.** `build-web.yml` runs the same classifier in
+  its own `Changes` job, so `ci-web.yml` carries no `if:`. The tag's deploy is
+  a `workflow_dispatch`, which has no diff base, so it always builds.
+  `scripts/ci-web-gate.test.mjs` holds both.
+- **The badges keep the last real answer.** A change both suites skipped
+  publishes nothing, and when one suite runs and the other skips, only the
+  one that ran is republished (see [Badges](#badges)).
+
+**The accepted gap.** `Unit` is not only Jest: it runs `test:scripts`, whose
+repository-wide guards read every tracked file: `scripts/ports.test.mjs`
+rejects a bare port literal anywhere, and `scripts/shell-locale.test.mjs` scans
+all the shell code. The unit list ignores `.maestro/`, `e2e/`, `fastlane/` and
+the Gemfile, among others, so a change to those alone skips these guards in CI.
+What it breaks surfaces on the next change that runs `Unit`, on whichever PR
+that is. The unit-ignore input can only widen the list, so closing this needs a
+change in shared-workflows. Until then, `make ci` before pushing a change to any
+of those paths is the check CI no longer makes.
+
+`scripts/ci-suite-gates.test.mjs` evaluates the `unit`, `e2e` and `badges` gates
+together as a graph, for each kind of change and for failed, cancelled and
+unclassified runs. `scripts/workflow-contract.test.mjs` checks that every output `ci.yml` reads
+is one `check-code.yml` declares at the pin. A renamed output would read as
+empty and quietly run every suite.
+
 ### Release and OTA
 
 | File | Trigger | Calls | Notes |
 | --- | --- | --- | --- |
-| `cd-release.yml` | `push` to `main` (all paths), `workflow_dispatch` | `googleapis/release-please-action@v5`, `pr-release-notes.yml` | Keeps one release PR open, dispatches `ci.yml` on its branch and drafts the<br>`## Store notes` section into its body (the only job that may call an LLM).<br>On a cut release, dispatches `cd-beta.yml` and `web.yml` at the tag |
+| `cd-release.yml` | `push` to `main` (all paths), `workflow_dispatch` | `googleapis/release-please-action@v5`, `pr-release-notes.yml` | Keeps one release PR open, dispatches `ci.yml` on its branch and drafts the<br>`## Store notes` section into its body (the only job that may call an LLM).<br>On a cut release, dispatches `cd-beta.yml` and `ci-web.yml` at the tag |
 | `cd-internal.yml` | `push` to `main` (skipping `docs/**`, `**.md`), `workflow_dispatch` | `build-prepare.yml`, `build-ios.yml`, `build-android.yml`,<br>`publish-store.yml`, `publish-github-release.yml`, `publish-ota.yml` | The only workflow that builds binaries |
 | `cd-beta.yml` | `workflow_dispatch` (`tag`), from `cd-release.yml` or by hand | `build-prepare.yml`, `publish-store.yml`, `publish-github-release.yml`, `publish-ota.yml` | Promotes the binary internal already built and tested. Never builds |
 | `cd-production.yml` | `workflow_dispatch` (`tag`, `action`) | `build-prepare.yml`, `check-security.yml`, `publish-store.yml`, `publish-github-release.yml`, `publish-ota.yml`, `build-web.yml` | `action` selects release, rollout, halt, resume or complete;<br>on `release` the store jobs wait for `security` |
@@ -257,7 +310,7 @@ Two independent ways in:
 events, so a change to it that lets iOS back onto every PR fails `make
 test-scripts`.
 
-Android runs on every non-docs-only run (`android` defaults to `true`).
+Android runs on every run whose change can affect E2E (`android` defaults to `true`).
 
 `macos-runner` is passed as `${{ vars.WORKFLOWS_MACOS_RUNNER || 'macos-26' }}`:
 set the repo variable `WORKFLOWS_MACOS_RUNNER` to move iOS onto a different (e.g.
@@ -357,7 +410,7 @@ gh-pages
 
 | Badge | Source |
 | --- | --- |
-| `unit.svg` | the `unit` job's result (`success` → passing, `failure` → failing, `cancelled`/`skipped` → grey) |
+| `unit.svg` | the `unit` job's result (`success` → passing, `failure` → failing; `cancelled` and `skipped` publish nothing) |
 | `e2e.svg` | the `e2e` job's result, same map |
 | `coverage.svg` | `coverage/coverage-summary.json` from the `coverage` artifact — Jest's `json-summary` reporter, never scraped HTML |
 
@@ -366,23 +419,26 @@ locally with `make gen-badges`); publishing is the workflows repo's
 (`scripts/ci/publish-badges.sh`). That is the same seam `check-code.yml` uses for
 typecheck and lint: the reusable workflow calls a named consumer script.
 
-Three details are deliberate:
+These details are deliberate:
 
 - **The job runs under `always()`** so a red Unit still gets a red badge — but
-  it skips when an upstream job was *cancelled*, when the change was docs-only,
-  on release events, and on PRs from forks (which have no write token).
+  it skips when an upstream job was *cancelled*, when both suites skipped
+  (a docs-only change, a `fastlane/`-only one, or a red `checks`), on release
+  events, and on PRs from forks (which have no write token).
+- **A skipped suite keeps its published badge.** When one suite ran and the
+  other skipped, `publish-badges.sh` republishes only the one that ran. A grey
+  `skipped` would overwrite the branch's last real answer with "this run did
+  not look".
 - **Only a Unit *failure* writes the red coverage placeholder.** A *skipped*
-  Unit renders no coverage badge at all, so a docs-only PR leaves the branch's
-  published coverage badge exactly as it was instead of blanking it.
+  Unit renders no coverage badge at all, so a flows-only or docs-only PR leaves
+  the branch's published coverage badge exactly as it was instead of blanking
+  it.
 - **Closing a PR removes `badges/<branch>/`** (`pr-closed.yml`), which is why
   that caller grants `contents: write`.
-- **A `checks` failure greys out two of the three badges.** On a non-docs-only
-  change, `unit` and `e2e` both `needs: checks`, so a red lint run makes them
-  *skip*; the badges job still runs (nothing was cancelled, nothing was
-  docs-only) and publishes both as grey `skipped`, while the coverage badge is
-  left as it was. That is deliberate — "we could not tell" is not "passing" —
-  but it does mean a lint-only failure on `main` shows two grey badges in the
-  README until the next green run.
+- **A `checks` failure leaves the badges as they were.** `unit` and `e2e` both
+  `needs: checks`, so a red lint run makes them *skip*, and a run where both
+  skipped publishes nothing. The README goes on showing the last suites that
+  ran. The red run is visible where CI is: the PR's checks and the Actions tab.
 
 **Coexistence with the web target.** `ci-web.yml` deploys the web export to GitHub
 Pages through `actions/deploy-pages`, which is an *artifact* deploy and does not
@@ -411,8 +467,9 @@ A shared-workflows release changes nothing here by itself
 pin, release workflows included, and that PR's Unit job runs the new shared
 code against this repository before any CD run can:
 
-- `scripts/workflow-contract.test.mjs` checks every call's inputs and secrets
-  against what the called workflow declares at the new commit, that every pin
+- `scripts/workflow-contract.test.mjs` checks every call's inputs and secrets,
+  and every output a caller reads, against what the called workflow declares
+  at the new commit, that every pin
   is the same commit, and that the commit is the one the job checked out.
 - `scripts/release/cd-notes.test.mjs` runs the store-notes chain through the
   shared scripts and our generator, end to end.

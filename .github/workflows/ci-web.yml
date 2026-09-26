@@ -18,7 +18,13 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 jobs:
   web:
-    # The called workflow's jobs show as "<this name> / Build|Playwright|Deploy".
+    # The called workflow's jobs show as "<this name> / Changes|Build|E2E|Deploy".
+    #
+    # No `if:` here: the called workflow's Changes job runs the same classifier
+    # as ci.yml's checks and skips Build - and with it E2E and Deploy - when no
+    # changed file can reach the web export (`web-changed`). The tag's deploy
+    # dispatch has no diff base, so the classifier fails open and it always
+    # builds. scripts/ci-web-gate.test.mjs holds both.
     name: Web
     uses: blinkbitcoin/shared-workflows/.github/workflows/build-web.yml@53689ee348f2b077d9c474d0e8e7c7fb0b37c83f # v0.14.0
     permissions:
