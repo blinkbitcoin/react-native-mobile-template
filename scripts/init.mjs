@@ -428,8 +428,10 @@ function validateMarkedBlock(root, block) {
   const text = read(root, block.path);
   const starts = countOccurrences(text, `${block.marker}-start`);
   const ends = countOccurrences(text, `${block.marker}-end`);
-  if (starts !== 1 || ends !== 1) {
-    return [`${block.path}: expected one ${block.marker}-start/-end pair, found ${starts}/${ends}`];
+  if (starts === 0 || starts !== ends) {
+    return [
+      `${block.path}: expected one or more ${block.marker}-start/-end pairs, found ${starts}/${ends}`,
+    ];
   }
   return [];
 }

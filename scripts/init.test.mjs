@@ -867,6 +867,52 @@ describe('init --yes --no-web', async () => {
     );
   });
 
+  // The second app.config.ts block: the Pages sub-path only ci-web.yml sets.
+  test('drops the web-only baseUrl from experiments and keeps typedRoutes', () => {
+    const config = readFileSync(path.join(root, 'app.config.ts'), 'utf8');
+    assert.doesNotMatch(config, /baseUrl|EXPO_PUBLIC_BASE_URL|GitHub Pages|ci-web/);
+    assert.match(config, /\n {2}experiments: \{\n {4}typedRoutes: true,\n {2}\},\n/);
+  });
+
+  // The paragraph is mostly about the Pages deploy, but its last sentence is a
+  // ruleset setting the badges need with or without web.
+  test('keeps the gh-pages ruleset exemption in docs/ci.md and drops the Pages deploy', () => {
+    const ci = readFileSync(path.join(root, 'docs/ci.md'), 'utf8');
+    assert.doesNotMatch(ci, /Coexistence with the web target|deploy-pages|Pages source/);
+    assert.match(
+      ci,
+      /The badges keep the last real answer[\s\S]*\n\*\*The badge branch needs one repository setting\.\*\* The badges live on a\n`gh-pages` branch and are served from `raw\.githubusercontent\.com`\. Exempt\n`gh-pages` from the PR-approval ruleset so the default `GITHUB_TOKEN` can push\nto it\.\n\n## /,
+    );
+  });
+
+  // cd-production.yml's web job goes with its marker block; the chart that
+  // draws it and the note that names it have to go with it.
+  test('drops the production web deploy from the release runbook', () => {
+    const runbook = readFileSync(path.join(root, 'docs/release-runbook.md'), 'utf8');
+    assert.doesNotMatch(runbook, /pweb|[Ww]eb deploy/);
+    assert.match(runbook, /prel -->\|"OTA_ENABLED"\| pota\["OTA production"\]\n {2}end\n```\n/);
+    assert.match(runbook, /the store notes and the OTA publish do not wait for\n/);
+  });
+
+  test('drops the test comments that point at the web gate test it deleted', () => {
+    const gates = readFileSync(path.join(root, 'scripts/ci-suite-gates.test.mjs'), 'utf8');
+    assert.doesNotMatch(gates, /ci-web-gate|web suite/);
+    assert.match(gates, /reports `skipped` to the jobs after it\.\nimport assert/);
+    const release = readFileSync(path.join(root, 'scripts/release-workflows.test.mjs'), 'utf8');
+    assert.doesNotMatch(release, /ci-web|web deploy/);
+    assert.match(release, /\n {2}\}\);\n\n {2}test\('a cut release dispatches cd-beta at the tag'/);
+  });
+
+  // The sweep behind the targeted tests above: a file that names ci-web.yml
+  // after this run points at a workflow that is not there. ADR 0011 is the
+  // exception, because it records why the release chain dispatches at all.
+  test('no file names ci-web.yml except the ADR that records its history', () => {
+    const offenders = textFiles(root)
+      .filter(([, text]) => text.includes('ci-web'))
+      .map(([rel]) => rel);
+    assert.deepEqual(offenders, ['docs/decisions/0011-release-chain-by-dispatch.md']);
+  });
+
   // Left behind, the step dispatches a workflow this run deleted, and the
   // first cut release fails the Release job on it.
   test('cd-release.yml no longer dispatches ci-web.yml but still starts beta', () => {
@@ -1037,11 +1083,37 @@ describe('init --yes --web', async () => {
       readFileSync(path.join(root, '.github/workflows/cd-production.yml'), 'utf8'),
       /^ {2}web:$/m,
     );
+    // Both app.config.ts blocks: the web key, and the baseUrl straight after
+    // typedRoutes with no gap where the marker lines were.
+    const config = readFileSync(path.join(root, 'app.config.ts'), 'utf8');
+    assert.match(config, /^\s*web: \{/m);
+    assert.match(
+      config,
+      /typedRoutes: true,\n {4}\/\/ Web only\.[\s\S]*?\.\.\.\(process\.env\.EXPO_PUBLIC_BASE_URL \? \{ baseUrl: process\.env\.EXPO_PUBLIC_BASE_URL \} : \{\}\),\n {2}\},/,
+    );
     // The step itself, straight after the beta dispatch, with no gap where the
     // marker lines were.
     assert.match(
       readFileSync(path.join(root, '.github/workflows/cd-release.yml'), 'utf8'),
       /-f "tag=\$TAG"\n {6}- name: Deploy the web build at the new tag\n[\s\S]*?gh workflow run ci-web\.yml --repo "\$REPO" --ref "\$TAG" -f "deploy=true"\n {6}# The PR's number/,
+    );
+  });
+
+  test('keeps the web deploy in the docs and comments the --no-web run rewrites', () => {
+    assert.match(
+      readFileSync(path.join(root, 'docs/ci.md'), 'utf8'),
+      /\*\*Coexistence with the web target\.\*\* `ci-web\.yml` deploys the web export/,
+    );
+    const runbook = readFileSync(path.join(root, 'docs/release-runbook.md'), 'utf8');
+    assert.match(runbook, /prel --> pweb\["Web deploy"\]/);
+    assert.match(runbook, /the OTA publish and the web deploy do not wait for/);
+    assert.match(
+      readFileSync(path.join(root, 'scripts/ci-suite-gates.test.mjs'), 'utf8'),
+      /\/\/\n\/\/ The web suite gates itself \(scripts\/ci-web-gate\.test\.mjs\)\.\nimport/,
+    );
+    assert.match(
+      readFileSync(path.join(root, 'scripts/release-workflows.test.mjs'), 'utf8'),
+      /\/\/ The web deploy's dispatch is pinned in ci-web-gate\.test\.mjs, which\n/,
     );
   });
 
@@ -1570,7 +1642,7 @@ describe('init preflight problems', () => {
       'knip.json: no "playwright" plugin key',
       'Makefile: no line matches /^web:/',
       "commitlint.config.mjs: no line matches /^\\s*'web',\\s*$/",
-      'app.config.ts: expected one init:web-start/-end pair, found 2/1',
+      'app.config.ts: expected one or more init:web-start/-end pairs, found 2/1',
       'absent.ts: missing (the manifest lists it)',
       'web.docScrub: no line in any scrubbed file matches /^no such row$/',
       'web.docScrub: no line in any scrubbed file matches /NO_SUCH_BULLET/',
@@ -1587,7 +1659,19 @@ describe('init preflight problems', () => {
 
   test('keeping web still checks the markers it will drop', () => {
     const problems = problemsFor({ files: { 'app.config.ts': 'no markers\n' } }, true);
-    assert.deepEqual(problems, ['app.config.ts: expected one init:web-start/-end pair, found 0/0']);
+    assert.deepEqual(problems, [
+      'app.config.ts: expected one or more init:web-start/-end pairs, found 0/0',
+    ]);
+  });
+
+  test('a file may hold several balanced marker pairs', () => {
+    const problems = problemsFor({
+      files: {
+        'app.config.ts':
+          '// init:web-start\na\n// init:web-end\n// init:web-start\nb\n// init:web-end\n',
+      },
+    });
+    assert.deepEqual(problems, []);
   });
 
   test('a missing rename path is drift', () => {

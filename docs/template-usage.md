@@ -117,13 +117,18 @@ The web target is opt-in. Answering "no" deletes the files listed in
 scope — from `commitlint.config.mjs` and from the four places the enum is
 spelled out for readers (`AGENTS.md`, `CONTRIBUTING.md`, `docs/quality.md`,
 `.github/PULL_REQUEST_TEMPLATE.md`) — and `knip.json`'s `playwright` plugin; and
-removes the marker-delimited web blocks from `app.config.ts`, `metro.config.js`,
-`.github/workflows/cd-production.yml` (the `web` job) and
-`.github/workflows/cd-release.yml` (its dispatch of `ci-web.yml` at a cut
-release, with the docs that describe it), the web rows from the docs, the
-`react-dom` ignore from `.github/dependabot.yml`, the `Web` platform option from
-the bug-report issue template, and the web-variant case from
-`src/features/settings/NativeDemoCard.test.tsx`.
+removes the marker-delimited web blocks from `app.config.ts` (the `web` key and
+the `experiments.baseUrl` that `ci-web.yml` sets for GitHub Pages),
+`metro.config.js`, `.github/workflows/cd-production.yml` (the `web` job, with
+the runbook chart's web deploy) and `.github/workflows/cd-release.yml` (its
+dispatch of `ci-web.yml` at a cut release, with the docs that describe it), the
+web rows from the docs, the Pages half of `docs/ci.md`'s badge-branch paragraph
+(the ruleset exemption stays), the `react-dom` ignore from
+`.github/dependabot.yml`, the `Web` platform option from the bug-report issue
+template, and the web-variant case from
+`src/features/settings/NativeDemoCard.test.tsx`. A file may hold more than one
+marker pair; `make init` refuses to run when the starts and ends do not pair
+up.
 
 Answering "yes" keeps all of it, and `make test-e2e-web` keeps working.
 
