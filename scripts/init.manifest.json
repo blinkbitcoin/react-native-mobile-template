@@ -190,6 +190,10 @@
       {
         "path": ".github/workflows/cd-production.yml",
         "marker": "init:web"
+      },
+      {
+        "path": ".github/workflows/cd-release.yml",
+        "marker": "init:web"
       }
     ],
     "edits": [
@@ -281,7 +285,20 @@
       {
         "path": "docs/release-runbook.md",
         "optional": true,
-        "replace": [["App Store + Play + web + OTA", "App Store + Play + OTA"]]
+        "$comment": "All but the first are the release hop's dispatch of ci-web.yml, whose step goes with its marker block in cd-release.yml: the diagram, the store-notes job's place after it and the hop's own section.",
+        "replace": [
+          ["App Store + Play + web + OTA", "App Store + Play + OTA"],
+          ["│  CD / Beta + CI / Web dispatched", "│  CD / Beta dispatched"],
+          ["job after the beta and web dispatches:", "job after the beta dispatch:"],
+          [
+            "A `release: published` trigger on `cd-beta.yml` or\n`ci-web.yml` would therefore never fire.",
+            "A `release: published` trigger on `cd-beta.yml`\nwould therefore never fire."
+          ],
+          [
+            "tag=vX.Y.Z`, the same for `ci-web.yml` with `deploy=true`, and `ci.yml` on the",
+            "tag=vX.Y.Z`, and `ci.yml` on the"
+          ]
+        ]
       },
       {
         "path": "README.md",
@@ -290,6 +307,10 @@
           [
             "| `.maestro/`, `e2e/` | Maestro flows for device E2E, Playwright specs for web                               |",
             "| `.maestro/`         | Maestro flows for device E2E                                                         |"
+          ],
+          [
+            "dispatches beta and web at a cut release           |",
+            "dispatches beta at a cut release                   |"
           ]
         ]
       },
@@ -356,6 +377,10 @@
           [
             "runs the suite. Three consequences\nfollow:",
             "runs the suite. Two consequences\nfollow:"
+          ],
+          [
+            "On a cut release, dispatches `cd-beta.yml` and `ci-web.yml` at the tag |",
+            "On a cut release, dispatches `cd-beta.yml` at the tag |"
           ]
         ],
         "$comment": "The suite-class table's web entries are anchored, not scrubbed: the scrub would take the whole e2e-changed row for its `e2e/web/`.",

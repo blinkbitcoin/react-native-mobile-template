@@ -208,15 +208,15 @@ describe('cd-release.yml chains the release by dispatch', () => {
     assert.match(code, /^\s+actions: write$/m, 'cd-release.yml lacks actions: write');
   });
 
-  test('a cut release dispatches cd-beta and web at the tag', () => {
-    for (const wf of ['cd-beta.yml', 'ci-web.yml']) {
-      const step = new RegExp(
-        `release_created == 'true'[\\s\\S]*?gh workflow run ${wf.replace('.', '\\.')} [^\n]*--ref "\\$TAG"`,
-      );
-      assert.match(code, step, `no dispatch of ${wf} gated on release_created`);
-    }
+  // The web deploy's dispatch is pinned in ci-web-gate.test.mjs, which
+  // `make init --no-web` deletes together with ci-web.yml and that step.
+  test('a cut release dispatches cd-beta at the tag', () => {
+    assert.match(
+      code,
+      /release_created == 'true'[\s\S]*?gh workflow run cd-beta\.yml [^\n]*--ref "\$TAG"/,
+      'no dispatch of cd-beta.yml gated on release_created',
+    );
     assert.match(code, /gh workflow run cd-beta\.yml [^\n]*-f "tag=\$TAG"/);
-    assert.match(code, /gh workflow run ci-web\.yml [^\n]*-f "deploy=true"/);
   });
 
   test('a created or updated release PR gets a CI run', () => {
@@ -316,23 +316,15 @@ describe('cd-release.yml chains the release by dispatch', () => {
   });
 
   test('nothing downstream waits on a release event, and no App token remains', () => {
-    for (const file of ['cd-beta.yml', 'ci-web.yml']) {
-      const text = readFileSync(path.join(dir, file), 'utf8')
-        .split('\n')
-        .filter((l) => !l.trimStart().startsWith('#'))
-        .join('\n');
-      assert.doesNotMatch(text, /^\s+release:\s*$/m, `${file} still triggers on release:`);
-      assert.match(text, /^\s+workflow_dispatch:\s*$/m, `${file} cannot be dispatched`);
-    }
     const beta = readFileSync(path.join(dir, 'cd-beta.yml'), 'utf8');
+    const betaCode = beta
+      .split('\n')
+      .filter((l) => !l.trimStart().startsWith('#'))
+      .join('\n');
+    assert.doesNotMatch(betaCode, /^\s+release:\s*$/m, 'cd-beta.yml still triggers on release:');
+    assert.match(betaCode, /^\s+workflow_dispatch:\s*$/m, 'cd-beta.yml cannot be dispatched');
     assert.match(beta, /tag:\n\s+description:[^\n]*\n\s+type: string\n\s+required: true/);
-    for (const file of [
-      'cd-release.yml',
-      'cd-internal.yml',
-      'cd-beta.yml',
-      'cd-production.yml',
-      'ci-web.yml',
-    ]) {
+    for (const file of ['cd-release.yml', 'cd-internal.yml', 'cd-beta.yml', 'cd-production.yml']) {
       const text = readFileSync(path.join(dir, file), 'utf8');
       assert.doesNotMatch(
         text,

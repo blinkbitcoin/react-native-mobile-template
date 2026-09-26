@@ -72,6 +72,7 @@ jobs:
           REPO: ${{ github.repository }}
           TAG: ${{ steps.release.outputs.tag_name }}
         run: gh workflow run cd-beta.yml --repo "$REPO" --ref "$TAG" -f "tag=$TAG"
+      # init:web-start
       - name: Deploy the web build at the new tag
         if: ${{ steps.release.outputs.release_created == 'true' }}
         env:
@@ -79,6 +80,7 @@ jobs:
           REPO: ${{ github.repository }}
           TAG: ${{ steps.release.outputs.tag_name }}
         run: gh workflow run ci-web.yml --repo "$REPO" --ref "$TAG" -f "deploy=true"
+      # init:web-end
       # The PR's number and branch are read from the `pr` output in the shell,
       # not with `fromJSON()` in `env:`: the runner validates a step's `env`
       # expressions even when its `if` is false, and `fromJSON('')` is a

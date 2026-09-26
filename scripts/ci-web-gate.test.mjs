@@ -46,3 +46,24 @@ describe('ci-web.yml leaves the web gate to build-web.yml', () => {
     );
   });
 });
+
+// The web half of the release hop that release-workflows.test.mjs pins for
+// cd-beta.yml. It lives here because `make init --no-web` deletes this file,
+// ci-web.yml and the cd-release.yml step that dispatches it, together.
+describe('cd-release.yml dispatches the web deploy at a cut release', () => {
+  const steps = parse(workflow('cd-release.yml')).jobs['release-please'].steps;
+  const dispatches = steps.filter((step) => /gh workflow run ci-web\.yml /.test(step.run ?? ''));
+
+  test('one step, gated on release_created, at the tag, with deploy=true', () => {
+    assert.equal(dispatches.length, 1, 'expected exactly one dispatch of ci-web.yml');
+    const [step] = dispatches;
+    assert.equal(unwrap(step.if), "steps.release.outputs.release_created == 'true'");
+    assert.match(step.run, /--ref "\$TAG"/);
+    assert.match(step.run, /-f "deploy=true"/);
+  });
+
+  test('ci-web.yml waits on no release event and uses no App token', () => {
+    assert.equal(Object.hasOwn(web.on, 'release'), false, 'ci-web.yml still triggers on release:');
+    assert.doesNotMatch(workflow('ci-web.yml'), /RELEASE_TAGGER|create-github-app-token/);
+  });
+});
