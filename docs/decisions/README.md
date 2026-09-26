@@ -28,6 +28,7 @@ checked against the repository rather than believed.
 | [0020](0020-huawei-joins-every-tier.md) | AppGallery runs on the internal, beta and release tiers behind the same toggle;<br>one version slot makes a tier a submit flag, and a busy slot skips rather than fails | 2026-09-21 |
 | [0021](0021-store-notes-drafted-on-the-release-pr.md) | The store notes are drafted once into the release PR body for review, and every tier<br>ships that text; the prompt is `release-notes.prompt.md`; the LLM runs in that one job | 2026-09-22 |
 | [0022](0022-security-scanning-before-release.md) | Scanners write SARIF, one verdict step applies the threshold; placed by what each<br>check reads; deterministic scanners can block, an LLM reviewer only annotates | 2026-09-24 |
+| [0023](0023-cd-verified-before-release.md) | Every shared-workflows call is pinned to one commit SHA that Dependabot moves;<br>a PR runs the CD calls and the store-notes chain against that pin | 2026-09-26 |
 
 ## Writing a new one
 

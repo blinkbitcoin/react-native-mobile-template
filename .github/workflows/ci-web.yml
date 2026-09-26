@@ -20,7 +20,7 @@ jobs:
   web:
     # The called workflow's jobs show as "<this name> / Build|Playwright|Deploy".
     name: Web
-    uses: blinkbitcoin/shared-workflows/.github/workflows/build-web.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/build-web.yml@aa12aaa99407e2800ffccb4db21ff962dc681b05 # v0.13.0
     permissions:
       contents: read
       # The called workflow's `deploy` job needs these; a called job can only

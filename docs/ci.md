@@ -396,32 +396,32 @@ so the default `GITHUB_TOKEN` can push to it.
 
 ## Pinning and bumping the workflows version
 
-Every `uses:` that points at the workflows repo is pinned to the moving major
-tag. Ten of the twelve files carry at least one, and several carry many:
-`cd-production.yml` alone has eleven. `cd-release.yml` and
-`cd-beta-retry.yml` call no reusable workflow at all.
+Every `uses:` that points at the workflows repo is pinned to one commit SHA,
+with that release's version beside it. Eleven of the twelve files carry at least
+one, and several carry many: `cd-production.yml` alone has twelve.
+`cd-beta-retry.yml` calls no reusable workflow at all.
 
 ```yaml
-uses: blinkbitcoin/shared-workflows/.github/workflows/check-code.yml@v0
+uses: blinkbitcoin/shared-workflows/.github/workflows/check-code.yml@aa12aaa99407e2800ffccb4db21ff962dc681b05 # v0.13.0
 ```
 
-`shared-workflows` is pre-1.0 and release-please-versioned from `0.1.0`;
-`v0` is re-pointed at the tip of each `0.x.y` release. So `@v0` picks up fixes
-(and, pre-1.0, breaking changes) automatically.
+A shared-workflows release changes nothing here by itself
+([ADR 0023](decisions/0023-cd-verified-before-release.md)). Dependabot's
+`shared-workflows` group (`.github/dependabot.yml`) opens one PR moving every
+pin, release workflows included, and that PR's Unit job runs the new shared
+code against this repository before any CD run can:
 
-To bump:
+- `scripts/workflow-contract.test.mjs` checks every call's inputs and secrets
+  against what the called workflow declares at the new commit, that every pin
+  is the same commit, and that the commit is the one the job checked out.
+- `scripts/release/cd-notes.test.mjs` runs the store-notes chain through the
+  shared scripts and our generator, end to end.
 
-- **Pin harder** — replace `@v0` with a full tag (`@v0.3.1`) in every workflow
-  file for byte-reproducible runs; you then upgrade deliberately.
-- **After the workflows repo reaches 1.0.0** — move all of them to `@v1` in one
-  commit and read that release's notes; `v1` behaves the same way (a moving
-  major tag), it just tracks a different major line.
-
-Change every `uses:` in one pass, release workflows included. A bump that only
-touches the everyday-CI files leaves the release path on the old line, which is
-exactly where a version mismatch is hardest to notice. `grep -rn '@v0'
-.github/workflows` is the check. All callers share the `.workflows/` self-checkout
-and the script contract; mixing versions across them is untested.
+Read the release's notes, then merge. To bump by hand, change every `uses:` in
+one pass to the new release's commit and version; the contract test fails on
+two different pins, and so does zizmor (`.github/zizmor.yml` requires a hash
+pin for shared-workflows). All callers share the `.workflows/` self-checkout
+and the script contract, and mixing versions across them is untested.
 
 ## `.workflows/`
 

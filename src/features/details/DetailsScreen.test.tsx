@@ -1,34 +1,10 @@
-import { Stack } from 'expo-router';
-import { renderRouter, screen, within } from 'expo-router/testing-library';
 import { StyleSheet } from 'react-native';
-import DetailsRoute from '@/app/details/[id]';
-import { Providers } from '@/test/render';
+import { renderWithProviders, screen, within } from '@/test/render';
 import { buildTheme } from '@/theme/tokens';
-
-test('details route reads the id param', async () => {
-  await renderRouter(
-    { _layout: () => <Stack />, 'details/[id]': DetailsRoute },
-    { initialUrl: '/details/42', wrapper: Providers },
-  );
-  expect(screen.getByTestId('details-id')).toHaveTextContent('42');
-});
-
-test('details route falls back to an empty id when the route has no param', async () => {
-  // Mounting the same component on a path with no `[id]` segment is the shape a
-  // mistyped route takes: the param is simply absent and must not render
-  // "undefined" to the user.
-  await renderRouter(
-    { _layout: () => <Stack />, index: DetailsRoute },
-    { initialUrl: '/', wrapper: Providers },
-  );
-  expect(screen.getByTestId('details-id').props.children).toBe('');
-});
+import { DetailsScreen } from './DetailsScreen';
 
 test('the id sits in a card, under a caption naming it', async () => {
-  await renderRouter(
-    { _layout: () => <Stack />, 'details/[id]': DetailsRoute },
-    { initialUrl: '/details/42', wrapper: Providers },
-  );
+  await renderWithProviders(<DetailsScreen id="42" />);
   const { colors, typography } = buildTheme('light');
   // <Trans> renders its string in a nested, unstyled Text: read the styled one.
   type Node = ReturnType<typeof screen.getByText> | null;

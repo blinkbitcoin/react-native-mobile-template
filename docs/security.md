@@ -87,9 +87,11 @@ until a repository turns them on:
 
 1. `"review": { "enabled": true }` and/or `"openant": { "enabled": true }`
    under `jobs`.
-2. `llm.provider`: `openai` for OpenAI or any OpenAI-compatible endpoint (Kimi,
-   Grok, Qwen, GLM, DeepSeek, OpenRouter - set `OPENAI_BASE_URL`), or
-   `anthropic`. `llm.model` names the model; OpenAnt requires one.
+2. `llm.provider`: `openai` for OpenAI or any OpenAI-compatible endpoint
+   (OpenRouter, Gemini, Groq, Mistral, DeepSeek, Kimi, Qwen, GitHub Models -
+   set `OPENAI_BASE_URL`), or `anthropic`. `llm.model` names the model; OpenAnt
+   requires one. The [provider recipes](release-runbook.md#provider-recipes)
+   give the base URL, a model and the effort for each.
 3. The key as a secret: `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`.
 
 In CI, step 2 is the repository variables `SECURITY_LLM_PROVIDER`,
@@ -98,12 +100,15 @@ In CI, step 2 is the repository variables `SECURITY_LLM_PROVIDER`,
 repository secret. The production dispatch carries none of them: model calls
 stay out of the CD lanes, and the release pull request is where they run.
 
-`llm.effort` (`low`, `medium`, `high`, `max`; `max` by default) is sent to the
-reviewer apart from the model: Anthropic's `output_config.effort` with
-adaptive thinking, or an OpenAI-compatible `reasoning_effort` (where `max`
-asks for `high`, the most that schema has). Vendor-specific switches go in
-`SECURITY_LLM_EXTRA_PARAMS`, a JSON object merged into the request (it may not
-set `model`, `messages` or `system`). OpenAnt takes no effort setting.
+`llm.effort` (`none`, `low`, `medium`, `high`, `max`; `max` by default) is
+sent to the reviewer apart from the model: Anthropic's `output_config.effort`
+with adaptive thinking, or an OpenAI-compatible `reasoning_effort` (where `max`
+asks for `high`, the most that schema has). `none` sends no effort field at
+all, for a model with no reasoning switch, which would answer HTTP 400 to one.
+Vendor-specific switches go in `SECURITY_LLM_EXTRA_PARAMS`, a JSON object
+merged into the request (it may not set `model`, `messages` or `system`); a key
+set to `null` removes that field, for an endpoint that rejects one of the
+defaults. OpenAnt takes no effort setting.
 
 A missing provider, key, model or prompt makes the job write "skipped" with
 the reason, never "clean", and a model that does not answer, refuses, or
@@ -142,7 +147,7 @@ upper snake case:
 | `jobs.openant.verify` | boolean | `false` | `SECURITY_OPENANT_VERIFY` |
 | `llm.provider` | `openai`, `anthropic` or empty | empty | `SECURITY_LLM_PROVIDER` |
 | `llm.model` | string | empty | `SECURITY_LLM_MODEL` |
-| `llm.effort` | `low`, `medium`, `high`, `max` | `max` | `SECURITY_LLM_EFFORT` |
+| `llm.effort` | `none`, `low`, `medium`, `high`, `max` | `max` | `SECURITY_LLM_EFFORT` |
 
 In the environment a list is comma-separated, and an **empty** option or
 `llm` twin counts as unset, so the file or the default applies: CI passes every

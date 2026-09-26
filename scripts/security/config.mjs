@@ -8,9 +8,9 @@
 // and CI reads the lot with `--json`. A value that is not a boolean throws
 // rather than reading as off: a typo must not quietly disable a scanner.
 import { readFileSync } from 'node:fs';
+import { EFFORTS } from '../lib/llm/index.mjs';
 
 export const SEVERITIES = ['none', 'low', 'medium', 'high', 'critical'];
-export const EFFORTS = ['low', 'medium', 'high', 'max'];
 export const PROVIDERS = ['', 'openai', 'anthropic'];
 
 /**

@@ -206,6 +206,20 @@ test('an empty diff is a clean run that says there was nothing to review', async
   assert.match(noteOf(doc), /nothing to review against abc123/);
 });
 
+test('a review at effort none sends no effort field, for a model with no reasoning switch', async () => {
+  const calls = [];
+  await run({
+    env: { ...ENV, SECURITY_LLM_EFFORT: 'none' },
+    fetchImpl: async (_url, init) => {
+      calls.push(JSON.parse(init.body));
+      return answer(JSON.stringify({ findings: [] }));
+    },
+  });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].thinking, undefined);
+  assert.equal(calls[0].output_config, undefined);
+});
+
 test('a review sends the prompt, the diff and the effort, and reports its findings', async () => {
   const calls = [];
   const finding = {

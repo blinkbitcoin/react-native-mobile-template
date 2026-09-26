@@ -241,7 +241,7 @@ describe('cd-release.yml chains the release by dispatch', () => {
 
   test('a second job drafts the store notes into the release PR through shared-workflows', () => {
     const job =
-      /store-notes:\n\s+name: Store Notes\n\s+needs: release-please\n[\s\S]*?uses: [^\n]*\/shared-workflows\/\.github\/workflows\/pr-release-notes\.yml@v0/;
+      /store-notes:\n\s+name: Store Notes\n\s+needs: release-please\n[\s\S]*?uses: [^\n]*\/shared-workflows\/\.github\/workflows\/pr-release-notes\.yml@[0-9a-f]{40}\b/;
     assert.match(code, job, 'no store-notes job calling pr-release-notes.yml');
     assert.match(code, /if: \$\{\{ needs\.release-please\.outputs\.pr-number != '' \}\}/);
     assert.match(code, /pull-requests: write/);
@@ -467,7 +467,7 @@ describe('the security gate', () => {
       assert.ok(jobs.security, 'ci.yml has no security job');
       assert.match(
         jobs.security.uses,
-        /shared-workflows\/\.github\/workflows\/check-security\.yml@v0$/,
+        /shared-workflows\/\.github\/workflows\/check-security\.yml@[0-9a-f]{40}\b/,
       );
       assert.equal(jobs.security.needs, 'checks');
       assert.match(jobs.security.if, /needs\.checks\.outputs\.docs-only != 'true'/);
@@ -529,7 +529,7 @@ describe('the security gate', () => {
 
     test('runs on action=release, after prepare, against the tag', () => {
       assert.ok(jobs.security, 'cd-production.yml has no security job');
-      assert.match(jobs.security.uses, /check-security\.yml@v0$/);
+      assert.match(jobs.security.uses, /check-security\.yml@[0-9a-f]{40}\b/);
       assert.equal(jobs.security.needs, 'prepare');
       assert.match(jobs.security.if, /inputs\.action == 'release'/);
       assert.match(jobs.security.if, /vars\.SECURITY_ENABLED != 'false'/);

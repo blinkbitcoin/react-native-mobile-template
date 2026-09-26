@@ -1,9 +1,22 @@
-import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
-import { ErrorBoundary } from 'react-error-boundary';
-import { ErrorFallback } from '@/components/ErrorFallback';
+import { act, fireEvent, screen } from '@testing-library/react-native';
 import { activateLocale } from '@/i18n/i18n';
 import { renderWithProviders } from '@/test/render';
 import { SettingsScreen } from './SettingsScreen';
+
+// The build variant decides whether the dev menu shows up front. `mockVariant`
+// is read on every access, so a test can switch to a production build.
+let mockVariant = 'development';
+jest.mock('@/config/constants', () => ({
+  constants: {
+    version: '1.0.0',
+    buildNumber: '1',
+    get variant() {
+      return mockVariant;
+    },
+    otaEnabled: false,
+    buildStamp: 'prod-stamp',
+  },
+}));
 
 /**
  * Theme and locale changes both land through subscriptions outside React's own
@@ -18,6 +31,7 @@ async function press(testID: string) {
 
 afterEach(() => {
   activateLocale('en');
+  mockVariant = 'development';
 });
 
 test('dev menu toggles theme and language', async () => {
@@ -38,37 +52,24 @@ test('dev menu shows the build stamp and version', async () => {
   expect(screen.getByTestId('settings-version')).toBeOnTheScreen();
 });
 
-test('dev menu signs in and out through the auth service', async () => {
-  await renderWithProviders(<SettingsScreen />);
-  expect(screen.getByTestId('settings-auth-state')).toHaveTextContent('signed out');
-
-  await press('settings-auth-sign-in');
-  await waitFor(() =>
-    expect(screen.getByTestId('settings-auth-state')).toHaveTextContent('signed in'),
-  );
-
-  await press('settings-auth-sign-out');
-  await waitFor(() =>
-    expect(screen.getByTestId('settings-auth-state')).toHaveTextContent('signed out'),
-  );
-});
-
-test('the trigger-error button raises to the boundary and retry comes back', async () => {
-  // React logs the error it caught; keep the test output readable.
-  const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
-  try {
-    await renderWithProviders(
-      <ErrorBoundary FallbackComponent={ErrorFallback}>
-        <SettingsScreen />
-      </ErrorBoundary>,
-    );
-    await press('settings-trigger-error');
-    expect(screen.getByTestId('error-screen')).toBeOnTheScreen();
-
-    await press('error-retry');
-    expect(screen.getByTestId('settings-screen')).toBeOnTheScreen();
-    expect(screen.queryByTestId('error-screen')).toBeNull();
-  } finally {
-    spy.mockRestore();
+async function tapTitle(times: number) {
+  for (let i = 0; i < times; i += 1) {
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('settings-title'));
+    });
   }
+}
+
+test('the dev menu stays hidden in a production build until seven taps', async () => {
+  // A production build must not show the dev menu until the hidden gesture on
+  // the title has been completed.
+  mockVariant = 'production';
+  await renderWithProviders(<SettingsScreen />);
+  expect(screen.queryByTestId('settings-build-stamp')).toBeNull();
+
+  await tapTitle(6);
+  expect(screen.queryByTestId('settings-build-stamp')).toBeNull();
+
+  await tapTitle(1);
+  expect(screen.getByTestId('settings-build-stamp')).toHaveTextContent('prod-stamp');
 });

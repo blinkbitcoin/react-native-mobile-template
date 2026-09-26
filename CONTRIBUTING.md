@@ -62,6 +62,12 @@ make check       # every static gate CI runs (no tests, no builds)
 make test-unit   # unit + component tests
 ```
 
+Every source file has its own test file beside it that covers it at 100% on
+its own (`Foo.tsx` → `Foo.test.tsx`; a route under `src/app/` mirrors its path
+under `src/__tests__/app/`). `make test-scripts` fails naming any file without
+one; `docs/testing.md` has the command that checks one module against its own
+test. See "One test file per module" there.
+
 Native-facing changes (`app.config.ts`, `plugins/`, `modules/`) additionally
 need `make check-prebuild`. Release-facing changes (`fastlane/`,
 `scripts/release/`, workflow pins) need `make check-release`.

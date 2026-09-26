@@ -2,12 +2,15 @@
 # at --min-severity medium over .github, naming this file with --config: zizmor's
 # own discovery skips it in a worktree (see the Makefile).
 rules:
-  # Tags, not commit SHAs: the shared workflows are called at the moving `@v0`
-  # tag by design, and every other action is held to the same rule so there is
-  # one policy to reason about. Dependabot moves the tags. Same policy as
-  # shared-workflows' .github/zizmor.yml.
+  # The shared workflows are pinned by commit SHA, so a shared-workflows release
+  # reaches CD only through a Dependabot PR whose CI ran it
+  # (docs/decisions/0023-cd-verified-before-release.md). Third-party actions
+  # stay on tags, which Dependabot moves.
   unpinned-uses:
-    disable: true
+    config:
+      policies:
+        blinkbitcoin/shared-workflows/*: hash-pin
+        '*': ref-pin
   dangerous-triggers:
     ignore:
       # workflow_run is dangerous when the triggered run checks out and runs
