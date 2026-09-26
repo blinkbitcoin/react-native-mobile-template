@@ -130,7 +130,7 @@ submission are never open against the same app at once.
 | `ci-web.yml` | `pull_request`, `workflow_dispatch` (`deploy`) | `build-web.yml` | PR = production export + Playwright smoke; a `deploy` dispatch from `cd-release.yml`<br>at the tag = the same export + Pages deploy, with `base-url` = `/<repo>` unless a custom<br>domain is set, and `+not-found.html` copied to `404.html` so a deep link boots the router |
 | `ci-pr-closed.yml` | `pull_request: closed` | `pr-closed.yml` | cancels the closed PR's in-flight runs and drops its `gh-pages` badge directory; needs `actions: write` and `contents: write` |
 | `ci-pr-title.yml` | `pull_request: edited` (only when the title changed) | `pr-title.yml` | `opened`/`synchronize` are already covered by `check-code.yml`'s `commitlint` |
-| `ci-codeql.yml` | `push` to `main`, `pull_request` to `main`, `schedule` (Mon 06:17 UTC) | `check-codeql.yml` | CodeQL advanced setup. Informational — **never** a required check.<br>Config in `.github/codeql/codeql-config.yml`; `make check-codeql` runs the same queries locally |
+| `ci-codeql.yml` | `push` to `main`, `pull_request` to `main`, `schedule` (Mon 06:17 UTC) | `check-codeql.yml` | CodeQL advanced setup. Informational — **never** a required check.<br>Config in `.github/codeql/codeql-config.yml`; `make check-code-scanning` runs the same queries locally |
 
 `push` is deliberately scoped to `main` only: a PR branch in this repo would
 otherwise fire both `push` and `pull_request` and run the whole suite twice for
@@ -205,7 +205,7 @@ locally means the same commands passed the same way in CI.
 | `check-unit.yml` | `test:coverage`, `test:scripts` | `make test-coverage`, `make test-scripts` (`make test-unit` runs `test` + `test:scripts`);<br>both gate coverage at 100%; `test:scripts` includes the `make setup` suite |
 | `check-e2e.yml` | Maestro flows in `.maestro/` against a debug build | `make test-e2e-ios` / `make test-e2e-android` (after `make dev-api`, `make dev`, `make dev-ios`/`make dev-android`) |
 | `build-web.yml` | `build:web`, `test:e2e:web` | `make build-web`, `make test-e2e-web` |
-| `check-codeql.yml` | no consumer script: the CodeQL action reads `.github/codeql/codeql-config.yml` | `make check-codeql` (same config, same suite, same packs) |
+| `check-codeql.yml` | no consumer script: the CodeQL action reads `.github/codeql/codeql-config.yml` | `make check-code-scanning` (same config, same suite, same packs) |
 
 Two script-contract details are load-bearing:
 

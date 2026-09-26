@@ -60,6 +60,7 @@ suites include:
 | `scripts/release/fingerprint.test.mjs` | The fingerprint and OTA plumbing |
 | `scripts/release/build-info.test.mjs` | The per-build provenance record |
 | `scripts/shell-locale.test.mjs` | The guard against `LC_ALL=C cmd` locale prefixes in tracked shell code (see `AGENTS.md`) |
+| `scripts/make-target-names.test.mjs` | That no make target is named after the tool it runs (`check-unused`, not `check-knip`; see `AGENTS.md`) |
 | `scripts/worktree-ignores.test.mjs` | That every tool which walks the tree skips `.claude/worktrees/`, anchored to the root<br>(see [quality.md](quality.md#worktrees-inside-the-checkout-are-not-this-checkout)) |
 | `scripts/coverage-completeness.test.mjs` | Loads every `scripts/**/*.mjs` module, so one no test imports still counts |
 | `scripts/release/shared-copies.test.mjs` | Our `resolve-version.sh` and `build-info.sh` against shared-workflows' copies, read from `$WORKFLOWS_DIR`.<br>CI always compares; locally they skip unless `WORKFLOWS_DIR` points at a checkout |

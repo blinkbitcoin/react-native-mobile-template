@@ -87,7 +87,7 @@ Add a rule to one side only, and record which side in the config comment.
 | `make check-types` | `tsc --noEmit` | Types. `strict`, plus `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`,<br>`verbatimModuleSyntax`, `noImplicitOverride`, `noFallthroughCasesInSwitch` |
 | `make check-lint` | `biome lint .` then `eslint . --max-warnings=0` | Lint, both halves. Warnings are failures |
 | `make check-format` | `biome format .` | Formatting. `make fix-format` writes |
-| `make check-knip` | `knip` | Unused files, exports, dependencies |
+| `make check-unused` | `knip` | Unused files, exports, dependencies |
 | `make check-spell` | `typos` | Spelling, Markdown included |
 | `make check-code` | the five above | The fast local gate |
 | `make check-gen` | `pnpm i18n:check`, `pnpm codegen:check` | Drift in generated catalogs and generated GraphQL documents |
@@ -104,7 +104,7 @@ Not in `make check`, because each is slow or needs a build:
 | `make check-slow` | The two below, grouped. Off by default in `check-code.yml` too (`prebuild-check`, `bundle-secrets`) |
 | `make check-prebuild` | Two prebuilds into temp directories, asserting the config plugin output |
 | `make check-security-bundle` | Exports the bundle and fails on a private variable name or a credential-shaped string in it<br>(the `bundle` scanner; [security.md](security.md)) |
-| `make check-codeql` | CodeQL's `security-and-quality` suite over the whole tree — see below |
+| `make check-code-scanning` | CodeQL's `security-and-quality` suite over the whole tree — see below |
 | `make test`, `make test-unit`, `make test-coverage`, `make test-scripts` | See [testing.md](testing.md); the last is `node:test` with a 100% coverage gate over `scripts/**/*.mjs` |
 
 ## `make check` is the CI gate set, and that is enforced
@@ -280,7 +280,7 @@ so an ignore added to get a PR green is an ignore that was never needed.
 
 CodeQL runs two ways from one config file, `.github/codeql/codeql-config.yml`:
 `.github/workflows/ci-codeql.yml` hands that path to
-`github/codeql-action/init`, and `make check-codeql` parses the suite, the packs and
+`github/codeql-action/init`, and `make check-code-scanning` parses the suite, the packs and
 the `paths-ignore` list out of the same file. One file, so a local "clean" and a
 CI "clean" mean the same thing.
 
@@ -290,7 +290,7 @@ on a settings page. It is **informational**: leave `codeql` out of the required
 checks, because a pack download that times out must not be able to block a
 merge. Alerts land under Security → Code scanning.
 
-`make check-codeql` needs a CodeQL CLI, which nothing else here does and `make check`
+`make check-code-scanning` needs a CodeQL CLI, which nothing else here does and `make check`
 therefore does not run it. Either route works:
 
 ```
@@ -332,7 +332,7 @@ firing elsewhere still reports.
 
 ## knip runs in default mode
 
-`make check-knip` runs `knip`, not `knip --strict`. Production mode resolves only the
+`make check-unused` runs `knip`, not `knip --strict`. Production mode resolves only the
 production graph, which means it flags exports used solely by tests as unused
 unless every test file is marked with `!` patterns. That trade is not worth it
 here. Default mode still catches unused files, unused exports and unused
@@ -366,7 +366,7 @@ every tool reads it, so each one names it itself:
 | tsc | `tsconfig.json` | `.claude/worktrees` in `exclude` |
 | typos | `typos.toml` | `.claude/worktrees/` in `extend-exclude` |
 | Semgrep | `.semgrepignore` | `.claude/worktrees/` |
-| CodeQL | `.github/codeql/codeql-config.yml` | `paths-ignore` (and so `make check-codeql`'s index filters) |
+| CodeQL | `.github/codeql/codeql-config.yml` | `paths-ignore` (and so `make check-code-scanning`'s index filters) |
 | git | `.gitignore` | `/.claude/worktrees/` |
 
 Jest and Metro match absolute paths, and a worktree's own root is itself under

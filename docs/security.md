@@ -22,7 +22,7 @@ request, the built binaries only once a release is built.
 | `policy` | `check-security-policy` | `pnpm-workspace.yaml` | every pull request, every push to `main` |
 | `review` | `check-security-review` | the diff (an LLM, off by default) | pull requests; the release pull request reviews everything since the last release tag |
 | `bundle` | `check-security-bundle` | the exported JavaScript bundle | the release pull request, and the production dispatch |
-| `openant` | `check-security-openant` | the codebase (knostic/OpenAnt, an LLM, off by default) | the release pull request |
+| `openant` | `check-security-review-codebase` | the codebase (knostic/OpenAnt, an LLM, off by default) | the release pull request |
 | `mobile` | `check-security-mobile` | a fresh prebuild of `android/` and `ios/` (mobsfscan) | the production dispatch |
 | `binaries` | `check-security-binaries` | the release's `.apk` and `.ipa` (OWASP MASTG checks) | the production dispatch, before any store job |
 | `sbom` | `check-security-sbom` | `pnpm-lock.yaml`; writes `.security/sbom.cdx.json` | the production dispatch |

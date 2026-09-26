@@ -154,7 +154,7 @@ fix-lint: ## Apply Biome's and ESLint's own fixes (writes)
 check-format: ## Check formatting without writing
 	pnpm format:check
 
-check-knip: ## Unused files, exports and dependencies (default mode; production mode flags test-only exports)
+check-unused: ## Unused files, exports and dependencies (default mode; production mode flags test-only exports)
 	pnpm knip
 
 check-spell: ## Spell-check with typos
@@ -167,7 +167,7 @@ check-gen: ## Generated-file drift (i18n, codegen)
 check-prebuild: ## Prebuild both platforms into a temp dir and assert plugin output
 	pnpm check-prebuild
 
-check-code: check-types check-lint check-format check-knip check-spell ## Fast local gate: types + lint + format + knip + spell
+check-code: check-types check-lint check-format check-unused check-spell ## Fast local gate: types + lint + format + unused code + spell
 
 check-deps: ## SDK drift, vulnerability audit, lockfile provenance, licenses
 	pnpm deps:check
@@ -206,7 +206,7 @@ check-secrets: ## Scan the whole git history for committed secrets (gitleaks)
 	gitleaks git --redact --no-banner .
 
 # Not in `make check` or `make ci`: external CLIs and minutes, the same reason
-# `check-codeql` is out. This is the deliberate deeper pass; the pre-push gate
+# `check-code-scanning` is out. This is the deliberate deeper pass; the pre-push gate
 # stays `make check && make test-unit && make test-scripts`.
 check-security: ## Every enabled security scanner, then the verdict (see docs/security.md)
 	bash scripts/security/local.sh
@@ -243,7 +243,7 @@ check-security-binaries: ## MASTG checks over built binaries (APK=... and/or IPA
 check-security-review: ## LLM security review of the diff (off by default; needs llm.provider and a key)
 	bash scripts/security/local.sh review
 
-check-security-openant: ## OpenAnt LLM scan of the codebase (off by default; needs llm.provider and a key)
+check-security-review-codebase: ## LLM security review of the whole codebase with OpenAnt (off by default; needs llm.provider and a key)
 	bash scripts/security/local.sh openant
 
 check: check-code check-gen check-deps check-ci check-docs check-release check-secrets ## Every static gate the check-code workflow runs (no tests/builds)
@@ -258,7 +258,7 @@ ci: check test-coverage test-scripts ## Everything CI runs except E2E (which nee
 # Deliberately NOT in `make check`: the first run downloads and compiles a query
 # pack (minutes) and every run needs a CodeQL CLI, which no other gate does.
 # CI runs the same queries through .github/workflows/ci-codeql.yml.
-check-codeql: ## CodeQL locally with the same config CI uses (needs a CodeQL CLI)
+check-code-scanning: ## CodeQL code scanning locally, with the same config CI uses (needs a CodeQL CLI)
 	bash scripts/codeql-local.sh
 
 test-scripts: ## node:test for scripts/**/*.test.mjs, with the 100% script coverage gate
@@ -297,4 +297,4 @@ reset: clean ## clean + reinstall
 help: ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: init doctor install setup setup-toolchain setup-android setup-ios setup-maestro ports dev dev-ios dev-android dev-web dev-api prebuild build-web version verify-ios verify-android release-notes gen-i18n gen-graphql check-types check-lint fix-format fix-lint check-format check-knip check-spell check-gen check-prebuild check-code check-deps check-ci check-docs check-skills check-secrets check-security check-security-deps check-security-code check-security-policy check-security-sbom check-security-bundle check-security-mobile check-security-binaries check-security-review check-security-openant check-release check check-slow ci check-codeql test-scripts test-unit test-coverage gen-badges test-e2e-ios test-e2e-android test-e2e-web test clean reset help
+.PHONY: init doctor install setup setup-toolchain setup-android setup-ios setup-maestro ports dev dev-ios dev-android dev-web dev-api prebuild build-web version verify-ios verify-android release-notes gen-i18n gen-graphql check-types check-lint fix-format fix-lint check-format check-unused check-spell check-gen check-prebuild check-code check-deps check-ci check-docs check-skills check-secrets check-security check-security-deps check-security-code check-security-policy check-security-sbom check-security-bundle check-security-mobile check-security-binaries check-security-review check-security-review-codebase check-release check check-slow ci check-code-scanning test-scripts test-unit test-coverage gen-badges test-e2e-ios test-e2e-android test-e2e-web test clean reset help

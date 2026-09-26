@@ -140,7 +140,7 @@ describe('the configurations that name paths relative to the root', () => {
   test('git, Semgrep and CodeQL ignore them', () => {
     assert.match(read('.gitignore'), /^\/\.claude\/worktrees\/$/m);
     assert.match(read('.semgrepignore'), /^\.claude\/worktrees\/$/m);
-    // paths-ignore; `make check-codeql` turns the same list into index filters.
+    // paths-ignore; `make check-code-scanning` turns the same list into index filters.
     assert.match(read('.github/codeql/codeql-config.yml'), /^ {2}- \.claude\/worktrees(\s|$)/m);
   });
 });
