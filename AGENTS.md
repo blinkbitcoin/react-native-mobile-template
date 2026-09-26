@@ -269,6 +269,7 @@ aggregates.
 | Machine setup (`make setup`), bash against fake tools | `scripts/setup/setup.test.mjs` | `make test-scripts` |
 | The native-setup skill's commands and paths | `.claude/skills/native-setup/tests/` | `make check-skills` |
 | Fastlane lanes | `fastlane/test/` | `make check-release` |
+| CD against the pinned shared workflows: every call's contract, the store-notes chain | `scripts/workflow-contract.test.mjs`,<br>`scripts/release/cd-notes.test.mjs` | `make test-scripts` (CI always; locally with `WORKFLOWS_DIR`) |
 | Native e2e | `.maestro/flows/` | `make test-e2e-ios`, `make test-e2e-android` |
 | Web e2e | `e2e/web/` | `make test-e2e-web` |
 
@@ -295,7 +296,9 @@ in-process; the entry itself is only an `import.meta.main` guard that sets
 
 ## CI, release and troubleshooting
 
-- CI is four callers into `blinkbitcoin/shared-workflows`, pinned by SHA —
+- CI and CD are eleven caller workflows into `blinkbitcoin/shared-workflows`,
+  every call pinned to one commit SHA that Dependabot moves in one PR, and a PR
+  runs the CD calls against that pin (`docs/decisions/0023-cd-verified-before-release.md`).
   `docs/ci.md` maps each `make` target to its CI job and explains `.workflows/`.
 - Releases (versions, build numbers, store notes, environments, rollback,
   hotfix): `docs/release-runbook.md`. Over-the-air updates and the channel

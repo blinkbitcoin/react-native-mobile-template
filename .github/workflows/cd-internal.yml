@@ -28,7 +28,7 @@ concurrency:
 jobs:
   prepare:
     name: Prepare
-    uses: blinkbitcoin/shared-workflows/.github/workflows/build-prepare.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/build-prepare.yml@aa12aaa99407e2800ffccb4db21ff962dc681b05 # v0.13.0
     permissions:
       # `contents: write` for `reserve-tag` below (it creates the build tag);
       # `actions: read` for the green gate's `gh run list`. build-prepare
@@ -74,7 +74,7 @@ jobs:
   build-ios:
     name: Build iOS
     needs: prepare
-    uses: blinkbitcoin/shared-workflows/.github/workflows/build-ios.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/build-ios.yml@aa12aaa99407e2800ffccb4db21ff962dc681b05 # v0.13.0
     permissions:
       contents: read
     with:
@@ -117,7 +117,7 @@ jobs:
   build-android:
     name: Build Android
     needs: prepare
-    uses: blinkbitcoin/shared-workflows/.github/workflows/build-android.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/build-android.yml@aa12aaa99407e2800ffccb4db21ff962dc681b05 # v0.13.0
     permissions:
       contents: read
     with:
@@ -167,7 +167,7 @@ jobs:
     # credentials still builds, verifies and publishes its artifacts.
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' }}
     needs: [prepare, build-ios]
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@aa12aaa99407e2800ffccb4db21ff962dc681b05 # v0.13.0
     permissions:
       contents: read
     with:
@@ -211,7 +211,7 @@ jobs:
     # credentials still builds, verifies and publishes its artifacts.
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' }}
     needs: [prepare, build-android]
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@aa12aaa99407e2800ffccb4db21ff962dc681b05 # v0.13.0
     permissions:
       contents: read
     with:
@@ -250,7 +250,7 @@ jobs:
     # not receive a build Play refused, and it must never be the only store
     # that has one.
     needs: [prepare, build-android, upload-android]
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@aa12aaa99407e2800ffccb4db21ff962dc681b05 # v0.13.0
     permissions:
       contents: read
     with:
@@ -296,7 +296,7 @@ jobs:
     # never hold up or fail the pre-release this run is built around.
     needs: [prepare, build-ios, build-android, upload-ios, upload-android]
     if: ${{ !cancelled() && !failure() && needs.build-ios.result == 'success' && needs.build-android.result == 'success' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-github-release.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-github-release.yml@aa12aaa99407e2800ffccb4db21ff962dc681b05 # v0.13.0
     permissions:
       # The called job creates a release; a called workflow can only narrow the
       # caller's token, so `contents: write` has to be granted here.
@@ -326,7 +326,7 @@ jobs:
       cancel-in-progress: false
     needs: [prepare, github-prerelease]
     if: ${{ vars.OTA_ENABLED == 'true' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-ota.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-ota.yml@aa12aaa99407e2800ffccb4db21ff962dc681b05 # v0.13.0
     permissions:
       contents: read
     with:

@@ -10,7 +10,7 @@
 // over there: shared-workflows defines the contract and never checks out a
 // consumer, and it is this repo that has to follow. In CI the shared copy is the
 // one this run's workflows were called at - the setup action checks it out at
-// $WORKFLOWS_DIR - so moving to a new `v0` is also when a drift turns red here.
+// $WORKFLOWS_DIR - so the Dependabot PR moving the pin is also when a drift turns red here.
 //
 // Locally there is no $WORKFLOWS_DIR unless you point it at a checkout
 // (`WORKFLOWS_DIR=../shared-workflows make test-scripts`), and the cases skip

@@ -68,16 +68,28 @@ updates:
       - dependency-name: '@types/jest'
         update-types: ['version-update:semver-major']
 
+  # Third-party actions, and the shared workflows every caller is pinned to by
+  # commit SHA. A shared-workflows release arrives here as one PR moving all
+  # of the pins together, and that PR's CI runs the shared code against this
+  # repository (scripts/workflow-contract.test.mjs,
+  # scripts/release/cd-notes.test.mjs) before any CD run uses it.
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
     cooldown:
       default-days: 7
+      # Our own release: the reason to wait out a third-party release does
+      # not apply, and the PR's CI is the check.
+      exclude: ['blinkbitcoin/shared-workflows']
     labels: ['dependencies', 'ci']
     commit-message:
       prefix: 'chore(ci)'
     groups:
+      # Listed first: a dependency joins the first group it matches, and every
+      # pin must move in the same PR (workflow-contract.test.mjs fails on two).
+      shared-workflows:
+        patterns: ['blinkbitcoin/shared-workflows*']
       actions-minor-patch:
         patterns: ['*']
         update-types: ['minor', 'patch']
