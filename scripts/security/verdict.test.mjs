@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { ENGINE_OF, main, severityOf, summarize, verdict } from './verdict.mjs';
+import { annotation, ENGINE_OF, main, severityOf, summarize, verdict } from './verdict.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -555,4 +555,66 @@ test('as a command it reads *.sarif files from the directory named on the comman
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// check-security.yml uploads SARIF from the default branch only, so on a pull
+// request code scanning no longer puts a finding on the diff. These workflow
+// commands do instead: an error for a finding that blocks, a warning for one
+// that is only reported, nothing below the severity floor.
+test('a blocking finding annotates as an error and a reported one as a warning', () => {
+  const v = verdict({
+    entries: [
+      entry('deps', doc('osv-scanner', [result('critical', 'GHSA-1')])),
+      entry('review', doc('review', [result('high', 'llm/1')])),
+      entry('code', doc('semgrep', [result('low', 'minor')])),
+    ],
+    severity: 'medium',
+    failOn: ['deterministic'],
+  });
+  assert.deepEqual(v.annotations, [
+    '::error file=f.ts,line=1,title=Security critical%3A GHSA-1::boom',
+    '::warning file=f.ts,line=1,title=Security high%3A llm/1::boom',
+  ]);
+});
+
+test('an annotation escapes what would end its properties or its message', () => {
+  const line = annotation('warning', {
+    severity: 'medium',
+    ruleId: 'a:b,c',
+    message: '50%\r\nnext',
+    file: 'dir,x/y:z.ts',
+    line: 7,
+  });
+  assert.equal(
+    line,
+    '::warning file=dir%2Cx/y%3Az.ts,line=7,title=Security medium%3A a%3Ab%2Cc::50%25%0D%0Anext',
+  );
+});
+
+test('an annotation without a location, or a message, still names the rule', () => {
+  assert.equal(
+    annotation('error', { severity: 'high', ruleId: 'r', message: '' }),
+    '::error title=Security high%3A r::r',
+  );
+  assert.equal(
+    annotation('error', { severity: 'high', ruleId: 'r', message: 'm', file: 'a.ts' }),
+    '::error file=a.ts,title=Security high%3A r::m',
+  );
+});
+
+test('the CLI prints annotations on a runner only', () => {
+  const run = (env) => {
+    const out = [];
+    main(['.security'], {
+      log: (l) => out.push(l),
+      error: () => {},
+      env,
+      readEntries: () => [entry('deps', doc('osv-scanner', [result('critical')]))],
+    });
+    return out.filter((line) => line.startsWith('::'));
+  };
+  assert.deepEqual(run({ GITHUB_ACTIONS: 'true' }), [
+    '::error file=f.ts,line=1,title=Security critical%3A r::boom',
+  ]);
+  assert.deepEqual(run({}), []);
 });

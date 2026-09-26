@@ -96,9 +96,10 @@ jobs:
     # scanners actually run is security-policy.json's decision; the inputs below
     # only say what this tier allows.
     if: ${{ needs.checks.outputs.docs-only != 'true' && vars.SECURITY_ENABLED != 'false' }}
-    # The verdict job uploads SARIF to code scanning. A called workflow can only
-    # narrow the caller's token, so a grant smaller than this is not a failed
-    # step but a startup_failure of the whole run.
+    # The verdict job uploads SARIF to code scanning, on main only; a pull
+    # request gets the Verdict job's annotations instead. A called workflow can
+    # only narrow the caller's token, so a grant smaller than this is not a
+    # failed step but a startup_failure of the whole run.
     permissions:
       contents: read
       actions: read

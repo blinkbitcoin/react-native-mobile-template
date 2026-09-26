@@ -93,12 +93,15 @@ export const summarize = (entries) => {
     suppressed += suppressedCountOf(document);
     for (const { result, rule } of resultsOf(document)) {
       const severity = severityOf(result, rule);
+      const where = result.locations?.[0]?.physicalLocation;
       counts[severity] += 1;
       findings.push({
         job,
         severity,
         ruleId: result.ruleId ?? '<no rule>',
         message: result.message?.text ?? '',
+        file: where?.artifactLocation?.uri,
+        line: where?.region?.startLine,
       });
     }
   }
@@ -106,7 +109,28 @@ export const summarize = (entries) => {
   return { counts, highest, skipped, findings, suppressed };
 };
 
-/** The verdict, its exit code and the lines to print. */
+// Workflow command escaping: the data half loses only %, CR and LF; a property
+// value also loses : and , because those separate the properties.
+const escapeData = (text) =>
+  String(text).replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
+const escapeProperty = (text) => escapeData(text).replaceAll(':', '%3A').replaceAll(',', '%2C');
+
+/**
+ * One `::error` or `::warning` workflow command for a finding, which the runner
+ * shows on the pull request's diff. Code scanning no longer does that on a pull
+ * request - check-security.yml uploads from the default branch only - so this
+ * is where a finding meets the change that introduced it.
+ */
+export const annotation = (level, finding) => {
+  const properties = [
+    finding.file && `file=${escapeProperty(finding.file)}`,
+    finding.file && finding.line && `line=${finding.line}`,
+    `title=${escapeProperty(`Security ${finding.severity}: ${finding.ruleId}`)}`,
+  ].filter(Boolean);
+  return `::${level} ${properties.join(',')}::${escapeData(finding.message || finding.ruleId)}`;
+};
+
+/** The verdict, its exit code, the lines to print and the annotations for CI. */
 export const verdict = ({ entries, severity, failOn }) => {
   // This is the only module allowed to fail a run, so it does not trust a
   // caller to have validated severity already: an unrecognized value throws
@@ -194,6 +218,11 @@ export const verdict = ({ entries, severity, failOn }) => {
     counts,
     suppressed,
     lines,
+    // A finding that blocks is an error; one that is only reported is a
+    // warning. Below the severity floor it is neither, as in the lines above.
+    annotations: reportable.map((finding) =>
+      annotation(blocking.includes(finding) ? 'error' : 'warning', finding),
+    ),
     exitCode: blocking.length > 0 ? 1 : 0,
   };
 };
@@ -254,6 +283,9 @@ export function main(
   const settings = load('security-policy.json', env);
   const outcome = verdict({ entries, severity: settings.severity, failOn: settings.failOn });
   for (const line of outcome.lines) log(line);
+  // Only on a runner: on a laptop, `make check-security` would print them as
+  // noise. verdict.sh in shared-workflows keeps them out of the run summary.
+  if (env.GITHUB_ACTIONS === 'true') for (const line of outcome.annotations) log(line);
   return outcome.exitCode;
 }
 

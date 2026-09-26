@@ -125,7 +125,7 @@ would otherwise have that code measured too. The suites include:
 | `scripts/release/cd-notes.test.mjs` | The store notes the way CD drafts them: cd-release's build-env through the shared `build-env.sh`, `pr-notes.sh` on<br>a real release PR body with a `gh` shim and a local model, then the shared `notes.sh` reading the section back |
 | `scripts/security/config.test.mjs` | Settings resolution: environment, then `security-policy.json`, then defaults |
 | `scripts/security/sarif.test.mjs` | The SARIF document builders: a skipped run and a findings run |
-| `scripts/security/verdict.test.mjs` | Merging SARIF documents, the severity threshold and the `failOn` engine gate |
+| `scripts/security/verdict.test.mjs` | Merging SARIF documents, the severity threshold, the `failOn` engine gate<br>and the pull request annotations |
 | `scripts/security/runners.test.mjs` | The bash runners (`deps.sh`, `code.sh`, `policy.sh`, `local.sh`): enabled, disabled and missing-tool paths |
 
 These run in `make ci` (and in CI's Unit job), **not** in `make check`, which
