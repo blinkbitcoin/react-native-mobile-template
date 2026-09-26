@@ -1,4 +1,8 @@
-import { render, screen } from '@testing-library/react-native';
+import { gql } from '@apollo/client';
+import { useQuery } from '@apollo/client/react';
+import { render, screen, waitFor } from '@testing-library/react-native';
+import { HttpResponse, http } from 'msw';
+import { server } from '@/test/setup';
 import { AppText } from './AppText';
 import { Providers } from './Providers';
 
@@ -42,4 +46,27 @@ test('the boundary can be opted out of, so errors propagate to the caller', asyn
   } finally {
     spy.mockRestore();
   }
+});
+
+test('apolloUri points the client at another endpoint', async () => {
+  server.use(
+    http.post('http://other.test/graphql', () =>
+      HttpResponse.json({ data: { hello: 'from elsewhere' } }),
+    ),
+  );
+  function Hello() {
+    const { data } = useQuery<{ hello: string }>(gql`
+      query Hello {
+        hello
+      }
+    `);
+    return <AppText testID="hello">{data?.hello ?? ''}</AppText>;
+  }
+
+  await render(
+    <Providers apolloUri="http://other.test/graphql">
+      <Hello />
+    </Providers>,
+  );
+  await waitFor(() => expect(screen.getByTestId('hello')).toHaveTextContent('from elsewhere'));
 });

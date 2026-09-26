@@ -1,7 +1,6 @@
 import { act, renderHook } from '@testing-library/react-native';
 import type { PropsWithChildren } from 'react';
 import { useColorScheme } from 'react-native';
-import { createStyles } from './createStyles';
 import { ThemeProvider } from './ThemeProvider';
 import { useTheme, useThemePreference } from './useTheme';
 
@@ -41,8 +40,14 @@ test('the preference context has an inert default outside a provider', async () 
   }).not.toThrow();
 });
 
-test('createStyles produces a hook bound to the current theme', async () => {
-  const useStyles = createStyles((t) => ({ box: { backgroundColor: t.colors.background } }));
-  const { result } = await renderHook(() => useStyles(), { wrapper });
-  expect(result.current.box.backgroundColor).toBe('#ffffff');
+test('an explicit preference ignores the system scheme', async () => {
+  systemScheme.mockReturnValue('dark');
+  const light = ({ children }: PropsWithChildren) => (
+    <ThemeProvider preference="light">{children}</ThemeProvider>
+  );
+  const { result } = await renderHook(() => ({ theme: useTheme(), pref: useThemePreference() }), {
+    wrapper: light,
+  });
+  expect(result.current.pref.preference).toBe('light');
+  expect(result.current.theme.scheme).toBe('light');
 });

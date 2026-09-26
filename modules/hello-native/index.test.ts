@@ -1,6 +1,6 @@
-jest.mock('../src/HelloNativeModule');
+jest.mock('./src/HelloNativeModule');
 
-import { getBuildStamp, HelloNativeError, hello, platformName } from '..';
+import { getBuildStamp, HelloNativeError, hello, platformName } from './index';
 
 test('hello validates input and proxies to native', () => {
   expect(hello('Ada')).toBe('Hello, Ada from mock');
@@ -21,11 +21,11 @@ test('missing native module rejects and throws helpfully', async () => {
   // throwing factory below stand in for an absent native module.
   jest.resetModules();
   await jest.isolateModulesAsync(async () => {
-    jest.doMock('../src/HelloNativeModule', () => {
+    jest.doMock('./src/HelloNativeModule', () => {
       throw new Error("Cannot find native module 'HelloNative'");
     });
     // eslint-disable-next-line @typescript-eslint/no-require-imports -- the wrapper has to be re-required inside the isolated module registry
-    const isolated = require('..') as typeof import('..');
+    const isolated = require('./index') as typeof import('./index');
 
     expect(() => isolated.hello('x')).toThrow(/make dev-ios/);
     await expect(isolated.getBuildStamp()).rejects.toThrow(isolated.HelloNativeError);

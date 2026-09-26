@@ -203,16 +203,6 @@
         "lines": ["^  - dist # web export$"]
       },
       {
-        "path": "src/features/settings/NativeDemoCard.test.tsx",
-        "blocks": [
-          {
-            "from": "^test\\('the web variant",
-            "until": "^\\}\\);$"
-          }
-        ],
-        "lines": ["NativeDemoCard\\.web"]
-      },
-      {
         "path": ".gitignore",
         "lines": ["^/playwright-report$", "^web-build/$"],
         "replace": [

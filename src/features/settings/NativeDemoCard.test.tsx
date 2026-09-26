@@ -1,7 +1,6 @@
 import { screen, waitFor } from '@testing-library/react-native';
 import { renderWithProviders } from '@/test/render';
 import { NativeDemoCard } from './NativeDemoCard';
-import { NativeDemoCard as WebNativeDemoCard } from './NativeDemoCard.web';
 
 // A failure that is not a `HelloNativeError` (a bug in the native code rather
 // than a missing module) must still render rather than crash the screen. The
@@ -39,10 +38,4 @@ test('a thrown non-Error is stringified rather than swallowed', async () => {
   await renderWithProviders(<NativeDemoCard />);
 
   expect(screen.getByTestId('native-hello')).toHaveTextContent('native blew up');
-});
-
-test('the web variant explains that the native demo is unavailable', async () => {
-  await renderWithProviders(<WebNativeDemoCard />);
-
-  expect(screen.getByTestId('native-hello')).toHaveTextContent('Native demo unavailable on web');
 });

@@ -35,7 +35,7 @@ plus a value the config plugin wrote into the native project.
 | `src/HelloNative.types.ts` | The shared TypeScript contract |
 | `src/__mocks__/HelloNativeModule.ts` | The Jest manual mock |
 | `index.ts` | The wrapper every caller imports |
-| `__tests__/index.test.ts` | The wrapper's tests |
+| `index.test.ts` | The wrapper's tests, beside it |
 
 The native side reads the build stamp the config plugin wrote:
 `Bundle.main.object(forInfoDictionaryKey: "AppBuildStamp")` on iOS,
