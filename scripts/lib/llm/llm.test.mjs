@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import * as anthropic from './anthropic.mjs';
 import { ADAPTERS, adapterFor, EFFORTS, KEY_ENV, parseEffort, parseExtraParams } from './index.mjs';
 import * as openai from './openai.mjs';
+import { mergeRequest, thinks, unfence } from './request.mjs';
 
 const respond =
   (payload, ok = true, status = 200) =>
@@ -53,6 +54,24 @@ test('anthropic: without an effort the request carries neither field', async () 
   await anthropic.complete({ system: 's', user: 'u', fetchImpl: respond(TEXT) });
   assert.equal(respond.last.body.thinking, undefined);
   assert.equal(respond.last.body.output_config, undefined);
+});
+
+test('anthropic: effort none carries neither field', async () => {
+  await anthropic.complete({ system: 's', user: 'u', effort: 'none', fetchImpl: respond(TEXT) });
+  assert.equal(respond.last.body.thinking, undefined);
+  assert.equal(respond.last.body.output_config, undefined);
+});
+
+test('anthropic: a null extra parameter removes that field', async () => {
+  await anthropic.complete({
+    system: 's',
+    user: 'u',
+    effort: 'high',
+    extraParams: { thinking: null },
+    fetchImpl: respond(TEXT),
+  });
+  assert.equal('thinking' in respond.last.body, false);
+  assert.deepEqual(respond.last.body.output_config, { effort: 'high' });
 });
 
 test('anthropic: extra parameters are merged into the body', async () => {
@@ -108,9 +127,26 @@ test('openai: effort maps onto reasoning_effort, max to high', async () => {
     await openai.complete({ system: 's', user: 'u', effort, fetchImpl: respond(CHAT) });
     sent.push(respond.last.body.reasoning_effort);
   }
-  assert.deepEqual(sent, ['low', 'medium', 'high', 'high']);
+  assert.deepEqual(sent, [undefined, 'low', 'medium', 'high', 'high']);
   await openai.complete({ system: 's', user: 'u', fetchImpl: respond(CHAT) });
   assert.equal(respond.last.body.reasoning_effort, undefined);
+});
+
+test('openai: null extra parameters drop a default, and a replacement is sent', async () => {
+  await withEnv({ OPENAI_BASE_URL: 'https://models.github.ai/inference' }, () =>
+    openai.complete({
+      system: 's',
+      user: 'u',
+      maxTokens: 99,
+      extraParams: { response_format: null, max_tokens: null, max_completion_tokens: 4000 },
+      fetchImpl: respond(CHAT),
+    }),
+  );
+  const { body } = respond.last;
+  assert.equal('response_format' in body, false);
+  assert.equal('max_tokens' in body, false);
+  assert.equal(body.max_completion_tokens, 4000);
+  assert.equal(body.messages.length, 2);
 });
 
 test('openai: extra parameters are merged, and failures throw', async () => {
@@ -135,10 +171,36 @@ test('parseEffort defaults to max and refuses anything outside the vocabulary', 
   assert.equal(parseEffort(undefined, 'X'), 'max');
   assert.equal(parseEffort('', 'X'), 'max');
   assert.equal(parseEffort('low', 'X'), 'low');
+  assert.equal(parseEffort('none', 'X'), 'none');
   assert.throws(
     () => parseEffort('xhigh', 'X'),
-    /X: expected one of low, medium, high, max, got "xhigh"/,
+    /X: expected one of none, low, medium, high, max, got "xhigh"/,
   );
+});
+
+test('thinks is true for every effort but none and unset', () => {
+  assert.deepEqual(
+    EFFORTS.map((effort) => thinks(effort)),
+    [false, true, true, true, true],
+  );
+  assert.equal(thinks(undefined), false);
+  assert.equal(thinks(''), false);
+});
+
+test('mergeRequest overrides, adds and removes top-level fields', () => {
+  assert.deepEqual(mergeRequest({ a: 1, b: 2 }), { a: 1, b: 2 });
+  assert.deepEqual(mergeRequest({ a: 1, b: 2 }, { a: 3, b: null, c: { d: null } }), {
+    a: 3,
+    c: { d: null },
+  });
+  assert.deepEqual(mergeRequest({ a: 1 }, { missing: null }), { a: 1 });
+});
+
+test('unfence removes one surrounding code fence and nothing else', () => {
+  assert.equal(unfence('```json\n{"a":1}\n```'), '{"a":1}');
+  assert.equal(unfence('  ```\n{"a":1}\n```  \n'), '{"a":1}');
+  assert.equal(unfence('{"a":1}'), '{"a":1}');
+  assert.equal(unfence('text ```json\n{}\n```'), 'text ```json\n{}\n```');
 });
 
 test('parseExtraParams accepts an object, nested values included', () => {
@@ -148,6 +210,7 @@ test('parseExtraParams accepts an object, nested values included', () => {
     reasoning: { effort: 'high' },
     top_k: 5,
   });
+  assert.deepEqual(parseExtraParams('{"response_format":null}', 'X'), { response_format: null });
 });
 
 test('parseExtraParams refuses what is not an object, and the fields that choose what is asked', () => {
@@ -156,10 +219,12 @@ test('parseExtraParams refuses what is not an object, and the fields that choose
   assert.throws(() => parseExtraParams('null', 'X'), /expected a JSON object/);
   assert.throws(() => parseExtraParams('"s"', 'X'), /expected a JSON object/);
   for (const key of ['model', 'messages', 'system']) {
-    assert.throws(
-      () => parseExtraParams(JSON.stringify({ [key]: 1 }), 'X'),
-      new RegExp(`may not set ${key}`),
-    );
+    for (const value of [1, null]) {
+      assert.throws(
+        () => parseExtraParams(JSON.stringify({ [key]: value }), 'X'),
+        new RegExp(`may not set ${key}`),
+      );
+    }
   }
 });
 

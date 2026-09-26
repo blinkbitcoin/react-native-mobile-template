@@ -568,6 +568,23 @@ test('the output budget grows with the number of locales', () => {
   assert.equal(maxTokensFor(['en-US']), 2524);
   assert.equal(maxTokensFor(['en-US', 'sv-SE', 'de-DE']), 5524);
   assert.equal(maxTokensFor(new Array(20).fill('x')), 8192);
+  assert.equal(maxTokensFor(['en-US'], 'none'), 2524);
+});
+
+test('an effort that thinks gets room to think on top of the text budget', () => {
+  assert.equal(maxTokensFor(['en-US'], 'low'), 18524);
+  assert.equal(maxTokensFor(['en-US'], 'max'), 18524);
+  assert.equal(maxTokensFor(new Array(20).fill('x'), 'max'), 24192);
+});
+
+test('a fenced answer is unwrapped, and its text still goes through every check', () => {
+  const fence = (object) => `\`\`\`json\n${JSON.stringify(object)}\n\`\`\``;
+  assert.deepEqual(validate(fence({ 'en-US': 'Faster sync.' }), ['en-US']), {
+    notes: { 'en-US': 'Faster sync.' },
+  });
+  const rejected = validate(fence({ 'en-US': 'See https://example.com' }), ['en-US']);
+  assert.equal(rejected.notes, undefined);
+  assert.match(rejected.error, /contains a link/);
 });
 
 // ---------- the prompt template at the repo root ----------
@@ -634,6 +651,22 @@ test('the budget reaches the adapter as max_tokens', async () => {
     ),
   );
   assert.equal(JSON.parse(calls[0].init.body).max_tokens, maxTokensFor(['en-US', 'sv-SE']));
+});
+
+test('the budget an effort buys reaches the adapter too', async () => {
+  const calls = [];
+  await withEnv({ ANTHROPIC_API_KEY: 'sk-ant-test' }, () =>
+    withFetch(stubFetch(JSON.parse(fixture('anthropic-response.json')), calls), () =>
+      rewriteNotes({
+        items: [],
+        prompt: 'p',
+        locales: ['en-US'],
+        provider: 'anthropic',
+        effort: 'max',
+      }),
+    ),
+  );
+  assert.equal(JSON.parse(calls[0].init.body).max_tokens, maxTokensFor(['en-US'], 'max'));
 });
 
 // ---------- fix round 1: cli surface ----------

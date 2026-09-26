@@ -395,15 +395,62 @@ part of the prompt and cannot be relaxed from it.
 | --- | --- | --- |
 | `RELEASE_NOTES_LLM_PROVIDER` | repo variable | `anthropic` or `openai`; anything else disables the pass |
 | `RELEASE_NOTES_LLM_MODEL` | repo variable | Model override |
-| `RELEASE_NOTES_LLM_EFFORT` | repo variable | `low`, `medium`, `high` or `max` (the default); any other value fails the draft |
-| `RELEASE_NOTES_LLM_EXTRA_PARAMS` | repo variable | A JSON object merged into the request, for a vendor-specific switch; may not set `model`, `messages` or `system` |
-| `OPENAI_BASE_URL` | repo variable | OpenAI-compatible endpoint |
+| `RELEASE_NOTES_LLM_EFFORT` | repo variable | `none`, `low`, `medium`, `high` or `max` (the default); any other value fails the draft.<br>`none` sends no effort field, for a model with no reasoning switch |
+| `RELEASE_NOTES_LLM_EXTRA_PARAMS` | repo variable | A JSON object merged into the request, for a vendor-specific switch; may not set `model`, `messages` or `system`.<br>A key set to `null` removes that field: `{"response_format": null}` |
+| `OPENAI_BASE_URL` | repo variable | OpenAI-compatible endpoint; see [Provider recipes](#provider-recipes) |
 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | **secret** | Key for the chosen provider |
 
 The three variables reach `notes.mjs` through the `Store Notes` job's
 `build-env`; the two keys are declared secrets on `pr-release-notes.yml`,
 because `build-env` is a workflow input and would publish them in the run's
 parameters. No CD lane receives them: the LLM runs in that one job.
+
+An effort that thinks (anything but `none`) gets 16000 output tokens on top of
+the text budget: both APIs count thinking against `max_tokens`, and without
+the allowance the thinking can spend it all and leave no text to publish.
+
+### Provider recipes
+
+Any model reachable through Anthropic's API or an OpenAI-compatible endpoint
+works; the key goes in `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` (a secret),
+the rest in repository variables. Use `none` for the effort unless the model
+reasons, and check the vendor's model list for current names.
+
+| Provider | `RELEASE_NOTES_LLM_PROVIDER` | `OPENAI_BASE_URL` | Model example | Effort |
+| --- | --- | --- | --- | --- |
+| Anthropic | `anthropic` | (not used) | `claude-sonnet-5` (the default) | `max` |
+| OpenAI | `openai` | (not set) | `gpt-5` (the default) | `max` |
+| OpenRouter, every vendor behind one key | `openai` | `https://openrouter.ai/api/v1` | `vendor/model`; a `:free` suffix costs nothing | per model |
+| Google Gemini, free tier from AI Studio | `openai` | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-2.5-flash` | `low` or `none` |
+| Groq | `openai` | `https://api.groq.com/openai/v1` | `llama-3.3-70b-versatile` | `none` |
+| Mistral | `openai` | `https://api.mistral.ai/v1` | `mistral-large-latest` | `none` |
+| DeepSeek | `openai` | `https://api.deepseek.com/v1` | `deepseek-chat` | `none` |
+| GitHub Models | `openai` | `https://models.github.ai/inference` | `openai/gpt-4.1` | `none` |
+| Ollama, local previews only | `openai` | `http://localhost:11434/v1` | any pulled model, `qwen3:8b` | `none`, or `low` for a thinking model |
+
+GitHub Models takes a fine-grained personal access token with the **Models:
+read** permission as `OPENAI_API_KEY`. It is separate from Copilot, but an
+organisation administrator can still turn it off. Ollama needs a non-empty
+`OPENAI_API_KEY` of any value and is reachable only from your own machine.
+
+If an endpoint answers HTTP 400 to a default field, remove that field in
+`RELEASE_NOTES_LLM_EXTRA_PARAMS`: `{"response_format": null}` when it has no
+JSON mode, or `{"max_tokens": null, "max_completion_tokens": 4000}` for a
+reasoning model that wants OpenAI's newer name. The adapter strips a markdown
+code fence around the answer, so a model without JSON mode still validates.
+
+Preview any recipe on your machine before setting the repository variables.
+`make release-notes` with no arguments drafts from the commits since the last
+tag and passes your shell's variables through; `TAG=` and `PR=` read the
+`## Store notes` section already in that body, which is final, so they never
+call a model:
+
+```bash
+env RELEASE_NOTES_LLM_PROVIDER=openai OPENAI_BASE_URL=http://localhost:11434/v1 OPENAI_API_KEY=ollama RELEASE_NOTES_LLM_MODEL=qwen3:8b RELEASE_NOTES_LLM_EFFORT=low make release-notes
+```
+
+A `release notes: ...` line on stderr means the draft fell back to the
+generated prose, and says why.
 
 ## Store listing metadata
 
@@ -652,8 +699,8 @@ lane still walks end to end
 | `STORE_NOTES_INCLUDE_CHANGELOG` | `notes.mjs` in internal's `build-prepare` and in `Store Notes` (via `build-env`) | `true` appends the changelog where notes are generated |
 | `RELEASE_NOTES_LLM_PROVIDER` | `notes.mjs` in `Store Notes` (via `build-env`) | `anthropic` or `openai`; anything else disables the optional LLM pass |
 | `RELEASE_NOTES_LLM_MODEL` | `notes.mjs` in `Store Notes` (via `build-env`) | Model override for that provider |
-| `RELEASE_NOTES_LLM_EFFORT` | `notes.mjs` in `Store Notes` (via `build-env`) | Reasoning effort, `max` when unset; the same adapter as the security reviewer (`scripts/lib/llm/`) |
-| `RELEASE_NOTES_LLM_EXTRA_PARAMS` | `notes.mjs` in `Store Notes` (via `build-env`) | JSON object merged into the request |
+| `RELEASE_NOTES_LLM_EFFORT` | `notes.mjs` in `Store Notes` (via `build-env`) | Reasoning effort, `max` when unset, `none` for a model with no reasoning switch.<br>The same adapter as the security reviewer (`scripts/lib/llm/`) |
+| `RELEASE_NOTES_LLM_EXTRA_PARAMS` | `notes.mjs` in `Store Notes` (via `build-env`) | JSON object merged into the request; a `null` value removes that field |
 | `OPENAI_BASE_URL` | `notes.mjs` in `Store Notes` (via `build-env`) | OpenAI-compatible endpoint |
 | `EXPO_PUBLIC_API_URL` | the bundle, through `src/config/env.ts` (via `build-env`) | **Required for a CI build**: `env.ts` validates it as a URL and the app fails to start without it |
 | `EXPO_PUBLIC_APP_NAME` | same | **Required for a CI build** (non-empty string) |
