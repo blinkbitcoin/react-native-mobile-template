@@ -176,10 +176,13 @@ check-deps: ## SDK drift, vulnerability audit, lockfile provenance, licenses
 
 # zizmor is the security half: injection, permissions, App token scope,
 # dangerous triggers. --offline keeps the answer independent of the network.
-# Policy and the one justified ignore: .github/zizmor.yml.
+# Policy and the one justified ignore: .github/zizmor.yml, passed by --config
+# because zizmor otherwise looks for it at the nearest directory holding a
+# `.git` directory, and a worktree's `.git` is a file: under .claude/worktrees/
+# it would read the outer checkout's policy instead of this one's.
 check-ci: ## Lint the CI itself: actionlint + zizmor (workflows) + shellcheck (scripts)
 	bash scripts/shellcheck.sh
-	@if [ -d .github/workflows ]; then actionlint && zizmor --offline --min-severity medium .github; else echo "no workflows yet"; fi
+	@if [ -d .github/workflows ]; then actionlint && zizmor --offline --min-severity medium --config .github/zizmor.yml .github; else echo "no workflows yet"; fi
 
 check-docs: ## Docs freshness, AGENTS.md command table, table widths, mermaid blocks
 	bash scripts/check-docs.sh
