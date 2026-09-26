@@ -836,6 +836,50 @@ test('main hands the provider and model from its environment to the rewrite', as
   assert.equal(JSON.parse(out)['en-US'].play, 'Rewritten.');
 });
 
+/** main with the real rewrite and adapter, stopping only at the network. */
+async function mainRequest(extraEnv) {
+  const calls = [];
+  const result = await withEnv(
+    { OPENAI_API_KEY: 'sk-test', OPENAI_BASE_URL: 'https://models.github.ai/inference' },
+    () =>
+      withFetch(stubFetch(JSON.parse(fixture('openai-response.json')), calls), () =>
+        runMain(['--from-body', releaseBody, '--locales', 'en-US'], {
+          env: { RELEASE_NOTES_LLM_PROVIDER: 'openai', ...extraEnv },
+        }),
+      ),
+  );
+  return { ...result, sent: calls.map((call) => JSON.parse(call.init.body)) };
+}
+
+test('effort none and a null extra parameter from the environment shape the request', async () => {
+  const { code, out, err, sent } = await mainRequest({
+    RELEASE_NOTES_LLM_EFFORT: 'none',
+    RELEASE_NOTES_LLM_EXTRA_PARAMS: '{"response_format": null}',
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(err, []);
+  assert.equal(sent.length, 1);
+  assert.equal('reasoning_effort' in sent[0], false);
+  assert.equal('response_format' in sent[0], false);
+  assert.equal(sent[0].max_tokens, maxTokensFor(['en-US']));
+  assert.match(JSON.parse(out)['en-US'].play, /^You stay signed in/);
+});
+
+test('an unset effort from the environment thinks at max, with room to think', async () => {
+  const { code, sent } = await mainRequest({});
+  assert.equal(code, 0);
+  assert.equal(sent[0].reasoning_effort, 'high');
+  assert.deepEqual(sent[0].response_format, { type: 'json_object' });
+  assert.equal(sent[0].max_tokens, maxTokensFor(['en-US'], 'max'));
+});
+
+test('an effort outside the vocabulary fails the draft and names the variable', async () => {
+  const { code, err, sent } = await mainRequest({ RELEASE_NOTES_LLM_EFFORT: 'off' });
+  assert.equal(code, 1);
+  assert.match(err[0], /RELEASE_NOTES_LLM_EFFORT: expected one of none, low, medium, high, max/);
+  assert.equal(sent.length, 0);
+});
+
 test('a rewrite that cannot be trusted leaves the deterministic prose', async () => {
   const items = parseBody(body);
   const notes = await buildNotes({
