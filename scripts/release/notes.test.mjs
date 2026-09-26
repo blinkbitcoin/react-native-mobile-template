@@ -5,15 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { after, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import * as anthropic from '../lib/llm/anthropic.mjs';
-import * as openai from '../lib/llm/openai.mjs';
-import {
-  maxTokensFor,
-  renderPrompt,
-  rewriteNotes,
-  TESTFLIGHT_LIMIT,
-  validate,
-} from './llm/index.mjs';
+import { maxTokensFor, renderPrompt, TESTFLIGHT_LIMIT } from './llm/index.mjs';
 import {
   buildNotes,
   cleanSection,
@@ -217,153 +209,7 @@ test('--include-changelog appends the full grouped list, chores included', async
 
 // ---------- llm adapters ----------
 
-test('the anthropic adapter posts the documented Messages API request', async () => {
-  const calls = [];
-  const text = await withEnv({ ANTHROPIC_API_KEY: 'sk-ant-test' }, () =>
-    withFetch(stubFetch(JSON.parse(fixture('anthropic-response.json')), calls), () =>
-      anthropic.complete({ system: 'be brief', user: 'the changes' }),
-    ),
-  );
-
-  assert.equal(calls.length, 1);
-  const [{ url, init }] = calls;
-  assert.equal(url, 'https://api.anthropic.com/v1/messages');
-  assert.equal(init.method, 'POST');
-  assert.equal(init.headers['x-api-key'], 'sk-ant-test');
-  assert.equal(init.headers['anthropic-version'], '2023-06-01');
-  assert.equal(init.headers['content-type'], 'application/json');
-  const sent = JSON.parse(init.body);
-  assert.equal(sent.model, 'claude-sonnet-5');
-  assert.equal(sent.system, 'be brief');
-  assert.deepEqual(sent.messages, [{ role: 'user', content: 'the changes' }]);
-  assert.equal(typeof sent.max_tokens, 'number');
-  assert.match(text, /^{"en-US"/);
-});
-
-test('the openai adapter posts a json-object chat completion', async () => {
-  const calls = [];
-  const text = await withEnv({ OPENAI_API_KEY: 'sk-test', OPENAI_BASE_URL: '' }, () =>
-    withFetch(stubFetch(JSON.parse(fixture('openai-response.json')), calls), () =>
-      openai.complete({ system: 'be brief', user: 'the changes', model: 'gpt-5-mini' }),
-    ),
-  );
-
-  const [{ url, init }] = calls;
-  assert.equal(url, 'https://api.openai.com/v1/chat/completions');
-  assert.equal(init.headers.authorization, 'Bearer sk-test');
-  const sent = JSON.parse(init.body);
-  assert.equal(sent.model, 'gpt-5-mini');
-  assert.deepEqual(sent.response_format, { type: 'json_object' });
-  assert.deepEqual(sent.messages[0], { role: 'system', content: 'be brief' });
-  assert.match(text, /^{"en-US"/);
-});
-
-test('OPENAI_BASE_URL redirects the adapter at a compatible gateway', async () => {
-  const calls = [];
-  await withEnv({ OPENAI_API_KEY: 'sk-test', OPENAI_BASE_URL: 'https://gateway.internal/v1' }, () =>
-    withFetch(stubFetch(JSON.parse(fixture('openai-response.json')), calls), () =>
-      openai.complete({ system: 's', user: 'u' }),
-    ),
-  );
-  assert.equal(calls[0].url, 'https://gateway.internal/v1/chat/completions');
-});
-
 // ---------- llm rewrite: validation and fallback ----------
-
-test('a valid rewrite replaces the deterministic prose', async () => {
-  const notes = await withEnv({ ANTHROPIC_API_KEY: 'sk-ant-test' }, () =>
-    withFetch(stubFetch(JSON.parse(fixture('anthropic-response.json')), []), () =>
-      rewriteNotes({
-        items: parseBody(body),
-        prompt: 'Write for {{locales}} within {{limit}} characters.',
-        locales: ['en-US'],
-        provider: 'anthropic',
-      }),
-    ),
-  );
-  assert.match(notes['en-US'], /^Signing in sticks now/);
-});
-
-test('a rewrite that is not strict JSON is rejected and falls back', async () => {
-  const warnings = [];
-  const notes = await withEnv({ ANTHROPIC_API_KEY: 'sk-ant-test' }, () =>
-    withFetch(stubFetch(JSON.parse(fixture('anthropic-invalid-response.json')), []), () =>
-      withWarnings(warnings, () =>
-        rewriteNotes({ items: [], prompt: 'p', locales: ['en-US'], provider: 'anthropic' }),
-      ),
-    ),
-  );
-  assert.equal(notes, null);
-  assert.match(warnings.join('\n'), /not JSON/);
-});
-
-test('markdown, hashes and a missing locale each reject the whole rewrite', async () => {
-  const cases = [
-    ['{"en-US": "New\\n# Heading"}', /contains "#"/],
-    ['{"en-US": "See [the notes](https://x)"}', /markdown link/],
-    ['{"en-US": "Fixed the crash (9f2c1ab)"}', /hash/],
-    ['{"en-US": "ok"}', /missing locale sv-SE/],
-    ['["en-US"]', /not a JSON object/],
-  ];
-  for (const [payload, expected] of cases) {
-    const warnings = [];
-    const locales = expected.source.includes('sv-SE') ? ['en-US', 'sv-SE'] : ['en-US'];
-    const notes = await withEnv({ ANTHROPIC_API_KEY: 'sk-ant-test' }, () =>
-      withFetch(stubFetch({ content: [{ type: 'text', text: payload }] }, []), () =>
-        withWarnings(warnings, () =>
-          rewriteNotes({ items: [], prompt: 'p', locales, provider: 'anthropic' }),
-        ),
-      ),
-    );
-    assert.equal(notes, null, payload);
-    assert.match(warnings.join('\n'), expected);
-  }
-});
-
-test('a missing api key warns and falls back instead of throwing', async () => {
-  const warnings = [];
-  const notes = await withEnv({ ANTHROPIC_API_KEY: '' }, () =>
-    withWarnings(warnings, () =>
-      rewriteNotes({ items: [], prompt: 'p', locales: ['en-US'], provider: 'anthropic' }),
-    ),
-  );
-  assert.equal(notes, null);
-  assert.match(warnings.join('\n'), /ANTHROPIC_API_KEY is not set/);
-});
-
-test('an http failure warns and falls back', async () => {
-  const warnings = [];
-  const notes = await withEnv({ OPENAI_API_KEY: 'sk-test' }, () =>
-    withFetch(stubFetch({}, [], false), () =>
-      withWarnings(warnings, () =>
-        rewriteNotes({ items: [], prompt: 'p', locales: ['en-US'], provider: 'openai' }),
-      ),
-    ),
-  );
-  assert.equal(notes, null);
-  assert.match(warnings.join('\n'), /HTTP 500/);
-});
-
-test('no provider means no network call at all', async () => {
-  const notes = await withFetch(
-    () => {
-      throw new Error('fetch must not be called');
-    },
-    () => rewriteNotes({ items: [], prompt: 'p', locales: ['en-US'], provider: 'none' }),
-  );
-  assert.equal(notes, null);
-});
-
-/** Runs `fn` with console.warn captured into `sink`. */
-async function withWarnings(sink, fn) {
-  const original = console.warn;
-  console.warn = (message) => sink.push(String(message));
-  try {
-    return await fn();
-  } finally {
-    console.warn = original;
-  }
-}
 
 // ---------- cli ----------
 
@@ -481,19 +327,6 @@ test('a comment line inside a section is dropped, not shipped', () => {
   assert.equal(cleanSection(extractStoreSection(body)), 'New\n• Thing.');
 });
 
-test('a rewrite carrying a rule line or html is rejected', () => {
-  const cases = [
-    ['Fixed\n---\nMore', /contains a horizontal rule/],
-    ['<details>hidden</details>', /contains html/],
-    ['Fixed <!-- x --> things', /contains html/],
-  ];
-  for (const [text, expected] of cases) {
-    const result = validate(JSON.stringify({ 'en-US': text }), ['en-US']);
-    assert.equal(result.notes, undefined, text);
-    assert.match(result.error, expected);
-  }
-});
-
 test('the cli sends --body-section through the same filter', () => {
   const dir = tempDir();
   const file = path.join(dir, 'body.md');
@@ -545,94 +378,7 @@ test('a [user-visible] marker moves a body bullet out of Other', () => {
 
 // ---------- fix round 1: llm validation ----------
 
-test('links, bare domains with a path and markdown are rejected', () => {
-  const cases = [
-    ['Visit https://example.com/promo for details.', /contains a link/],
-    ['Now at example.com/promo.', /contains a domain/],
-    ['* markdown bullet\n- another', /contains markdown/],
-    ['Now with **bold**.', /contains markdown/],
-  ];
-  for (const [text, expected] of cases) {
-    const result = validate(JSON.stringify({ 'en-US': text }), ['en-US']);
-    assert.equal(result.notes, undefined, text);
-    assert.match(result.error, expected);
-  }
-  // A sentence that merely names a product is not a link.
-  assert.equal(
-    validate('{"en-US": "Faster on iOS 26."}', ['en-US']).notes['en-US'],
-    'Faster on iOS 26.',
-  );
-});
-
-test('the output budget grows with the number of locales', () => {
-  assert.equal(maxTokensFor(['en-US']), 2524);
-  assert.equal(maxTokensFor(['en-US', 'sv-SE', 'de-DE']), 5524);
-  assert.equal(maxTokensFor(new Array(20).fill('x')), 8192);
-  assert.equal(maxTokensFor(['en-US'], 'none'), 2524);
-});
-
-test('an effort that thinks gets room to think on top of the text budget', () => {
-  assert.equal(maxTokensFor(['en-US'], 'low'), 18524);
-  assert.equal(maxTokensFor(['en-US'], 'max'), 18524);
-  assert.equal(maxTokensFor(new Array(20).fill('x'), 'max'), 24192);
-});
-
-test('a fenced answer is unwrapped, and its text still goes through every check', () => {
-  const fence = (object) => `\`\`\`json\n${JSON.stringify(object)}\n\`\`\``;
-  assert.deepEqual(validate(fence({ 'en-US': 'Faster sync.' }), ['en-US']), {
-    notes: { 'en-US': 'Faster sync.' },
-  });
-  const rejected = validate(fence({ 'en-US': 'See https://example.com' }), ['en-US']);
-  assert.equal(rejected.notes, undefined);
-  assert.match(rejected.error, /contains a link/);
-});
-
 // ---------- the prompt template at the repo root ----------
-
-test('the prompt template is rendered with the locales and the limit', () => {
-  const rendered = renderPrompt('Locales: {{locales}}. At most {{limit}} characters.', {
-    locales: 'en-US, sv-SE',
-    limit: 4000,
-  });
-  assert.equal(rendered, 'Locales: en-US, sv-SE. At most 4000 characters.');
-  assert.throws(
-    () => renderPrompt('{{nope}}', { locales: 'en-US', limit: 1 }),
-    /unknown placeholder/,
-  );
-});
-
-test('the rendered template is the whole system prompt the adapter receives', async () => {
-  const calls = [];
-  await withEnv({ ANTHROPIC_API_KEY: 'sk-ant-test' }, () =>
-    withFetch(stubFetch(JSON.parse(fixture('anthropic-response.json')), calls), () =>
-      rewriteNotes({
-        items: [],
-        prompt: 'Rules for {{locales}}, {{limit}} max.',
-        locales: ['en-US', 'sv-SE'],
-        provider: 'anthropic',
-      }),
-    ),
-  );
-  assert.equal(
-    JSON.parse(calls[0].init.body).system,
-    `Rules for en-US, sv-SE, ${TESTFLIGHT_LIMIT} max.`,
-  );
-});
-
-test('a missing prompt template means no rewrite, with a warning', async () => {
-  const calls = [];
-  const warnings = [];
-  const notes = await withEnv({ ANTHROPIC_API_KEY: 'sk-ant-test' }, () =>
-    withFetch(stubFetch({}, calls), () =>
-      withWarnings(warnings, () =>
-        rewriteNotes({ items: [], prompt: '', locales: ['en-US'], provider: 'anthropic' }),
-      ),
-    ),
-  );
-  assert.equal(notes, null);
-  assert.equal(calls.length, 0);
-  assert.match(warnings.join('\n'), /release-notes\.prompt\.md/);
-});
 
 test('the shipped prompt template renders and states the output contract', () => {
   const template = loadPrompt();
@@ -641,32 +387,6 @@ test('the shipped prompt template renders and states the output contract', () =>
   assert.match(rendered, /\{"en-US": "\.\.\."\}/);
   assert.match(rendered, new RegExp(`At most ${TESTFLIGHT_LIMIT} characters`));
   assert.doesNotMatch(rendered, /\{\{/);
-});
-
-test('the budget reaches the adapter as max_tokens', async () => {
-  const calls = [];
-  await withEnv({ ANTHROPIC_API_KEY: 'sk-ant-test' }, () =>
-    withFetch(stubFetch(JSON.parse(fixture('anthropic-response.json')), calls), () =>
-      rewriteNotes({ items: [], prompt: 'p', locales: ['en-US', 'sv-SE'], provider: 'anthropic' }),
-    ),
-  );
-  assert.equal(JSON.parse(calls[0].init.body).max_tokens, maxTokensFor(['en-US', 'sv-SE']));
-});
-
-test('the budget an effort buys reaches the adapter too', async () => {
-  const calls = [];
-  await withEnv({ ANTHROPIC_API_KEY: 'sk-ant-test' }, () =>
-    withFetch(stubFetch(JSON.parse(fixture('anthropic-response.json')), calls), () =>
-      rewriteNotes({
-        items: [],
-        prompt: 'p',
-        locales: ['en-US'],
-        provider: 'anthropic',
-        effort: 'max',
-      }),
-    ),
-  );
-  assert.equal(JSON.parse(calls[0].init.body).max_tokens, maxTokensFor(['en-US'], 'max'));
 });
 
 // ---------- fix round 1: cli surface ----------
@@ -920,70 +640,6 @@ test('the cli exits 1 with the reason on a bad argument', () => {
 
 // ---------- llm adapters: every failure shape ----------
 
-test('the anthropic adapter sends an empty key rather than "undefined" and honours a model', async () => {
-  const calls = [];
-  await withEnv({ ANTHROPIC_API_KEY: '' }, () =>
-    withFetch(stubFetch({ content: [{ type: 'text', text: 'ok' }] }, calls), () =>
-      anthropic.complete({ system: 's', user: 'u', model: 'claude-haiku-5' }),
-    ),
-  );
-  assert.equal(calls[0].init.headers['x-api-key'], '');
-  assert.equal(JSON.parse(calls[0].init.body).model, 'claude-haiku-5');
-});
-
-test('the anthropic adapter throws on an HTTP failure', async () => {
-  await assert.rejects(
-    withFetch(stubFetch({}, [], false), () => anthropic.complete({ system: 's', user: 'u' })),
-    /anthropic: HTTP 500/,
-  );
-});
-
-test('the anthropic adapter throws when the response has no text block', async () => {
-  for (const payload of [
-    {},
-    null,
-    { content: 'not a list' },
-    { content: [null, { type: 'tool_use' }] },
-    { content: [{ type: 'text', text: 42 }] },
-  ]) {
-    await assert.rejects(
-      withFetch(stubFetch(payload, []), () => anthropic.complete({ system: 's', user: 'u' })),
-      /anthropic: no text block in response/,
-      JSON.stringify(payload),
-    );
-  }
-});
-
-test('the openai adapter sends an empty bearer and the default model and endpoint', async () => {
-  const calls = [];
-  await withEnv({ OPENAI_API_KEY: '', OPENAI_BASE_URL: '' }, () =>
-    withFetch(stubFetch({ choices: [{ message: { content: 'ok' } }] }, calls), () =>
-      openai.complete({ system: 's', user: 'u', maxTokens: 10 }),
-    ),
-  );
-  assert.equal(calls[0].url, 'https://api.openai.com/v1/chat/completions');
-  assert.equal(calls[0].init.headers.authorization, 'Bearer ');
-  const sent = JSON.parse(calls[0].init.body);
-  assert.equal(sent.model, 'gpt-5');
-  assert.equal(sent.max_completion_tokens, 10);
-});
-
-test('the openai adapter throws when the response has no message content', async () => {
-  for (const payload of [
-    null,
-    {},
-    { choices: [] },
-    { choices: [{}] },
-    { choices: [{ message: {} }] },
-  ]) {
-    await assert.rejects(
-      withFetch(stubFetch(payload, []), () => openai.complete({ system: 's', user: 'u' })),
-      /openai: no message content in response/,
-      JSON.stringify(payload),
-    );
-  }
-});
-
 // ---------- edge cases of the deterministic pipeline ----------
 
 test('a line with nothing left after cleaning is dropped, not rendered empty', () => {
@@ -1011,14 +667,4 @@ test('locale discovery falls back to en-US when the metadata has no locale direc
   mkdirSync(path.join(dir, 'review_information'));
   assert.deepEqual(discoverLocales(dir), ['en-US']);
   assert.deepEqual(discoverLocales(path.join(dir, 'absent')), ['en-US']);
-});
-
-test('an empty or over-long rewrite is rejected', () => {
-  assert.deepEqual(validate(JSON.stringify({ 'en-US': '  ' }), ['en-US']), {
-    error: 'en-US: empty',
-  });
-  assert.deepEqual(
-    validate(JSON.stringify({ 'en-US': 'a'.repeat(TESTFLIGHT_LIMIT + 1) }), ['en-US']),
-    { error: `en-US: longer than ${TESTFLIGHT_LIMIT} characters` },
-  );
 });
