@@ -33,6 +33,8 @@ msgstr "Go home"
 #: src/app/_layout.tsx:23
 #: src/features/home/HomeScreen.tsx:17
 #: src/i18n/i18n.test.tsx:10
+#: src/i18n/I18nProvider.test.tsx:13
+#: src/i18n/I18nProvider.test.tsx:24
 msgid "Home"
 msgstr "Home"
 
