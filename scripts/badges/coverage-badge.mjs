@@ -8,7 +8,7 @@
 //   node scripts/badges/coverage-badge.mjs --status pending  yellow placeholder
 //
 // A placeholder is what CI writes when Unit *failed*; a Unit that merely
-// skipped writes nothing at all, so a docs-only change leaves the branch's
+// skipped writes nothing at all, so a red checks run leaves the branch's
 // badge as it was. `--out` and `--summary` exist for tests and for a CI layout
 // that keeps its artifacts elsewhere.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';

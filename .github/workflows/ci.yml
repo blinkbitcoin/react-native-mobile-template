@@ -5,7 +5,7 @@ on:
     # No paths-ignore: it would be a second, narrower docs rule that already
     # disagrees with the classifier's (it misses LICENSE and the issue/PR
     # templates). check-code.yml's `changes` job is the single source - it
-    # classifies pushes too, so a docs-only merge still skips unit and e2e.
+    # classifies pushes too, so a docs-only merge still skips e2e.
   pull_request:
     types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:
@@ -39,18 +39,13 @@ jobs:
   unit:
     name: Unit
     needs: checks
-    # checks' `changes` job says whether any changed file can affect the unit
-    # suite; a docs-only change is `false` here too. `!= 'false'`, never
-    # `== 'true'`: an output that never arrived runs the suite.
-    #
-    # The gap, accepted: `test:scripts` holds guards that read the whole tree
-    # (ports.test.mjs, shell-locale.test.mjs), and the built-in unit list
-    # ignores .maestro/, e2e/, fastlane/ and the Gemfile, among others. A
-    # change to those alone skips the guards, and a violation it adds surfaces
-    # on the next change that runs Unit. unit-ignore-globs can only widen that
-    # list, never narrow it; see docs/ci.md. scripts/ci-suite-gates.test.mjs
-    # evaluates this line.
-    if: ${{ needs.checks.outputs.unit-changed != 'false' }}
+    # No `unit-changed` gate: there is no change this suite cannot affect.
+    # `test:scripts` holds guards that read every tracked file, docs included -
+    # ports.test.mjs rejects a bare port literal anywhere, shell-locale.test.mjs
+    # scans all the shell code - so a Maestro flow, a fastlane lane or a doc
+    # can each fail Unit. Skipping on the classifier's unit list let such a
+    # change land unchecked. scripts/ci-suite-gates.test.mjs holds this job to
+    # having no `if:`.
     uses: blinkbitcoin/shared-workflows/.github/workflows/check-unit.yml@53689ee348f2b077d9c474d0e8e7c7fb0b37c83f # v0.14.0
   e2e:
     name: E2E
@@ -59,11 +54,11 @@ jobs:
     # full E2E - fifteen to twenty-five minutes of Android, and macOS at ten
     # times the rate when iOS is on - to learn what unit already knew.
     #
-    # A *skipped* unit must not stop it: a change to Maestro flows alone skips
-    # unit and is exactly what E2E has to run. `needs` adds an implicit
-    # success(), which a skipped job is not, so the gate spells the result out
-    # under !cancelled() instead. A test-only change skips E2E itself
-    # (e2e-changed). scripts/ci-suite-gates.test.mjs evaluates this expression.
+    # A test-only or docs-only change skips E2E itself (e2e-changed). The rest
+    # is the consumer guide's gate, kept as it is: under !cancelled() it spells
+    # out what the implicit success() of `needs` would check, and it still lets
+    # E2E past a *skipped* unit, should unit ever be gated again.
+    # scripts/ci-suite-gates.test.mjs evaluates this expression.
     needs: [checks, unit]
     if: >-
       !cancelled() &&
@@ -152,19 +147,18 @@ jobs:
     name: Badges
     needs: [checks, unit, e2e]
     # always(), so a red Unit still gets a red badge. A cancelled upstream job
-    # says nothing about the branch, and a change both suites skipped - docs
-    # only, or fastlane/ alone - never ran the jobs the badges describe: in
-    # each case the published badges stay as they are. When one suite runs and
-    # the other skips, publish-badges.sh keeps the skipped one's published
-    # badge, and a skipped Unit renders no coverage badge. publish-badges.yml
-    # also skips release events and fork PRs (no push token).
+    # says nothing about the branch, and a run where both suites skipped (a red
+    # checks) ran none of the jobs the badges describe: in each case the
+    # published badges stay as they are. A docs-only change runs Unit, so it
+    # publishes too, and publish-badges.sh keeps a skipped E2E's published
+    # badge. `docs-only` is therefore not passed: publish-badges.yml would skip
+    # on it. It also skips release events and fork PRs (no push token).
     # scripts/ci-suite-gates.test.mjs evaluates this expression.
     if: >-
       always() &&
       needs.checks.result != 'cancelled' &&
       needs.unit.result != 'cancelled' &&
       needs.e2e.result != 'cancelled' &&
-      needs.checks.outputs.docs-only != 'true' &&
       !(needs.unit.result == 'skipped' && needs.e2e.result == 'skipped')
     permissions:
       contents: write # publish-badges.sh pushes the gh-pages branch
@@ -172,4 +166,3 @@ jobs:
     with:
       unit-result: ${{ needs.unit.result }}
       e2e-result: ${{ needs.e2e.result }}
-      docs-only: ${{ needs.checks.outputs.docs-only }}

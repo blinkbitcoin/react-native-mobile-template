@@ -12,7 +12,7 @@
 //   BADGE_OUT_DIR                 coverage/badge
 //
 // The coverage default is the rule the plan calls out: only a Unit *failure*
-// writes the red placeholder. A skipped Unit — a docs-only change, a cancelled
+// writes the red placeholder. A skipped Unit — a red checks run, a cancelled
 // upstream — renders no coverage badge at all, so publishing leaves the
 // branch's existing one untouched instead of blanking it.
 import { BadgeError } from './badge.mjs';

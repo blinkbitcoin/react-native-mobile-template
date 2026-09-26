@@ -147,7 +147,7 @@ holds what they actually do. Job names are what the Actions graph shows.
 
 | Workflow        | Jobs                                    | Fires on                                                                            |
 | --------------- | --------------------------------------- | ----------------------------------------------------------------------------------- |
-| `ci.yml`        | `Checks`<br>`Unit`<br>`E2E`<br>`Security`<br>`Badges` | Push, PR, dispatch. Each job gates the next, so a failed unit run never reaches E2E;<br>each suite skips a change it cannot affect; `Security` runs the scanners beside them |
+| `ci.yml`        | `Checks`<br>`Unit`<br>`E2E`<br>`Security`<br>`Badges` | Push, PR, dispatch. Each job gates the next, so a failed unit run never reaches E2E;<br>E2E skips a change it cannot affect; `Security` runs the scanners beside them |
 | `ci-codeql.yml`    | `Analyze`                               | Push, PR, weekly. Informational, never a required check                             |
 | `ci-web.yml`       | `Web`                                   | PR and release — the web export and Playwright suite, skipped on a PR it cannot affect |
 | `ci-pr-title.yml`  | `Title`                                 | Conventional Commits on the PR title                                                |
