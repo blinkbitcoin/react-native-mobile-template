@@ -117,8 +117,10 @@ The web target is opt-in. Answering "no" deletes the files listed in
 scope — from `commitlint.config.mjs` and from the four places the enum is
 spelled out for readers (`AGENTS.md`, `CONTRIBUTING.md`, `docs/quality.md`,
 `.github/PULL_REQUEST_TEMPLATE.md`) — and `knip.json`'s `playwright` plugin; and
-removes the marker-delimited web blocks from `app.config.ts`, `metro.config.js`
-and `.github/workflows/cd-production.yml`, the web rows from the docs, the
+removes the marker-delimited web blocks from `app.config.ts`, `metro.config.js`,
+`.github/workflows/cd-production.yml` (the `web` job) and
+`.github/workflows/cd-release.yml` (its dispatch of `ci-web.yml` at a cut
+release, with the docs that describe it), the web rows from the docs, the
 `react-dom` ignore from `.github/dependabot.yml`, the `Web` platform option from
 the bug-report issue template, and the web-variant case from
 `src/features/settings/NativeDemoCard.test.tsx`.

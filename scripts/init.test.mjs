@@ -502,6 +502,13 @@ const SKIP_SCAN_AT_ROOT = new Set([
   'Gemfile.lock',
 ]);
 const BINARY = /\.(png|jpg|jpeg|gif|ttf|otf|ico|webp|pem|keystore|jks|zip)$/i;
+// Every file with an init:web marker block (web.markedBlocks in the manifest).
+const WEB_MARKED_FILES = [
+  'app.config.ts',
+  'metro.config.js',
+  '.github/workflows/cd-production.yml',
+  '.github/workflows/cd-release.yml',
+];
 
 const tempDirs = [];
 after(() => {
@@ -850,7 +857,7 @@ describe('init --yes --no-web', async () => {
   });
 
   test('removes the marker blocks and the markers themselves', () => {
-    for (const rel of ['app.config.ts', 'metro.config.js', '.github/workflows/cd-production.yml']) {
+    for (const rel of WEB_MARKED_FILES) {
       assert.doesNotMatch(readFileSync(path.join(root, rel), 'utf8'), /init:web-(start|end)/, rel);
     }
     assert.doesNotMatch(readFileSync(path.join(root, 'app.config.ts'), 'utf8'), /^\s*web: \{/m);
@@ -858,6 +865,59 @@ describe('init --yes --no-web', async () => {
       readFileSync(path.join(root, '.github/workflows/cd-production.yml'), 'utf8'),
       /^ {2}web:$/m,
     );
+  });
+
+  // Left behind, the step dispatches a workflow this run deleted, and the
+  // first cut release fails the Release job on it.
+  test('cd-release.yml no longer dispatches ci-web.yml but still starts beta', () => {
+    const release = readFileSync(path.join(root, '.github/workflows/cd-release.yml'), 'utf8');
+    assert.doesNotMatch(release, /ci-web/);
+    assert.doesNotMatch(release, /Deploy the web build/);
+    assert.match(
+      release,
+      /gh workflow run cd-beta\.yml --repo "\$REPO" --ref "\$TAG" -f "tag=\$TAG"/,
+    );
+    assert.match(release, /gh workflow run ci\.yml --repo "\$REPO" --ref "\$BRANCH"/);
+  });
+
+  // The generated app's own release-chain test, run in it: it used to read
+  // ci-web.yml and fail `make test-scripts` on the missing file.
+  test("the generated app's release workflow test passes without ci-web.yml", () => {
+    const env = { ...process.env };
+    delete env.NODE_TEST_CONTEXT;
+    delete env.NODE_V8_COVERAGE;
+    const run = spawnSync(process.execPath, ['--test', 'scripts/release-workflows.test.mjs'], {
+      cwd: root,
+      encoding: 'utf8',
+      env,
+    });
+    assert.equal(run.status, 0, `${run.stdout}\n${run.stderr}`);
+  });
+
+  test('drops the web deploy dispatch from the docs that describe the release hop', () => {
+    const ci = readFileSync(path.join(root, 'docs/ci.md'), 'utf8');
+    const row = ci.split('\n').find((line) => line.startsWith('| `cd-release.yml` |'));
+    assert.match(row, /On a cut release, dispatches `cd-beta\.yml` at the tag \|$/);
+    const runbook = readFileSync(path.join(root, 'docs/release-runbook.md'), 'utf8');
+    assert.match(
+      runbook,
+      /A `release: published` trigger on `cd-beta\.yml`\nwould therefore never fire\./,
+    );
+    assert.match(runbook, /tag=vX\.Y\.Z`, and `ci\.yml` on the\n/);
+    assert.match(runbook, /│ {2}CD \/ Beta dispatched\n/);
+    assert.match(runbook, /`Store Notes` job is its own job after the beta dispatch: a red\n/);
+    const readme = readFileSync(path.join(root, 'README.md'), 'utf8');
+    assert.match(
+      readme,
+      /drafts the store notes into it; dispatches beta at a cut release {19}\|$/m,
+    );
+    for (const [rel, text] of [
+      ['docs/ci.md cd-release.yml row', row],
+      ['docs/release-runbook.md', runbook],
+      ['README.md', readme],
+    ]) {
+      assert.doesNotMatch(text, /ci-web|beta and web|CI \/ Web/, rel);
+    }
   });
 
   test('drops the web make targets, the commitlint scope and the knip plugin', () => {
@@ -969,13 +1029,19 @@ describe('init --yes --web', async () => {
   });
 
   test('drops the init:web markers but keeps what they wrapped', () => {
-    for (const rel of ['app.config.ts', 'metro.config.js', '.github/workflows/cd-production.yml']) {
+    for (const rel of WEB_MARKED_FILES) {
       assert.doesNotMatch(readFileSync(path.join(root, rel), 'utf8'), /init:web-(start|end)/, rel);
     }
     assert.match(readFileSync(path.join(root, 'metro.config.js'), 'utf8'), /tslib\.es6\.mjs/);
     assert.match(
       readFileSync(path.join(root, '.github/workflows/cd-production.yml'), 'utf8'),
       /^ {2}web:$/m,
+    );
+    // The step itself, straight after the beta dispatch, with no gap where the
+    // marker lines were.
+    assert.match(
+      readFileSync(path.join(root, '.github/workflows/cd-release.yml'), 'utf8'),
+      /-f "tag=\$TAG"\n {6}- name: Deploy the web build at the new tag\n[\s\S]*?gh workflow run ci-web\.yml --repo "\$REPO" --ref "\$TAG" -f "deploy=true"\n {6}# The PR's number/,
     );
   });
 
