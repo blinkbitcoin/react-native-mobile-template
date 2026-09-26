@@ -1,5 +1,6 @@
 # zizmor policy. `make check-ci` (and so CI's Tooling job) runs zizmor offline
-# at --min-severity medium over .github.
+# at --min-severity medium over .github, naming this file with --config: zizmor's
+# own discovery skips it in a worktree (see the Makefile).
 rules:
   # Tags, not commit SHAs: the shared workflows are called at the moving `@v0`
   # tag by design, and every other action is held to the same rule so there is

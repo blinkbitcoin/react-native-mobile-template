@@ -92,7 +92,7 @@ Add a rule to one side only, and record which side in the config comment.
 | `make check-code` | the five above | The fast local gate |
 | `make check-gen` | `pnpm i18n:check`, `pnpm codegen:check` | Drift in generated catalogs and generated GraphQL documents |
 | `make check-deps` | `pnpm deps:check`, `pnpm deps:audit`, `pnpm deps:licenses` | Expo SDK drift (`scripts/check-deps.sh`: `expo install --check` is advisory, a CI warning;<br>`expo-doctor`'s other checks block), high-severity vulnerabilities in production dependencies,<br>lockfile provenance (`scripts/check-lockfile.sh`), and the license allowlist (`scripts/check-licenses.mjs`) |
-| `make check-ci` | `scripts/shellcheck.sh`, `actionlint`, `zizmor --offline --min-severity medium` | The CI itself: every `scripts/**/*.sh`, and the workflow files.<br>zizmor allows tag pins by policy and ignores one reviewed `workflow_run` (`.github/zizmor.yml`) |
+| `make check-ci` | `scripts/shellcheck.sh`, `actionlint`,<br>`zizmor --offline --min-severity medium --config .github/zizmor.yml` | The CI itself: every `scripts/**/*.sh`, and the workflow files.<br>zizmor allows tag pins by policy and ignores one reviewed `workflow_run` (`.github/zizmor.yml`) |
 | `make check-docs` | `scripts/check-docs.sh`, `scripts/check-docs-tables.mjs`, `scripts/check-diagrams.mjs` | Warns when architecture-relevant paths changed with no `docs/` change.<br>Fails when `AGENTS.md`'s command table and the Makefile's `##`-documented targets disagree in either direction,<br>when a markdown table cell has a line wider than 120 visible characters,<br>or when a fenced `mermaid` block does not parse |
 | `make check-release` | `ruby -c` over the Fastfile and lanes, `fastlane lanes`, the minitest suite in `fastlane/test/lanes_test.rb`,<br>and every `.claude/skills/*/tests/run.sh` | That the lanes parse and that their pure logic still behaves,<br>and that the store skills still agree with the fastlane gem.<br>Needs the Ruby gems `make install` installs, and talks to no store |
 | `make check-secrets` | `gitleaks git` over the whole history | No committed secret, including one deleted in a later commit.<br>Test data that must look real is allowlisted in `.gitleaks.toml`, each entry with its reason |
@@ -376,10 +376,24 @@ entries are anchored to the root for that reason. Biome's entry is `!!` rather
 than `!` so its scanner never indexes the directory either: otherwise it finds
 the worktree's `biome.json` and stops with "Found a nested root configuration".
 
+The reverse problem hits a tool that looks for its configuration somewhere
+other than the working directory: run from a worktree, it can read the outer
+checkout's settings instead of this one's. zizmor does exactly that. It looks
+for `zizmor.yml` or `.github/zizmor.yml` at the repository root, which it takes
+to be the nearest directory holding a `.git` *directory*, and a worktree's
+`.git` is a file. So it reads the outer checkout's policy, or none at all if
+that branch has no `.github/zizmor.yml`. With no policy, `unpinned-uses` comes
+back on and fails every tag-pinned workflow. `make check-ci` therefore names the
+file with `--config .github/zizmor.yml`. Biome, ESLint, typos and shellcheck
+also walk up for theirs, but they start from the working directory or the file
+being checked. So they find the worktree's own file before they reach the outer
+checkout.
+
 `scripts/worktree-ignores.test.mjs` (`make test-scripts`) holds every entry in
 place, and checks the Jest, Metro and ESLint ones by what they match, including
-from a root that is itself a worktree. A new tool that walks the tree adds its
-entry here and an assertion there.
+from a root that is itself a worktree. It also fails on a zizmor command
+without the `--config` flag. A new tool that walks the tree adds its entry here
+and an assertion there. So does a tool that discovers its configuration.
 
 ## Commit conventions
 

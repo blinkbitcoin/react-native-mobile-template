@@ -101,6 +101,20 @@ test('ESLint ignores other worktrees, not this checkout', () => {
   assert.deepEqual(ignored, [true, false]);
 });
 
+// zizmor looks for its policy at the nearest directory holding a `.git`
+// directory. A worktree's `.git` is a file, so without --config it reads the
+// outer checkout's policy, or none, and every tag pin turns into a finding.
+test("zizmor is always handed this checkout's policy", () => {
+  const calls = execFileSync('git', ['grep', '-h', '-E', 'zizmor[ ]+--', '--', ':!*.md'], {
+    cwd: root,
+    encoding: 'utf8',
+  })
+    .split('\n')
+    .filter(Boolean);
+  assert.ok(calls.length > 0, 'no zizmor command found');
+  for (const call of calls) assert.match(call, /--config \.github\/zizmor\.yml /, call);
+});
+
 describe('the configurations that name paths relative to the root', () => {
   test('Biome force-ignores them, so its scanner never finds their biome.json', () => {
     const biome = JSON.parse(read('biome.json'));
