@@ -18,7 +18,7 @@ working.
 ---
 
 <p align="center">
-  <img src="docs/assets/readme-hero.svg" alt="Press Use this template and run make init to get an Expo and TypeScript app that runs on day one, with a themed component kit, GraphQL, i18n and one mock API for Jest and E2E. Every push runs Checks, Unit and device E2E through shared-workflows at @v0. A merge to main opens a release PR, then ships signed, verified builds to TestFlight and Google Play." width="960">
+  <img src="docs/assets/readme-hero.svg" alt="Press Use this template and run make init to get an Expo and TypeScript app that runs on day one, with a themed component kit, GraphQL, i18n and one mock API for Jest and E2E. Every push runs Checks, Unit and device E2E through shared-workflows, pinned to one commit. A merge to main opens a release PR, then ships signed, verified builds to TestFlight and Google Play." width="960">
 </p>
 
 Every React Native project pays the same tax before it ships anything. Signing
@@ -97,7 +97,7 @@ someone applied to an Xcode project two years ago and cannot explain.
 
 The workflows live in
 [`blinkbitcoin/shared-workflows`](https://github.com/blinkbitcoin/shared-workflows),
-pinned here at `@v0`. What is left in this repo is eleven short files naming
+pinned here to one commit that Dependabot moves. What is left in this repo is eleven short files naming
 which ones to run. A fix to the Android emulator boot lands once, for every app
 in the family.
 

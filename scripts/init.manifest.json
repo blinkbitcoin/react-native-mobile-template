@@ -342,8 +342,8 @@
           ],
           ["the twelve files in", "the eleven files in"],
           ["Two of the twelve are the exception", "Two of the eleven are the exception"],
-          ["Ten of the twelve files carry", "Nine of the eleven files carry"],
-          ["`cd-production.yml` alone has eleven.", "`cd-production.yml` alone has ten."]
+          ["Eleven of the twelve files carry", "Ten of the eleven files carry"],
+          ["`cd-production.yml` alone has twelve.", "`cd-production.yml` alone has eleven."]
         ]
       },
       {

@@ -24,7 +24,7 @@ concurrency:
 jobs:
   checks:
     name: Checks
-    uses: blinkbitcoin/shared-workflows/.github/workflows/check-code.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/check-code.yml@aa12aaa99407e2800ffccb4db21ff962dc681b05 # v0.13.0
     with:
       # Runs `pnpm check:release` (= `make check-release`): Ruby syntax, a
       # fastlane lane parse and the lane unit tests. Needs Ruby, which is why
@@ -40,7 +40,7 @@ jobs:
     name: Unit
     needs: checks
     if: ${{ needs.checks.outputs.docs-only != 'true' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/check-unit.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/check-unit.yml@aa12aaa99407e2800ffccb4db21ff962dc681b05 # v0.13.0
   e2e:
     name: E2E
     # `unit` as well as `checks`, so a failed unit run never reaches E2E. On a
@@ -49,7 +49,7 @@ jobs:
     # times the rate when iOS is on - to learn what unit already knew.
     needs: [checks, unit]
     if: ${{ needs.checks.outputs.docs-only != 'true' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/check-e2e.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/check-e2e.yml@aa12aaa99407e2800ffccb4db21ff962dc681b05 # v0.13.0
     with:
       # iOS runs on a push to main (and a manual run) when the repo variable
       # E2E_IOS is true, and on a PR only when it carries the `e2e:ios` label
@@ -103,7 +103,7 @@ jobs:
       contents: read
       actions: read
       security-events: write
-    uses: blinkbitcoin/shared-workflows/.github/workflows/check-security.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/check-security.yml@aa12aaa99407e2800ffccb4db21ff962dc681b05 # v0.13.0
     with:
       # The diff review runs on pull requests, and on the release pull request,
       # whose CI is the workflow_dispatch cd-release.yml starts on its branch -
@@ -141,7 +141,7 @@ jobs:
       needs.checks.outputs.docs-only != 'true'
     permissions:
       contents: write # publish-badges.sh pushes the gh-pages branch
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-badges.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-badges.yml@aa12aaa99407e2800ffccb4db21ff962dc681b05 # v0.13.0
     with:
       unit-result: ${{ needs.unit.result }}
       e2e-result: ${{ needs.e2e.result }}

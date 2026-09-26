@@ -75,7 +75,8 @@
     "msw": "^2.15.0",
     "ts-node": "^10.9.2",
     "tsx": "^4.23.13",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "yaml": "^2.9.1"
   },
   "scripts": {
     "preinstall": "npx only-allow pnpm",
@@ -87,7 +88,7 @@
     "build:web": "bash scripts/build-web.sh",
     "prebuild": "expo prebuild --clean",
     "doctor": "node scripts/doctor.mjs",
-    "test:scripts": "node --test --experimental-test-coverage --test-coverage-lines=100 --test-coverage-branches=100 --test-coverage-functions=100 \"scripts/**/*.test.mjs\"",
+    "test:scripts": "node --test --experimental-test-coverage --test-coverage-include=\"scripts/**/*.mjs\" --test-coverage-lines=100 --test-coverage-branches=100 --test-coverage-functions=100 \"scripts/**/*.test.mjs\"",
     "test": "jest",
     "test:coverage": "jest --coverage && pnpm check:coverage-empty",
     "check:coverage-empty": "node scripts/check-coverage-empty.mjs",

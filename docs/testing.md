@@ -96,11 +96,13 @@ which is why they sit at the top level and not in either project.
 
 ### `pnpm test:scripts`
 
-`node --test --experimental-test-coverage --test-coverage-lines=100
---test-coverage-branches=100 --test-coverage-functions=100
+`node --test --experimental-test-coverage --test-coverage-include="scripts/**/*.mjs"
+--test-coverage-lines=100 --test-coverage-branches=100 --test-coverage-functions=100
 "scripts/**/*.test.mjs"` covers the tooling that has no business booting React
 Native, and fails below 100% — see [Script coverage](#script-coverage). The
-suites include:
+include keeps the gate on this repository's scripts: a test that runs
+shared-workflows' scripts from `$WORKFLOWS_DIR` (or `pnpm` from outside mise)
+would otherwise have that code measured too. The suites include:
 
 | Suite | Covers |
 | --- | --- |
@@ -119,6 +121,8 @@ suites include:
 | `scripts/worktree-ignores.test.mjs` | That every tool which walks the tree skips `.claude/worktrees/`, anchored to the root<br>(see [quality.md](quality.md#worktrees-inside-the-checkout-are-not-this-checkout)) |
 | `scripts/coverage-completeness.test.mjs` | Loads every `scripts/**/*.mjs` module, so one no test imports still counts |
 | `scripts/release/shared-copies.test.mjs` | Our `resolve-version.sh` and `build-info.sh` against shared-workflows' copies, read from `$WORKFLOWS_DIR`.<br>CI always compares; locally they skip unless `WORKFLOWS_DIR` points at a checkout |
+| `scripts/workflow-contract.test.mjs` | Every shared-workflows call pinned to the same commit SHA with its version beside it, and every call's inputs and<br>secrets against what the called workflow declares at `$WORKFLOWS_DIR`, which must be that commit |
+| `scripts/release/cd-notes.test.mjs` | The store notes the way CD drafts them: cd-release's build-env through the shared `build-env.sh`, `pr-notes.sh` on<br>a real release PR body with a `gh` shim and a local model, then the shared `notes.sh` reading the section back |
 | `scripts/security/config.test.mjs` | Settings resolution: environment, then `security-policy.json`, then defaults |
 | `scripts/security/sarif.test.mjs` | The SARIF document builders: a skipped run and a findings run |
 | `scripts/security/verdict.test.mjs` | Merging SARIF documents, the severity threshold and the `failOn` engine gate |

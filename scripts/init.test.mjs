@@ -793,8 +793,8 @@ describe('init --yes --no-web', async () => {
     assert.match(ci, /Eleven files, in two groups: four that run on every change/);
     assert.match(ci, /the eleven files in/);
     assert.match(ci, /Two of the eleven are the exception/);
-    assert.match(ci, /Nine of the eleven files carry/);
-    assert.match(ci, /`cd-production\.yml` alone has ten\./);
+    assert.match(ci, /Ten of the eleven files carry/);
+    assert.match(ci, /`cd-production\.yml` alone has eleven\./);
   });
 
   test('replaced the placeholders with the answers', () => {

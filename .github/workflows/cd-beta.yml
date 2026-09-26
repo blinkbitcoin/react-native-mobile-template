@@ -25,7 +25,7 @@ concurrency:
 jobs:
   prepare:
     name: Prepare
-    uses: blinkbitcoin/shared-workflows/.github/workflows/build-prepare.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/build-prepare.yml@aa12aaa99407e2800ffccb4db21ff962dc681b05 # v0.13.0
     permissions:
       contents: read
       # `require-green-workflow` runs `gh run list` against the gated workflow,
@@ -63,7 +63,7 @@ jobs:
     # credentials still runs everything that does not need one.
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' }}
     needs: prepare
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@aa12aaa99407e2800ffccb4db21ff962dc681b05 # v0.13.0
     permissions:
       contents: read
     with:
@@ -103,7 +103,7 @@ jobs:
     # credentials still runs everything that does not need one.
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' }}
     needs: prepare
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@aa12aaa99407e2800ffccb4db21ff962dc681b05 # v0.13.0
     permissions:
       contents: read
     with:
@@ -128,7 +128,7 @@ jobs:
     # uses a status function.
     needs: [prepare, promote-ios, promote-android]
     if: ${{ !cancelled() && !failure() }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-github-release.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-github-release.yml@aa12aaa99407e2800ffccb4db21ff962dc681b05 # v0.13.0
     permissions:
       contents: write
     with:
@@ -195,7 +195,7 @@ jobs:
     # and the release itself are already done or independent of it.
     needs: [prepare, promote-android, huawei-binary]
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && vars.HUAWEI_UPLOADS_ENABLED == 'true' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@aa12aaa99407e2800ffccb4db21ff962dc681b05 # v0.13.0
     permissions:
       contents: read
     with:
@@ -259,7 +259,7 @@ jobs:
   store-notes:
     name: Attach store notes
     needs: [prepare, store-notes-section]
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-github-release.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-github-release.yml@aa12aaa99407e2800ffccb4db21ff962dc681b05 # v0.13.0
     permissions:
       contents: write
     with:
@@ -274,7 +274,7 @@ jobs:
     name: OTA
     needs: [prepare, github-release]
     if: ${{ vars.OTA_ENABLED == 'true' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-ota.yml@v0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-ota.yml@aa12aaa99407e2800ffccb4db21ff962dc681b05 # v0.13.0
     permissions:
       contents: read
     with:
