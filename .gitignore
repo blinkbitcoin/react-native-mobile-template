@@ -60,7 +60,7 @@ yarn-error.*
 modules/*/android/build/
 modules/*/android/.cxx/
 
-# `make check-codeql` output: the database, results.sarif and the two tool logs.
+# `make check-code-scanning` output: the database, results.sarif and the two tool logs.
 # Hundreds of MB, and rebuilt from the tree on every run.
 /.codeql
 

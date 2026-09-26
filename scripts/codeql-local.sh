@@ -4,7 +4,7 @@
 # .github/workflows/ci-codeql.yml - and therefore the same findings, before a push,
 # with the inline `// codeql[<rule-id>]` markers shown as suppressed or not.
 #
-#   make check-codeql
+#   make check-code-scanning
 #
 # LOCAL ONLY. CI runs CodeQL on GitHub through the reusable workflow; nothing in
 # .github/ calls this file.

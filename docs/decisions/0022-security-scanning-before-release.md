@@ -48,7 +48,7 @@ started from (`uuid@7.0.3` failing the run) has since been accepted with a
 reasoned ignore; the current one is in `docs/security.md`, "The current
 baseline".
 Scanners are external CLIs, so `make check-security` is minutes and stays out
-of `make check` and `make ci`, like `check-codeql`; unlike `check-codeql` it
+of `make check` and `make ci`, like `check-code-scanning`; unlike `check-code-scanning` it
 also has no CI caller yet at all, on any workflow - wiring it in is a later,
 separate stage. A repository that finds the whole feature overkill sets
 `SECURITY_ENABLED=false`.
