@@ -85,11 +85,11 @@ aggregates.
 | `make check` | Every static gate the `check-code` workflow runs (no tests/builds) |
 | `make ci` | Everything CI runs except E2E — `check` plus coverage and the script tests |
 | `make check-slow` | The minutes-long gates: prebuild output + the bundle scan (off by default in CI too) |
-| `make check-code` | `check-types` + `check-lint` + `check-format` + `check-knip` + `check-spell` |
+| `make check-code` | `check-types` + `check-lint` + `check-format` + `check-unused` + `check-spell` |
 | `make check-types` | `tsc --noEmit` |
 | `make check-lint` | Biome lint + ESLint (React/Expo rules) |
 | `make check-format` | Check formatting without writing (`make fix-format` writes) |
-| `make check-knip` | Unused files, exports and dependencies |
+| `make check-unused` | Unused files, exports and dependencies |
 | `make check-spell` | Spell-check with typos |
 | `make check-gen` | Generated-file drift (i18n, codegen) |
 | `make check-deps` | SDK drift, audit, lockfile provenance, licenses |
@@ -108,8 +108,8 @@ aggregates.
 | `make check-security-mobile` | mobsfscan over a fresh prebuild of `android/` and `ios/` |
 | `make check-security-binaries` | MASTG checks over built binaries (`APK=...` and/or `IPA=...`) |
 | `make check-security-review` | LLM security review of the diff (off by default; needs `llm.provider` and a key) |
-| `make check-security-openant` | OpenAnt LLM scan of the codebase (off by default; needs `llm.provider` and a key) |
-| `make check-codeql` | CodeQL with the same config CI uses (needs a CodeQL CLI; not in `make check`) |
+| `make check-security-review-codebase` | LLM security review of the whole codebase with OpenAnt (off by default; needs `llm.provider` and a key) |
+| `make check-code-scanning` | CodeQL code scanning with the same config CI uses (needs a CodeQL CLI; not in `make check`) |
 
 | Tests | |
 |---|---|
@@ -200,6 +200,14 @@ aggregates.
   expand an uncommon one on first use. A prefix made of the family's initials
   was rejected for exactly this reason; so was "ids" for identifiers in a
   status message.
+- **A make target is named for what it checks or does, never after the tool
+  that does it.** `check-unused`, not `check-knip`; `check-code-scanning`, not
+  `check-codeql`. A tool's name tells a reader nothing until they already know
+  the tool; it belongs in the `##` description, where `make help` shows it.
+  `scripts/make-target-names.test.mjs` fails on a target with a word that names
+  a tool pinned in `.mise.toml` or a package in `package.json`; a `setup-`
+  target installs the tool it names, and any other exception needs an entry
+  with its reason.
 - **Workflow files carry their stage in the name.** GitHub reads only the top
   level of `.github/workflows/`, so the prefix is the only grouping there is:
   `ci.yml` and `ci-*.yml` run on every change and display as `CI` /

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// The findings of a CodeQL SARIF run, as `make check-codeql` prints them: one line
+// The findings of a CodeQL SARIF run, as `make check-code-scanning` prints them: one line
 // per result with its rule id, location and message, marked when an inline
 //
 //     // codeql[<rule-id>]
