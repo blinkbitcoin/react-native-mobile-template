@@ -32,6 +32,23 @@ The release pull request is the one cd-release.yml keeps open; its CI is a
 by `github.ref_name`. On the production dispatch the store jobs wait for the
 `security` job and do not start if it fails.
 
+## Where the findings show up
+
+On a pull request, in the `Security / *` jobs and nowhere else. The `Verdict`
+job's summary carries the report, and every reportable finding is an
+annotation on the diff: an error when it blocks, a warning when it is only
+reported. `verdict.mjs` prints those annotations only under
+`GITHUB_ACTIONS=true`, so a laptop run stays plain text.
+
+The SARIF goes to code scanning (Security → Code scanning) from `main` only.
+Every upload makes code scanning add a check per tool under GitHub's own "Code
+scanning results" heading, which cannot be renamed, and on a pull request
+those checks only repeated the `Security / *` jobs. Before the upload each run
+is named after its job, so the tool filter reads `Dependencies`, `Code`,
+`Policy` and so on rather than `osv-scanner` and `Semgrep OSS`. CodeQL's own
+`Code scanning results / CodeQL` check still appears on pull requests; see
+[quality.md](quality.md).
+
 The deterministic scanners can block a run; the two LLM jobs annotate unless
 `failOn` names them (see "Turning things off" below). An LLM that refuses a
 prompt, or answers differently twice, must not be able to hold a release.
