@@ -7,11 +7,12 @@ import * as openai from './openai.mjs';
 
 export const ADAPTERS = { anthropic, openai };
 export const KEY_ENV = { anthropic: 'ANTHROPIC_API_KEY', openai: 'OPENAI_API_KEY' };
-export const EFFORTS = ['low', 'medium', 'high', 'max'];
+export const EFFORTS = ['none', 'low', 'medium', 'high', 'max'];
 
 /**
- * An effort setting, `max` when unset. Anything else throws: a typo must not
- * quietly buy a shallower answer than the one asked for.
+ * An effort setting, `max` when unset; `none` is for a model with no reasoning
+ * switch. Anything else throws: a typo must not quietly buy a shallower answer
+ * than the one asked for.
  */
 export const parseEffort = (value, source) => {
   if (value === undefined || value === '') return 'max';
@@ -30,7 +31,8 @@ const PROTECTED = new Set(['model', 'messages', 'system']);
 /**
  * Vendor-specific request fields (Qwen's `enable_thinking`, OpenRouter's
  * `reasoning`, Kimi's `thinking`), as a JSON object merged into the top of the
- * request body. Empty means none. The value is never echoed into an error: it is an arbitrary
+ * request body; a key set to null removes that field from the request (an
+ * endpoint that rejects `response_format`, say). Empty means none. The value is never echoed into an error: it is an arbitrary
  * string from the environment, and an error message ends up in a CI log.
  */
 export const parseExtraParams = (value, source) => {

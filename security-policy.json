@@ -45,7 +45,7 @@
     }
   },
   "llm": {
-    "$comment": "Shared by review and openant. provider is openai (any OpenAI-compatible endpoint through OPENAI_BASE_URL) or anthropic; effort is low, medium, high or max.",
+    "$comment": "Shared by review and openant. provider is openai (any OpenAI-compatible endpoint through OPENAI_BASE_URL) or anthropic; effort is none (a model with no reasoning switch), low, medium, high or max.",
     "provider": "",
     "model": "",
     "effort": "max"

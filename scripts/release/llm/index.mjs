@@ -6,6 +6,7 @@
 // commit hash -- is a warning on stderr and a fall back to the deterministic
 // prose. A release must never fail because a model was unavailable.
 import { adapterFor, KEY_ENV } from '../../lib/llm/index.mjs';
+import { thinks, unfence } from '../../lib/llm/request.mjs';
 
 /** The tightest limit the text must fit before per-store cuts are applied. */
 export const TESTFLIGHT_LIMIT = 4000;
@@ -25,13 +26,20 @@ export function renderPrompt(template, values) {
   });
 }
 
+/** Room for the model's thinking, the same allowance the security review has. */
+const THINKING_TOKENS = 16000;
+
 /**
  * Enough output tokens for every requested locale to reach the TestFlight cap.
  * A fixed budget truncates the JSON mid-object once a release asks for more
  * than a couple of locales, and a truncated response is a silent fallback.
+ * Thinking tokens count against the same budget on both APIs, so an effort
+ * that thinks gets its allowance on top; without it the thinking can spend the
+ * whole budget and leave no text.
  */
-export function maxTokensFor(locales) {
-  return Math.min(8192, 1024 + locales.length * 1500);
+export function maxTokensFor(locales, effort) {
+  const text = Math.min(8192, 1024 + locales.length * 1500);
+  return thinks(effort) ? text + THINKING_TOKENS : text;
 }
 
 /** The user turn: the deterministic items, grouped, plus the locales wanted. */
@@ -75,7 +83,7 @@ function violations(text) {
 export function validate(raw, locales) {
   let parsed;
   try {
-    parsed = JSON.parse(raw);
+    parsed = JSON.parse(unfence(raw));
   } catch {
     return { error: 'response is not JSON' };
   }
@@ -129,7 +137,7 @@ export async function rewriteNotes({
   let raw;
   try {
     raw = await adapter.complete({
-      maxTokens: maxTokensFor(locales),
+      maxTokens: maxTokensFor(locales, effort),
       system,
       user: buildUserPrompt(items, locales),
       model,

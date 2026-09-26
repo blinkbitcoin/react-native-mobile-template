@@ -356,6 +356,8 @@ test('the llm block follows the same order', () => {
   assert.equal(settings.llm.provider, 'openai');
   assert.equal(settings.llm.effort, 'low');
   assert.equal(settings.llm.model, 'claude-opus-5');
+  assert.equal(resolve({ llm: { effort: 'none' } }, {}).llm.effort, 'none');
+  assert.equal(resolve({}, { SECURITY_LLM_EFFORT: 'none' }).llm.effort, 'none');
 });
 
 test('parseTyped reads every type from a string and from JSON', () => {

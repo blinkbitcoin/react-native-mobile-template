@@ -4,5 +4,6 @@
 // `+not-found`, `+native-intent`, `+api`, `+middleware`) crashes at runtime with
 // "Route nodes cannot start with the '+' character." That rules out colocating
 // `+native-intent.test.ts` here — see `src/lib/native-intent.ts` for the
-// implementation and its test.
+// implementation and its test. The re-export's own test mirrors this path
+// under `src/__tests__/app/`.
 export { redirectSystemPath } from '@/lib/native-intent';

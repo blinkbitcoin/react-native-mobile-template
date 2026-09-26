@@ -224,6 +224,22 @@ aggregates.
   lane, a `scripts/*.test.mjs` assertion per workflow rule. A threshold is never lowered and no file is excluded from
   coverage to make a PR pass; if something truly cannot be tested, the PR says
   what and why.
+- **Every source file has its own sibling test, and that file alone covers
+  it at 100%.** `foo.mjs` has `foo.test.mjs` and `Foo.tsx` has `Foo.test.tsx`
+  (a `.ts` module may use `.test.tsx`), in the same directory. A
+  directory-wide test file, a `__tests__/` directory, or a module's tests
+  living in a caller's test file does not count, even when global coverage is
+  100%. Check a module with its own test alone: `node --test
+  --experimental-test-coverage --test-coverage-include=<file>.mjs
+  <file>.test.mjs`, or `pnpm exec jest <file>.test.tsx --coverage
+  --collectCoverageFrom=<file>.tsx`. The one exception is `src/app/`:
+  expo-router loads every file there as a route, so a route's test mirrors its
+  path under `src/__tests__/app/` (`src/app/details/[id].tsx` →
+  `src/__tests__/app/details/[id].test.tsx`). Scope: `scripts/**/*.mjs`,
+  `src/**/*.ts(x)`, `plugins/*.ts` and `modules/*/index.ts`, less generated
+  code, `*.d.ts` and `src/test/`. `scripts/test-siblings.test.mjs` fails
+  naming every file without one; an exception is an entry in its allowlist
+  with a one-line reason, the same bar as `coveragePathIgnorePatterns`.
 - **Docs and diagrams ship in the same PR as the change, never as a
   follow-up.** Any change to a name, input, output, job, file, flow, count or
   default updates every doc that describes it, in the same PR: prose, tables,
@@ -245,7 +261,9 @@ aggregates.
 
 | Layer | Where | Run with |
 |---|---|---|
-| Units, components, router, Apollo (MSW) | `src/**/*.test.ts(x)` | `make test-unit` |
+| Units, components, router, Apollo (MSW) | `src/**/*.test.ts(x)`, one beside each module | `make test-unit` |
+| Routes (`src/app/`), one per route file | `src/__tests__/app/**/*.test.ts(x)` | `make test-unit` |
+| That every source file has a sibling test | `scripts/test-siblings.test.mjs` | `make test-scripts` |
 | Config plugins | `plugins/*.test.ts` | `make test-unit` |
 | Node scripts (release, doctor, init, checks), 100% coverage | `scripts/**/*.test.mjs` | `make test-scripts` |
 | Machine setup (`make setup`), bash against fake tools | `scripts/setup/setup.test.mjs` | `make test-scripts` |
@@ -261,6 +279,12 @@ without one is not mergeable, and a native module's TS wrapper does not qualify
 just because the native half is Swift/Kotlin. `make test-coverage` (and CI, through
 `test:coverage`) also fails on any file with zero statements (`scripts/check-coverage-empty.mjs`), so a re-export
 barrel cannot lift the number while testing nothing.
+
+Global coverage says every line ran somewhere, not that its own test ran it.
+The sibling rule above closes that gap: each module's test covers it at 100%
+alone, so deleting a caller's test never silently uncovers the module it
+used. A zero-statement re-export under `coveragePathIgnorePatterns` still has
+its sibling test, pinning what it re-exports.
 
 The Node scripts have their own gate: `test:scripts` (`make test-scripts`, CI's
 Unit job) runs `node:test` with its built-in coverage at 100% lines, branches

@@ -20,6 +20,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { adapterFor, KEY_ENV, parseExtraParams } from '../lib/llm/index.mjs';
+import { unfence } from '../lib/llm/request.mjs';
 import { load } from './config.mjs';
 import { fromFindings, noted, skipped } from './sarif.mjs';
 
@@ -96,12 +97,9 @@ export const fitDiff = (files, maxBytes) => {
  * no better.
  */
 export const validateReview = (raw, files) => {
-  // A model with no JSON mode (Anthropic has none) sometimes fences its answer
-  // as a markdown code block; the fence is packaging, not a malformed answer.
-  const fenced = /^\s*```(?:json)?\s*\n([\s\S]*?)\n\s*```\s*$/.exec(raw);
   let parsed;
   try {
-    parsed = JSON.parse(fenced ? fenced[1] : raw);
+    parsed = JSON.parse(unfence(raw));
   } catch {
     return { error: 'the answer is not JSON' };
   }

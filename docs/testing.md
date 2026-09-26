@@ -8,9 +8,9 @@ Five runners, each with a job. Nothing here needs a network.
 | --- | --- | --- | --- |
 | Unit (pure TS) | Jest, `app` project (jest-expo) | `src/**/*.test.ts` | `make test-unit` |
 | Component | Jest, RNTL 14 | `src/**/*.test.tsx` | `make test-unit` |
-| Router | Jest, `renderRouter` from `expo-router/testing-library` | `src/routes.test.tsx`,<br>`src/features/**` | `make test-unit` |
+| Router | Jest, `renderRouter` from `expo-router/testing-library` | `src/__tests__/app/**` (one per route),<br>`src/features/**` | `make test-unit` |
 | Apollo with a real schema | Jest, MSW over the `mocks/` executable schema | anything that renders a query | `make test-unit` |
-| Native module wrapper | Jest, the manual mock in `modules/hello-native/src/__mocks__/` | `modules/hello-native/__tests__/` | `make test-unit` |
+| Native module wrapper | Jest, the manual mock in `modules/hello-native/src/__mocks__/` | `modules/hello-native/index.test.ts` | `make test-unit` |
 | Config plugins | Jest, `plugins` project (plain node) | `plugins/*.test.ts` | `make test-unit` |
 | Node scripts | `node:test` | `scripts/**/*.test.mjs` | `make test-scripts` |
 | Machine setup scripts | `node:test`, bash with fake tools on `PATH` | `scripts/setup/setup.test.mjs` | `make test-scripts` |
@@ -20,6 +20,61 @@ Five runners, each with a job. Nothing here needs a network.
 
 `make test` is `make test-unit` plus `make check-code`. `make test-coverage` is what CI
 enforces.
+
+## One test file per module
+
+Every source file has its own test file beside it, and that file alone covers
+the module at 100% (lines, branches, functions, and statements where the tool
+measures them):
+
+| Module | Its test |
+| --- | --- |
+| `scripts/badges/render.mjs` | `scripts/badges/render.test.mjs` |
+| `src/components/Card.tsx` | `src/components/Card.test.tsx` |
+| `src/i18n/i18n.ts` | `src/i18n/i18n.test.tsx` (a `.ts` module may be tested in JSX) |
+| `src/features/settings/NativeDemoCard.web.tsx` | `src/features/settings/NativeDemoCard.web.test.tsx` |
+| `modules/hello-native/index.ts` | `modules/hello-native/index.test.ts` |
+| `src/app/details/[id].tsx` | `src/__tests__/app/details/[id].test.tsx` |
+
+Global coverage only says each line ran in some test. A module reached only
+through a caller's test is uncovered the day that caller changes, and nothing
+fails when it happens. So a directory-wide test file, a `__tests__/`
+directory, or a module's tests living in a caller's file does not count, even
+at 100% globally. A test that spans several modules is welcome on top, but it
+is extra, never the module's own test.
+
+**Routes are the one exception to "beside".** expo-router loads every
+`.ts(x)` file under `src/app/` as a route, test files included: one there
+would be bundled into the app and registered as a route, and a `+`-prefixed
+one crashes the router. Expo's own testing guide says to keep tests out of the
+app directory. A route's test therefore mirrors its path under
+`src/__tests__/app/`. Route tests import the route through `@/app/...` and
+render it with `renderRouter`, against the real `src/app` tree when the route
+is a layout or a screen mount, or against an inline route map when only the
+route's own logic is under test.
+
+Check one module against its own test before pushing:
+
+```sh
+node --test --experimental-test-coverage --test-coverage-include=scripts/badges/render.mjs scripts/badges/render.test.mjs
+pnpm exec jest src/components/Card.test.tsx --coverage --collectCoverageFrom=src/components/Card.tsx
+```
+
+Jest applies the global 100% thresholds to the one file it measures, so the
+second command fails below 100%.
+
+`scripts/test-siblings.test.mjs` (`make test-scripts`) enforces that the
+sibling exists. It lists tracked files with `git ls-files` and names every
+one without a sibling. In scope: `scripts/**/*.mjs`, `src/**/*.ts(x)`,
+`plugins/*.ts` and `modules/*/index.ts`. Out of scope: test files, `*.d.ts`,
+`src/graphql/generated/`, `src/i18n/locales/` and `src/test/` (the harness,
+which has its own tests anyway). The same test fails on a test file under
+`src/app/` and on a route test whose route was renamed or deleted. A file that
+truly has nothing to assert goes in its `ALLOWLIST` with a one-line reason,
+the same bar as `coveragePathIgnorePatterns`; an entry whose file gains a
+test, or disappears, fails until it is removed. That the one file covers its
+module at 100% is not measured per file by CI, so review holds it, with the
+commands above.
 
 ### The two Jest projects
 
@@ -60,6 +115,7 @@ suites include:
 | `scripts/release/fingerprint.test.mjs` | The fingerprint and OTA plumbing |
 | `scripts/release/build-info.test.mjs` | The per-build provenance record |
 | `scripts/shell-locale.test.mjs` | The guard against `LC_ALL=C cmd` locale prefixes in tracked shell code (see `AGENTS.md`) |
+| `scripts/test-siblings.test.mjs` | That every source file has its own sibling test, and that no route test sits under `src/app/`<br>(see [One test file per module](#one-test-file-per-module)) |
 | `scripts/worktree-ignores.test.mjs` | That every tool which walks the tree skips `.claude/worktrees/`, anchored to the root<br>(see [quality.md](quality.md#worktrees-inside-the-checkout-are-not-this-checkout)) |
 | `scripts/coverage-completeness.test.mjs` | Loads every `scripts/**/*.mjs` module, so one no test imports still counts |
 | `scripts/release/shared-copies.test.mjs` | Our `resolve-version.sh` and `build-info.sh` against shared-workflows' copies, read from `$WORKFLOWS_DIR`.<br>CI always compares; locally they skip unless `WORKFLOWS_DIR` points at a checkout |
@@ -297,7 +353,7 @@ listening, `src/test/env.ts` sets `EXPO_PUBLIC_API_URL` to the same value, and
 ## Native module and plugin tests
 
 The native module wrapper is tested against its manual mock
-(`jest.mock('../src/HelloNativeModule')`), which covers the happy path, and
+(`jest.mock('./src/HelloNativeModule')` in `modules/hello-native/index.test.ts`), which covers the happy path, and
 against a factory that throws, which covers the "native module absent" path.
 Both matter: the wrapper's contract is that a missing module produces a
 `HelloNativeError` naming `make dev-ios` / `make dev-android`, synchronously from

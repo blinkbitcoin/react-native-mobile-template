@@ -40,7 +40,8 @@ const coveragePathIgnorePatterns = [
   '<rootDir>/src/i18n/locales/',
   // Pure re-export barrels. expo-router route files that only re-export the
   // screen or handler they point at carry zero statements, so including them
-  // would lift the percentage while asserting nothing.
+  // would lift the percentage while asserting nothing. Each still has its own
+  // test under `src/__tests__/app/`, pinning what it re-exports.
   '<rootDir>/src/app/\\(tabs\\)/(index|settings)\\.tsx$',
   '<rootDir>/src/app/\\+native-intent\\.tsx$',
   // The `requireNativeModule` binding for the Swift/Kotlin half, plus the
