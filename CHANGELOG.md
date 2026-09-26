@@ -5,6 +5,18 @@ by [release-please](https://github.com/googleapis/release-please) from
 [Conventional Commits](https://www.conventionalcommits.org/) — edit the commit
 messages, not this file. See [docs/release-runbook.md](docs/release-runbook.md).
 
+## [0.9.0](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.8.0...v0.9.0) (2026-09-26)
+
+
+### Features
+
+* **tooling:** store notes and the security review work with any LLM provider ([#77](https://github.com/blinkbitcoin/react-native-mobile-template/issues/77)) ([b74948e](https://github.com/blinkbitcoin/react-native-mobile-template/commit/b74948e34ee2541a3674f1cfed14294728a4f953))
+
+
+### Bug Fixes
+
+* **ci:** hand zizmor this checkout's policy with --config ([#79](https://github.com/blinkbitcoin/react-native-mobile-template/issues/79)) ([2f5dcd6](https://github.com/blinkbitcoin/react-native-mobile-template/commit/2f5dcd6f9ca0696abf73a048e5f0fd3c9cb3b9a0))
+
 ## [0.8.0](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.7.0...v0.8.0) (2026-09-24)
 
 
