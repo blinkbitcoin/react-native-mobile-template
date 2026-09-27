@@ -203,6 +203,23 @@
         "lines": ["^  'build:web',$"]
       },
       {
+        "$comment": "Two test-file comments that point at scripts/ci-web-gate.test.mjs, which this run deletes. The suite-gates one is a replace because its blank `//` separator is indistinguishable from the others as a line.",
+        "path": "scripts/ci-suite-gates.test.mjs",
+        "replace": [
+          [
+            "reports `skipped` to the jobs after it.\n//\n// The web suite gates itself (scripts/ci-web-gate.test.mjs).\n",
+            "reports `skipped` to the jobs after it.\n"
+          ]
+        ]
+      },
+      {
+        "path": "scripts/release-workflows.test.mjs",
+        "lines": [
+          "^  // The web deploy's dispatch is pinned in ci-web-gate\\.test\\.mjs, which$",
+          "^  // `make init --no-web` deletes together with ci-web\\.yml and that step\\.$"
+        ]
+      },
+      {
         "$comment": "The web export directory, in the CodeQL scan exclusions. Left behind it is a path-ignore for a target the generated app does not build.",
         "path": ".github/codeql/codeql-config.yml",
         "lines": ["^  - dist # web export$"]
@@ -285,9 +302,14 @@
       {
         "path": "docs/release-runbook.md",
         "optional": true,
-        "$comment": "All but the first are the release hop's dispatch of ci-web.yml, whose step goes with its marker block in cd-release.yml: the diagram, the store-notes job's place after it and the hop's own section.",
+        "$comment": "The first two replaces and the chart line are the production web deploy, whose job goes with its marker block in cd-production.yml: the summary and the Huawei note name it, the chart draws it. The rest are the release hop's dispatch of ci-web.yml, whose step goes with its marker block in cd-release.yml: the diagram, the store-notes job's place after it and the hop's own section.",
+        "lines": ["^    prel --> pweb\\[\"Web deploy\"\\]$"],
         "replace": [
           ["App Store + Play + web + OTA", "App Store + Play + OTA"],
+          [
+            "the store notes, the OTA publish and the web deploy do not wait for",
+            "the store notes and the OTA publish do not wait for"
+          ],
           ["│  CD / Beta + CI / Web dispatched", "│  CD / Beta dispatched"],
           ["job after the beta and web dispatches:", "job after the beta dispatch:"],
           [
@@ -381,6 +403,10 @@
           [
             "On a cut release, dispatches `cd-beta.yml` and `ci-web.yml` at the tag |",
             "On a cut release, dispatches `cd-beta.yml` at the tag |"
+          ],
+          [
+            "**Coexistence with the web target.** `ci-web.yml` deploys the web export to GitHub\nPages through `actions/deploy-pages`, which is an *artifact* deploy and does not\nread any branch. The badges live on a `gh-pages` branch and are served from\n`raw.githubusercontent.com`, not from the Pages site, so the two do not collide\n— **as long as the repo's Pages source stays \"GitHub Actions\"**. Switching it to\n\"Deploy from a branch → gh-pages\" would make every web deploy fight the badge\ncommits and publish the badge directory as the site. Two repo settings go with\nthis: keep that Pages source, and exempt `gh-pages` from the PR-approval ruleset\nso the default `GITHUB_TOKEN` can push to it.",
+            "**The badge branch needs one repository setting.** The badges live on a\n`gh-pages` branch and are served from `raw.githubusercontent.com`. Exempt\n`gh-pages` from the PR-approval ruleset so the default `GITHUB_TOKEN` can push\nto it."
           ]
         ],
         "$comment": "The suite-class table's web entries are anchored, not scrubbed: the scrub would take the whole e2e-changed row for its `e2e/web/`.",
