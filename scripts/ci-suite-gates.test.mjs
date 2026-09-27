@@ -1,10 +1,11 @@
-// The gates that let each suite skip a change it cannot affect. check-code.yml's
-// `changes` job classifies the diff into `unit-changed` and `e2e-changed`, and
-// ci.yml turns them into `if:`s on unit, e2e and badges. Those three read each
-// other's results, so they are evaluated here as a graph: each scenario runs
-// checks, then every job in file order, the way GitHub decides them - an `if:`
-// with no status function gets the implicit success() that `needs` adds, and a
-// job whose gate is false reports `skipped` to the jobs after it.
+// The gates that let a suite skip a change it cannot affect. check-code.yml's
+// `changes` job classifies the diff, and ci.yml turns `e2e-changed` into E2E's
+// `if:`. Unit has no gate - its guards read every tracked file - and badges
+// reads both suites' results. The three are evaluated here as a graph: each
+// scenario runs checks, then every job in file order, the way GitHub decides
+// them - an `if:` with no status function, or none at all, gets the implicit
+// success() that `needs` adds, and a job whose gate is false reports `skipped`
+// to the jobs after it.
 //
 // The web suite gates itself (scripts/ci-web-gate.test.mjs).
 import assert from 'node:assert/strict';
@@ -65,7 +66,8 @@ function runCi({ checks = 'success', outputs, outcome = {}, cancelled = false })
   const jobs = { checks: { result: checks, outputs } };
   for (const job of ['unit', 'e2e', 'badges']) {
     const needs = Object.fromEntries(needsOf(job).map((name) => [name, jobs[name]]));
-    const runs = compile(unwrap(ci.jobs[job].if))({ needs, cancelled });
+    // No `if:` is GitHub's default success(): 'true' behind the implicit one.
+    const runs = compile(unwrap(ci.jobs[job].if ?? 'true'))({ needs, cancelled });
     jobs[job] = { result: runs ? (outcome[job] ?? 'success') : 'skipped', outputs: {} };
   }
   return Object.fromEntries(Object.entries(jobs).map(([job, { result }]) => [job, result]));
@@ -78,7 +80,7 @@ const classified = (docsOnly, unit, e2e) => ({
   'e2e-changed': String(e2e),
 });
 
-describe('ci.yml runs each suite only for a change that can affect it', () => {
+describe('ci.yml runs E2E only for a change that can affect it, and Unit on every change', () => {
   const cases = [
     [
       'a source change runs both suites and publishes the badges',
@@ -86,24 +88,24 @@ describe('ci.yml runs each suite only for a change that can affect it', () => {
       { unit: 'success', e2e: 'success', badges: 'success' },
     ],
     [
-      'a docs-only change skips both suites, and the badges stay as they are',
+      'a docs-only change runs Unit, whose guards read docs, skips E2E, and publishes',
       { outputs: classified(true, false, false) },
-      { unit: 'skipped', e2e: 'skipped', badges: 'skipped' },
+      { unit: 'success', e2e: 'skipped', badges: 'success' },
     ],
     [
-      'a Maestro-flows-only change skips unit and still runs E2E',
+      'a Maestro-flows-only change runs both suites',
       { outputs: classified(false, false, true) },
-      { unit: 'skipped', e2e: 'success', badges: 'success' },
+      { unit: 'success', e2e: 'success', badges: 'success' },
     ],
     [
-      'a unit-test-only change runs unit and skips E2E',
+      'a unit-test-only change runs Unit and skips E2E',
       { outputs: classified(false, true, false) },
       { unit: 'success', e2e: 'skipped', badges: 'success' },
     ],
     [
-      'a change neither suite reads (fastlane/ alone) skips both, and the badges',
+      'a fastlane/-only change still runs Unit, whose guards read it too',
       { outputs: classified(false, false, false) },
-      { unit: 'skipped', e2e: 'skipped', badges: 'skipped' },
+      { unit: 'success', e2e: 'skipped', badges: 'success' },
     ],
     [
       'a failed unit run keeps E2E from running, and still gets its red badge',
@@ -121,8 +123,8 @@ describe('ci.yml runs each suite only for a change that can affect it', () => {
       { unit: 'skipped', e2e: 'skipped', badges: 'skipped' },
     ],
     [
-      'failed checks on a flows-only change still keep E2E from running',
-      { checks: 'failure', outputs: classified(false, false, true) },
+      'failed checks on a docs-only change publish nothing either',
+      { checks: 'failure', outputs: classified(true, false, false) },
       { unit: 'skipped', e2e: 'skipped', badges: 'skipped' },
     ],
     [
@@ -152,16 +154,31 @@ describe('ci.yml runs each suite only for a change that can affect it', () => {
     });
   }
 
-  test('unit and E2E read their own class, never the docs-only one', () => {
-    assert.match(ci.jobs.unit.if, /needs\.checks\.outputs\.unit-changed != 'false'/);
+  test('Unit has no gate of its own: its guards read every tracked file', () => {
+    // A gate on unit-changed skipped a change to .maestro/, fastlane/ or docs
+    // alone, all of which ports.test.mjs and shell-locale.test.mjs read.
+    assert.equal(ci.jobs.unit.if, undefined);
+  });
+
+  test('E2E reads its own class, never the docs-only one', () => {
     assert.match(ci.jobs.e2e.if, /needs\.checks\.outputs\.e2e-changed != 'false'/);
-    for (const job of ['unit', 'e2e']) {
-      assert.doesNotMatch(ci.jobs[job].if, /docs-only/, `${job} would skip on docs-only alone`);
-    }
+    assert.doesNotMatch(ci.jobs.e2e.if, /docs-only/);
+  });
+
+  test('E2E still runs past a skipped unit, as the consumer guide gates it', () => {
+    const e2e = compile(unwrap(ci.jobs.e2e.if));
+    const checks = { result: 'success', outputs: classified(false, false, true) };
+    assert.equal(e2e({ needs: { checks, unit: { result: 'skipped' } }, cancelled: false }), true);
   });
 
   test('E2E still needs unit, so a failed unit run never reaches it', () => {
     assert.deepEqual(needsOf('e2e'), ['checks', 'unit']);
+  });
+
+  test('the badges call passes no docs-only, which publish-badges.yml would skip on', () => {
+    // A docs-only change runs Unit now, so its result is worth publishing.
+    assert.equal(ci.jobs.badges.with['docs-only'], undefined);
+    assert.doesNotMatch(ci.jobs.badges.if, /docs-only/);
   });
 });
 

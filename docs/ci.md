@@ -26,7 +26,7 @@ flowchart TD
 
   subgraph CI["CI — every change"]
     direction LR
-    checks["Checks"] -->|"unit-changed"| unit["Unit"] -->|"e2e-changed; runs past<br/>a skipped Unit, not a failed one"| e2e["E2E Android"] --> badges["Badges"]
+    checks["Checks"] --> unit["Unit"] -->|"e2e-changed"| e2e["E2E Android"] --> badges["Badges"]
     unit -.->|"E2E_IOS on a push to main,<br/>e2e:ios label on a PR"| e2eios["E2E iOS"] -.-> badges
     checks -.->|"SECURITY_ENABLED"| sec["Security<br/>(source scanners; + bundle, OpenAnt<br/>on the release PR)"]
   end
@@ -81,9 +81,8 @@ flowchart TD
 Two edges are worth reading twice. `Prepare` in **CD / Internal** waits for CI
 to conclude green for the same commit, so a red `main` never reaches a build or
 a store. And `E2E` sits behind `Unit`, so a failed unit run never pays for a
-twenty-minute Android suite or a macOS runner. A *skipped* unit run does not
-hold it back: each suite skips a change it cannot affect, so a Maestro-flows-only
-change skips `Unit` and still runs `E2E` (see
+twenty-minute Android suite or a macOS runner. `Unit` runs on every change;
+`E2E` skips one it cannot affect, such as a unit-test or docs-only change (see
 [Skipping a suite the change cannot affect](#skipping-a-suite-the-change-cannot-affect)).
 
 Dotted edges are the configurable ones: a feature that exists, drawn where it
@@ -129,7 +128,7 @@ submission are never open against the same app at once.
 
 | File | Trigger | Calls | Notes |
 | --- | --- | --- | --- |
-| `ci.yml` | `push` to `main` (all paths), `pull_request` (`opened`, `synchronize`, `reopened`, `labeled`), `workflow_dispatch` | `check-code.yml`, `check-unit.yml`, `check-e2e.yml`, `check-security.yml`, `publish-badges.yml` | `unit`, `e2e` and `security` all `needs: checks`. `unit` skips when `checks` reports<br>`unit-changed` false, `e2e` when it reports `e2e-changed` false, on a push as well as a PR<br>([Skipping a suite](#skipping-a-suite-the-change-cannot-affect)); `security` skips on `docs-only`<br>and when `SECURITY_ENABLED` is `false` ([security.md](security.md)); `badges` runs under<br>`always()` and publishes this branch's badges (see [Badges](#badges)) |
+| `ci.yml` | `push` to `main` (all paths), `pull_request` (`opened`, `synchronize`, `reopened`, `labeled`), `workflow_dispatch` | `check-code.yml`, `check-unit.yml`, `check-e2e.yml`, `check-security.yml`, `publish-badges.yml` | `unit`, `e2e` and `security` all `needs: checks`. `unit` runs on every change; `e2e` skips<br>when `checks` reports `e2e-changed` false, on a push as well as a PR<br>([Skipping a suite](#skipping-a-suite-the-change-cannot-affect)); `security` skips on `docs-only`<br>and when `SECURITY_ENABLED` is `false` ([security.md](security.md)); `badges` runs under<br>`always()` and publishes this branch's badges (see [Badges](#badges)) |
 | `ci-web.yml` | `pull_request`, `workflow_dispatch` (`deploy`) | `build-web.yml` | PR = production export + Playwright smoke, skipped by the called workflow's `Changes` job<br>when `web-changed` is false; a `deploy` dispatch from `cd-release.yml` at the tag = the same<br>export + Pages deploy (never skipped: a dispatch has no diff base, so the classifier fails open),<br>with `base-url` = `/<repo>` unless a custom domain is set, and `+not-found.html` copied to<br>`404.html` so a deep link boots the router |
 | `ci-pr-closed.yml` | `pull_request: closed` | `pr-closed.yml` | cancels the closed PR's in-flight runs and drops its `gh-pages` badge directory; needs `actions: write` and `contents: write` |
 | `ci-pr-title.yml` | `pull_request: edited` (only when the title changed) | `pr-title.yml` | `opened`/`synchronize` are already covered by `check-code.yml`'s `commitlint` |
@@ -172,7 +171,7 @@ repo at the workflows version `ci.yml` pins, and fails this repo's PR in either
 direction. See
 [quality.md](quality.md#make-check-is-the-ci-gate-set-and-that-is-enforced).
 
-What that costs: only `unit`, `e2e` and `security` skip on a docs-only change.
+What that costs: only `e2e` and `security` skip on a docs-only change.
 `check-code.yml`'s `code` job has no `docs-only` gate, so a documentation push to
 `main` now runs typecheck, lint, format, knip, spell and audit — a couple of
 minutes that used to be zero, because the workflow did not trigger at all.
@@ -181,51 +180,48 @@ break. The expensive half, the native matrix, still skips.
 
 ### Skipping a suite the change cannot affect
 
-The same `changes` job also classifies the diff per suite, and each suite's
-gate reads its own class rather than `docs-only`:
+The same `changes` job also classifies the diff per suite, and a suite's gate
+reads its own class rather than `docs-only`:
 
 | Output | Gates | `false` when every changed file is docs or one of |
 | --- | --- | --- |
-| `unit-changed` | `unit` | `.maestro/`, `e2e/`, `playwright.config.*`, `fastlane/`, `Gemfile`, `Gemfile.lock` |
 | `e2e-changed` | `e2e` | `__tests__/`, `__snapshots__/`, `*.test.*`, `jest.config.*`, `e2e/web/`, `playwright.config.*`, `fastlane/` |
 | `web-changed` | `ci-web.yml`'s Build, E2E and Deploy | `.maestro/`, `__snapshots__/`, `jest.config.*`, `fastlane/`, `Gemfile`, `Gemfile.lock` |
 
 The lists are shared-workflows' (its `docs/consumer-guide.md`, "The suite
 classes"), and each is an *ignore* list: a path on none of them, a new directory
 included, runs the suite. Nothing under `.github/` is on any of them, so a
-change to a caller workflow or a Dependabot pin bump runs everything. The
-`*-ignore-globs` inputs can add to a list; nothing can take away from one.
+change to a caller workflow or a Dependabot pin bump runs everything.
+
+**`unit` has no gate.** The classifier also writes `unit-changed`, and
+`ci.yml` does not read it: there is no change the unit suite cannot affect
+here. `Unit` is not only Jest. It runs `test:scripts`, whose repository-wide
+guards read every tracked file, documentation included:
+`scripts/ports.test.mjs` rejects a bare port literal anywhere, and
+`scripts/shell-locale.test.mjs` scans all the shell code. The classifier's unit
+list ignores `.maestro/`, `fastlane/`, the Gemfile and docs, so gating on it let
+a change to those alone land without the guards, to fail whichever PR ran `Unit`
+next. The cost is the minute or two `Unit` takes on a docs-only change.
 
 Every gate is `!= 'false'`, never `== 'true'`: an output that never arrived,
 or a diff the classifier could not read, runs the suite. Three consequences
 follow:
 
-- **E2E survives a skipped Unit.** `needs: [checks, unit]` adds an implicit
-  `success()`, which a skipped job is not, so a flows-only change would skip
-  the one suite it can affect. `e2e` therefore gates on `!cancelled()`, a green
-  `checks`, and a `unit` result of `success` *or* `skipped`: a failed unit run
-  still keeps E2E from starting.
+- **E2E gates the way the consumer guide shows.** Under `!cancelled()` it
+  needs a green `checks`, a `unit` result of `success` *or* `skipped`, and
+  `e2e-changed`: a failed unit run still keeps E2E from starting, and a
+  skipped one would not, should `unit` ever be gated again.
 - **The web export gates itself.** `build-web.yml` runs the same classifier in
   its own `Changes` job, so `ci-web.yml` carries no `if:`. The tag's deploy is
   a `workflow_dispatch`, which has no diff base, so it always builds.
   `scripts/ci-web-gate.test.mjs` holds both.
-- **The badges keep the last real answer.** A change both suites skipped
-  publishes nothing, and when one suite runs and the other skips, only the
-  one that ran is republished (see [Badges](#badges)).
+- **The badges keep the last real answer.** When `E2E` skips, only `Unit`'s
+  badges are republished, and a run where both skipped (a red `checks`)
+  publishes nothing (see [Badges](#badges)).
 
-**The accepted gap.** `Unit` is not only Jest: it runs `test:scripts`, whose
-repository-wide guards read every tracked file: `scripts/ports.test.mjs`
-rejects a bare port literal anywhere, and `scripts/shell-locale.test.mjs` scans
-all the shell code. The unit list ignores `.maestro/`, `e2e/`, `fastlane/` and
-the Gemfile, among others, so a change to those alone skips these guards in CI.
-What it breaks surfaces on the next change that runs `Unit`, on whichever PR
-that is. The unit-ignore input can only widen the list, so closing this needs a
-change in shared-workflows. Until then, `make ci` before pushing a change to any
-of those paths is the check CI no longer makes.
-
-`scripts/ci-suite-gates.test.mjs` evaluates the `unit`, `e2e` and `badges` gates
+`scripts/ci-suite-gates.test.mjs` evaluates the `unit`, `e2e` and `badges` jobs
 together as a graph, for each kind of change and for failed, cancelled and
-unclassified runs. `scripts/workflow-contract.test.mjs` checks that every output `ci.yml` reads
+unclassified runs, and holds `unit` to having no gate. `scripts/workflow-contract.test.mjs` checks that every output `ci.yml` reads
 is one `check-code.yml` declares at the pin. A renamed output would read as
 empty and quietly run every suite.
 
@@ -423,16 +419,15 @@ These details are deliberate:
 
 - **The job runs under `always()`** so a red Unit still gets a red badge — but
   it skips when an upstream job was *cancelled*, when both suites skipped
-  (a docs-only change, a `fastlane/`-only one, or a red `checks`), on release
-  events, and on PRs from forks (which have no write token).
-- **A skipped suite keeps its published badge.** When one suite ran and the
-  other skipped, `publish-badges.sh` republishes only the one that ran. A grey
-  `skipped` would overwrite the branch's last real answer with "this run did
-  not look".
+  (a red `checks`), on release events, and on PRs from forks (which have no
+  write token). A docs-only change runs `Unit`, so it publishes: `ci.yml`
+  deliberately passes no `docs-only`, which `publish-badges.yml` would skip on.
+- **A skipped suite keeps its published badge.** When `Unit` ran and `E2E`
+  skipped, `publish-badges.sh` republishes only `Unit`'s. A grey `skipped`
+  would overwrite the branch's last real answer with "this run did not look".
 - **Only a Unit *failure* writes the red coverage placeholder.** A *skipped*
-  Unit renders no coverage badge at all, so a flows-only or docs-only PR leaves
-  the branch's published coverage badge exactly as it was instead of blanking
-  it.
+  Unit renders no coverage badge at all, so a red `checks` leaves the branch's
+  published coverage badge exactly as it was instead of blanking it.
 - **Closing a PR removes `badges/<branch>/`** (`pr-closed.yml`), which is why
   that caller grants `contents: write`.
 - **A `checks` failure leaves the badges as they were.** `unit` and `e2e` both

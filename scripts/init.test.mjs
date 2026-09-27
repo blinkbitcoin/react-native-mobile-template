@@ -804,22 +804,21 @@ describe('init --yes --no-web', async () => {
     assert.match(ci, /`cd-production\.yml` alone has eleven\./);
   });
 
-  test('keeps both native suite classes in docs/ci.md and drops only the web one', () => {
+  test('keeps the E2E suite class in docs/ci.md and drops only the web one', () => {
     const ci = readFileSync(path.join(root, 'docs/ci.md'), 'utf8');
-    assert.match(
-      ci,
-      /^\| `unit-changed` \| `unit` \| `\.maestro\/`, `e2e\/`, `fastlane\/`, `Gemfile`, `Gemfile\.lock` \|$/m,
-    );
     assert.match(
       ci,
       /^\| `e2e-changed` \| `e2e` \| `__tests__\/`, `__snapshots__\/`, `\*\.test\.\*`, `jest\.config\.\*`, `fastlane\/` \|$/m,
     );
     assert.doesNotMatch(ci, /web-changed|web export gates itself|ci-web-gate/);
-    assert.match(ci, /Two consequences\nfollow:\n\n- \*\*E2E survives a skipped Unit\.\*\*/);
+    assert.match(
+      ci,
+      /Two consequences\nfollow:\n\n- \*\*E2E gates the way the consumer guide shows\.\*\*/,
+    );
     // The bullet after the removed one is still in the list, not glued to it.
     assert.match(
       ci,
-      /still keeps E2E from starting\.\n- \*\*The badges keep the last real answer\.\*\*/,
+      /should `unit` ever be gated again\.\n- \*\*The badges keep the last real answer\.\*\*/,
     );
   });
 

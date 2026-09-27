@@ -123,7 +123,7 @@ would otherwise have that code measured too. The suites include:
 | `scripts/coverage-completeness.test.mjs` | Loads every `scripts/**/*.mjs` module, so one no test imports still counts |
 | `scripts/release/shared-copies.test.mjs` | Our `resolve-version.sh` and `build-info.sh` against shared-workflows' copies, read from `$WORKFLOWS_DIR`.<br>CI always compares; locally they skip unless `WORKFLOWS_DIR` points at a checkout |
 | `scripts/workflow-contract.test.mjs` | Every shared-workflows call pinned to the same commit SHA with its version beside it, and every call's inputs,<br>secrets and read outputs against what the called workflow declares at `$WORKFLOWS_DIR`, which must be that commit |
-| `scripts/ci-suite-gates.test.mjs` | `ci.yml`'s `unit`, `e2e` and `badges` gates evaluated together for each kind of change<br>(see [ci.md](ci.md#skipping-a-suite-the-change-cannot-affect)) |
+| `scripts/ci-suite-gates.test.mjs` | `ci.yml`'s `unit`, `e2e` and `badges` jobs evaluated together for each kind of change, and `unit` held to having<br>no gate (see [ci.md](ci.md#skipping-a-suite-the-change-cannot-affect)) |
 | `scripts/release/cd-notes.test.mjs` | The store notes the way CD drafts them: cd-release's build-env through the shared `build-env.sh`, `pr-notes.sh` on<br>a real release PR body with a `gh` shim and a local model, then the shared `notes.sh` reading the section back |
 | `scripts/security/config.test.mjs` | Settings resolution: environment, then `security-policy.json`, then defaults |
 | `scripts/security/sarif.test.mjs` | The SARIF document builders: a skipped run and a findings run |
@@ -135,11 +135,10 @@ is the static gates only. The port guard in `scripts/ports.test.mjs`, the
 locale-prefix guard in `scripts/shell-locale.test.mjs` and the
 `make init` manifest coverage live here, so a change that passes `make check`
 can still fail Unit on the runner — and Unit gates E2E, so the E2E run you
-wanted never starts. The reverse holds too: a change to the Maestro flows,
-`e2e/` or `fastlane/` alone skips Unit in CI, so these guards do not run on it
-there ([ci.md](ci.md#skipping-a-suite-the-change-cannot-affect)). Run `make ci`
-before pushing anything that touches `scripts/`, the Maestro flows, `e2e/`,
-`fastlane/` or `ci.yml`.
+wanted never starts. These guards read every tracked file, which is why CI
+runs Unit on every change, docs included
+([ci.md](ci.md#skipping-a-suite-the-change-cannot-affect)). Run `make ci`
+before pushing anything that touches `scripts/`, the Maestro flows or `ci.yml`.
 
 ## Coverage
 
