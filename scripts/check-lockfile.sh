@@ -1,14 +1,25 @@
 #!/usr/bin/env bash
 # Every resolved package must come from the npm registry with an integrity hash.
-# pnpm's v9 lockfile format encodes non-registry sources via `type: git`/`repo:`
-# in the resolution map (git dependencies) or a `tarball:` URL (direct tarball
-# deps) instead of a plain integrity hash; registry deps carry only `integrity:`.
+#
+# An allowlist of shapes, not a list of bad ones. A registry package resolves
+# to `{integrity: ...}`, or to `{integrity: ..., tarball: <registry.npmjs.org URL>}`
+# when its tarball sits off the standard path; anything else is some other
+# source. The earlier denylist (`type: git`, `repo:`, a *leading* `tarball:`)
+# fell behind pnpm's own format: pnpm 12 writes a git dependency as
+# `{gitHosted: true, integrity: ..., path: ..., tarball: https://codeload.github.com/...}`,
+# which matched none of it and passed as "lockfile ok".
+#
+# Usage: check-lockfile.sh [DIR]   (default: the repository root)
 set -euo pipefail
-cd "$(dirname "$0")/.."
-if grep -nE '^\s+resolution: \{.*\b(type: git|repo:|git\+|github:)' pnpm-lock.yaml; then
-  echo "pnpm-lock.yaml contains git-hosted sources" >&2; exit 1
+cd "${1:-$(dirname "$0")/..}"
+if [ ! -f pnpm-lock.yaml ]; then
+  echo "no pnpm-lock.yaml in $(pwd)" >&2
+  exit 1
 fi
-if grep -nE '^\s+resolution: \{tarball: ' pnpm-lock.yaml | grep -v 'registry.npmjs.org'; then
-  echo "pnpm-lock.yaml contains tarballs outside registry.npmjs.org" >&2; exit 1
+registry='resolution: \{integrity: [^,{}[:space:]]+(, tarball: https://registry\.npmjs\.org/[^,{}[:space:]]+)?\}$'
+if other="$(grep -nE '^[[:space:]]+resolution:' pnpm-lock.yaml | grep -vE "$registry")"; then
+  echo "pnpm-lock.yaml resolves packages from outside the npm registry:" >&2
+  printf '%s\n' "$other" >&2
+  exit 1
 fi
 echo "lockfile ok"
