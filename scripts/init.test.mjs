@@ -896,7 +896,7 @@ describe('init --yes --no-web', async () => {
   test('drops the test comments that point at the web gate test it deleted', () => {
     const gates = readFileSync(path.join(root, 'scripts/ci-suite-gates.test.mjs'), 'utf8');
     assert.doesNotMatch(gates, /ci-web-gate|web suite/);
-    assert.match(gates, /reports `skipped` to the jobs after it\.\nimport assert/);
+    assert.match(gates, /reports `skipped`\n\/\/ to the jobs after it\.\nimport assert/);
     const release = readFileSync(path.join(root, 'scripts/release-workflows.test.mjs'), 'utf8');
     assert.doesNotMatch(release, /ci-web|web deploy/);
     assert.match(release, /\n {2}\}\);\n\n {2}test\('a cut release dispatches cd-beta at the tag'/);
