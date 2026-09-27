@@ -79,6 +79,7 @@ aggregates.
 |---|---|
 | `make fix-format` | Format everything with Biome (writes) |
 | `make fix-lint` | Apply Biome's and ESLint's own fixes (writes) |
+| `make fix-tooling-pin` | Point the shared tooling package at the commit the workflows pin, and relock (writes) |
 
 | Gates | |
 |---|---|
@@ -110,6 +111,7 @@ aggregates.
 | `make check-security-review` | LLM security review of the diff (off by default; needs `llm.provider` and a key) |
 | `make check-security-review-codebase` | LLM security review of the whole codebase with OpenAnt (off by default; needs `llm.provider` and a key) |
 | `make check-code-scanning` | CodeQL code scanning with the same config CI uses (needs a CodeQL CLI; not in `make check`) |
+| `make check-contract` | Everything the called shared workflows need from this repository, in one report<br>(CI runs it as `Checks / Contract`; not in `make check`) |
 
 | Tests | |
 |---|---|
@@ -307,6 +309,9 @@ in-process; the entry itself is only an `import.meta.main` guard that sets
 - CI and CD are eleven caller workflows into `blinkbitcoin/shared-workflows`,
   every call pinned to one commit SHA that Dependabot moves in one PR, and a PR
   runs the CD calls against that pin (`docs/decisions/0023-cd-verified-before-release.md`).
+  The shared tooling package (`@blinkbitcoin/dev-config`) is a git dependency
+  at that same commit; run `make fix-tooling-pin` on the Dependabot PR
+  (`docs/decisions/0024-shared-tooling-at-the-workflows-pin.md`).
   `docs/ci.md` maps each `make` target to its CI job and explains `.workflows/`.
 - Releases (versions, build numbers, store notes, environments, rollback,
   hotfix): `docs/release-runbook.md`. Over-the-air updates and the channel

@@ -470,10 +470,19 @@ code against this repository before any CD run can:
 - `scripts/release/cd-notes.test.mjs` runs the store-notes chain through the
   shared scripts and our generator, end to end.
 
-Read the release's notes, then merge. To bump by hand, change every `uses:` in
-one pass to the new release's commit and version; the contract test fails on
-two different pins, and so does zizmor (`.github/zizmor.yml` requires a hash
-pin for shared-workflows). All callers share the `.workflows/` self-checkout
+The same Unit job fails until one more thing moves. The shared tooling package
+(`@blinkbitcoin/dev-config`, behind `make check-contract`) is a git dependency
+on shared-workflows at the pinned commit
+([ADR 0024](decisions/0024-shared-tooling-at-the-workflows-pin.md)), and
+Dependabot cannot move a git dependency with the pins. Check out the PR's
+branch, run `make fix-tooling-pin` (it repoints `package.json` at the new pin
+and relocks), and push.
+
+Then read the release's notes and merge. To bump by hand, change every `uses:`
+in one pass to the new release's commit and version, then run
+`make fix-tooling-pin`; the contract test fails on two different pins or a
+tooling package left behind, and zizmor fails on anything but a hash pin for
+shared-workflows (`.github/zizmor.yml`). All callers share the `.workflows/` self-checkout
 and the script contract, and mixing versions across them is untested.
 
 ## `.workflows/`

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { after, test } from 'node:test';
@@ -28,6 +28,27 @@ function lockfileDir(...resolutions) {
   );
   return dir;
 }
+
+/** Gives `dir` a ci.yml calling shared-workflows once at each of `pins`. */
+function withPins(dir, ...pins) {
+  mkdirSync(path.join(dir, '.github', 'workflows'), { recursive: true });
+  const calls = pins.map(
+    (pin, i) =>
+      `  job-${i}:\n    uses: blinkbitcoin/shared-workflows/.github/workflows/check-code.yml@${pin} # v0.14.0\n`,
+  );
+  writeFileSync(path.join(dir, '.github', 'workflows', 'ci.yml'), `jobs:\n${calls.join('')}`);
+  return dir;
+}
+
+const PIN = '53689ee348f2b077d9c474d0e8e7c7fb0b37c83f';
+const OTHER = '0123456789abcdef0123456789abcdef01234567';
+/** The shared tooling package's resolution, as pnpm 12 writes it. */
+const tooling = ({
+  commit = PIN,
+  repository = 'blinkbitcoin/shared-workflows',
+  subdirectory = '/packages/dev-config',
+} = {}) =>
+  `    resolution: {gitHosted: true, integrity: ${INTEGRITY}, path: ${subdirectory}, tarball: https://codeload.github.com/${repository}/tar.gz/${commit}}`;
 
 function check(...args) {
   return spawnSync('bash', [script, ...args], { encoding: 'utf8' });
@@ -84,4 +105,36 @@ test('a directory with no lockfile fails', () => {
   const result = check(dir);
   assert.equal(result.status, 1);
   assert.match(result.stderr, /no pnpm-lock\.yaml/);
+});
+
+test('the shared tooling package at the commit the workflows pin passes', () => {
+  const result = check(withPins(lockfileDir(REGISTRY, tooling()), PIN, PIN));
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /lockfile ok/);
+});
+
+for (const [name, line, pins] of [
+  ['at a commit the workflows do not pin', tooling({ commit: OTHER }), [PIN]],
+  ['from another repository', tooling({ repository: 'someone-else/other' }), [PIN]],
+  [
+    'from another directory of shared-workflows',
+    tooling({ subdirectory: '/packages/other' }),
+    [PIN],
+  ],
+  ['when no workflow pins shared-workflows', tooling(), []],
+  ['when the workflows pin two commits', tooling(), [PIN, OTHER]],
+]) {
+  test(`the shared tooling package ${name} fails`, () => {
+    const result = check(withPins(lockfileDir(REGISTRY, line), ...pins));
+    assert.equal(result.status, 1);
+    assert.ok(result.stderr.includes(line.trim()), result.stderr);
+  });
+}
+
+test('a second git dependency beside the allowed one fails, and only it is named', () => {
+  const second = tooling({ repository: 'someone-else/other' });
+  const result = check(withPins(lockfileDir(tooling(), second), PIN));
+  assert.equal(result.status, 1);
+  assert.ok(result.stderr.includes(second.trim()), result.stderr);
+  assert.ok(!result.stderr.includes(tooling().trim()), 'the allowed package was reported too');
 });

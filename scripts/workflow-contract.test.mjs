@@ -18,6 +18,7 @@ import path from 'node:path';
 import { describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { callsIn, contractProblems, interfaceOf, pinsIn } from './lib/workflow-calls.mjs';
+import { toolingProblems } from './tooling-pin.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const workflowsDir = path.join(root, '.github', 'workflows');
@@ -62,6 +63,14 @@ test('every shared call is pinned to one commit, with the version beside it', ()
     1,
     `the shared calls are pinned to more than one commit: ${[...refs].join(', ')} - CI would test one and CD run another`,
   );
+});
+
+// The shared tooling package is a git dependency on shared-workflows at the same
+// commit (docs/decisions/0024-shared-tooling-at-the-workflows-pin.md). Dependabot
+// moves the pins above and cannot move the package with them, so this is the
+// case that turns its pin-bump PR red until `make fix-tooling-pin` runs on it.
+test('the shared tooling package is taken at the workflows pin', () => {
+  assert.deepEqual(toolingProblems(root), []);
 });
 
 test('the pinned commit is the shared-workflows checkout this run tests against', (t) => {
