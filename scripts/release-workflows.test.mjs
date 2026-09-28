@@ -241,7 +241,7 @@ describe('cd-release.yml chains the release by dispatch', () => {
 
   test('a second job drafts the store notes into the release PR through shared-workflows', () => {
     const job =
-      /store-notes:\n\s+name: Store Notes\n\s+needs: release-please\n[\s\S]*?uses: [^\n]*\/shared-workflows\/\.github\/workflows\/pr-release-notes\.yml@[0-9a-f]{40}\b/;
+      /store-notes:\n\s+name: Release notes\n\s+needs: release-please\n[\s\S]*?uses: [^\n]*\/shared-workflows\/\.github\/workflows\/pr-release-notes\.yml@[0-9a-f]{40}\b/;
     assert.match(code, job, 'no store-notes job calling pr-release-notes.yml');
     assert.match(code, /if: \$\{\{ needs\.release-please\.outputs\.pr-number != '' \}\}/);
     assert.match(code, /pull-requests: write/);
