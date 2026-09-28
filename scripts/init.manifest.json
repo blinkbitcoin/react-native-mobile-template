@@ -7,37 +7,51 @@
         "path": "app.config.ts",
         "replace": [
           [
-            "process.env.IOS_BUNDLE_ID || 'com.example.rnmt'",
+            "process.env.IOS_BUNDLE_ID || 'sv.blink.reactnativemobiletemplate'",
             "process.env.IOS_BUNDLE_ID || '{{iosBundleId}}'"
           ],
           [
-            "process.env.ANDROID_PACKAGE || 'com.example.rnmt'",
+            "process.env.ANDROID_PACKAGE || 'sv.blink.reactnativemobiletemplate'",
             "process.env.ANDROID_PACKAGE || '{{androidPackage}}'"
           ]
         ]
       },
       {
         "path": "scripts/e2e/maestro-ios.sh",
-        "replace": [["APP_ID:-com.example.rnmt.dev", "APP_ID:-{{iosBundleId}}.dev"]]
+        "replace": [
+          ["APP_ID:-sv.blink.reactnativemobiletemplate.dev", "APP_ID:-{{iosBundleId}}.dev"]
+        ]
       },
       {
         "path": "scripts/e2e/maestro-android.sh",
-        "replace": [["APP_ID:-com.example.rnmt.dev", "APP_ID:-{{androidPackage}}.dev"]]
+        "replace": [
+          ["APP_ID:-sv.blink.reactnativemobiletemplate.dev", "APP_ID:-{{androidPackage}}.dev"]
+        ]
       },
       {
         "path": "scripts/release/verify.test.mjs",
         "replace": [
-          ["package: name='com.example.rnmt'", "package: name='{{androidPackage}}'"],
           [
-            "vc_badging_field ${arg} name`), 'com.example.rnmt'",
+            "package: name='sv.blink.reactnativemobiletemplate'",
+            "package: name='{{androidPackage}}'"
+          ],
+          [
+            "vc_badging_field ${arg} name`), 'sv.blink.reactnativemobiletemplate'",
             "vc_badging_field ${arg} name`), '{{androidPackage}}'"
           ],
           [
-            "<key>CFBundleIdentifier</key><string>com.example.rnmt</string>",
+            "<key>CFBundleIdentifier</key><string>sv.blink.reactnativemobiletemplate</string>",
             "<key>CFBundleIdentifier</key><string>{{iosBundleId}}</string>"
           ],
-          ["IOS_BUNDLE_ID: 'com.example.rnmt'", "IOS_BUNDLE_ID: '{{iosBundleId}}'", 2],
-          ["/ok bundle-id: com\\.example\\.rnmt/", "/ok bundle-id: {{iosBundleIdRe}}/"]
+          [
+            "IOS_BUNDLE_ID: 'sv.blink.reactnativemobiletemplate'",
+            "IOS_BUNDLE_ID: '{{iosBundleId}}'",
+            2
+          ],
+          [
+            "/ok bundle-id: sv\\.blink\\.reactnativemobiletemplate/",
+            "/ok bundle-id: {{iosBundleIdRe}}/"
+          ]
         ]
       },
       {
@@ -96,7 +110,7 @@
       ["react-native-mobile-template", "{{slug}}"],
       ["rn-mobile-template", "{{slug}}"],
       ["RN Mobile Template", "{{name}}"],
-      ["com.example.rnmt", "{{androidPackage}}"],
+      ["sv.blink.reactnativemobiletemplate", "{{androidPackage}}"],
       ["rnmt", "{{scheme}}"]
     ],
     "paths": [

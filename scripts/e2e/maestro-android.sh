@@ -11,7 +11,7 @@ eval "$(node scripts/ports.mjs --sh)"
 bash scripts/e2e/wait-for-mock-api.sh
 adb reverse "tcp:$METRO_PORT" "tcp:$METRO_PORT"
 adb reverse "tcp:$MOCK_API_PORT" "tcp:$MOCK_API_PORT"
-APP_ID="${APP_ID:-com.example.rnmt.dev}"
+APP_ID="${APP_ID:-sv.blink.reactnativemobiletemplate.dev}"
 SCHEME="${SCHEME:-rnmt}"
 # Foreground the app through the expo-development-client deep link, exactly as
 # shared-workflows' scripts/e2e/app-launch.sh does (10.0.2.2 is the

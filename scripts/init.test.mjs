@@ -47,7 +47,8 @@ import {
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-const RENAME_TOKENS = /rnmt|RN Mobile Template|react-native-mobile-template|rn-mobile-template/;
+const RENAME_TOKENS =
+  /rnmt|reactnativemobiletemplate|RN Mobile Template|react-native-mobile-template|rn-mobile-template/;
 // `blinkbitcoin` is two different things: the GitHub owner of THIS repo, which
 // init must rewrite, and the owner of the reusable-workflow repo, which it must
 // not. Blanking the second is what makes the first greppable.
@@ -693,9 +694,10 @@ describe('init --yes --no-web', async () => {
   });
 
   // The four store setup skills get the same rename as the rest of the
-  // template: none of them may still say `com.example.rnmt`, `rn-mobile-template`,
-  // `RN Mobile Template` or `react-native-mobile-template` afterwards, and the
-  // reusable-workflow repo they call out to (not a rename token) must survive.
+  // template: none of them may still say `sv.blink.reactnativemobiletemplate`,
+  // `rn-mobile-template`, `RN Mobile Template` or `react-native-mobile-template`
+  // afterwards, and the reusable-workflow repo they call out to (not a rename
+  // token) must survive.
   test('renames the store setup skills, keeping blinkbitcoin/shared-workflows', () => {
     const skillFiles = files.filter(([rel]) => rel.startsWith('.claude/skills/'));
     assert.ok(skillFiles.length > 0, 'no .claude/skills files were scanned');

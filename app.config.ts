@@ -9,8 +9,8 @@ const isDev = variant === 'development';
 // died with "Cannot automatically write to dynamic config" while trying to
 // persist com.anonymous.<slug>. Empty is falsy but not nullish - the same trap
 // as the `&&`/`||` expression pitfall documented in the release workflows.
-const iosBundleId = process.env.IOS_BUNDLE_ID || 'com.example.rnmt';
-const androidPackage = process.env.ANDROID_PACKAGE || 'com.example.rnmt';
+const iosBundleId = process.env.IOS_BUNDLE_ID || 'sv.blink.reactnativemobiletemplate';
+const androidPackage = process.env.ANDROID_PACKAGE || 'sv.blink.reactnativemobiletemplate';
 const otaEnabled = process.env.OTA_ENABLED === 'true';
 const buildStamp = `${variant}-${process.env.GITHUB_SHA?.slice(0, 7) ?? 'local'}-${new Date().toISOString().slice(0, 10)}`;
 const webDomain = process.env.EXPO_PUBLIC_WEB_DOMAIN;

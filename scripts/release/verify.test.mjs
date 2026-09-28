@@ -132,7 +132,7 @@ test('an artifact with no native libraries at all fails', () => {
 // ---------------------------------------------------------------------------
 
 const badging = [
-  "package: name='com.example.rnmt' versionCode='42' versionName='1.2.3' compileSdkVersion='36'",
+  "package: name='sv.blink.reactnativemobiletemplate' versionCode='42' versionName='1.2.3' compileSdkVersion='36'",
   "minSdkVersion:'24'",
   "targetSdkVersion:'36'",
   "uses-permission: name='android.permission.INTERNET'",
@@ -150,7 +150,7 @@ function withBadging(text, fn) {
 
 test('badging fields come off the package line, not a permission line', () =>
   withBadging(badging, (arg) => {
-    assert.equal(sh(`vc_badging_field ${arg} name`), 'com.example.rnmt');
+    assert.equal(sh(`vc_badging_field ${arg} name`), 'sv.blink.reactnativemobiletemplate');
     assert.equal(sh(`vc_badging_field ${arg} versionCode`), '42');
     assert.equal(sh(`vc_badging_field ${arg} versionName`), '1.2.3');
     assert.equal(sh(`vc_badging_line_value ${arg} minSdkVersion`), '24');
@@ -927,7 +927,7 @@ function fakeApp(
 <plist version="1.0"><dict>
 <key>CFBundleShortVersionString</key><string>${version}</string>
 <key>CFBundleVersion</key><string>${build}</string>
-<key>CFBundleIdentifier</key><string>com.example.rnmt</string>
+<key>CFBundleIdentifier</key><string>sv.blink.reactnativemobiletemplate</string>
 <key>CFBundleExecutable</key><string>Fake</string>
 </dict></plist>
 `,
@@ -954,14 +954,14 @@ test('verify-ios.sh passes a well-formed artifact with exit 0', macOnly, () =>
     const { status, stdout } = run(verifyIos, [app, '--no-signing'], {
       APP_VERSION: '1.2.3',
       APP_BUILD_NUMBER: '42',
-      IOS_BUNDLE_ID: 'com.example.rnmt',
+      IOS_BUNDLE_ID: 'sv.blink.reactnativemobiletemplate',
       OTA_ENABLED: 'false',
     });
     assert.equal(status, 0, stdout);
     assert.doesNotMatch(stdout, /^FAIL /m, stdout);
     assert.match(stdout, /ok version: 1\.2\.3/);
     assert.match(stdout, /ok build-number: 42/);
-    assert.match(stdout, /ok bundle-id: com\.example\.rnmt/);
+    assert.match(stdout, /ok bundle-id: sv\.blink\.reactnativemobiletemplate/);
     assert.match(stdout, /ok arch: arm64 only/);
     assert.match(stdout, /ok hermes: Hermes bytecode/);
     assert.match(stdout, /ok dev-server: no development markers/);
@@ -975,7 +975,7 @@ test('verify-ios.sh fails on a version that is not the one being released', macO
     const { status, stdout } = run(verifyIos, [app, '--no-signing'], {
       APP_VERSION: '1.2.3',
       APP_BUILD_NUMBER: '42',
-      IOS_BUNDLE_ID: 'com.example.rnmt',
+      IOS_BUNDLE_ID: 'sv.blink.reactnativemobiletemplate',
     });
     assert.equal(status, 1);
     assert.match(stdout, /FAIL version: expected '1\.2\.3', got '1\.2\.2'/);
