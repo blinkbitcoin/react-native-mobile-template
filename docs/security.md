@@ -58,6 +58,31 @@ already run in CI, inside `make check` as `check-secrets` and `check-ci`. The
 line: `check` owns fast, reproducible pass/fail gates; `check-security*` owns
 the SARIF-producing scanners that cost minutes.
 
+### Where the verdict goes
+
+One verdict, several destinations, each written by the file named:
+
+| Destination | Written by | When |
+| --- | --- | --- |
+| the step log and the run summary | `verdict.sh` in shared-workflows | every run |
+| annotations on the diff | `verdict.mjs` | on a runner only (`GITHUB_ACTIONS=true`) |
+| code scanning | `check-security.yml` | from `main` only |
+| `.security/verdict.json` | `verdict.mjs` | every run, laptop included |
+
+`verdict.json` is one line of JSON, for the Security badge:
+
+```json
+{"verdict":"informational","highest":"medium","canBlock":true}
+```
+
+`verdict` is the word on the summary line, `highest` its highest severity
+(`none` when nothing was found), and `canBlock` says whether anything in the
+run could have failed it: `false` when `severity` is `none` or `failOn` is
+empty, and the badge then adds `(advisory)`. In CI, `check-security.yml` turns
+the file into its `verdict` output and `ci.yml` hands that to the badges job
+(see [ci.md](ci.md#badges)). Locally, `make gen-badges` reads the file from the
+last `make check-security`.
+
 ### What each new scanner looks for
 
 - **`bundle`** exports the bundle for each platform in `bundle.platforms` and

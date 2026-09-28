@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
@@ -330,6 +330,7 @@ test('the CLI prints the summary and returns the exit code', () => {
     error: () => {},
     env: {},
     readEntries,
+    writeVerdict: () => {},
   });
   assert.equal(code, 1);
   assert.ok(out.some((line) => /security: fail/.test(line)));
@@ -368,6 +369,11 @@ test('the real directory reader lists *.sarif files and parses them', () => {
     assert.ok(out.some((line) => /deps: 1 finding\(s\)/.test(line)));
     assert.ok(out.some((line) => /code: skipped/.test(line)));
     assert.ok(out.some((line) => /security: fail/.test(line)));
+    assert.deepEqual(JSON.parse(readFileSync(path.join(dir, 'verdict.json'), 'utf8')), {
+      verdict: 'fail',
+      highest: 'critical',
+      canBlock: true,
+    });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -610,6 +616,7 @@ test('the CLI prints annotations on a runner only', () => {
       error: () => {},
       env,
       readEntries: () => [entry('deps', doc('osv-scanner', [result('critical')]))],
+      writeVerdict: () => {},
     });
     return out.filter((line) => line.startsWith('::'));
   };
@@ -617,4 +624,43 @@ test('the CLI prints annotations on a runner only', () => {
     '::error file=f.ts,line=1,title=Security critical%3A r::boom',
   ]);
   assert.deepEqual(run({}), []);
+});
+
+test('canBlock says whether anything in this run could have failed it', () => {
+  const entries = [entry('deps', doc('osv-scanner', []))];
+  assert.equal(verdict({ entries, severity: 'high', failOn: ['deterministic'] }).canBlock, true);
+  assert.equal(verdict({ entries, severity: 'high', failOn: [] }).canBlock, false);
+  assert.equal(verdict({ entries, severity: 'none', failOn: ['deterministic'] }).canBlock, false);
+});
+
+test('the CLI hands the verdict file its word, highest severity and canBlock', () => {
+  const written = [];
+  const code = main(['.security'], {
+    log: () => {},
+    error: () => {},
+    env: { SECURITY_SEVERITY: 'high', SECURITY_FAIL_ON: 'deterministic' },
+    readEntries: () => [entry('deps', doc('osv-scanner', [result('critical')]))],
+    writeVerdict: (dir, outcome) => written.push({ dir, outcome }),
+  });
+  assert.equal(code, 1);
+  assert.equal(written.length, 1);
+  assert.equal(written[0].dir, '.security');
+  assert.equal(written[0].outcome.verdict, 'fail');
+  assert.equal(written[0].outcome.highest, 'critical');
+  assert.equal(written[0].outcome.canBlock, true);
+});
+
+test('a verdict file that cannot be written exits 2 and names the file', () => {
+  const out = [];
+  const code = main(['.security'], {
+    log: () => {},
+    error: (l) => out.push(l),
+    env: {},
+    readEntries: () => [entry('deps', doc('osv-scanner', []))],
+    writeVerdict: () => {
+      throw new Error('EROFS');
+    },
+  });
+  assert.equal(code, 2);
+  assert.match(out[0], /verdict\.json: could not be written \(EROFS\)/);
 });

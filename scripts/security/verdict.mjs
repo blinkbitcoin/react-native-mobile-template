@@ -8,7 +8,7 @@
 // never fails its own scanner, and an engine outside failOn annotates only.
 // The same file runs locally and in CI, so `make check-security` gives the
 // answer the pipeline will give.
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { load, SEVERITIES } from './config.mjs';
 
@@ -212,11 +212,16 @@ export const verdict = ({ entries, severity, failOn }) => {
   lines.push(
     `security: ${name}, highest ${highest}, ${findings.length} finding(s), ${suppressed} suppressed, ${skipped.length} job(s) skipped${failOnNote}`,
   );
+  // Whether anything in this run could have failed it. The badge says
+  // "(advisory)" when not, so a clean advisory run never reads as a pass that
+  // was checked against a threshold.
+  const canBlock = floor >= 0 && failOn.length > 0;
   return {
     verdict: name,
     highest,
     counts,
     suppressed,
+    canBlock,
     lines,
     // A finding that blocks is an error; one that is only reported is a
     // warning. Below the severity floor it is neither, as in the lines above.
@@ -226,6 +231,17 @@ export const verdict = ({ entries, severity, failOn }) => {
     exitCode: blocking.length > 0 ? 1 : 0,
   };
 };
+
+/** The file the badge reads, next to the SARIF it summarises. */
+export const VERDICT_FILE = 'verdict.json';
+
+// One line: shared-workflows' verdict-output.sh copies it into a step output
+// as it is, and a step output is one line.
+const writeVerdictFile = (dir, outcome) =>
+  writeFileSync(
+    path.join(dir, VERDICT_FILE),
+    `${JSON.stringify({ verdict: outcome.verdict, highest: outcome.highest, canBlock: outcome.canBlock })}\n`,
+  );
 
 // readdirSync failing (dir does not exist, or is not a directory) and
 // JSON.parse failing on one particular file are different problems with
@@ -266,7 +282,13 @@ const read = (dir) =>
 /** Command-line entry; returns the exit code. */
 export function main(
   argv = process.argv.slice(2),
-  { log = console.log, error = console.error, env = process.env, readEntries = read } = {},
+  {
+    log = console.log,
+    error = console.error,
+    env = process.env,
+    readEntries = read,
+    writeVerdict = writeVerdictFile,
+  } = {},
 ) {
   const dir = argv[0] ?? '.security';
   let entries;
@@ -286,6 +308,14 @@ export function main(
   // Only on a runner: on a laptop, `make check-security` would print them as
   // noise. verdict.sh in shared-workflows keeps them out of the run summary.
   if (env.GITHUB_ACTIONS === 'true') for (const line of outcome.annotations) log(line);
+  // A verdict nobody can read is not a pass: CI would publish nothing, or a
+  // stale badge. Exit 2, the same code as a SARIF file that cannot be read.
+  try {
+    writeVerdict(dir, outcome);
+  } catch (err) {
+    error(`${path.join(dir, VERDICT_FILE)}: could not be written (${err.message})`);
+    return 2;
+  }
   return outcome.exitCode;
 }
 
