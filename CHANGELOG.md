@@ -5,6 +5,30 @@ by [release-please](https://github.com/googleapis/release-please) from
 [Conventional Commits](https://www.conventionalcommits.org/) — edit the commit
 messages, not this file. See [docs/release-runbook.md](docs/release-runbook.md).
 
+## [0.9.0](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.8.0...v0.9.0) (2026-09-28)
+
+
+### Features
+
+* **ci:** skip the unit, E2E and web suites a change cannot affect ([#84](https://github.com/blinkbitcoin/react-native-mobile-template/issues/84)) ([7d911d7](https://github.com/blinkbitcoin/react-native-mobile-template/commit/7d911d7ad7ca35d100fb9dca23988625492500d6))
+* **config:** default the app identifiers to sv.blink.reactnativemobiletemplate ([#95](https://github.com/blinkbitcoin/react-native-mobile-template/issues/95)) ([40086a5](https://github.com/blinkbitcoin/react-native-mobile-template/commit/40086a5f42f6b268c4030887894d13b46e2fefe5))
+* **tooling:** annotate security findings on the pull request's diff ([#83](https://github.com/blinkbitcoin/react-native-mobile-template/issues/83)) ([769d2d8](https://github.com/blinkbitcoin/react-native-mobile-template/commit/769d2d82ccab0ed9f6304d434361e44523fc0e5b))
+* **tooling:** store notes and the security review work with any LLM provider ([#77](https://github.com/blinkbitcoin/react-native-mobile-template/issues/77)) ([b74948e](https://github.com/blinkbitcoin/react-native-mobile-template/commit/b74948e34ee2541a3674f1cfed14294728a4f953))
+* **tooling:** take shared-workflows' dev-config as a git dependency at the workflows pin ([#93](https://github.com/blinkbitcoin/react-native-mobile-template/issues/93)) ([26c319c](https://github.com/blinkbitcoin/react-native-mobile-template/commit/26c319cb55045384e698b25419cde827e7643918))
+
+
+### Bug Fixes
+
+* **ci:** hand zizmor this checkout's policy with --config ([#79](https://github.com/blinkbitcoin/react-native-mobile-template/issues/79)) ([2f5dcd6](https://github.com/blinkbitcoin/react-native-mobile-template/commit/2f5dcd6f9ca0696abf73a048e5f0fd3c9cb3b9a0))
+* **ci:** run Unit on every change, since its guards read every tracked file ([#87](https://github.com/blinkbitcoin/react-native-mobile-template/issues/87)) ([5d9bba2](https://github.com/blinkbitcoin/react-native-mobile-template/commit/5d9bba285447d5168e7d5a27365c1f6d378b2641))
+* **e2e:** press back in 00-launch only when the developer menu is open ([#97](https://github.com/blinkbitcoin/react-native-mobile-template/issues/97)) ([466bfe1](https://github.com/blinkbitcoin/react-native-mobile-template/commit/466bfe1d37a17a3b7b5a3af4f0c002b97fc42fd5))
+* **release:** drop the web deploy dispatch from cd-release.yml under --no-web ([#85](https://github.com/blinkbitcoin/react-native-mobile-template/issues/85)) ([c144fb1](https://github.com/blinkbitcoin/react-native-mobile-template/commit/c144fb180c5cba28f09e045dbf0ccadcaf259ba2))
+* **tooling:** clear the web residue make init --no-web still leaves behind ([#86](https://github.com/blinkbitcoin/react-native-mobile-template/issues/86)) ([67b7336](https://github.com/blinkbitcoin/react-native-mobile-template/commit/67b7336d6b269784d77ac88d9bb44ca41202f65f))
+* **tooling:** drop playwright.config from docs/ci.md's unit list under make init --no-web ([#94](https://github.com/blinkbitcoin/react-native-mobile-template/issues/94)) ([dfbb8e8](https://github.com/blinkbitcoin/react-native-mobile-template/commit/dfbb8e8367f8970e7246afae0b4a15ef8df6a85f))
+* **tooling:** follow the rewrapped ci-suite-gates comment in make init's manifest ([#92](https://github.com/blinkbitcoin/react-native-mobile-template/issues/92)) ([abc0dc1](https://github.com/blinkbitcoin/react-native-mobile-template/commit/abc0dc1f2d51480e7bb05df2e6c86eece23dee08))
+* **tooling:** refuse every lockfile resolution that is not a registry package ([#91](https://github.com/blinkbitcoin/react-native-mobile-template/issues/91)) ([fb5c7cb](https://github.com/blinkbitcoin/react-native-mobile-template/commit/fb5c7cba1b23d4e26616644835972d851dd14401))
+* **tooling:** search captured output in the Android setup instead of a pipe ([#98](https://github.com/blinkbitcoin/react-native-mobile-template/issues/98)) ([209c755](https://github.com/blinkbitcoin/react-native-mobile-template/commit/209c755a94f04095bf0673fdc0f8d7f74eeee4b9))
+
 ## [0.8.0](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.7.0...v0.8.0) (2026-09-24)
 
 
