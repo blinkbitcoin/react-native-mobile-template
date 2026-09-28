@@ -207,8 +207,8 @@
         "path": "scripts/ci-suite-gates.test.mjs",
         "replace": [
           [
-            "reports `skipped` to the jobs after it.\n//\n// The web suite gates itself (scripts/ci-web-gate.test.mjs).\n",
-            "reports `skipped` to the jobs after it.\n"
+            "// to the jobs after it.\n//\n// The web suite gates itself (scripts/ci-web-gate.test.mjs).\n",
+            "// to the jobs after it.\n"
           ]
         ]
       },
