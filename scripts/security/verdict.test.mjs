@@ -387,14 +387,23 @@ test('the real directory reader lists *.sarif files and parses them', () => {
 // readdirSync/readFileSync/JSON.parse path, not just a mocked one.
 test('a malformed SARIF file names itself, distinct from a missing directory', () => {
   const missing = [];
-  assert.equal(
-    main([path.join(tmpdir(), 'verdict-does-not-exist')], {
-      log: () => {},
-      error: (l) => missing.push(l),
-      env: {},
-    }),
-    2,
-  );
+  // Inside a private temporary directory, not a fixed name in the shared one:
+  // main() now writes verdict.json into the directory it is given, and a
+  // predictable path under os.tmpdir() is one another user could create first
+  // (CodeQL js/insecure-temporary-file).
+  const parent = mkdtempSync(path.join(tmpdir(), 'verdict-missing-'));
+  try {
+    assert.equal(
+      main([path.join(parent, 'does-not-exist')], {
+        log: () => {},
+        error: (l) => missing.push(l),
+        env: {},
+      }),
+      2,
+    );
+  } finally {
+    rmSync(parent, { recursive: true, force: true });
+  }
   assert.match(missing[0], /run a scanner first/);
 
   const dir = mkdtempSync(path.join(tmpdir(), 'verdict-malformed-'));
