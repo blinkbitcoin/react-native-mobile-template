@@ -17,6 +17,7 @@
 // branch's existing one untouched instead of blanking it.
 import { BadgeError } from './badge.mjs';
 import { BADGE_DIR, SUMMARY_PATH, writeCoverageBadge } from './coverage-badge.mjs';
+import { writeSecurityBadge } from './security-badge.mjs';
 import { writeStatusBadge } from './status-badge.mjs';
 
 /** What to do about the coverage badge, given the Unit job's result. */
@@ -53,6 +54,22 @@ export function renderBadges(env = process.env) {
     const badge = writeStatusBadge({ outDir, name, label, result });
     console.log(`badges: ${badge.label} ${badge.message}`);
     written.push(`${name}.svg`);
+  }
+
+  // check-security.yml's verdict output, passed on by publish-badges.yml. No
+  // verdict (a docs-only change skipped Security) renders nothing, and
+  // publish-badges.sh copies only what was rendered, so the published badge stays.
+  const security = env.BADGE_SECURITY || '';
+  if (security) {
+    const badge = writeSecurityBadge({
+      outDir,
+      label: env.BADGE_SECURITY_LABEL || 'Security',
+      verdict: security,
+    });
+    console.log(`badges: ${badge.label} ${badge.message}`);
+    written.push('security.svg');
+  } else {
+    console.log('badges: no security verdict — leaving the published one');
   }
   return written;
 }

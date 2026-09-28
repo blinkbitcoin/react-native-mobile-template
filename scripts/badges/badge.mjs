@@ -38,6 +38,50 @@ export const STATUS_RESULTS = {
   skipped: { message: 'skipped', color: 'lightgrey' },
 };
 
+// The security verdict's words (scripts/security/verdict.mjs) -> badge
+// text/colour, plus `disabled`, which check-security.yml and ci.yml send when
+// the gate is switched off. `informational` takes its message from the highest
+// severity instead. Anything else throws, like STATUS_RESULTS.
+export const SECURITY_VERDICTS = {
+  pass: { message: 'passing', color: 'brightgreen' },
+  informational: { message: null, color: 'yellow' },
+  skipped: { message: 'skipped', color: 'lightgrey' },
+  fail: { message: 'failing', color: 'red' },
+  disabled: { message: 'disabled', color: 'lightgrey' },
+};
+
+const FINDING_SEVERITIES = ['low', 'medium', 'high', 'critical'];
+
+/** check-security.yml's verdict output (one line of JSON) -> the badge. */
+export function securityBadgeFor(raw, label = 'Security') {
+  let value;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    throw new BadgeError(`security badge: the verdict is not JSON: ${raw}`);
+  }
+  const known = SECURITY_VERDICTS[value?.verdict];
+  if (!known) {
+    throw new BadgeError(
+      `security badge: unknown verdict in ${raw} — expected one of ${Object.keys(SECURITY_VERDICTS).join(', ')}`,
+    );
+  }
+  let { message, color } = known;
+  if (value.verdict === 'informational') {
+    if (!FINDING_SEVERITIES.includes(value.highest)) {
+      throw new BadgeError(`security badge: informational needs a finding severity, got ${raw}`);
+    }
+    message = `${value.highest} findings`;
+    if (value.highest === 'high' || value.highest === 'critical') color = 'orange';
+  }
+  // Only a result that reads as fine gets the note: a skipped run already
+  // says it checked nothing, and `fail` cannot happen when nothing can block.
+  if (value.canBlock === false && (value.verdict === 'pass' || value.verdict === 'informational')) {
+    message += ' (advisory)';
+  }
+  return { label, message, color };
+}
+
 export function colorFor(pct) {
   if (pct >= 100) return 'brightgreen';
   if (pct >= 90) return 'green';

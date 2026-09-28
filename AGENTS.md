@@ -73,7 +73,7 @@ aggregates.
 |---|---|
 | `make gen-i18n` | Extract + compile Lingui catalogs |
 | `make gen-graphql` | Regenerate typed GraphQL documents |
-| `make gen-badges` | Render the CI badges into `coverage/badge/` (after `make test-coverage`) |
+| `make gen-badges` | Render the CI badges into `coverage/badge/` (after `make test-coverage`; Security after `make check-security`) |
 
 | Fixers | |
 |---|---|

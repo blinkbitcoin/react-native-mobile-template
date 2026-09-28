@@ -96,6 +96,41 @@ describe('renderBadges', () => {
     assert.ok(readFileSync(path.join(dir, 'e2e.svg'), 'utf8').includes('Device'));
   });
 
+  test('a security verdict renders security.svg after the suites', () => {
+    const dir = outDir();
+    const written = renderBadges({
+      BADGE_OUT_DIR: dir,
+      BADGE_UNIT: 'skipped',
+      BADGE_E2E: 'skipped',
+      BADGE_SECURITY: '{"verdict":"informational","highest":"medium","canBlock":true}',
+    });
+    assert.deepEqual(written, ['unit.svg', 'e2e.svg', 'security.svg']);
+    assert.ok(readFileSync(path.join(dir, 'security.svg'), 'utf8').includes('medium findings'));
+  });
+
+  test('BADGE_SECURITY_LABEL renames the security badge', () => {
+    const dir = outDir();
+    renderBadges({
+      BADGE_OUT_DIR: dir,
+      BADGE_UNIT: 'skipped',
+      BADGE_E2E: 'skipped',
+      BADGE_SECURITY: '{"verdict":"pass","highest":"none","canBlock":true}',
+      BADGE_SECURITY_LABEL: 'Scan',
+    });
+    assert.ok(readFileSync(path.join(dir, 'security.svg'), 'utf8').includes('Scan'));
+  });
+
+  test('no security verdict writes no security badge, so publishing leaves it alone', () => {
+    const dir = outDir();
+    const written = renderBadges({
+      BADGE_OUT_DIR: dir,
+      BADGE_UNIT: 'skipped',
+      BADGE_E2E: 'skipped',
+    });
+    assert.ok(!written.includes('security.svg'));
+    assert.throws(() => readFileSync(path.join(dir, 'security.svg')));
+  });
+
   test('an unset job result is an error rather than a green badge', () => {
     assert.throws(
       () => renderBadges({ BADGE_OUT_DIR: outDir(), BADGE_COVERAGE: 'skip' }),
@@ -139,6 +174,18 @@ describe('render main', () => {
     const { err, io } = capture();
     assert.equal(renderMain({ BADGE_OUT_DIR: outDir(), BADGE_COVERAGE: 'skip' }, io), 1);
     assert.match(err[0], /unknown job result ""/);
+  });
+
+  test('an unrecognised security verdict exits 1 with the reason', () => {
+    const { err, io } = capture();
+    const env = {
+      BADGE_OUT_DIR: outDir(),
+      BADGE_UNIT: 'skipped',
+      BADGE_E2E: 'skipped',
+      BADGE_SECURITY: '{"verdict":"nope"}',
+    };
+    assert.equal(renderMain(env, io), 1);
+    assert.match(err[0], /unknown verdict/);
   });
 
   test('an error that is not a badge error is not swallowed', () => {

@@ -12,6 +12,7 @@ import {
   renderBadgeJson,
   renderBadgeSvg,
   STATUS_RESULTS,
+  securityBadgeFor,
   textWidth,
 } from './badge.mjs';
 
@@ -204,5 +205,74 @@ describe('renderBadgeJson', () => {
       message: 'passing',
       color: 'brightgreen',
     });
+  });
+});
+
+describe('securityBadgeFor', () => {
+  const badge = (value) => securityBadgeFor(JSON.stringify(value));
+
+  test('each verdict word has its own message and colour', () => {
+    assert.deepEqual(badge({ verdict: 'pass', highest: 'none', canBlock: true }), {
+      label: 'Security',
+      message: 'passing',
+      color: 'brightgreen',
+    });
+    assert.equal(badge({ verdict: 'fail', highest: 'high', canBlock: true }).color, 'red');
+    assert.equal(badge({ verdict: 'fail', highest: 'high', canBlock: true }).message, 'failing');
+    assert.equal(badge({ verdict: 'skipped', highest: 'none', canBlock: true }).message, 'skipped');
+    assert.equal(badge({ verdict: 'disabled' }).message, 'disabled');
+    assert.equal(badge({ verdict: 'disabled' }).color, 'lightgrey');
+  });
+
+  test('informational names its highest severity, orange from high up', () => {
+    assert.deepEqual(badge({ verdict: 'informational', highest: 'medium', canBlock: true }), {
+      label: 'Security',
+      message: 'medium findings',
+      color: 'yellow',
+    });
+    assert.equal(
+      badge({ verdict: 'informational', highest: 'low', canBlock: true }).color,
+      'yellow',
+    );
+    assert.equal(
+      badge({ verdict: 'informational', highest: 'high', canBlock: true }).color,
+      'orange',
+    );
+    assert.equal(
+      badge({ verdict: 'informational', highest: 'critical', canBlock: true }).color,
+      'orange',
+    );
+  });
+
+  test('a run where nothing could block says so', () => {
+    assert.equal(
+      badge({ verdict: 'pass', highest: 'none', canBlock: false }).message,
+      'passing (advisory)',
+    );
+    assert.equal(
+      badge({ verdict: 'informational', highest: 'medium', canBlock: false }).message,
+      'medium findings (advisory)',
+    );
+    assert.equal(
+      badge({ verdict: 'skipped', highest: 'none', canBlock: false }).message,
+      'skipped',
+    );
+  });
+
+  test('the label can be changed', () => {
+    assert.equal(securityBadgeFor('{"verdict":"pass"}', 'Scan').label, 'Scan');
+  });
+
+  test('anything it does not recognise throws rather than render green', () => {
+    for (const raw of [
+      'not json',
+      '"pass"',
+      'null',
+      '{"verdict":"passed"}',
+      '{"verdict":"informational","highest":"none"}',
+      '{"verdict":"informational"}',
+    ]) {
+      assert.throws(() => securityBadgeFor(raw), BadgeError, raw);
+    }
   });
 });
