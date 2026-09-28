@@ -266,9 +266,11 @@ and takes Play to 100%. `action: halt` stops both. See
 
 ## Versions and build numbers
 
-- **Version** comes from `scripts/release/resolve-version.sh`: a stable `vX.Y.Z`
-  tag on HEAD → a HEAD subject of `chore(<scope>): release X.Y.Z` → the open
-  release PR's title → the newest stable tag with its patch bumped → `0.0.1`.
+- **Version** comes from `resolve-version.sh`, the shared script CI runs and
+  `make version` runs from `node_modules/@blinkbitcoin/dev-config/release/`: a
+  stable `vX.Y.Z` tag on HEAD → a HEAD subject of
+  `chore(<scope>): release X.Y.Z` → the open release PR's title → the newest
+  stable tag with its patch bumped → `0.0.1`.
   Prerelease tags are ignored at every step. Internal builds therefore already
   carry the version that will be released.
   - `<scope>` is the **release branch's name**, because that is what

@@ -25,7 +25,7 @@ src/test/           jest setup, render helper, mocks
 plugins/            Expo config plugins (with-*.ts) + their tests
 modules/            local native modules (hello-native)
 mocks/              GraphQL mock API (server.ts, msw.ts, schema.graphql)
-scripts/            check-*.sh, doctor, init, hooks/, release/ (verify, notes, version), e2e/, badges/
+scripts/            check-*.sh, doctor, init, hooks/, release/ (verify, notes, build-info), e2e/, badges/
 scripts/setup/      make setup: toolchain, Maestro, Android SDK + emulator, iOS (setup.test.mjs)
 scripts/security/   the check-security scanners, their settings resolver and the verdict
 scripts/lib/llm/    provider-portable LLM adapters (store notes, security review)

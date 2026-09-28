@@ -87,8 +87,10 @@ prebuild: ## Regenerate ios/ and android/ locally (debugging plugins only; never
 build-web: ## Static web export into dist/
 	pnpm build:web
 
+# The script CI's build-prepare runs, from the shared tooling package at the
+# same commit, so the answer here is the one CI will give.
 version: ## Print what CI would build for HEAD
-	bash scripts/release/resolve-version.sh
+	bash node_modules/@blinkbitcoin/dev-config/release/resolve-version.sh
 
 # ARTIFACT, not PATH: a variable set on make's command line is exported to every
 # recipe, so `make verify-ios PATH=...` would replace the shell's PATH.

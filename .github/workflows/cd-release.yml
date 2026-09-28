@@ -4,9 +4,10 @@ name: CD / Release
 # the CHANGELOG section, tags `vX.Y.Z` and publishes the GitHub release, which
 # is what `cd-beta.yml` listens for.
 #
-# Merge that PR with **squash** (or rebase). `scripts/release/resolve-version.sh`
-# reads the release commit's `chore(main): release X.Y.Z` subject to stamp the
-# build that ships with the release — cd-internal runs on the same push and
+# Merge that PR with **squash** (or rebase). `resolve-version.sh` (the shared
+# script; `make version` runs it from @blinkbitcoin/dev-config) reads the
+# release commit's `chore(main): release X.Y.Z` subject to stamp the build
+# that ships with the release — cd-internal runs on the same push and
 # the tag does not exist yet, so the subject is the only source that is right on
 # that commit. Squash and rebase both put the PR title on main; a merge commit
 # writes `Merge pull request #N from …` and the script has to fall back to the
