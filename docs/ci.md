@@ -448,7 +448,7 @@ instead (see [security.md](security.md#where-the-verdict-goes)):
 | `pass` | green `passing` |
 | `informational` | `<highest> findings`: yellow for low or medium, orange for high or critical |
 | `skipped` | grey `skipped` |
-| `fail` (findings block, a scanner crashed, or the verdict step failed) | red `failing` |
+| `fail` (findings block, a scanner crashed, or the Security run broke before its verdict) | red `failing` |
 | `disabled` (`SECURITY_ENABLED=false`, or `"enabled": false` in `security-policy.json`) | grey `disabled` |
 | nothing could block (`severity` is `none` or `failOn` is empty) | the message above plus `(advisory)` |
 
@@ -477,7 +477,7 @@ one, and several carry many: `cd-production.yml` alone has twelve.
 `cd-beta-retry.yml` calls no reusable workflow at all.
 
 ```yaml
-uses: blinkbitcoin/shared-workflows/.github/workflows/check-code.yml@f94cca4e20b383b5a6508edf21c4966f0434c05b # v0.16.0
+uses: blinkbitcoin/shared-workflows/.github/workflows/check-code.yml@f6e04492c80b4250f5878da52d8b422ec80a8dd4 # v0.16.0
 ```
 
 A shared-workflows release changes nothing here by itself
