@@ -94,7 +94,10 @@ const FAKES = {
   emulator: `if [ "$1" = -list-avds ] && [ -f "$WORK/avds" ]; then exec cat "$WORK/avds"; fi`,
   adb: `
     case "$1 $2" in
-      "devices ") printf 'List of devices attached\\n%s' "\${FAKE_ADB_DEVICES:-}" ;;
+      # $WORK/adb-devices, when present, is a list too long for an environment
+      # variable (Linux caps one at 128 KiB); exec, so SIGPIPE reaches the caller.
+      "devices ") [ -f "$WORK/adb-devices" ] && exec cat "$WORK/adb-devices"
+        printf 'List of devices attached\\n%s' "\${FAKE_ADB_DEVICES:-}" ;;
       "shell getprop") echo 1 ;;
     esac; true`,
   'xcode-select': `echo "\${FAKE_DEVELOPER_DIR-/Applications/Xcode.app/Contents/Developer}"`,
@@ -424,9 +427,11 @@ test('android: --boot sees a running emulator at the top of a long device list',
   const s = sandbox();
   assert.equal(s.run('android.sh', ['--yes']).status, 0);
   s.resetLog();
-  const r = s.run('android.sh', ['--boot'], {
-    FAKE_ADB_DEVICES: longListAfter('emulator-5554\tdevice'),
-  });
+  writeFileSync(
+    path.join(s.work, 'adb-devices'),
+    `List of devices attached\n${longListAfter('emulator-5554\tdevice')}`,
+  );
+  const r = s.run('android.sh', ['--boot']);
   assert.equal(r.status, 0, r.output);
   assert.match(r.output, /an emulator is already running/);
 });
