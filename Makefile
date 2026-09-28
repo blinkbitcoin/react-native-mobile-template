@@ -286,9 +286,12 @@ test-coverage: ## Tests with coverage thresholds and the empty-row check (what C
 
 # Same entry point CI calls, so what you see locally is what gh-pages gets.
 # The job results default to success here; set BADGE_UNIT/BADGE_E2E to any of
-# success|failure|cancelled|skipped to see the other colours.
-gen-badges: ## Render the CI badges into coverage/badge/ (run make test-coverage first)
-	@BADGE_UNIT="$${BADGE_UNIT:-success}" BADGE_E2E="$${BADGE_E2E:-success}" pnpm badges:render
+# success|failure|cancelled|skipped to see the other colours. The Security
+# badge reads .security/verdict.json from the last make check-security; set
+# BADGE_SECURITY to a verdict line to try another, or to empty for none.
+gen-badges: ## Render the CI badges into coverage/badge/ (run make test-coverage first, make check-security for Security)
+	@BADGE_UNIT="$${BADGE_UNIT:-success}" BADGE_E2E="$${BADGE_E2E:-success}" \
+		BADGE_SECURITY="$${BADGE_SECURITY-$$(cat .security/verdict.json 2>/dev/null)}" pnpm badges:render
 
 # ---------- End-to-end ----------
 test-e2e-ios: ## Maestro flows on iOS (needs: make dev-api, make dev, make dev-ios)

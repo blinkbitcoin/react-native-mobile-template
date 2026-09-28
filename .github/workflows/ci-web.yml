@@ -26,7 +26,7 @@ jobs:
     # dispatch has no diff base, so the classifier fails open and it always
     # builds. scripts/ci-web-gate.test.mjs holds both.
     name: Web
-    uses: blinkbitcoin/shared-workflows/.github/workflows/build-web.yml@1309c00d8cc3e5d62ccdc9bcaa1797a49b7a5789 # v0.15.1
+    uses: blinkbitcoin/shared-workflows/.github/workflows/build-web.yml@f6e04492c80b4250f5878da52d8b422ec80a8dd4 # v0.16.0
     permissions:
       contents: read
       # The called workflow's `deploy` job needs these; a called job can only

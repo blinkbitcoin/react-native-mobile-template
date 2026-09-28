@@ -75,13 +75,13 @@
       },
       {
         "path": "README.md",
-        "$comment": "The three gh-pages badge URLs and the links under them. Anchored on the host and repo together so the `blinkbitcoin/shared-workflows` link further down keeps its owner; the repo half of each is renamed by the token pass, which runs after this one.",
+        "$comment": "The four gh-pages badge URLs and the links under them. Anchored on the host and repo together so the `blinkbitcoin/shared-workflows` link further down keeps its owner; the repo half of each is renamed by the token pass, which runs after this one.",
         "replace": [
-          ["raw.githubusercontent.com/blinkbitcoin/", "raw.githubusercontent.com/{{owner}}/", 3],
+          ["raw.githubusercontent.com/blinkbitcoin/", "raw.githubusercontent.com/{{owner}}/", 4],
           [
             "github.com/blinkbitcoin/react-native-mobile-template/actions",
             "github.com/{{owner}}/react-native-mobile-template/actions",
-            3
+            4
           ]
         ]
       },
@@ -221,8 +221,8 @@
         "path": "scripts/ci-suite-gates.test.mjs",
         "replace": [
           [
-            "// to the jobs after it.\n//\n// The web suite gates itself (scripts/ci-web-gate.test.mjs).\n",
-            "// to the jobs after it.\n"
+            "// gate reads.\n//\n// The web suite gates itself (scripts/ci-web-gate.test.mjs).\n",
+            "// gate reads.\n"
           ]
         ]
       },

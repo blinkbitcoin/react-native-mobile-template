@@ -29,6 +29,7 @@ flowchart TD
     checks["Checks"] --> unit["Unit"] -->|"e2e-changed"| e2e["E2E Android"] --> badges["Badges"]
     unit -.->|"E2E_IOS on a push to main,<br/>e2e:ios label on a PR"| e2eios["E2E iOS"] -.-> badges
     checks -.->|"SECURITY_ENABLED"| sec["Security<br/>(source scanners; + bundle, OpenAnt<br/>on the release PR)"]
+    sec -->|"verdict"| badges
   end
 
   CI -->|"push to main"| rp["CD / Release<br/>(release-please, then Store Notes<br/>drafted into the release PR)"]
@@ -128,7 +129,7 @@ submission are never open against the same app at once.
 
 | File | Trigger | Calls | Notes |
 | --- | --- | --- | --- |
-| `ci.yml` | `push` to `main` (all paths), `pull_request` (`opened`, `synchronize`, `reopened`, `labeled`), `workflow_dispatch` | `check-code.yml`, `check-unit.yml`, `check-e2e.yml`, `check-security.yml`, `publish-badges.yml` | `unit`, `e2e` and `security` all `needs: checks`. `unit` runs on every change; `e2e` skips<br>when `checks` reports `e2e-changed` false, on a push as well as a PR<br>([Skipping a suite](#skipping-a-suite-the-change-cannot-affect)); `security` skips on `docs-only`<br>and when `SECURITY_ENABLED` is `false` ([security.md](security.md)); `badges` runs under<br>`always()` and publishes this branch's badges (see [Badges](#badges)) |
+| `ci.yml` | `push` to `main` (all paths), `pull_request` (`opened`, `synchronize`, `reopened`, `labeled`), `workflow_dispatch` | `check-code.yml`, `check-unit.yml`, `check-e2e.yml`, `check-security.yml`, `publish-badges.yml` | `unit`, `e2e` and `security` all `needs: checks`. `unit` runs on every change; `e2e` skips<br>when `checks` reports `e2e-changed` false, on a push as well as a PR<br>([Skipping a suite](#skipping-a-suite-the-change-cannot-affect)); `security` skips on `docs-only`<br>and when `SECURITY_ENABLED` is `false` ([security.md](security.md)); `badges` needs all three,<br>runs under `always()` and publishes this branch's badges (see [Badges](#badges)) |
 | `ci-web.yml` | `pull_request`, `workflow_dispatch` (`deploy`) | `build-web.yml` | PR = production export + Playwright smoke, skipped by the called workflow's `Changes` job<br>when `web-changed` is false; a `deploy` dispatch from `cd-release.yml` at the tag = the same<br>export + Pages deploy (never skipped: a dispatch has no diff base, so the classifier fails open),<br>with `base-url` = `/<repo>` unless a custom domain is set, and `+not-found.html` copied to<br>`404.html` so a deep link boots the router |
 | `ci-pr-closed.yml` | `pull_request: closed` | `pr-closed.yml` | cancels the closed PR's in-flight runs and drops its `gh-pages` badge directory; needs `actions: write` and `contents: write` |
 | `ci-pr-title.yml` | `pull_request: edited` (only when the title changed) | `pr-title.yml` | `opened`/`synchronize` are already covered by `check-code.yml`'s `commitlint` |
@@ -394,14 +395,14 @@ Locally the same debug tree lands in `.maestro/output/` (gitignored).
 
 ## Badges
 
-The README's three badges are real, per-branch and measured. `ci.yml`'s
+The README's four badges are real, per-branch and measured. `ci.yml`'s
 `badges` job renders them from the run's own results and publishes them to the
 `gh-pages` branch:
 
 ```
 gh-pages
 └── badges/
-    ├── main/{unit,e2e,coverage}.svg (+ .json)
+    ├── main/{unit,e2e,coverage,security}.svg (+ .json)
     └── <branch>/…
 ```
 
@@ -410,6 +411,7 @@ gh-pages
 | `unit.svg` | the `unit` job's result (`success` → passing, `failure` → failing; `cancelled` and `skipped` publish nothing) |
 | `e2e.svg` | the `e2e` job's result, same map |
 | `coverage.svg` | `coverage/coverage-summary.json` from the `coverage` artifact — Jest's `json-summary` reporter, never scraped HTML |
+| `security.svg` | `check-security.yml`'s `verdict` output — the verdict's own word from `.security/verdict.json`,<br>never the job's result (see below) |
 
 Rendering is this repo's job (`scripts/badges/`, `pnpm badges:render`, run
 locally with `make gen-badges`); publishing is the workflows repo's
@@ -436,6 +438,27 @@ These details are deliberate:
   skipped publishes nothing. The README goes on showing the last suites that
   ran. The red run is visible where CI is: the PR's checks and the Actions tab.
 
+**The Security badge shows the verdict, not the job.** The `security` job
+succeeds on `pass`, `informational` and `skipped` alike, so its result cannot
+tell them apart; `ci.yml` hands `publish-badges.yml` the `verdict` output
+instead (see [security.md](security.md#where-the-verdict-goes)):
+
+| Verdict | Badge |
+| --- | --- |
+| `pass` | green `passing` |
+| `informational` | `<highest> findings`: yellow for low or medium, orange for high or critical |
+| `skipped` | grey `skipped` |
+| `fail` (findings block, a scanner crashed, or the Security run broke before its verdict) | red `failing` |
+| `disabled` (`SECURITY_ENABLED=false`, or `"enabled": false` in `security-policy.json`) | grey `disabled` |
+| nothing could block (`severity` is `none` or `failOn` is empty) | the message above plus `(advisory)` |
+
+- **A skipped Security keeps its published badge.** A docs-only change skips
+  the `security` job, hands over no verdict, and the render script writes no
+  `security.svg`, so the branch's last real answer stays.
+- **Security switched off shows `disabled`.** A stale green badge for a gate
+  that no longer runs would be the one wrong answer.
+- **A cancelled Security publishes nothing,** like a cancelled suite.
+
 **Coexistence with the web target.** `ci-web.yml` deploys the web export to GitHub
 Pages through `actions/deploy-pages`, which is an *artifact* deploy and does not
 read any branch. The badges live on a `gh-pages` branch and are served from
@@ -454,7 +477,7 @@ one, and several carry many: `cd-production.yml` alone has twelve.
 `cd-beta-retry.yml` calls no reusable workflow at all.
 
 ```yaml
-uses: blinkbitcoin/shared-workflows/.github/workflows/check-code.yml@1309c00d8cc3e5d62ccdc9bcaa1797a49b7a5789 # v0.15.1
+uses: blinkbitcoin/shared-workflows/.github/workflows/check-code.yml@f6e04492c80b4250f5878da52d8b422ec80a8dd4 # v0.16.0
 ```
 
 A shared-workflows release changes nothing here by itself
