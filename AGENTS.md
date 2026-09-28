@@ -221,10 +221,10 @@ aggregates.
   updates every reference in the same PR, not just the ones spelled `.yml`:
   `uses:` paths, `gh workflow run` targets, `require-green-workflow`,
   `workflow_run` listeners (they match the display name), the init manifest,
-  docs, diagrams, README tables and "Actions → ..." paths (the sidebar shows display names). Before
-  pushing, `git grep` the old name without its suffix. Only `CHANGELOG.md`,
-  `docs/superpowers/` and concurrency group names (renaming one changes which
-  runs queue together) may still hold it.
+  docs, diagrams, README tables and "Actions → ..." paths (the sidebar shows
+  display names). Before pushing, `git grep` the old name without its suffix.
+  Only `CHANGELOG.md`, `docs/superpowers/` and concurrency group names
+  (renaming one changes which runs queue together) may still hold it.
 - **Every PR tests everything it adds or changes, in the same PR.** That means
   the happy path, every error path and every branch a reviewer could ask
   about, and the PR description names the tests that cover the change. Where a
@@ -289,9 +289,9 @@ Coverage (`jest.config.ts`) is 100% lines, branches, functions and statements,
 globally. New code needs a test in the same commit. A file with nothing to
 assert goes in `coveragePathIgnorePatterns` **with a one-line reason**; an entry
 without one is not mergeable, and a native module's TS wrapper does not qualify
-just because the native half is Swift/Kotlin. `make test-coverage` (and CI, through
-`test:coverage`) also fails on any file with zero statements (`check-coverage-empty`, from
-`@blinkbitcoin/dev-config`), so a re-export
+just because the native half is Swift/Kotlin. `make test-coverage` (and CI,
+through `test:coverage`) also fails on any file with zero statements
+(`check-coverage-empty`, from `@blinkbitcoin/dev-config`), so a re-export
 barrel cannot lift the number while testing nothing.
 
 Global coverage says every line ran somewhere, not that its own test ran it.

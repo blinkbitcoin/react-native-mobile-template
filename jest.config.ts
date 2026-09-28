@@ -143,7 +143,8 @@ const config: Config = {
     '!src/**/*.test.*',
     '!plugins/*.test.ts',
   ],
-  // `json-summary` is what `check-coverage-empty` (from @blinkbitcoin/dev-config) reads after the run.
+  // `json-summary` is what `check-coverage-empty` (from @blinkbitcoin/dev-config)
+  // reads after the run.
   coverageReporters: ['text', 'lcov', 'json-summary'],
   coverageThreshold: {
     global: { lines: 100, branches: 100, functions: 100, statements: 100 },
