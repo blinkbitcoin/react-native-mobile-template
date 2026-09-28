@@ -7,7 +7,7 @@ cd "$(dirname "$0")/../.."
 # (scripts/ports.mjs); an already-exported per-service variable wins.
 eval "$(node scripts/ports.mjs --sh)"
 bash scripts/e2e/wait-for-mock-api.sh
-APP_ID="${APP_ID:-com.example.rnmt.dev}"
+APP_ID="${APP_ID:-sv.blink.reactnativemobiletemplate.dev}"
 SCHEME="${SCHEME:-rnmt}"
 # Foreground the app through the expo-development-client deep link, exactly as
 # shared-workflows' scripts/e2e/app-launch.sh does. The dev client's own

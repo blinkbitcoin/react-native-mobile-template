@@ -91,7 +91,7 @@ Two separate channels, and mixing them is the classic mistake.
 | `APP_VARIANT` | `production` or (default) `development`. Picks the app name and suffixes the bundle id and package with `.dev` |
 | `APP_VERSION` | `version`, and so `CFBundleShortVersionString` / `versionName`. Defaults to `0.0.0` |
 | `APP_BUILD_NUMBER` | iOS `buildNumber` and Android `versionCode`. Defaults to `1` |
-| `IOS_BUNDLE_ID`, `ANDROID_PACKAGE` | Identity. Both default to `com.example.rnmt` |
+| `IOS_BUNDLE_ID`, `ANDROID_PACKAGE` | Identity. Both default to `sv.blink.reactnativemobiletemplate` |
 | `OTA_ENABLED` | `true` compiles the `updates` block in. Anything else compiles `updates: { enabled: false }` |
 | `EXPO_UPDATES_URL` | The update server origin, only used when OTA is on |
 | `GITHUB_SHA` | Feeds the build stamp (`<variant>-<sha7>-<date>`) |
