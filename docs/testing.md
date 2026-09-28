@@ -110,7 +110,6 @@ would otherwise have that code measured too. The suites include:
 | `scripts/check-licenses.test.mjs` | The SPDX allowlist logic |
 | `scripts/check-lockfile.test.mjs` | Lockfile provenance: only registry resolution shapes pass, plus the shared tooling package at the workflows pin |
 | `scripts/tooling-pin.test.mjs` | The shared tooling package's pin: the one workflows commit, and `make fix-tooling-pin` |
-| `scripts/check-coverage-empty.test.mjs` | The empty-coverage-row parser |
 | `scripts/init.test.mjs` | The template rename and web-removal script behind `make init` |
 | `scripts/hooks/install-if-lockfile-changed.test.mjs` | The post-merge / post-checkout lockfile-install hook |
 | `scripts/release/resolve-version.test.mjs` | Version resolution for a build |
@@ -241,7 +240,7 @@ A re-export barrel or a type-only module has zero statements. istanbul prints
 it as 0% in every column while the totals stay at 100%, so it is a silent way
 to add an untested file without moving the number.
 
-`test:coverage` runs `scripts/check-coverage-empty.mjs` after Jest, so `make test-coverage` and
+`test:coverage` runs `check-coverage-empty` (from `@blinkbitcoin/dev-config`) after Jest, so `make test-coverage` and
 CI's Unit job both make the check. It reads
 `coverage/coverage-summary.json` — which is why `json-summary` is in
 `coverageReporters` — and fails naming any file with `statements.total === 0`.

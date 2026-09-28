@@ -288,7 +288,8 @@ globally. New code needs a test in the same commit. A file with nothing to
 assert goes in `coveragePathIgnorePatterns` **with a one-line reason**; an entry
 without one is not mergeable, and a native module's TS wrapper does not qualify
 just because the native half is Swift/Kotlin. `make test-coverage` (and CI, through
-`test:coverage`) also fails on any file with zero statements (`scripts/check-coverage-empty.mjs`), so a re-export
+`test:coverage`) also fails on any file with zero statements (`check-coverage-empty`, from
+`@blinkbitcoin/dev-config`), so a re-export
 barrel cannot lift the number while testing nothing.
 
 Global coverage says every line ran somewhere, not that its own test ran it.

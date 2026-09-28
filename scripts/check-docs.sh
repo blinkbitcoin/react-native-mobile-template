@@ -11,9 +11,9 @@
 #      read at run time, so a target added by a later change fails this check
 #      until AGENTS.md gains a row for it (and vice versa).
 #   3. Strict (fail, exit 1): no markdown table cell line is wider than the
-#      house limit (scripts/check-docs-tables.mjs).
+#      house limit (check-docs-tables, from @blinkbitcoin/dev-config).
 #   4. Strict (fail, exit 1): every fenced ```mermaid block parses
-#      (scripts/check-diagrams.mjs) — skips with a warning when the pinned CLI
+#      (check-diagrams, from @blinkbitcoin/dev-config) — skips with a warning when the pinned CLI
 #      cannot be fetched.
 #
 # Env (CI): EVENT_NAME, BASE_REF, PR_AUTHOR. Everywhere else the base is
@@ -130,13 +130,13 @@ if [ "$fail" -ne 0 ]; then
   exit 1
 fi
 
-node scripts/check-docs-tables.mjs
+pnpm exec check-docs-tables
 # --all in CI: the changed-file shortcut is a local convenience, and a CI run is
 # the place where checking every diagram is worth the minute it costs.
 if [ -n "${EVENT_NAME:-}" ]; then
-  node scripts/check-diagrams.mjs --all
+  pnpm exec check-diagrams --all
 else
-  node scripts/check-diagrams.mjs
+  pnpm exec check-diagrams
 fi
 
 echo "docs check ok"

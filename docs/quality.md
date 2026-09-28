@@ -93,7 +93,7 @@ Add a rule to one side only, and record which side in the config comment.
 | `make check-gen` | `pnpm i18n:check`, `pnpm codegen:check` | Drift in generated catalogs and generated GraphQL documents |
 | `make check-deps` | `pnpm deps:check`, `pnpm deps:audit`, `pnpm deps:licenses` | Expo SDK drift (`scripts/check-deps.sh`: `expo install --check` is advisory, a CI warning;<br>`expo-doctor`'s other checks block), high-severity vulnerabilities in production dependencies,<br>lockfile provenance (`scripts/check-lockfile.sh`), and the license allowlist (`scripts/check-licenses.mjs`) |
 | `make check-ci` | `scripts/shellcheck.sh`, `actionlint`,<br>`zizmor --offline --min-severity medium --config .github/zizmor.yml` | The CI itself: every `scripts/**/*.sh`, and the workflow files.<br>zizmor allows tag pins by policy and ignores one reviewed `workflow_run` (`.github/zizmor.yml`) |
-| `make check-docs` | `scripts/check-docs.sh`, `scripts/check-docs-tables.mjs`, `scripts/check-diagrams.mjs` | Warns when architecture-relevant paths changed with no `docs/` change.<br>Fails when `AGENTS.md`'s command table and the Makefile's `##`-documented targets disagree in either direction,<br>when a markdown table cell has a line wider than 120 visible characters,<br>or when a fenced `mermaid` block does not parse |
+| `make check-docs` | `scripts/check-docs.sh`, `check-docs-tables`, `check-diagrams`<br>(both from `@blinkbitcoin/dev-config`) | Warns when architecture-relevant paths changed with no `docs/` change.<br>Fails when `AGENTS.md`'s command table and the Makefile's `##`-documented targets disagree in either direction,<br>when a markdown table cell has a line wider than 120 visible characters,<br>or when a fenced `mermaid` block does not parse |
 | `make check-release` | `ruby -c` over the Fastfile and lanes, `fastlane lanes`, the minitest suite in `fastlane/test/lanes_test.rb`,<br>and every `.claude/skills/*/tests/run.sh` | That the lanes parse and that their pure logic still behaves,<br>and that the store skills still agree with the fastlane gem.<br>Needs the Ruby gems `make install` installs, and talks to no store |
 | `make check-secrets` | `gitleaks git` over the whole history | No committed secret, including one deleted in a later commit.<br>Test data that must look real is allowlisted in `.gitleaks.toml`, each entry with its reason |
 
@@ -184,7 +184,7 @@ courtesy, which is how a stale command table could reach `main`.
 | --- | --- | --- |
 | Freshness | nothing — it warns | Touch `docs/`, or ignore the warning deliberately |
 | Command table | `AGENTS.md` and the Makefile's `##`-documented targets disagreeing in either direction | None. Fix whichever side is wrong |
-| Table width | a markdown table cell line wider than 120 visible characters | Break the cell with `<br>`; the limit is `MAX_LINE` in `scripts/check-docs-tables.mjs` |
+| Table width | a markdown table cell line wider than 120 visible characters | Break the cell with `<br>`; 120 is the default of `check-docs-tables` (`@blinkbitcoin/dev-config`) |
 | Mermaid | a fenced `mermaid` block the parser rejects | Fix the diagram. There is no ignore |
 
 The freshness warning reads a `package.json` change as architectural only when
