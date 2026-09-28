@@ -1,6 +1,6 @@
 # CI-owned branch
 
-badges/<branch>/{coverage,unit,e2e}.svg (+ their .json siblings) - written by
+badges/<branch>/{coverage,unit,e2e,security}.svg (+ their .json siblings) - written by
 the badges job in the CI workflow (shared-workflows publish-badges.yml ->
 scripts/ci/publish-badges.sh) on every run; a branch directory is removed when
 its pull request closes (badges-cleanup.sh). Do not edit by hand.
