@@ -959,7 +959,7 @@ describe('init --yes --no-web', async () => {
     );
     assert.match(runbook, /tag=vX\.Y\.Z`, and `ci\.yml` on the\n/);
     assert.match(runbook, /│ {2}CD \/ Beta dispatched\n/);
-    assert.match(runbook, /`Store Notes` job is its own job after the beta dispatch: a red\n/);
+    assert.match(runbook, /`Release notes` job is its own job after the beta dispatch: a red\n/);
     const readme = readFileSync(path.join(root, 'README.md'), 'utf8');
     assert.match(
       readme,

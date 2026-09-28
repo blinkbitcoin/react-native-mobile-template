@@ -120,7 +120,7 @@ included - is the one to read. A private consumer that finds a full run per
 release-PR update too expensive drops that single step in `cd-release.yml`.
 
 The PR body carries a `## Store notes` section: the prose the stores will
-get, drafted by the `Store Notes` job of `cd-release.yml` from the
+get, drafted by the `Release notes` job of `cd-release.yml` from the
 changelog the PR carries (and rewritten by the optional LLM pass when one is
 configured). **Review it with the version bump** — see
 [Store notes](#store-notes). To change it, edit `release-notes.prompt.md` and
@@ -330,12 +330,12 @@ Where the text comes from differs per tier, and that is the design:
 | Tier | Source | Generated or copied |
 | --- | --- | --- |
 | Internal (every push to `main`) | Commit subjects since the last tag | Generated, deterministic only; the LLM never runs here |
-| The release PR | The changelog the PR carries | Generated once, by `Store Notes` in `cd-release.yml`; the LLM pass runs here when configured. **This is the review point** |
+| The release PR | The changelog the PR carries | Generated once, by `Release notes` in `cd-release.yml`; the LLM pass runs here when configured. **This is the review point** |
 | Beta and production | The `## Store notes` section of the release body | Copied verbatim; nothing is regenerated, so both tiers ship the reviewed text |
 
 release-please builds the release body from the PR body, so the section a
 human reviewed in the PR is the section beta and production read. The
-`Store Notes` job is its own job after the beta and web dispatches: a red
+`Release notes` job is its own job after the beta and web dispatches: a red
 draft never withholds a release, and `gh run rerun --failed` re-drafts.
 
 Two costs that come with drafting into the PR: every push to `main` now
@@ -400,7 +400,7 @@ part of the prompt and cannot be relaxed from it.
 | `OPENAI_BASE_URL` | repo variable | OpenAI-compatible endpoint; see [Provider recipes](#provider-recipes) |
 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | **secret** | Key for the chosen provider |
 
-The three variables reach `notes.mjs` through the `Store Notes` job's
+The three variables reach `notes.mjs` through the `Release notes` job's
 `build-env`; the two keys are declared secrets on `pr-release-notes.yml`,
 because `build-env` is a workflow input and would publish them in the run's
 parameters. No CD lane receives them: the LLM runs in that one job.
@@ -696,12 +696,12 @@ lane still walks end to end
 | `OTA_ENABLED` | `app.config.ts` at build time (via `build-env`) and the `if:` on every `ota-*` job | `true` to turn OTA on; see [ota.md](ota.md) |
 | `EXPO_UPDATES_URL` | `app.config.ts` at build time (via `build-env`) and the OTA manifest smoke check | Public origin of the update server |
 | `OTA_CLI_VERSION` | `publish-ota` | Exact `eoas` version; the publish script refuses to run unpinned |
-| `STORE_NOTES_INCLUDE_CHANGELOG` | `notes.mjs` in internal's `build-prepare` and in `Store Notes` (via `build-env`) | `true` appends the changelog where notes are generated |
-| `RELEASE_NOTES_LLM_PROVIDER` | `notes.mjs` in `Store Notes` (via `build-env`) | `anthropic` or `openai`; anything else disables the optional LLM pass |
-| `RELEASE_NOTES_LLM_MODEL` | `notes.mjs` in `Store Notes` (via `build-env`) | Model override for that provider |
-| `RELEASE_NOTES_LLM_EFFORT` | `notes.mjs` in `Store Notes` (via `build-env`) | Reasoning effort, `max` when unset, `none` for a model with no reasoning switch.<br>The same adapter as the security reviewer (`scripts/lib/llm/`) |
-| `RELEASE_NOTES_LLM_EXTRA_PARAMS` | `notes.mjs` in `Store Notes` (via `build-env`) | JSON object merged into the request; a `null` value removes that field |
-| `OPENAI_BASE_URL` | `notes.mjs` in `Store Notes` (via `build-env`) | OpenAI-compatible endpoint |
+| `STORE_NOTES_INCLUDE_CHANGELOG` | `notes.mjs` in internal's `build-prepare` and in `Release notes` (via `build-env`) | `true` appends the changelog where notes are generated |
+| `RELEASE_NOTES_LLM_PROVIDER` | `notes.mjs` in `Release notes` (via `build-env`) | `anthropic` or `openai`; anything else disables the optional LLM pass |
+| `RELEASE_NOTES_LLM_MODEL` | `notes.mjs` in `Release notes` (via `build-env`) | Model override for that provider |
+| `RELEASE_NOTES_LLM_EFFORT` | `notes.mjs` in `Release notes` (via `build-env`) | Reasoning effort, `max` when unset, `none` for a model with no reasoning switch.<br>The same adapter as the security reviewer (`scripts/lib/llm/`) |
+| `RELEASE_NOTES_LLM_EXTRA_PARAMS` | `notes.mjs` in `Release notes` (via `build-env`) | JSON object merged into the request; a `null` value removes that field |
+| `OPENAI_BASE_URL` | `notes.mjs` in `Release notes` (via `build-env`) | OpenAI-compatible endpoint |
 | `EXPO_PUBLIC_API_URL` | the bundle, through `src/config/env.ts` (via `build-env`) | **Required for a CI build**: `env.ts` validates it as a URL and the app fails to start without it |
 | `EXPO_PUBLIC_APP_NAME` | same | **Required for a CI build** (non-empty string) |
 | `EXPO_PUBLIC_WEB_DOMAIN` | same, plus `app.config.ts` universal links | Your web domain; empty disables the associated-domain / intent-filter entries |
@@ -738,7 +738,7 @@ you want a reviewer between a token and production.
 | `HUAWEI_CLIENT_ID` | every Huawei lane job: internal, beta and release | AppGallery Connect → Users and permissions → API key → Connect API → Create; the client id half of the pair |
 | `HUAWEI_CLIENT_SECRET` | same three jobs | Same page, the client secret half. It is shown exactly once |
 | `OTA_PUBLISH_TOKEN` | every `ota-*` job | One of the update server's `EOO_TOKENS`; scope per environment |
-| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | `Store Notes` in `cd-release.yml` (`notes.mjs`), and the `Review` and `OpenAnt` steps of `ci.yml`'s `security` job | Only needed when `RELEASE_NOTES_LLM_PROVIDER` or `SECURITY_LLM_PROVIDER` selects that provider.<br>The notes fall back to deterministic prose without them, and the two scanners report skipped |
+| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | `Release notes` in `cd-release.yml` (`notes.mjs`), and the `Review` and `OpenAnt` steps of `ci.yml`'s `security` job | Only needed when `RELEASE_NOTES_LLM_PROVIDER` or `SECURITY_LLM_PROVIDER` selects that provider.<br>The notes fall back to deterministic prose without them, and the two scanners report skipped |
 | `APP_REVIEW_EMAIL`, `APP_REVIEW_FIRST_NAME`, `APP_REVIEW_LAST_NAME`, `APP_REVIEW_PHONE` | iOS `promote_beta` and `release_production` lanes | The contact Apple reaches for review questions |
 | `APP_REVIEW_DEMO_USER`, `APP_REVIEW_DEMO_PASSWORD` | same | A working login for the reviewer; omit both if the app needs no account |
 | `APP_REVIEW_NOTES` | same | Free-text notes for the reviewer |

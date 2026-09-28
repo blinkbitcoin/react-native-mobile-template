@@ -236,7 +236,7 @@ jobs:
   # `release-meta` here would replace the checksums of the promoted binaries
   # with the checksums of four metadata files.
   store-notes-section:
-    name: Store Notes
+    name: Stage release notes
     needs: [prepare, github-release]
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -257,7 +257,7 @@ jobs:
           if-no-files-found: error
 
   store-notes:
-    name: Attach store notes
+    name: Attach release notes
     needs: [prepare, store-notes-section]
     uses: blinkbitcoin/shared-workflows/.github/workflows/publish-github-release.yml@f6e04492c80b4250f5878da52d8b422ec80a8dd4 # v0.16.0
     permissions:

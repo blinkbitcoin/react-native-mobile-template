@@ -32,7 +32,7 @@ flowchart TD
     sec -->|"verdict"| badges
   end
 
-  CI -->|"push to main"| rp["CD / Release<br/>(release-please, then Store Notes<br/>drafted into the release PR)"]
+  CI -->|"push to main"| rp["CD / Release<br/>(release-please, then the release notes<br/>drafted into the release PR)"]
   CI -->|"push to main"| internal
 
   subgraph internal["CD / Internal"]

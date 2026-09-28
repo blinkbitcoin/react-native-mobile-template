@@ -16,7 +16,7 @@ word.
 
 Names carry purpose, in the vocabulary of the stores and of the family.
 
-- Callers (this repo): `Pre-release`, `Release`, `Attach store notes`,
+- Callers (this repo): `Pre-release`, `Release`, `Attach release notes`,
   `Record stage`, `Attach stage note`, `Fingerprint baseline`, `Web`;
   `CD / Release` for the workflow that cuts the release and starts beta and
   web; job ids match names (`upload-ios`, `upload-android`).

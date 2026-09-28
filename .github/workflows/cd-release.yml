@@ -125,7 +125,7 @@ jobs:
   # A hand edit to the section in the PR lasts until the next push to main;
   # edit release-notes.prompt.md instead, or the release body after merging.
   store-notes:
-    name: Store Notes
+    name: Release notes
     needs: release-please
     if: ${{ needs.release-please.outputs.pr-number != '' }}
     uses: blinkbitcoin/shared-workflows/.github/workflows/pr-release-notes.yml@f6e04492c80b4250f5878da52d8b422ec80a8dd4 # v0.16.0
