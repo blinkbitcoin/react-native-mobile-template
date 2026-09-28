@@ -893,6 +893,11 @@ describe('init --yes --no-web', async () => {
     assert.match(runbook, /the store notes and the OTA publish do not wait for\n/);
   });
 
+  test('drops playwright.config from the unit ignore list and keeps the rest of it', () => {
+    const ci = readFileSync(path.join(root, 'docs/ci.md'), 'utf8');
+    assert.match(ci, /list ignores `\.maestro\/`, `e2e\/`, `fastlane\/`, the\nGemfile and docs/);
+  });
+
   test('drops the test comments that point at the web gate test it deleted', () => {
     const gates = readFileSync(path.join(root, 'scripts/ci-suite-gates.test.mjs'), 'utf8');
     assert.doesNotMatch(gates, /ci-web-gate|web suite/);
