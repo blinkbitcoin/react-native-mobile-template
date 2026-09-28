@@ -46,10 +46,17 @@ tags: [smoke]
 # proper (Reload / Go home / TOOLS), which is still a sheet over the app. That
 # close was written, but only inside the launcher branch below, so it never ran
 # here: the first fix tapped Continue and then waited 90s on a menu it had just
-# paged forward. Close it the same way the branch below does.
+# paged forward. Close it the same way the branch below does - but only when
+# the menu is on screen: expo-dev-client does not always open it, and a back
+# press with nothing to close backs out of the app itself, stranding every flow
+# on the Android launcher (run 36424304994: Continue not found, back pressed,
+# all six flows then saw the home screen's Camera and Gallery). `Go home` is a
+# row of the menu proper (expo-dev-menu), never of the app.
 - runFlow:
     when:
       platform: Android
+      visible:
+        text: 'Go home'
     commands:
       - back
 - runFlow:
@@ -91,6 +98,8 @@ tags: [smoke]
       - runFlow:
           when:
             platform: Android
+            visible:
+              text: 'Go home'
           commands:
             - back
 # `stopApp: false` means this flow can start on whatever screen the previous
