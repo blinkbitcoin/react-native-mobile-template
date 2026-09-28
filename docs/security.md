@@ -67,7 +67,7 @@ One verdict, several destinations, each written by the file named:
 | the step log and the run summary | `verdict.sh` in shared-workflows | every run |
 | annotations on the diff | `verdict.mjs` | on a runner only (`GITHUB_ACTIONS=true`) |
 | code scanning | `check-security.yml` | from `main` only |
-| `.security/verdict.json` | `verdict.mjs` | every run, laptop included |
+| `.security/verdict.json` | `verdict.mjs` | every run that reaches a verdict, laptop included (not when a SARIF file cannot be read) |
 
 `verdict.json` is one line of JSON, for the Security badge:
 
