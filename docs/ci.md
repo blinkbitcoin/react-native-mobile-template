@@ -199,7 +199,8 @@ here. `Unit` is not only Jest. It runs `test:scripts`, whose repository-wide
 guards read every tracked file, documentation included:
 `scripts/ports.test.mjs` rejects a bare port literal anywhere, and
 `scripts/shell-locale.test.mjs` scans all the shell code. The classifier's unit
-list ignores `.maestro/`, `fastlane/`, the Gemfile and docs, so gating on it let
+list ignores `.maestro/`, `e2e/`, `playwright.config.*`, `fastlane/`, the
+Gemfile and docs, so gating on it let
 a change to those alone land without the guards, to fail whichever PR ran `Unit`
 next. The cost is the minute or two `Unit` takes on a docs-only change.
 
@@ -479,7 +480,11 @@ and the script contract, and mixing versions across them is untested.
 
 Every job checks the workflows repo out into `$GITHUB_WORKSPACE/.workflows` and
 reaches its scripts through `$WORKFLOWS_DIR`. Nothing in this repo references
-`shared-workflows` paths directly. Local tooling that walks the whole
-tree ignores it: `biome.json` (`!**/.workflows`), `eslint.config.mjs`
-(`.workflows/**`), `tsconfig.json` (`exclude`), `typos.toml` (`extend-exclude`) and
-`.gitignore` (`/.workflows`).
+`shared-workflows` paths directly. Local tooling that walks the whole tree
+ignores it, in all seven places the consumer guide's
+[`.workflows/` ignore list](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/consumer-guide.md#workflows-ignore-list-for-consumers)
+names: `biome.json` (`!**/.workflows`), `eslint.config.mjs` (`.workflows/**`),
+`tsconfig.json` (`exclude`), `knip.json` (every glob is rooted, so none reaches
+it), `typos.toml` (`extend-exclude`), `jest.config.ts`
+(`testPathIgnorePatterns`) and `.gitignore` (`/.workflows`). The contract check
+reports any of them this repository loses.
