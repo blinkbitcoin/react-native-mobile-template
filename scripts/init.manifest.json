@@ -407,8 +407,8 @@
             "`jest.config.*`, `fastlane/` |"
           ],
           [
-            "list ignores `.maestro/`, `e2e/`, `playwright.config.*`, `fastlane/`, the\nGemfile and docs, so gating on it let",
-            "list ignores `.maestro/`, `e2e/`, `fastlane/`, the Gemfile and docs, so\ngating on it let"
+            "list ignores `.maestro/`, `e2e/`, `playwright.config.*`, `fastlane/`, the\n",
+            "list ignores `.maestro/`, `e2e/`, `fastlane/`, the\n"
           ],
           [
             "runs the suite. Three consequences\nfollow:",
