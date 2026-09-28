@@ -108,6 +108,7 @@ would otherwise have that code measured too. The suites include:
 | --- | --- |
 | `scripts/doctor.test.mjs` | The toolchain check |
 | `scripts/check-licenses.test.mjs` | The SPDX allowlist logic |
+| `scripts/check-lockfile.test.mjs` | Lockfile provenance: only registry resolution shapes pass |
 | `scripts/check-coverage-empty.test.mjs` | The empty-coverage-row parser |
 | `scripts/init.test.mjs` | The template rename and web-removal script behind `make init` |
 | `scripts/hooks/install-if-lockfile-changed.test.mjs` | The post-merge / post-checkout lockfile-install hook |
