@@ -9,7 +9,15 @@ name: CD / Internal
 on:
   push:
     branches: [main]
-    paths-ignore: [docs/**, "**.md"]
+    # Every commit except one that changes only docs. `paths` with negations,
+    # not `paths-ignore`, because the last matching pattern wins: a prompt
+    # (release-notes.prompt.md feeds the store notes this build ships) ends in
+    # .md but is not documentation, and `paths-ignore` cannot take one back.
+    paths:
+      - "**"
+      - "!docs/**"
+      - "!**.md"
+      - "**.prompt.md"
   workflow_dispatch:
 permissions:
   contents: read
