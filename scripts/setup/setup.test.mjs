@@ -86,11 +86,18 @@ const FAKES = {
       printf '#!/bin/bash\necho "%s $*" >>"$LOG"\n. "$FAKEBIN/%s.impl"\n' "$tool" "$tool" >"$sdk/$pkg/$tool"
       chmod +x "$sdk/$pkg/$tool"
     fi`,
-  avdmanager: `for a in "$@"; do case "$prev" in --name) echo "$a" >>"$WORK/avds" ;; esac; prev="$a"; done`,
-  emulator: `[ "$1" = -list-avds ] && cat "$WORK/avds" 2>/dev/null; true`,
+  // Records the answer to its custom-hardware-profile prompt, as the real one reads it.
+  avdmanager: `
+    for a in "$@"; do case "$prev" in --name) echo "$a" >>"$WORK/avds" ;; esac; prev="$a"; done
+    read -r answer; echo "$answer" >"$WORK/avdmanager-answer"`,
+  // exec, so a reader that stops early kills it with SIGPIPE as it would the real one.
+  emulator: `if [ "$1" = -list-avds ] && [ -f "$WORK/avds" ]; then exec cat "$WORK/avds"; fi`,
   adb: `
     case "$1 $2" in
-      "devices ") printf 'List of devices attached\\n%s' "\${FAKE_ADB_DEVICES:-}" ;;
+      # $WORK/adb-devices, when present, is a list too long for an environment
+      # variable (Linux caps one at 128 KiB); exec, so SIGPIPE reaches the caller.
+      "devices ") [ -f "$WORK/adb-devices" ] && exec cat "$WORK/adb-devices"
+        printf 'List of devices attached\\n%s' "\${FAKE_ADB_DEVICES:-}" ;;
       "shell getprop") echo 1 ;;
     esac; true`,
   'xcode-select': `echo "\${FAKE_DEVELOPER_DIR-/Applications/Xcode.app/Contents/Developer}"`,
@@ -394,6 +401,39 @@ test('android: without node_modules it says to install first', () => {
   const r = s.run('android.sh', ['--yes']);
   assert.notEqual(r.status, 0);
   assert.match(r.output, /libs.versions.toml is missing. Run: make setup-toolchain/);
+});
+
+// A pipe into `grep -q` loses the race once the writer has more to say than the
+// pipe buffer holds: grep exits at the first match, the writer dies of SIGPIPE
+// and pipefail reports the search as failed.
+const longListAfter = (first) => `${first}\n${'padding line\n'.repeat(20000)}`;
+
+test('android: an existing AVD is found even at the top of a long AVD list', () => {
+  const s = sandbox();
+  writeFileSync(path.join(s.work, 'avds'), longListAfter('Pixel_10_API_36'));
+  const r = s.run('android.sh', ['--yes']);
+  assert.equal(r.status, 0, r.output);
+  assert.match(r.output, /Pixel_10_API_36 exists/);
+  assert.deepEqual(s.calls('avdmanager'), []);
+});
+
+test('android: avdmanager is told not to create a custom hardware profile', () => {
+  const s = sandbox();
+  assert.equal(s.run('android.sh', ['--yes']).status, 0);
+  assert.equal(readFileSync(path.join(s.work, 'avdmanager-answer'), 'utf8'), 'no\n');
+});
+
+test('android: --boot sees a running emulator at the top of a long device list', () => {
+  const s = sandbox();
+  assert.equal(s.run('android.sh', ['--yes']).status, 0);
+  s.resetLog();
+  writeFileSync(
+    path.join(s.work, 'adb-devices'),
+    `List of devices attached\n${longListAfter('emulator-5554\tdevice')}`,
+  );
+  const r = s.run('android.sh', ['--boot']);
+  assert.equal(r.status, 0, r.output);
+  assert.match(r.output, /an emulator is already running/);
 });
 
 test('android: --boot starts the emulator, waits for boot and turns animations off', async () => {

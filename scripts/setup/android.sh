@@ -115,11 +115,17 @@ for package in "${packages[@]}"; do
 done
 
 step "emulator $ANDROID_AVD_NAME"
-if "$SDK/emulator/emulator" -list-avds 2>/dev/null | grep -qx "$ANDROID_AVD_NAME"; then
+# Output is captured before it is searched, and avdmanager's answer comes from a
+# here-string, never a pipe. Under pipefail a pipe's writer that outlives its
+# reader dies of SIGPIPE: `grep -q` stops reading at the first match, so a long
+# AVD list made an existing AVD look missing, and an avdmanager that exits
+# without reading its prompt answer killed the whole script with status 141.
+avds="$("$SDK/emulator/emulator" -list-avds 2>/dev/null || true)"
+if grep -qx "$ANDROID_AVD_NAME" <<<"$avds"; then
   ok "$ANDROID_AVD_NAME exists"
 else
-  echo no | "$AVDMANAGER" create avd --name "$ANDROID_AVD_NAME" \
-    --package "$SYSTEM_IMAGE_ID" -d "$ANDROID_AVD_DEVICE" >/dev/null
+  "$AVDMANAGER" create avd --name "$ANDROID_AVD_NAME" \
+    --package "$SYSTEM_IMAGE_ID" -d "$ANDROID_AVD_DEVICE" >/dev/null <<<no
   ok "created $ANDROID_AVD_NAME ($ANDROID_AVD_DEVICE, API $ANDROID_EMULATOR_API, $ABI)"
 fi
 
@@ -132,7 +138,8 @@ ok "ANDROID_HOME=$SDK recorded in .env.local"
 if [ "$SETUP_BOOT" = 1 ]; then
   step "boot $ANDROID_AVD_NAME"
   ADB="$SDK/platform-tools/adb"
-  if "$ADB" devices | grep -q '^emulator-.*device$'; then
+  devices="$("$ADB" devices)"
+  if grep -q '^emulator-.*device$' <<<"$devices"; then
     ok "an emulator is already running"
   else
     flags=(-avd "$ANDROID_AVD_NAME" -no-snapshot-save -no-boot-anim -netdelay none -netspeed full)
