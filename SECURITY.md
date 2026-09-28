@@ -48,4 +48,7 @@ OTA update.
   rotate first, then clean up history.
 
 Dependency exposure is watched by `make check-deps` (audit, lockfile provenance,
-licenses) and by Dependabot (`.github/dependabot.yml`).
+licenses) and by Dependabot (`.github/dependabot.yml`). Provenance means every
+package comes from the npm registry with an integrity hash; the one exception is
+shared-workflows' own tooling package, at exactly the commit the workflows pin
+([ADR 0024](docs/decisions/0024-shared-tooling-at-the-workflows-pin.md)).

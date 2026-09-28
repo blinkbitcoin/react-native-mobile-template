@@ -51,8 +51,10 @@ const RENAME_TOKENS =
   /rnmt|reactnativemobiletemplate|RN Mobile Template|react-native-mobile-template|rn-mobile-template/;
 // `blinkbitcoin` is two different things: the GitHub owner of THIS repo, which
 // init must rewrite, and the owner of the reusable-workflow repo, which it must
-// not. Blanking the second is what makes the first greppable.
-const WORKFLOWS_REPO = /blinkbitcoin\/shared-workflows/g;
+// not - that repo, and the tooling package it ships (a git dependency on it,
+// docs/decisions/0024-shared-tooling-at-the-workflows-pin.md). Blanking the
+// second is what makes the first greppable.
+const WORKFLOWS_REPO = /blinkbitcoin\/shared-workflows|@blinkbitcoin\/dev-config/g;
 const namesTheOwner = (text) => text.replace(WORKFLOWS_REPO, '').includes('blinkbitcoin');
 // `react-native-webview` and `--dev-client` are native, not web: the negative
 // lookaheads keep the sweep from flagging them.

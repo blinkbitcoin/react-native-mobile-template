@@ -136,9 +136,11 @@ The `Checks / Contract` job, the first job of every CI run, reads this repo's
 
 It is this repo's PR that fails, never shared-workflows': that repo defines the
 contract and never checks out a consumer. So adding a gate here means adding
-its CI step, and vice versa. To run the same check before pushing, point the
-checker at this repo from a shared-workflows checkout:
-`node ../shared-workflows/packages/dev-config/bin/check-consumer-contract.mjs --root .`
+its CI step, and vice versa. To run the same check before pushing, run
+`make check-contract`: the checker comes from `@blinkbitcoin/dev-config`, a git
+dependency on shared-workflows at the commit the workflows pin, so it is the
+same code CI runs
+([ADR 0024](decisions/0024-shared-tooling-at-the-workflows-pin.md)).
 
 ### How a gate gets into CI
 

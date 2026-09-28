@@ -151,6 +151,12 @@ fix-format: ## Format everything with Biome (writes)
 fix-lint: ## Apply Biome's and ESLint's own fixes (writes)
 	pnpm lint:fix
 
+# Dependabot moves the workflow pins and cannot move the shared tooling package,
+# a git dependency at the same commit, so its pin-bump PR stays red until this
+# runs on it (scripts/workflow-contract.test.mjs names this target).
+fix-tooling-pin: ## Point the shared tooling package at the commit the workflows pin, and relock (writes)
+	node scripts/tooling-pin.mjs
+
 check-format: ## Check formatting without writing
 	pnpm format:check
 
@@ -261,6 +267,14 @@ ci: check test-coverage test-scripts ## Everything CI runs except E2E (which nee
 check-code-scanning: ## CodeQL code scanning locally, with the same config CI uses (needs a CodeQL CLI)
 	bash scripts/codeql-local.sh
 
+# Not in `make check` either: CI's `Checks / Contract` job already runs this
+# checker, from its own checkout of the commit the workflows pin, and a gate
+# `make ci` reaches must be one a CI step runs by the same name. This is the same
+# check from the installed package (the same commit, docs/decisions/0024-...),
+# for a laptop, before pushing.
+check-contract: ## Everything the called shared workflows need from this repository, in one report
+	pnpm check:contract
+
 test-scripts: ## node:test for scripts/**/*.test.mjs, with the 100% script coverage gate
 	pnpm test:scripts
 
@@ -297,4 +311,4 @@ reset: clean ## clean + reinstall
 help: ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: init doctor install setup setup-toolchain setup-android setup-ios setup-maestro ports dev dev-ios dev-android dev-web dev-api prebuild build-web version verify-ios verify-android release-notes gen-i18n gen-graphql check-types check-lint fix-format fix-lint check-format check-unused check-spell check-gen check-prebuild check-code check-deps check-ci check-docs check-skills check-secrets check-security check-security-deps check-security-code check-security-policy check-security-sbom check-security-bundle check-security-mobile check-security-binaries check-security-review check-security-review-codebase check-release check check-slow ci check-code-scanning test-scripts test-unit test-coverage gen-badges test-e2e-ios test-e2e-android test-e2e-web test clean reset help
+.PHONY: init doctor install setup setup-toolchain setup-android setup-ios setup-maestro ports dev dev-ios dev-android dev-web dev-api prebuild build-web version verify-ios verify-android release-notes gen-i18n gen-graphql check-types check-lint fix-format fix-lint fix-tooling-pin check-format check-unused check-spell check-gen check-prebuild check-code check-deps check-ci check-docs check-skills check-secrets check-security check-security-deps check-security-code check-security-policy check-security-sbom check-security-bundle check-security-mobile check-security-binaries check-security-review check-security-review-codebase check-release check check-slow ci check-code-scanning check-contract test-scripts test-unit test-coverage gen-badges test-e2e-ios test-e2e-android test-e2e-web test clean reset help
