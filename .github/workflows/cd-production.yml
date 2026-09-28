@@ -429,4 +429,8 @@ jobs:
       # the one failure mode nothing downstream would catch. It adds a browser
       # e2e run (~15-20 min) to the dispatch on code CI already tested at merge.
       playwright: true
+      # The same base path ci-web.yml's deploy bakes in. A project Pages site is
+      # served under `/<repo>/` and a custom domain at `/`; without this the
+      # release redeployed the site with every asset path missing `/<repo>`.
+      base-url: ${{ vars.EXPO_PUBLIC_WEB_DOMAIN == '' && format('/{0}', github.event.repository.name) || '' }}
   # init:web-end

@@ -19,7 +19,9 @@ Deploy under the sub-path, and test exactly the bytes that deploy.
 
 - `app.config.ts` — `EXPO_PUBLIC_BASE_URL` becomes `experiments.baseUrl`;
   `.github/workflows/ci-web.yml` sets it to `/<repo>` on a deploy (empty with a
-  custom domain, and on PR exports).
+  custom domain, and on PR exports). `cd-production.yml`'s web job, which
+  redeploys the site on a release dispatch, passes the same value;
+  `scripts/ci-web-gate.test.mjs` holds the two together.
 - `scripts/build-web.sh` — the export, then `+not-found.html` copied to
   `404.html`: Pages serves it for any unknown path and the router boots from
   the real URL.
