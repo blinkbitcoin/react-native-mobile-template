@@ -393,6 +393,10 @@
             "`jest.config.*`, `fastlane/` |"
           ],
           [
+            "list ignores `.maestro/`, `e2e/`, `playwright.config.*`, `fastlane/`, the\n",
+            "list ignores `.maestro/`, `e2e/`, `fastlane/`, the\n"
+          ],
+          [
             "runs the suite. Three consequences\nfollow:",
             "runs the suite. Two consequences\nfollow:"
           ],
