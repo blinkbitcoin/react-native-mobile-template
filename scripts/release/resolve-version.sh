@@ -7,8 +7,10 @@
 # Build number: first-parent commit count + BUILD_NUMBER_OFFSET (default 1000).
 #
 # shared-workflows ships a contract-identical copy of this script;
-# test/resolve-version.bats over there compares the two on stdout and on
-# $GITHUB_OUTPUT. Neither copy writes $GITHUB_ENV: resolving a version and
+# scripts/release/shared-copies.test.mjs here compares the two on stdout and on
+# $GITHUB_OUTPUT (shared-workflows never checks out a consumer, so its own
+# test/resolve-version.bats can only pin the contract, not compare). Neither
+# copy writes $GITHUB_ENV: resolving a version and
 # publishing it into a CI environment are two jobs, and this copy also runs on a
 # developer machine under `make version`, where $GITHUB_ENV does not exist.
 set -euo pipefail
