@@ -884,8 +884,9 @@ The bundle scans run `grep` in the C locale through `env LC_ALL=C grep`, not a
 own locale inside a forked subshell, which calls into CoreFoundation where that
 is not fork-safe, and now and then the subshell dies with SIGSEGV:
 `FAIL dev-server: could not scan the bundle: grep failed with status 139`,
-intermittently, on a bundle that was fine. `scripts/shell-locale.test.mjs`
-keeps the prefix out of every tracked shell file.
+intermittently, on a bundle that was fine. `check-shell-locale` (from
+`@blinkbitcoin/dev-config`, run by `make check-ci`) keeps the prefix out of
+every tracked shell file.
 
 **`--strict`** turns a skip caused by a *missing tool* into a `FAIL`, so a gate
 cannot report success having verified nothing. It is on automatically whenever

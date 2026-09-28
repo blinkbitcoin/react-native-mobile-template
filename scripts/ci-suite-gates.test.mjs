@@ -194,7 +194,7 @@ describe('ci.yml runs E2E only for a change that can affect it, and Unit on ever
 
   test('Unit has no gate of its own: its guards read every tracked file', () => {
     // A gate on unit-changed skipped a change to .maestro/, fastlane/ or docs
-    // alone, all of which ports.test.mjs and shell-locale.test.mjs read.
+    // alone, all of which ports.test.mjs reads.
     assert.equal(ci.jobs.unit.if, undefined);
   });
 

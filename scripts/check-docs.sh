@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Four checks, in this order:
+# Five checks, in this order:
 #
 #   1. Advisory (warn, exit 0): architecture-relevant paths changed vs the base
 #      without a docs/ change. A package.json counts only when the change is
@@ -10,9 +10,12 @@
 #      `##`-documented targets must agree in BOTH directions. The Makefile is
 #      read at run time, so a target added by a later change fails this check
 #      until AGENTS.md gains a row for it (and vice versa).
-#   3. Strict (fail, exit 1): no markdown table cell line is wider than the
+#   3. Strict (fail, exit 1): no documented make target is named after the
+#      tool it runs (check-make-target-names, from @blinkbitcoin/dev-config),
+#      the AGENTS.md rule beside the command table.
+#   4. Strict (fail, exit 1): no markdown table cell line is wider than the
 #      house limit (check-docs-tables, from @blinkbitcoin/dev-config).
-#   4. Strict (fail, exit 1): every fenced ```mermaid block parses
+#   5. Strict (fail, exit 1): every fenced ```mermaid block parses
 #      (check-diagrams, from @blinkbitcoin/dev-config) — skips with a warning when the pinned CLI
 #      cannot be fetched.
 #
@@ -129,6 +132,10 @@ if [ "$fail" -ne 0 ]; then
   echo "AGENTS.md and the Makefile disagree; update whichever is wrong" >&2
   exit 1
 fi
+
+# The one exception, with its reason; an --allow that stops applying fails too.
+pnpm exec check-make-target-names \
+  --allow 'gen-graphql=GraphQL is what it generates, the typed documents, not the tool that does it'
 
 pnpm exec check-docs-tables
 # --all in CI: the changed-file shortcut is a local convenience, and a CI run is

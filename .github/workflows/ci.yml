@@ -41,10 +41,9 @@ jobs:
     needs: checks
     # No `unit-changed` gate: there is no change this suite cannot affect.
     # `test:scripts` holds guards that read every tracked file, docs included -
-    # ports.test.mjs rejects a bare port literal anywhere, shell-locale.test.mjs
-    # scans all the shell code - so a Maestro flow, a fastlane lane or a doc
-    # can each fail Unit. Skipping on the classifier's unit list let such a
-    # change land unchecked. scripts/ci-suite-gates.test.mjs holds this job to
+    # ports.test.mjs rejects a bare port literal anywhere - so a Maestro flow, a
+    # fastlane lane or a doc can each fail Unit. Skipping on the classifier's
+    # unit list let such a change land unchecked. scripts/ci-suite-gates.test.mjs holds this job to
     # having no `if:`.
     uses: blinkbitcoin/shared-workflows/.github/workflows/check-unit.yml@f6e04492c80b4250f5878da52d8b422ec80a8dd4 # v0.16.0
   e2e:

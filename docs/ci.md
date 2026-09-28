@@ -198,12 +198,10 @@ change to a caller workflow or a Dependabot pin bump runs everything.
 `ci.yml` does not read it: there is no change the unit suite cannot affect
 here. `Unit` is not only Jest. It runs `test:scripts`, whose repository-wide
 guards read every tracked file, documentation included:
-`scripts/ports.test.mjs` rejects a bare port literal anywhere, and
-`scripts/shell-locale.test.mjs` scans all the shell code. The classifier's unit
-list ignores `.maestro/`, `e2e/`, `playwright.config.*`, `fastlane/`, the
-Gemfile and docs, so gating on it let
-a change to those alone land without the guards, to fail whichever PR ran `Unit`
-next. The cost is the minute or two `Unit` takes on a docs-only change.
+`scripts/ports.test.mjs` rejects a bare port literal anywhere. The classifier's
+unit list ignores `.maestro/`, `e2e/`, `playwright.config.*`, `fastlane/`, the
+Gemfile and docs, so gating on it let a change to those alone land without the
+guards, to fail whichever PR ran `Unit` next. The cost is the minute or two `Unit` takes on a docs-only change.
 
 Every gate is `!= 'false'`, never `== 'true'`: an output that never arrived,
 or a diff the classifier could not read, runs the suite. Three consequences

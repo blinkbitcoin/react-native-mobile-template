@@ -94,8 +94,8 @@ aggregates.
 | `make check-spell` | Spell-check with typos |
 | `make check-gen` | Generated-file drift (i18n, codegen) |
 | `make check-deps` | SDK drift, audit, lockfile provenance, licenses |
-| `make check-ci` | actionlint + zizmor (workflows) + shellcheck (scripts) |
-| `make check-docs` | Docs freshness, this file's command table vs the Makefile, table widths, mermaid blocks |
+| `make check-ci` | actionlint + zizmor + workflow names (workflows), shellcheck + locale prefixes (shell code) |
+| `make check-docs` | Docs freshness, this file's command table vs the Makefile, make target names, table widths,<br>mermaid blocks |
 | `make check-skills` | Only the offline skill tests under `.claude/skills/` (part of `make check-release`, which CI runs) |
 | `make check-prebuild` | Prebuild both platforms in a temp dir, assert plugin output |
 | `make check-release` | Ruby syntax + fastlane lane parse + lane unit tests + skill tests |
@@ -148,8 +148,9 @@ aggregates.
 - **Never set a locale as a command prefix in shell code.** Write
   `env LC_ALL=C grep ...`, not `LC_ALL=C grep ...`: with the prefix a Homebrew
   bash on macOS switches its own locale inside `$(...)` or a pipeline and now
-  and then dies with SIGSEGV (status 139). `scripts/shell-locale.test.mjs`
-  fails on the prefix and names the line.
+  and then dies with SIGSEGV (status 139). `check-shell-locale` (from
+  `@blinkbitcoin/dev-config`, run by `make check-ci`) fails on the prefix and
+  names the line.
 - **User-visible strings go through Lingui** (`t`/`Trans` macros), then
   `make gen-i18n`. No bare literals in JSX.
 - **Secrets go through `src/lib/secure-store`**, never `expo-secure-store`
@@ -206,20 +207,21 @@ aggregates.
   that does it.** `check-unused`, not `check-knip`; `check-code-scanning`, not
   `check-codeql`. A tool's name tells a reader nothing until they already know
   the tool; it belongs in the `##` description, where `make help` shows it.
-  `scripts/make-target-names.test.mjs` fails on a target with a word that names
-  a tool pinned in `.mise.toml` or a package in `package.json`; a `setup-`
-  target installs the tool it names, and any other exception needs an entry
-  with its reason.
+  `check-make-target-names` (from `@blinkbitcoin/dev-config`, run by
+  `make check-docs`) fails on a target with a word that names a tool pinned in
+  `.mise.toml` or a package in `package.json`; a `setup-` target installs the
+  tool it names, and any other exception needs an `--allow TARGET=REASON` in
+  `scripts/check-docs.sh`.
 - **Workflow files carry their stage in the name.** GitHub reads only the top
   level of `.github/workflows/`, so the prefix is the only grouping there is:
   `ci.yml` and `ci-*.yml` run on every change and display as `CI` /
   `CI / ...`; `cd-*.yml` make releases and display as `CD / ...`. A new
   workflow takes the prefix and the matching display name
-  (`scripts/workflow-names.test.mjs` fails otherwise). A rename updates every
-  reference in the same PR, not just the ones spelled `.yml`: `uses:` paths,
-  `gh workflow run` targets, `require-green-workflow`, `workflow_run` listeners
-  (they match the display name), the init manifest, docs, diagrams, README
-  tables and "Actions → ..." paths (the sidebar shows display names). Before
+  (`check-workflow-names`, run by `make check-ci`, fails otherwise). A rename
+  updates every reference in the same PR, not just the ones spelled `.yml`:
+  `uses:` paths, `gh workflow run` targets, `require-green-workflow`,
+  `workflow_run` listeners (they match the display name), the init manifest,
+  docs, diagrams, README tables and "Actions → ..." paths (the sidebar shows display names). Before
   pushing, `git grep` the old name without its suffix. Only `CHANGELOG.md`,
   `docs/superpowers/` and concurrency group names (renaming one changes which
   runs queue together) may still hold it.

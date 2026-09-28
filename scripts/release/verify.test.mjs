@@ -310,7 +310,7 @@ test('a grep that cannot run fails the check instead of passing it', () =>
 // grep reads bytes, not characters: a bundle is not valid UTF-8. The C locale
 // reaches grep through `env`, never as a `LC_ALL=C grep` prefix, which crashes
 // a forked bash on macOS now and then (see vc_grep, and
-// scripts/shell-locale.test.mjs for the guard). This pins the half a test can
+// check-shell-locale in make check-ci for the guard). This pins the half a test can
 // see: grep still gets LC_ALL=C, in both places that scan a bundle.
 test('both bundle scans hand grep the C locale', () =>
   withTempDir((dir) => {

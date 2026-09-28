@@ -186,11 +186,12 @@ check-deps: ## SDK drift, vulnerability audit, lockfile provenance, licenses
 # because zizmor otherwise looks for it at the nearest directory holding a
 # `.git` directory, and a worktree's `.git` is a file: under .claude/worktrees/
 # it would read the outer checkout's policy instead of this one's.
-check-ci: ## Lint the CI itself: actionlint + zizmor (workflows) + shellcheck (scripts)
+check-ci: ## Lint the CI itself: actionlint + zizmor + workflow names (workflows), shellcheck + locale prefixes (shell code)
 	bash scripts/shellcheck.sh
-	@if [ -d .github/workflows ]; then actionlint && zizmor --offline --min-severity medium --config .github/zizmor.yml .github; else echo "no workflows yet"; fi
+	pnpm exec check-shell-locale
+	@if [ -d .github/workflows ]; then actionlint && zizmor --offline --min-severity medium --config .github/zizmor.yml .github && pnpm exec check-workflow-names --group ci=CI --group cd=CD; else echo "no workflows yet"; fi
 
-check-docs: ## Docs freshness, AGENTS.md command table, table widths, mermaid blocks
+check-docs: ## Docs freshness, AGENTS.md command table, make target names, table widths, mermaid blocks
 	bash scripts/check-docs.sh
 
 # The skills' tests run here, in the recipe rather than as a prerequisite: they
