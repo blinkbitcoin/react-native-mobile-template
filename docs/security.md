@@ -323,7 +323,12 @@ regression. It also means `code.sh` needs network access every run - fetching
 what `--config p/...` does. `--metrics off` only stops telemetry; it does not
 make the run offline.
 
-**`rn-secret-in-async-storage` (`rules/react-native-secrets.yaml`) has two
+**`rn-secret-in-plain-storage` (`rules/react-native-secrets.yaml`)** reports a
+credential-named key written to unencrypted key-value storage: `AsyncStorage`,
+`expo-sqlite/kv-store` (the store this template uses, through `setItem`,
+`setItemSync` or `setItemAsync`), and the template's own `storage.set` wrapper
+in `src/lib/storage.ts`. It used to know only `AsyncStorage`, which this app
+does not use, so none of the app's own writes was checked. **It has two
 deliberate gaps.** It does not match an unqualified `key` identifier, so
 `keyExtractor` and `sortKey` are not reported - only identifiers that read as
 a credential, such as `apiKey` or `authToken`, trigger the rule. It also does

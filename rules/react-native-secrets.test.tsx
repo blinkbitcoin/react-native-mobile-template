@@ -1,38 +1,72 @@
-// ruleid: rn-secret-in-async-storage
+import Storage from 'expo-sqlite/kv-store';
+import { storage } from '@/lib/storage';
+
+// ruleid: rn-secret-in-plain-storage
 AsyncStorage.setItem('auth_token', token);
 
-// ruleid: rn-secret-in-async-storage
+// ruleid: rn-secret-in-plain-storage
 AsyncStorage.setItem(authToken, token);
 
-// ruleid: rn-secret-in-async-storage
+// ruleid: rn-secret-in-plain-storage
 AsyncStorage.setItem(apiKey, token);
 
-// ruleid: rn-secret-in-async-storage
+// ruleid: rn-secret-in-plain-storage
 AsyncStorage.setItem(accessKey, token);
 
-// ruleid: rn-secret-in-async-storage
+// ruleid: rn-secret-in-plain-storage
 AsyncStorage.setItem(sessionToken, token);
 
-// ruleid: rn-secret-in-async-storage
+// ruleid: rn-secret-in-plain-storage
 AsyncStorage.setItem(userPassword, token);
 
-// ruleid: rn-secret-in-async-storage
+// ruleid: rn-secret-in-plain-storage
 AsyncStorage.setItem(privateKey, token);
 
-// ok: rn-secret-in-async-storage
+// ok: rn-secret-in-plain-storage
 AsyncStorage.setItem('last_screen', name);
 
-// ok: rn-secret-in-async-storage
+// ok: rn-secret-in-plain-storage
 AsyncStorage.setItem(lastScreen, name);
 
-// ok: rn-secret-in-async-storage
+// ok: rn-secret-in-plain-storage
 AsyncStorage.setItem(keyExtractor, value);
 
-// ok: rn-secret-in-async-storage
+// ok: rn-secret-in-plain-storage
 AsyncStorage.setItem(keyboardHeight, value);
 
-// ok: rn-secret-in-async-storage
+// ok: rn-secret-in-plain-storage
 AsyncStorage.setItem(sortKey, value);
+
+// The store this template actually uses, under any of its writers.
+// ruleid: rn-secret-in-plain-storage
+Storage.setItem('auth_token', token);
+
+// ruleid: rn-secret-in-plain-storage
+Storage.setItemSync(refreshToken, token);
+
+// ruleid: rn-secret-in-plain-storage
+void Storage.setItemAsync(apiKey, token);
+
+// ok: rn-secret-in-plain-storage
+Storage.setItem('last_screen', name);
+
+// ok: rn-secret-in-plain-storage
+Storage.getItem(authToken);
+
+// The template's wrapper in front of kv-store, which is how app code writes.
+// ruleid: rn-secret-in-plain-storage
+void storage.set('session_token', token);
+
+// ruleid: rn-secret-in-plain-storage
+void storage.set(userPassword, token);
+
+// ok: rn-secret-in-plain-storage
+void storage.set('apollo-cache', snapshot);
+
+// Another object with a set() of its own is not the wrapper.
+const other = new Map();
+// ok: rn-secret-in-plain-storage
+other.set(authToken, token);
 
 // ruleid: rn-cleartext-fetch
 fetch('http://api.example.com/graphql');
