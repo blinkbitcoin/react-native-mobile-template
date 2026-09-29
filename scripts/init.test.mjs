@@ -897,6 +897,16 @@ describe('init --yes --no-web', async () => {
     assert.match(runbook, /the store notes and the OTA publish do not wait for\n/);
   });
 
+  // The cd-production.yml row names the web job and ci-web.yml; the rest of
+  // the row describes the release actions, which stay.
+  test("drops the web redeploy from docs/ci.md's cd-production.yml row and keeps the row", () => {
+    const ci = readFileSync(path.join(root, 'docs/ci.md'), 'utf8');
+    const row = ci.split('\n').find((line) => line.startsWith('| `cd-production.yml` |'));
+    assert.ok(row, 'the cd-production.yml row is gone');
+    assert.doesNotMatch(row, /build-web|redeploys Pages|base-url/);
+    assert.match(row, /<br>on `release` the store jobs wait for `security` \|$/);
+  });
+
   test('drops playwright.config from the unit ignore list and keeps the rest of it', () => {
     const ci = readFileSync(path.join(root, 'docs/ci.md'), 'utf8');
     assert.match(ci, /list ignores `\.maestro\/`, `e2e\/`, `fastlane\/`, the\nGemfile and docs/);

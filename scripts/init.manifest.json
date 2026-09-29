@@ -395,6 +395,10 @@
           ],
           ["`publish-ota.yml`, `build-web.yml`", "`publish-ota.yml`"],
           [
+            "on `release` the store jobs wait for `security`, and `web` redeploys Pages<br>with the same `base-url` as `ci-web.yml` |",
+            "on `release` the store jobs wait for `security` |"
+          ],
+          [
             "Two script-contract details are load-bearing:",
             "One script-contract detail is load-bearing:"
           ],
