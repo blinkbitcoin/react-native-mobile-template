@@ -10,7 +10,7 @@
 // pr-notes.sh writes is the one build-prepare reads back from the release.
 //
 // The shared scripts come from $WORKFLOWS_DIR, the checkout this run's
-// workflows were called at, as in shared-copies.test.mjs: locally the cases
+// workflows were called at, as in workflow-contract.test.mjs: locally the cases
 // skip unless it is set, and in CI a missing one fails.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
