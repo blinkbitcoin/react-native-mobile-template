@@ -16,7 +16,7 @@ internal testers see. The prompt was split between a fastlane file and code.
 Generate the store notes once, into the release PR body, and treat that text
 as final downstream.
 
-- `.github/workflows/cd-release.yml` — the `Store Notes` job calls the
+- `.github/workflows/cd-release.yml` — the `Release notes` job calls the
   shared `pr-release-notes.yml` with the PR's number and branch; it is the only
   job that may call an LLM.
 - `release-notes.prompt.md` — the whole system prompt, versioned at the root.

@@ -32,7 +32,7 @@ flowchart TD
     sec -->|"verdict"| badges
   end
 
-  CI -->|"push to main"| rp["CD / Release<br/>(release-please, then Store Notes<br/>drafted into the release PR)"]
+  CI -->|"push to main"| rp["CD / Release<br/>(release-please, then the release notes<br/>drafted into the release PR)"]
   CI -->|"push to main"| internal
 
   subgraph internal["CD / Internal"]
@@ -153,8 +153,13 @@ are joined into one ERE, so a stray leading, trailing or doubled `|` is
 path, which would classify every change as docs-only and skip the whole matrix
 green. A pattern that fails to compile for any other reason runs everything and
 says so with a `::notice::`. `cd-internal.yml`
-keeps its `paths-ignore`: that one is not a docs classification but a "do not
-cut a build for this" rule, and it calls no classifier.
+keeps a path filter of its own: that one is not a docs classification but a
+"do not cut a build for this" rule, and it calls no classifier. It is a `paths`
+list with negations rather than `paths-ignore`, because the last matching
+pattern wins there: `*.prompt.md` ends in `.md` but is not documentation
+(`release-notes.prompt.md` shapes the store notes the build ships), and only a
+`paths` list can take it back. `scripts/release-workflows.test.mjs` evaluates
+the filter the way GitHub does.
 
 ### Running CI locally
 
@@ -233,7 +238,7 @@ empty and quietly run every suite.
 | `cd-release.yml` | `push` to `main` (all paths), `workflow_dispatch` | `googleapis/release-please-action@v5`, `pr-release-notes.yml` | Keeps one release PR open, dispatches `ci.yml` on its branch and drafts the<br>`## Store notes` section into its body (the only job that may call an LLM).<br>On a cut release, dispatches `cd-beta.yml` and `ci-web.yml` at the tag |
 | `cd-internal.yml` | `push` to `main` (skipping `docs/**`, `**.md`), `workflow_dispatch` | `build-prepare.yml`, `build-ios.yml`, `build-android.yml`,<br>`publish-store.yml`, `publish-github-release.yml`, `publish-ota.yml` | The only workflow that builds binaries |
 | `cd-beta.yml` | `workflow_dispatch` (`tag`), from `cd-release.yml` or by hand | `build-prepare.yml`, `publish-store.yml`, `publish-github-release.yml`, `publish-ota.yml` | Promotes the binary internal already built and tested. Never builds |
-| `cd-production.yml` | `workflow_dispatch` (`tag`, `action`) | `build-prepare.yml`, `check-security.yml`, `publish-store.yml`, `publish-github-release.yml`, `publish-ota.yml`, `build-web.yml` | `action` selects release, rollout, halt, resume or complete;<br>on `release` the store jobs wait for `security` |
+| `cd-production.yml` | `workflow_dispatch` (`tag`, `action`) | `build-prepare.yml`, `check-security.yml`, `publish-store.yml`, `publish-github-release.yml`, `publish-ota.yml`, `build-web.yml` | `action` selects release, rollout, halt, resume or complete;<br>on `release` the store jobs wait for `security`, and `web` redeploys Pages<br>with the same `base-url` as `ci-web.yml` |
 | `cd-beta-retry.yml` | `workflow_run` on a completed `CD / Internal` (its display name) for `main` | nothing: it re-runs a failed beta run with `gh` | Closes the hole where the beta dispatch arrives once, before internal is green |
 | `cd-ota-hotfix.yml` | `workflow_dispatch` (`channel`, `ref`, rollout) | `publish-ota.yml` | JavaScript-only fixes. The fingerprint gate rejects anything native |
 | `cd-store-listing.yml` | `workflow_dispatch` (`direction`, `platforms`, `dry_run`) | `publish-store.yml` (twice: iOS and Android) | The store *page*, not a release: `sync_metadata` pushes `fastlane/metadata/**`<br>to App Store Connect and Play, `pull_metadata` reports what they hold. Both<br>jobs run on the `production` environment, behind its reviewers, and are gated<br>on `STORE_METADATA_SYNC_ENABLED` |
@@ -476,7 +481,7 @@ one, and several carry many: `cd-production.yml` alone has twelve.
 `cd-beta-retry.yml` calls no reusable workflow at all.
 
 ```yaml
-uses: blinkbitcoin/shared-workflows/.github/workflows/check-code.yml@f6e04492c80b4250f5878da52d8b422ec80a8dd4 # v0.16.0
+uses: blinkbitcoin/shared-workflows/.github/workflows/check-code.yml@99aa209e2b5993f816b08db4054074e10c3d2af5 # v0.16.0
 ```
 
 A shared-workflows release changes nothing here by itself

@@ -22,6 +22,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import test, { describe } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { parse } from 'yaml';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const GATE = 'STORE_UPLOADS_ENABLED';
@@ -241,7 +242,7 @@ describe('cd-release.yml chains the release by dispatch', () => {
 
   test('a second job drafts the store notes into the release PR through shared-workflows', () => {
     const job =
-      /store-notes:\n\s+name: Store Notes\n\s+needs: release-please\n[\s\S]*?uses: [^\n]*\/shared-workflows\/\.github\/workflows\/pr-release-notes\.yml@[0-9a-f]{40}\b/;
+      /store-notes:\n\s+name: Release notes\n\s+needs: release-please\n[\s\S]*?uses: [^\n]*\/shared-workflows\/\.github\/workflows\/pr-release-notes\.yml@[0-9a-f]{40}\b/;
     assert.match(code, job, 'no store-notes job calling pr-release-notes.yml');
     assert.match(code, /if: \$\{\{ needs\.release-please\.outputs\.pr-number != '' \}\}/);
     assert.match(code, /pull-requests: write/);
@@ -560,5 +561,57 @@ describe('the security gate', () => {
         );
       }
     });
+  });
+});
+
+// GitHub's push path filter, for the patterns these workflows use: `**`
+// matches across directories, `*` within one, a `!` pattern excludes, and the
+// last pattern that matches a path decides. Node's own glob matcher differs
+// (its `**.md` does not match a nested file), so it cannot stand in.
+function pushFilterRuns(patterns, changed) {
+  // Split on `**` first, so its halves' single `*`s cannot be mistaken for it.
+  const segment = (part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*');
+  const toRegExp = (glob) => new RegExp(`^${glob.split('**').map(segment).join('.*')}$`);
+  return changed.some((file) => {
+    let included = false;
+    for (const pattern of patterns) {
+      const negated = pattern.startsWith('!');
+      if (toRegExp(negated ? pattern.slice(1) : pattern).test(file)) included = !negated;
+    }
+    return included;
+  });
+}
+
+describe('cd-internal.yml builds every commit to main except a docs-only one', () => {
+  const push = parse(readFileSync(path.join(root, '.github/workflows/cd-internal.yml'), 'utf8')).on
+    .push;
+
+  test('it filters with paths, not paths-ignore, which cannot take a pattern back', () => {
+    assert.equal(push['paths-ignore'], undefined);
+    assert.ok(Array.isArray(push.paths));
+  });
+
+  test('a docs-only commit cuts no build', () => {
+    assert.equal(
+      pushFilterRuns(push.paths, ['docs/ci.md', 'README.md', 'docs/images/a/b.svg']),
+      false,
+    );
+  });
+
+  test('a commit that changes only a prompt builds, in any directory', () => {
+    // release-notes.prompt.md feeds the store notes the internal build ships.
+    assert.equal(pushFilterRuns(push.paths, ['release-notes.prompt.md']), true);
+    assert.equal(pushFilterRuns(push.paths, ['docs/security-review.prompt.md']), true);
+  });
+
+  test('a commit that changes code builds, with or without docs beside it', () => {
+    assert.equal(pushFilterRuns(push.paths, ['src/app/index.tsx']), true);
+    assert.equal(pushFilterRuns(push.paths, ['docs/ci.md', 'package.json']), true);
+  });
+
+  test('the filter evaluator follows GitHub: ** crosses directories, * does not', () => {
+    assert.equal(pushFilterRuns(['**.md'], ['a/b/README.md']), true);
+    assert.equal(pushFilterRuns(['*.md'], ['a/README.md']), false);
+    assert.equal(pushFilterRuns(['**', '!a/**'], ['a/x.ts']), false);
   });
 });
