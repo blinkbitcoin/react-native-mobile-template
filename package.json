@@ -92,7 +92,7 @@
     "test:scripts": "node --test --experimental-test-coverage --test-coverage-include=\"scripts/**/*.mjs\" --test-coverage-lines=100 --test-coverage-branches=100 --test-coverage-functions=100 \"scripts/**/*.test.mjs\"",
     "test": "jest",
     "test:coverage": "jest --coverage && pnpm check:coverage-empty",
-    "check:coverage-empty": "node scripts/check-coverage-empty.mjs",
+    "check:coverage-empty": "check-coverage-empty",
     "badges:render": "node scripts/badges/render.mjs",
     "test:e2e:ios": "bash scripts/e2e/maestro-ios.sh",
     "test:e2e:android": "bash scripts/e2e/maestro-android.sh",

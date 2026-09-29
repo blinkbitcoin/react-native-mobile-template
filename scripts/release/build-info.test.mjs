@@ -66,3 +66,24 @@ test('stage defaults to development and workflowRunId is null off CI', () => {
   assert.equal(info.stage, 'development');
   assert.equal(info.workflowRunId, null);
 });
+
+// With no version in the environment the script resolves one itself, through
+// the resolve-version.sh @blinkbitcoin/dev-config ships (the one `make version`
+// and CI run). That is what makes a bare local run work at all.
+test('an unset version and build number are resolved through the package script', () => {
+  const info = buildInfo({ APP_VERSION: '', APP_BUILD_NUMBER: '' });
+  assert.match(info.version, /^\d+\.\d+\.\d+$/);
+  assert.ok(Number.isInteger(info.buildNumber) && info.buildNumber > 1000, `${info.buildNumber}`);
+  const expected = execFileSync(
+    'bash',
+    ['node_modules/@blinkbitcoin/dev-config/release/resolve-version.sh'],
+    {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      env: { ...process.env, GITHUB_OUTPUT: '' },
+    },
+  );
+  assert.match(expected, new RegExp(`^APP_VERSION=${info.version.replaceAll('.', '\\.')}$`, 'm'));
+  assert.match(expected, new RegExp(`^APP_BUILD_NUMBER=${info.buildNumber}$`, 'm'));
+});

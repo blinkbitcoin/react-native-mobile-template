@@ -17,7 +17,8 @@ Conventional commits in, one release PR out; merging it is the only human step.
 - `release-please-config.json` + `.release-please-manifest.json`, **manifest
   mode only** — an inline `release-type` makes the action ignore both files.
 - The release PR **must be squash- or rebase-merged**: a merge commit hides the
-  release subject, so `scripts/release/resolve-version.sh` also reads `HEAD^2`.
+  release subject, so `resolve-version.sh` also reads `HEAD^2` (the shared
+  script; `make version` runs it from `@blinkbitcoin/dev-config`).
   Order: HEAD tag → release commit → `RELEASE_PR_TITLE` → open PR → patch+1.
 - Build number = first-parent commit count + `BUILD_NUMBER_OFFSET` (default
   1000): cross-platform, monotonic, idempotent; set in `app.config.ts`, no `sed`.

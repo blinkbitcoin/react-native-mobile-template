@@ -167,7 +167,8 @@ vc_fail_group() { # <detail> <check>...
 # fork-safe: the child dies with SIGSEGV now and then, and the check reads
 # `grep failed with status 139` -- a crash in bash, not in grep, and nothing to
 # do with the bundle. `env` sets the variable only for grep's own process, so
-# bash never changes locale. scripts/shell-locale.test.mjs keeps the prefix out.
+# bash never changes locale. check-shell-locale (make check-ci) keeps the
+# prefix out.
 VC_GREP_OUTPUT=''
 VC_GREP_ERROR=''
 

@@ -4,7 +4,8 @@
 #   { sha, version, buildNumber, stage, fingerprint: { ios, android },
 #     expoSdk, reactNative, workflowRunId, artifacts: {} }
 #
-# Version/build default to scripts/release/resolve-version.sh when APP_VERSION /
+# Version/build default to resolve-version.sh (from @blinkbitcoin/dev-config, the
+# script `make version` and CI run) when APP_VERSION /
 # APP_BUILD_NUMBER are not already in the environment, so this is safe to run
 # locally as well as from CI. `artifacts` starts empty; the release workflow
 # fills it in as each artifact lands.
@@ -22,7 +23,7 @@ run_id="${GITHUB_RUN_ID:-}"
 if [ -z "${APP_VERSION:-}" ] || [ -z "${APP_BUILD_NUMBER:-}" ]; then
   # GITHUB_OUTPUT is cleared so resolving here never writes step outputs the
   # caller did not ask for.
-  resolved="$(GITHUB_OUTPUT='' bash scripts/release/resolve-version.sh)"
+  resolved="$(GITHUB_OUTPUT='' bash node_modules/@blinkbitcoin/dev-config/release/resolve-version.sh)"
   APP_VERSION="${APP_VERSION:-$(printf '%s\n' "$resolved" | sed -n 's/^APP_VERSION=//p')}"
   APP_BUILD_NUMBER="${APP_BUILD_NUMBER:-$(printf '%s\n' "$resolved" | sed -n 's/^APP_BUILD_NUMBER=//p')}"
 fi

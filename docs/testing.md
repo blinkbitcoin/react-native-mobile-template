@@ -110,20 +110,16 @@ would otherwise have that code measured too. The suites include:
 | `scripts/check-licenses.test.mjs` | The SPDX allowlist logic |
 | `scripts/check-lockfile.test.mjs` | Lockfile provenance: only registry resolution shapes pass, plus the shared tooling package at the workflows pin |
 | `scripts/tooling-pin.test.mjs` | The shared tooling package's pin: the one workflows commit, and `make fix-tooling-pin` |
-| `scripts/check-coverage-empty.test.mjs` | The empty-coverage-row parser |
 | `scripts/init.test.mjs` | The template rename and web-removal script behind `make init` |
 | `scripts/hooks/install-if-lockfile-changed.test.mjs` | The post-merge / post-checkout lockfile-install hook |
-| `scripts/release/resolve-version.test.mjs` | Version resolution for a build |
 | `scripts/release/notes.test.mjs` | Store notes from a release body or from commits |
 | `scripts/release/verify.test.mjs` | The artifact verification helpers |
 | `scripts/release/fingerprint.test.mjs` | The fingerprint and OTA plumbing |
 | `scripts/release/build-info.test.mjs` | The per-build provenance record |
-| `scripts/shell-locale.test.mjs` | The guard against `LC_ALL=C cmd` locale prefixes in tracked shell code (see `AGENTS.md`) |
-| `scripts/make-target-names.test.mjs` | That no make target is named after the tool it runs (`check-unused`, not `check-knip`; see `AGENTS.md`) |
 | `scripts/test-siblings.test.mjs` | That every source file has its own sibling test, and that no route test sits under `src/app/`<br>(see [One test file per module](#one-test-file-per-module)) |
 | `scripts/worktree-ignores.test.mjs` | That every tool which walks the tree skips `.claude/worktrees/`, anchored to the root<br>(see [quality.md](quality.md#worktrees-inside-the-checkout-are-not-this-checkout)) |
 | `scripts/coverage-completeness.test.mjs` | Loads every `scripts/**/*.mjs` module, so one no test imports still counts |
-| `scripts/release/shared-copies.test.mjs` | Our `resolve-version.sh` and `build-info.sh` against shared-workflows' copies, read from `$WORKFLOWS_DIR`.<br>CI always compares; locally they skip unless `WORKFLOWS_DIR` points at a checkout |
+| `scripts/release/shared-copies.test.mjs` | Our `build-info.sh` against shared-workflows' copy, read from `$WORKFLOWS_DIR`.<br>CI always compares; locally it skips unless `WORKFLOWS_DIR` points at a checkout |
 | `scripts/workflow-contract.test.mjs` | Every shared-workflows call pinned to the same commit SHA with its version beside it, the shared tooling package<br>at that commit, and every call's inputs, secrets and read outputs against what the called workflow declares<br>at `$WORKFLOWS_DIR`, which must be that commit |
 | `scripts/ci-suite-gates.test.mjs` | `ci.yml`'s `unit`, `e2e` and `badges` jobs evaluated together for each kind of change, and `unit` held to having<br>no gate (see [ci.md](ci.md#skipping-a-suite-the-change-cannot-affect)) |
 | `scripts/release/cd-notes.test.mjs` | The store notes the way CD drafts them: cd-release's build-env through the shared `build-env.sh`, `pr-notes.sh` on<br>a real release PR body with a `gh` shim and a local model, then the shared `notes.sh` reading the section back |
@@ -133,8 +129,7 @@ would otherwise have that code measured too. The suites include:
 | `scripts/security/runners.test.mjs` | The bash runners (`deps.sh`, `code.sh`, `policy.sh`, `local.sh`): enabled, disabled and missing-tool paths |
 
 These run in `make ci` (and in CI's Unit job), **not** in `make check`, which
-is the static gates only. The port guard in `scripts/ports.test.mjs`, the
-locale-prefix guard in `scripts/shell-locale.test.mjs` and the
+is the static gates only. The port guard in `scripts/ports.test.mjs` and the
 `make init` manifest coverage live here, so a change that passes `make check`
 can still fail Unit on the runner — and Unit gates E2E, so the E2E run you
 wanted never starts. These guards read every tracked file, which is why CI
@@ -241,9 +236,9 @@ A re-export barrel or a type-only module has zero statements. istanbul prints
 it as 0% in every column while the totals stay at 100%, so it is a silent way
 to add an untested file without moving the number.
 
-`test:coverage` runs `scripts/check-coverage-empty.mjs` after Jest, so `make test-coverage` and
-CI's Unit job both make the check. It reads
-`coverage/coverage-summary.json` — which is why `json-summary` is in
+`test:coverage` runs `check-coverage-empty` (from `@blinkbitcoin/dev-config`)
+after Jest, so `make test-coverage` and CI's Unit job both make the check. It
+reads `coverage/coverage-summary.json` — which is why `json-summary` is in
 `coverageReporters` — and fails naming any file with `statements.total === 0`.
 The fix is always the same: ignore the file with a reason, or give it code
 worth testing.

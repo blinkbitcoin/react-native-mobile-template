@@ -266,9 +266,11 @@ and takes Play to 100%. `action: halt` stops both. See
 
 ## Versions and build numbers
 
-- **Version** comes from `scripts/release/resolve-version.sh`: a stable `vX.Y.Z`
-  tag on HEAD → a HEAD subject of `chore(<scope>): release X.Y.Z` → the open
-  release PR's title → the newest stable tag with its patch bumped → `0.0.1`.
+- **Version** comes from `resolve-version.sh`, the shared script CI runs and
+  `make version` runs from `node_modules/@blinkbitcoin/dev-config/release/`: a
+  stable `vX.Y.Z` tag on HEAD → a HEAD subject of
+  `chore(<scope>): release X.Y.Z` → the open release PR's title → the newest
+  stable tag with its patch bumped → `0.0.1`.
   Prerelease tags are ignored at every step. Internal builds therefore already
   carry the version that will be released.
   - `<scope>` is the **release branch's name**, because that is what
@@ -884,8 +886,9 @@ The bundle scans run `grep` in the C locale through `env LC_ALL=C grep`, not a
 own locale inside a forked subshell, which calls into CoreFoundation where that
 is not fork-safe, and now and then the subshell dies with SIGSEGV:
 `FAIL dev-server: could not scan the bundle: grep failed with status 139`,
-intermittently, on a bundle that was fine. `scripts/shell-locale.test.mjs`
-keeps the prefix out of every tracked shell file.
+intermittently, on a bundle that was fine. `check-shell-locale` (from
+`@blinkbitcoin/dev-config`, run by `make check-ci`) keeps the prefix out of
+every tracked shell file.
 
 **`--strict`** turns a skip caused by a *missing tool* into a `FAIL`, so a gate
 cannot report success having verified nothing. It is on automatically whenever

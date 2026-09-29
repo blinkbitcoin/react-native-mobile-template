@@ -203,12 +203,11 @@ change to a caller workflow or a Dependabot pin bump runs everything.
 `ci.yml` does not read it: there is no change the unit suite cannot affect
 here. `Unit` is not only Jest. It runs `test:scripts`, whose repository-wide
 guards read every tracked file, documentation included:
-`scripts/ports.test.mjs` rejects a bare port literal anywhere, and
-`scripts/shell-locale.test.mjs` scans all the shell code. The classifier's unit
-list ignores `.maestro/`, `e2e/`, `playwright.config.*`, `fastlane/`, the
-Gemfile and docs, so gating on it let
-a change to those alone land without the guards, to fail whichever PR ran `Unit`
-next. The cost is the minute or two `Unit` takes on a docs-only change.
+`scripts/ports.test.mjs` rejects a bare port literal anywhere. The classifier's
+unit list ignores `.maestro/`, `e2e/`, `playwright.config.*`, `fastlane/`, the
+Gemfile and docs, so gating on it let a change to those alone land without the
+guards, to fail whichever PR ran `Unit` next. The cost is the minute or two
+`Unit` takes on a docs-only change.
 
 Every gate is `!= 'false'`, never `== 'true'`: an output that never arrived,
 or a diff the classifier could not read, runs the suite. Three consequences
@@ -257,7 +256,7 @@ locally means the same commands passed the same way in CI.
 
 | CI job | Scripts it runs | Local equivalent |
 | --- | --- | --- |
-| `check-code.yml` | `typecheck`, `lint`, `format:check`, `knip`, `spell`, `expo-doctor`, `pnpm audit --prod`,<br>commitlint, actionlint, zizmor, shellcheck, `check:docs`, `check:release`, `check:secrets` | `make check-code`, `make check-deps`, `make check-ci`, `make check-docs`,<br>`make check-release`, `make check-secrets` (`make check` runs all of it) |
+| `check-code.yml` | `typecheck`, `lint`, `format:check`, `knip`, `spell`, `expo-doctor`, `pnpm audit --prod`,<br>commitlint, actionlint, zizmor, shellcheck, `check:docs`, `check:release`, `check:secrets`.<br>`check:ci` also runs the shell-locale and workflow-name guards, `check:docs` the make-target-name guard<br>(all three from `@blinkbitcoin/dev-config`) | `make check-code`, `make check-deps`, `make check-ci`, `make check-docs`,<br>`make check-release`, `make check-secrets` (`make check` runs all of it) |
 | `check-unit.yml` | `test:coverage`, `test:scripts` | `make test-coverage`, `make test-scripts` (`make test-unit` runs `test` + `test:scripts`);<br>both gate coverage at 100%; `test:scripts` includes the `make setup` suite |
 | `check-e2e.yml` | Maestro flows in `.maestro/` against a debug build | `make test-e2e-ios` / `make test-e2e-android` (after `make dev-api`, `make dev`, `make dev-ios`/`make dev-android`) |
 | `build-web.yml` | `build:web`, `test:e2e:web` | `make build-web`, `make test-e2e-web` |

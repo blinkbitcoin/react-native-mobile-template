@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Four checks, in this order:
+# Five checks, in this order:
 #
 #   1. Advisory (warn, exit 0): architecture-relevant paths changed vs the base
 #      without a docs/ change. A package.json counts only when the change is
@@ -10,10 +10,13 @@
 #      `##`-documented targets must agree in BOTH directions. The Makefile is
 #      read at run time, so a target added by a later change fails this check
 #      until AGENTS.md gains a row for it (and vice versa).
-#   3. Strict (fail, exit 1): no markdown table cell line is wider than the
-#      house limit (scripts/check-docs-tables.mjs).
-#   4. Strict (fail, exit 1): every fenced ```mermaid block parses
-#      (scripts/check-diagrams.mjs) — skips with a warning when the pinned CLI
+#   3. Strict (fail, exit 1): no documented make target is named after the
+#      tool it runs (check-make-target-names, from @blinkbitcoin/dev-config),
+#      the AGENTS.md rule beside the command table.
+#   4. Strict (fail, exit 1): no markdown table cell line is wider than the
+#      house limit (check-docs-tables, from @blinkbitcoin/dev-config).
+#   5. Strict (fail, exit 1): every fenced ```mermaid block parses
+#      (check-diagrams, from @blinkbitcoin/dev-config) — skips with a warning when the pinned CLI
 #      cannot be fetched.
 #
 # Env (CI): EVENT_NAME, BASE_REF, PR_AUTHOR. Everywhere else the base is
@@ -130,13 +133,17 @@ if [ "$fail" -ne 0 ]; then
   exit 1
 fi
 
-node scripts/check-docs-tables.mjs
+# The one exception, with its reason; an --allow that stops applying fails too.
+pnpm exec check-make-target-names \
+  --allow 'gen-graphql=GraphQL is what it generates, the typed documents, not the tool that does it'
+
+pnpm exec check-docs-tables
 # --all in CI: the changed-file shortcut is a local convenience, and a CI run is
 # the place where checking every diagram is worth the minute it costs.
 if [ -n "${EVENT_NAME:-}" ]; then
-  node scripts/check-diagrams.mjs --all
+  pnpm exec check-diagrams --all
 else
-  node scripts/check-diagrams.mjs
+  pnpm exec check-diagrams
 fi
 
 echo "docs check ok"

@@ -13,7 +13,7 @@
 // the implementation it displaced.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import test, { describe } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -163,4 +163,71 @@ test('shellcheck.sh walks the tree instead of globbing to a fixed depth', () => 
     /scripts\/\*\/\*\//,
     'shellcheck.sh is back to a fixed-depth glob and will skip deeper scripts',
   );
+});
+
+// Six guards and the version script are not ours any more: they come from
+// @blinkbitcoin/dev-config, at the commit the workflows pin. A copy deleted in
+// favour of a bin is only as good as the call that replaced it, so each call is
+// pinned here, in the gate CI runs it from: `check:ci` (make check-ci) and
+// `check:docs` (make check-docs) run on every change in the Checks job.
+describe('the shared tooling guards run where CI runs them', () => {
+  const PACKAGE = 'node_modules/@blinkbitcoin/dev-config';
+  const RESOLVE_VERSION = `${PACKAGE}/release/resolve-version.sh`;
+
+  /** The recipe lines of a Makefile target, joined. */
+  function recipe(makefile, target) {
+    const lines = makefile.split('\n');
+    const start = lines.findIndex((line) => line.startsWith(`${target}:`));
+    assert.notEqual(start, -1, `the Makefile has no ${target} target`);
+    const body = [];
+    for (const line of lines.slice(start + 1)) {
+      if (!line.startsWith('\t')) break;
+      body.push(line);
+    }
+    return body.join('\n');
+  }
+
+  const code = (rel) =>
+    read(rel)
+      .split('\n')
+      .filter((line) => !line.trimStart().startsWith('#'))
+      .join('\n');
+  const makefile = read('Makefile');
+
+  test('the recipe reader stops at the next target', () => {
+    const sample = 'a: ## A\n\tone\n\ttwo\n\nb: ## B\n\tthree\n';
+    assert.equal(recipe(sample, 'a'), '\tone\n\ttwo');
+    assert.equal(recipe(sample, 'b'), '\tthree');
+  });
+
+  test('make check-ci runs the shell locale and workflow name guards', () => {
+    const ci = recipe(makefile, 'check-ci');
+    assert.match(ci, /pnpm exec check-shell-locale/);
+    assert.match(ci, /pnpm exec check-workflow-names --group ci=CI --group cd=CD/);
+  });
+
+  test('check-docs.sh runs the tables, diagrams and make target name guards', () => {
+    const docs = code('scripts/check-docs.sh');
+    assert.match(docs, /pnpm exec check-docs-tables/);
+    assert.match(
+      docs,
+      /if \[ -n "\$\{EVENT_NAME:-\}" \]; then\n\s*pnpm exec check-diagrams --all\nelse\n\s*pnpm exec check-diagrams\n/,
+      'check-diagrams must check every diagram under CI (EVENT_NAME set)',
+    );
+    assert.match(docs, /pnpm exec check-make-target-names \\\n\s*--allow 'gen-graphql=\S/);
+  });
+
+  test('test:coverage runs the empty-row guard from the package', () => {
+    assert.match(pkg.scripts['test:coverage'], /&& pnpm check:coverage-empty$/);
+    assert.equal(pkg.scripts['check:coverage-empty'], 'check-coverage-empty');
+  });
+
+  test('make version and build-info.sh resolve the version with the package script', () => {
+    assert.match(recipe(makefile, 'version'), new RegExp(`^\\tbash ${RESOLVE_VERSION}$`));
+    assert.ok(
+      code('scripts/release/build-info.sh').includes(`bash ${RESOLVE_VERSION})`),
+      'build-info.sh must fall back to the package resolve-version.sh',
+    );
+    assert.ok(existsSync(path.join(root, RESOLVE_VERSION)), `${RESOLVE_VERSION} is not installed`);
+  });
 });
