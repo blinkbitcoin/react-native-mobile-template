@@ -5,6 +5,22 @@ by [release-please](https://github.com/googleapis/release-please) from
 [Conventional Commits](https://www.conventionalcommits.org/) — edit the commit
 messages, not this file. See [docs/release-runbook.md](docs/release-runbook.md).
 
+## [0.10.0](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.9.0...v0.10.0) (2026-09-29)
+
+
+### Features
+
+* **ci:** publish the security verdict as a Security badge ([#99](https://github.com/blinkbitcoin/react-native-mobile-template/issues/99)) ([da3e7f6](https://github.com/blinkbitcoin/react-native-mobile-template/commit/da3e7f68b61df57c3d0b35c54db625374d6aecec))
+
+
+### Bug Fixes
+
+* **ci:** cut an internal build for a commit that changes only a prompt ([#104](https://github.com/blinkbitcoin/react-native-mobile-template/issues/104)) ([7b38b15](https://github.com/blinkbitcoin/react-native-mobile-template/commit/7b38b157831636154a63ef00d41b37f4ceca9711))
+* **ci:** deploy the production web release under the same base path as ci-web ([#103](https://github.com/blinkbitcoin/react-native-mobile-template/issues/103)) ([b83df84](https://github.com/blinkbitcoin/react-native-mobile-template/commit/b83df84bdecea21e437241b203f3f3238c12c198))
+* **ci:** pin shared-workflows to the v0.16.0 release commit ([#102](https://github.com/blinkbitcoin/react-native-mobile-template/issues/102)) ([32a40c2](https://github.com/blinkbitcoin/react-native-mobile-template/commit/32a40c2c41af3fd30acb723766c159ff78f2aa2e))
+* **tooling:** check secrets written to the key-value store this app actually uses ([#105](https://github.com/blinkbitcoin/react-native-mobile-template/issues/105)) ([b02ca30](https://github.com/blinkbitcoin/react-native-mobile-template/commit/b02ca3059563e50a62b272fa8c3099bd3b4005f4))
+* **tooling:** scrub the web redeploy from docs/ci.md under make init --no-web ([#107](https://github.com/blinkbitcoin/react-native-mobile-template/issues/107)) ([4c6106f](https://github.com/blinkbitcoin/react-native-mobile-template/commit/4c6106fd0de60a1395c99c8680f882188cd59423))
+
 ## [0.9.0](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.8.0...v0.9.0) (2026-09-28)
 
 
