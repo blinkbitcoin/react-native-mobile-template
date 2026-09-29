@@ -153,8 +153,13 @@ are joined into one ERE, so a stray leading, trailing or doubled `|` is
 path, which would classify every change as docs-only and skip the whole matrix
 green. A pattern that fails to compile for any other reason runs everything and
 says so with a `::notice::`. `cd-internal.yml`
-keeps its `paths-ignore`: that one is not a docs classification but a "do not
-cut a build for this" rule, and it calls no classifier.
+keeps a path filter of its own: that one is not a docs classification but a
+"do not cut a build for this" rule, and it calls no classifier. It is a `paths`
+list with negations rather than `paths-ignore`, because the last matching
+pattern wins there: `*.prompt.md` ends in `.md` but is not documentation
+(`release-notes.prompt.md` shapes the store notes the build ships), and only a
+`paths` list can take it back. `scripts/release-workflows.test.mjs` evaluates
+the filter the way GitHub does.
 
 ### Running CI locally
 
