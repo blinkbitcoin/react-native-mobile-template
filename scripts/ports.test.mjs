@@ -224,8 +224,8 @@ test('ci.yml builds the iOS E2E app against the default mock API port', () => {
   const url = mockApiUrl(resolvePorts({}).mockApi);
   assert.match(
     ci,
-    new RegExp(`^\\s*build-env: '\\{"EXPO_PUBLIC_API_URL":"${url}"\\}'$`, 'm'),
-    `ci.yml must pass build-env with EXPO_PUBLIC_API_URL=${url}`,
+    new RegExp(`^\\s*environment-variables: '\\{"EXPO_PUBLIC_API_URL":"${url}"\\}'$`, 'm'),
+    `ci.yml must pass environment-variables with EXPO_PUBLIC_API_URL=${url}`,
   );
 });
 
@@ -279,7 +279,7 @@ const PORT_LITERALS = [BASE_DEFAULT, 8081, 8082, 8083, 8089, 4000];
 //
 // What is deliberately NOT a branch: a colon followed by a space. `webPreview:
 // 8083` would be nice to catch, but `{ testflight: 4000, play: 500 }` in
-// scripts/release/notes.mjs and `limit: 4000` in fastlane/ are the App Store
+// the store notes generator and `limit: 4000` in fastlane/ are the App Store
 // note character limit, not ports, and they are the same shape. Keying on a
 // `port` token instead keeps every real consumer covered (a key holding a port
 // is called `port`) without allowlisting two release files that have nothing to
@@ -307,7 +307,7 @@ const ALLOWED = [
   ['CHANGELOG.md', 'generated release history'],
   [
     '.github/workflows/ci.yml',
-    'the iOS E2E build-env URL, which must be a literal (the build job precedes the mock API job, on another runner) and is pinned above',
+    'the iOS E2E environment-variables URL, which must be a literal (the build job precedes the mock API job, on another runner) and is pinned above',
   ],
 ];
 

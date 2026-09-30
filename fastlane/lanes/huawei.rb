@@ -175,7 +175,7 @@ end
 # AppGallery takes the changelog as a file path, and the file it takes is a
 # throwaway: nothing in fastlane/metadata describes an AppGallery release.
 def with_huawei_changelog
-  require_env!(%w[RELEASE_NOTES_STORE_FILE])
+  require_env!(%w[STORE_NOTES_FILE])
   text = store_notes(HUAWEI_NOTES_LIMIT)
   if text.length < HUAWEI_NOTES_MINIMUM
     UI.important(

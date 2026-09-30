@@ -1,14 +1,19 @@
 #!/usr/bin/env node
 // The security scanning settings, resolved in one order everywhere: an
-// environment variable wins over security-policy.json, which wins over the
+// environment variable wins over security-settings.json, which wins over the
 // built-in default. Bash runners read one key at a time
 //
-//     node scripts/security/config.mjs get jobs.deps
+//     node scripts/security/settings.mjs get jobs.dependencies
 //
 // and CI reads the lot with `--json`. A value that is not a boolean throws
 // rather than reading as off: a typo must not quietly disable a scanner.
 import { readFileSync } from 'node:fs';
-import { EFFORTS } from '../lib/llm/index.mjs';
+
+// The efforts @blinkbitcoin/app-tooling/llm accepts, written out rather than
+// imported: check-security.yml's Settings job runs this file before any
+// install, so it may import nothing outside node itself. settings.test.mjs
+// holds the two lists equal.
+export const EFFORTS = ['none', 'low', 'medium', 'high', 'max'];
 
 export const SEVERITIES = ['none', 'low', 'medium', 'high', 'critical'];
 export const PROVIDERS = ['', 'openai', 'anthropic'];
@@ -23,7 +28,7 @@ export const DEFAULTS = {
   severity: 'high',
   failOn: ['deterministic'],
   jobs: {
-    deps: true,
+    dependencies: true,
     code: true,
     policy: true,
     sbom: true,
@@ -31,13 +36,13 @@ export const DEFAULTS = {
     mobile: true,
     binaries: true,
     review: false,
-    openant: false,
+    'review-codebase': false,
   },
 };
 
 // The tunables beside each job's `enabled`, with their type and default. One
 // schema, so every option resolves the same way the switches do: the
-// environment twin SECURITY_<JOB>_<KEY> beats security-policy.json, which beats
+// environment twin SECURITY_<JOB>_<KEY> beats security-settings.json, which beats
 // the default here, and a value of the wrong type fails the run.
 export const OPTIONS = {
   bundle: {
@@ -53,7 +58,7 @@ export const OPTIONS = {
   review: {
     maxDiffBytes: { type: 'int', default: 200000 },
   },
-  openant: {
+  'review-codebase': {
     limit: { type: 'int', default: 0 },
     verify: { type: 'bool', default: false },
   },
@@ -66,8 +71,12 @@ export const LLM = {
   effort: { type: 'enum', of: EFFORTS, default: 'max' },
 };
 
-/** `androidPermissions` -> `ANDROID_PERMISSIONS`. */
-export const snake = (key) => key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toUpperCase();
+/** `androidPermissions` -> `ANDROID_PERMISSIONS`, `review-codebase` -> `REVIEW_CODEBASE`. */
+export const snake = (key) =>
+  key
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/-/g, '_')
+    .toUpperCase();
 
 export const parseBoolean = (value, source) => {
   if (value === true || value === 'true') return true;
@@ -138,12 +147,12 @@ export const parseTyped = (spec, value, source) => {
 const assertKnownKeys = (block, known, where) => {
   for (const key of Object.keys(block ?? {})) {
     if (key.startsWith('$') || known.includes(key)) continue;
-    throw new Error(`security-policy.json: unknown setting ${where}.${key}`);
+    throw new Error(`security-settings.json: unknown setting ${where}.${key}`);
   }
 };
 
 // An empty environment twin is an unset one. CI hands every twin over through
-// build-env as `"KEY":"${{ vars.KEY }}"`, and an unset repository variable
+// environment-variables as `"KEY":"${{ vars.KEY }}"`, and an unset repository variable
 // arrives there as "" - reading that as a value would fail every run of a
 // repository that simply has not set it. A non-empty value that does not parse
 // still fails the run; to empty a list, set it to [] in the file.
@@ -155,7 +164,7 @@ const resolveBlock = (schema, fileBlock, envPrefix, where, env) =>
         return [key, parseTyped(spec, env[envKey], envKey)];
       }
       if (fileBlock?.[key] !== undefined) {
-        return [key, parseTyped(spec, fileBlock[key], `security-policy.json: ${where}.${key}`)];
+        return [key, parseTyped(spec, fileBlock[key], `security-settings.json: ${where}.${key}`)];
       }
       return [key, spec.default];
     }),
@@ -165,18 +174,13 @@ const resolveBlock = (schema, fileBlock, envPrefix, where, env) =>
 export const resolve = (policy = {}, env = process.env) => {
   const bool = (key, envKey, fileValue, fallback) => {
     if (env[envKey] !== undefined) return parseBoolean(env[envKey], envKey);
-    if (fileValue !== undefined) return parseBoolean(fileValue, `security-policy.json: ${key}`);
+    if (fileValue !== undefined) return parseBoolean(fileValue, `security-settings.json: ${key}`);
     return fallback;
   };
   const jobs = Object.fromEntries(
     Object.entries(DEFAULTS.jobs).map(([name, fallback]) => [
       name,
-      bool(
-        `jobs.${name}`,
-        `SECURITY_${name.toUpperCase()}`,
-        policy.jobs?.[name]?.enabled,
-        fallback,
-      ),
+      bool(`jobs.${name}`, `SECURITY_${snake(name)}`, policy.jobs?.[name]?.enabled, fallback),
     ]),
   );
   const severity =
@@ -185,7 +189,8 @@ export const resolve = (policy = {}, env = process.env) => {
       : parseSeverity(policy.severity ?? DEFAULTS.severity, 'severity');
   const failOn = parseList(env.SECURITY_FAIL_ON ?? policy.failOn ?? DEFAULTS.failOn);
   for (const name of Object.keys(policy.jobs ?? {})) {
-    if (!(name in DEFAULTS.jobs)) throw new Error(`security-policy.json: unknown job jobs.${name}`);
+    if (!(name in DEFAULTS.jobs))
+      throw new Error(`security-settings.json: unknown job jobs.${name}`);
     assertKnownKeys(
       policy.jobs[name],
       ['enabled', ...Object.keys(OPTIONS[name] ?? {})],
@@ -196,13 +201,7 @@ export const resolve = (policy = {}, env = process.env) => {
   const options = Object.fromEntries(
     Object.entries(OPTIONS).map(([name, schema]) => [
       name,
-      resolveBlock(
-        schema,
-        policy.jobs?.[name],
-        `SECURITY_${name.toUpperCase()}`,
-        `jobs.${name}`,
-        env,
-      ),
+      resolveBlock(schema, policy.jobs?.[name], `SECURITY_${snake(name)}`, `jobs.${name}`, env),
     ]),
   );
   return {
@@ -215,14 +214,14 @@ export const resolve = (policy = {}, env = process.env) => {
   };
 };
 
-// SECURITY_POLICY_FILE overrides the path, the same override policy.sh
+// SECURITY_SETTINGS_FILE overrides the path, the same override policy.sh
 // already uses for its own target file. Tests point it at a temp fixture so
-// nothing ever has to write to the tracked security-policy.json on disk -
+// nothing ever has to write to the tracked security-settings.json on disk -
 // two node:test files reading and writing that one real file concurrently
 // is a race, not a test.
 /** Settings from the policy file on disk; a missing file is the defaults. */
-export const load = (file = 'security-policy.json', env = process.env) => {
-  const path = env.SECURITY_POLICY_FILE ?? file;
+export const load = (file = 'security-settings.json', env = process.env) => {
+  const path = env.SECURITY_SETTINGS_FILE ?? file;
   let policy = {};
   try {
     policy = JSON.parse(readFileSync(path, 'utf8'));
@@ -242,7 +241,7 @@ export function main(
   argv = process.argv.slice(2),
   { log = console.log, error = console.error, env = process.env } = {},
 ) {
-  const settings = load('security-policy.json', env);
+  const settings = load('security-settings.json', env);
   if (argv[0] === '--json') {
     log(JSON.stringify(settings));
     return 0;
@@ -256,7 +255,7 @@ export function main(
     log(Array.isArray(value) ? value.join(',') : String(value));
     return 0;
   }
-  error('usage: config.mjs get <dotted.key> | --json');
+  error('usage: settings.mjs get <dotted.key> | --json');
   return 2;
 }
 

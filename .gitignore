@@ -50,7 +50,7 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-# per-build provenance record (dev-config release/build-info.sh)
+# per-build provenance record (app-tooling release/build-info.sh)
 /build-info.json
 
 # generated native folders (Continuous Native Generation: never commit these)

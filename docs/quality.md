@@ -20,11 +20,11 @@ just the one that failed.
 | osv-scanner | Known vulnerabilities and malicious-package records in the lockfile | `osv-scanner.toml` |
 | Semgrep | Mobile-specific source patterns and the registry TypeScript/secrets/OWASP packs | `rules/`, `.semgrepignore` |
 | pnpm install policy scanner | The install-time supply-chain settings, asserted rather than trusted | `pnpm-workspace.yaml` |
-| pnpm sbom | A CycloneDX bill of materials from the lockfile | `security-policy.json` (`jobs.sbom`) |
-| Bundle scanner | Private variable names, credential-shaped strings and cleartext URLs in the exported bundle | `security-policy.json` (`jobs.bundle`) |
+| pnpm sbom | A CycloneDX bill of materials from the lockfile | `security-settings.json` (`jobs.sbom`) |
+| Bundle scanner | Private variable names, credential-shaped strings and cleartext URLs in the exported bundle | `security-settings.json` (`jobs.bundle`) |
 | mobsfscan | Mobile-specific misconfiguration in a fresh prebuild of `android/` and `ios/` | `.mobsf` |
-| Binary checks | OWASP MASTG tests over the release's built APK and IPA | `security-policy.json` (`jobs.binaries`) |
-| LLM reviewer and OpenAnt | Security review of the diff, and an LLM scan of the codebase; both off by default | `security-review.prompt.md`, `security-policy.json` (`llm`) |
+| Binary checks | OWASP MASTG tests over the release's built APK and IPA | `security-settings.json` (`jobs.binaries`) |
+| LLM reviewer and codebase review (OpenAnt) | Security review of the diff, and an LLM scan of the codebase; both off by default | `security-review.prompt.md`, `security-settings.json` (`llm`) |
 
 The scanners from osv-scanner down are `make check-security*`, run separately
 from `make check` because they are external CLIs and cost minutes; see
@@ -79,8 +79,9 @@ Add a rule to one side only, and record which side in the config comment.
 
 ## Every gate in `make check`
 
-`make check` = `check-code` + `check-gen` + `check-deps` + `check-ci` +
-`check-docs` + `check-release` + `check-secrets`.
+`make check` = `check-code` + `check-generated` + `check-expo-health` +
+`check-audit` + `check-licenses` + `check-ci` + `check-docs` + `check-release` +
+`check-secrets`.
 
 | Target | Runs | Owns |
 | --- | --- | --- |
@@ -90,10 +91,12 @@ Add a rule to one side only, and record which side in the config comment.
 | `make check-unused` | `knip` | Unused files, exports, dependencies |
 | `make check-spell` | `typos` | Spelling, Markdown included |
 | `make check-code` | the five above | The fast local gate |
-| `make check-gen` | `pnpm i18n:check`, `pnpm codegen:check` | Drift in generated catalogs and generated GraphQL documents |
-| `make check-deps` | `pnpm deps:check`, `pnpm deps:audit`, `pnpm deps:licenses` | Expo SDK drift (`scripts/check-deps.sh`: `expo install --check` is advisory, a CI warning;<br>`expo-doctor`'s other checks block), high-severity vulnerabilities in production dependencies,<br>lockfile provenance (`check-lockfile` from `@blinkbitcoin/dev-config`),<br>and the license allowlist (`scripts/check-licenses.mjs`) |
-| `make check-ci` | shared-workflows' `ci/lint-ci.sh` (actionlint, `zizmor --offline --min-severity medium`<br>with `.github/zizmor.yml`, shellcheck over `scripts/` and `.claude/skills/`, all at the pinned versions),<br>`check-shell-locale`, `check-workflow-names --group ci=CI --group cd=CD` | The CI itself: every shell script, and the workflow files.<br>zizmor allows tag pins by policy and ignores one reviewed `workflow_run` (`.github/zizmor.yml`).<br>Fails on a `LC_ALL=C cmd` locale prefix in any tracked shell code (Makefile and workflow `run:` blocks included),<br>and on a workflow file or display name outside the `ci`/`cd` groups (see `AGENTS.md`).<br>`check-shell-locale` and `check-workflow-names` come from `@blinkbitcoin/dev-config` |
-| `make check-docs` | `scripts/check-docs.sh`, `check-make-target-names`, `check-docs-tables`,<br>`check-diagrams` (all three from `@blinkbitcoin/dev-config`) | Warns when architecture-relevant paths changed with no `docs/` change.<br>Fails when `AGENTS.md`'s command table and the Makefile's `##`-documented targets disagree in either direction,<br>when a make target is named after the tool it runs,<br>when a markdown table cell has a line wider than 120 visible characters,<br>or when a fenced `mermaid` block does not parse |
+| `make check-generated` | `pnpm check:generated`: shared-workflows' `checks/generated.sh`, which runs `gen:i18n`<br>and `gen:graphql` | Drift in generated catalogs and generated GraphQL documents, an untracked new catalog included |
+| `make check-expo-health` | `pnpm check:expo-health`: shared-workflows' `checks/expo-health.sh` | Expo SDK drift (`expo install --check` is advisory, a CI warning),<br>then `expo-doctor`, whose other checks block |
+| `make check-audit` | `pnpm check:audit`: `pnpm audit --audit-level=high --prod`, then `check-lockfile` | High-severity vulnerabilities in production dependencies, and lockfile provenance |
+| `make check-licenses` | `pnpm check:licenses`: `check-licenses` | Every production dependency's license against the organisation's allowlist |
+| `make check-ci` | shared-workflows' `ci/check-ci.sh` (actionlint, `zizmor --offline --min-severity medium`<br>with `.github/zizmor.yml`, shellcheck over `scripts/` and `.claude/skills/`, all at the pinned versions),<br>`check-shell-locale`, `check-workflow-names --group ci=CI --group cd=CD`,<br>`check-ignored-directories` | The CI itself: every shell script, and the workflow files.<br>Fails when a tool that walks the tree stops skipping `.workflows/` or `.claude/worktrees/`<br>([below](#worktrees-inside-the-checkout-are-not-this-checkout)).<br><br>zizmor allows tag pins by policy and ignores one reviewed `workflow_run` (`.github/zizmor.yml`).<br>Fails on a `LC_ALL=C cmd` locale prefix in any tracked shell code (Makefile and workflow `run:` blocks included),<br>and on a workflow file or display name outside the `ci`/`cd` groups (see `AGENTS.md`).<br>The three guards come from `@blinkbitcoin/app-tooling` |
+| `make check-docs` | `check-docs` from `@blinkbitcoin/app-tooling`, which runs `check-make-target-names`,<br>`check-docs-tables` and `check-diagrams`; its rules are the `docs` section of `app-tooling.json` | Warns when architecture-relevant paths changed with no `docs/` change.<br>Fails when `AGENTS.md`'s command table and the Makefile's `##`-documented targets disagree in either direction,<br>when a make target is named after the tool it runs,<br>when a markdown table cell has a line wider than 120 visible characters,<br>or when a fenced `mermaid` block does not parse |
 | `make check-release` | `ruby -c` over the Fastfile and lanes, `fastlane lanes`, the minitest suite in `fastlane/test/lanes_test.rb`,<br>and every `.claude/skills/*/tests/run.sh` | That the lanes parse and that their pure logic still behaves,<br>and that the store skills still agree with the fastlane gem.<br>Needs the Ruby gems `make install` installs, and talks to no store |
 | `make check-secrets` | shared-workflows' `checks/secrets.sh`: `gitleaks git` over the whole history,<br>at the pinned version, refusing a shallow clone | No committed secret, including one deleted in a later commit.<br>Test data that must look real is allowlisted in `.gitleaks.toml`, each entry with its reason |
 
@@ -101,7 +104,7 @@ Not in `make check`, because each is slow or needs a build:
 
 | Target | Runs |
 | --- | --- |
-| `make check-slow` | The two below, grouped. Off by default in `check-code.yml` too (`prebuild-check`, `bundle-secrets`) |
+| `make check-slow` | The two below, grouped. Off by default in CI too (`check.yml`'s `prebuild`, `check-security.yml`'s `bundle`) |
 | `make check-prebuild` | Two prebuilds into temp directories, asserting the config plugin output |
 | `make check-security-bundle` | Exports the bundle and fails on a private variable name or a credential-shaped string in it<br>(the `bundle` scanner; [security.md](security.md)) |
 | `make check-code-scanning` | CodeQL's `security-and-quality` suite over the whole tree — see below |
@@ -109,8 +112,8 @@ Not in `make check`, because each is slow or needs a build:
 
 ## `make check` is the CI gate set, and that is enforced
 
-`make check` runs the gates the `check-code` workflow runs. `make ci` adds the
-`check-unit` workflow's — coverage and the script tests — and is the one-command
+`make check` runs the gates the `check` workflow runs. `make ci` adds the
+`test-unit` workflow's — coverage and the script tests — and is the one-command
 local CI run:
 
 ```sh
@@ -122,7 +125,7 @@ stays in `make test-e2e-ios`, `make test-e2e-android` and `make test-e2e-web`.
 
 **This is checked, not asserted.** It used to be asserted — the Makefile headed
 this section "each is what CI runs" — while four gates ran here and in no CI job
-at all: i18n drift, codegen drift, lockfile provenance and the licence check. A
+at all: i18n drift, GraphQL document drift, lockfile provenance and the licence check. A
 green `make check` was making a claim about coverage CI was not providing, and
 nothing detected it.
 
@@ -137,7 +140,7 @@ The `Checks / Contract` job, the first job of every CI run, reads this repo's
 It is this repo's PR that fails, never shared-workflows': that repo defines the
 contract and never checks out a consumer. So adding a gate here means adding
 its CI step, and vice versa. To run the same check before pushing, run
-`make check-contract`: the checker comes from `@blinkbitcoin/dev-config`, a git
+`make check-contract`: the checker comes from `@blinkbitcoin/app-tooling`, a git
 dependency on shared-workflows at the commit the workflows pin, so it is the
 same code CI runs
 ([ADR 0024](decisions/0024-shared-tooling-at-the-workflows-pin.md)).
@@ -148,28 +151,29 @@ The reusable workflows call the consumer's **package scripts**, never `make`
 directly — requiring a Makefile with exact target names would make the workflows
 unusable for consumers that have none. A package script may wrap a make target,
 and several here do: `check:docs`, `check:release`, `check:ci` and
-`check:bundle-secrets` are each `make <target>`. That is how make ends up
+`check:secrets` are each `make <target>`. That is how make ends up
 running in CI: the package script is the interface, make is the implementation.
 
-For five gates — i18n, codegen, Expo doctor, the audit and the CI linters —
-`shared-workflows` prefers this repo's script and falls back to its own
-only if we ship none. For i18n, codegen, secrets and the CI linters ours now
-call the shared scripts themselves, from `@blinkbitcoin/dev-config` at the
-workflows pin, so the local gate and CI's are the same code;
-`scripts/gates.test.mjs` pins those calls.
+For five gates — the generated files, the Expo health check, the audit, the
+CI linters and the secrets scan — `shared-workflows` prefers this repo's script
+and falls back to its own only if we ship none. For the generated files, the
+Expo health check, secrets and the CI linters ours call the shared scripts
+themselves, from `@blinkbitcoin/app-tooling` at the workflows pin, so the local
+gate and CI's are the same code; `scripts/gates.test.mjs` pins those calls.
 
 ### Why CI is not one `make check` step
 
-It would guarantee parity trivially, and it was rejected. The `check-code` workflow
+It would guarantee parity trivially, and it was rejected. The `check` workflow
 runs each gate as its own step, which buys three things a single step loses: the
 per-gate workflow inputs, which are a documented consumer interface; the audit
 step's own `timeout-minutes` and its advisory-on-PR behaviour; and per-step
 timing in the run UI. Parity is worth having, but not at the price of the
 controls that make a red run diagnosable.
 
-The thirteen gates already share one job, one checkout and one `pnpm install`.
-Splitting them across parallel jobs would pay that setup again per job to
-parallelise gates that mostly take seconds.
+The gates are already grouped into a handful of jobs by what they need (Code,
+Generated, Docs, Dependencies, Release, CI, Secrets, Commits), each with one
+checkout and one `pnpm install`. A job per gate would pay that setup again for
+gates that mostly take seconds.
 
 `make check-lint` and `make check-code` are what the pre-push hook and the CI
 `checks` job cover between them. The CI mapping table is in [ci.md](ci.md).
@@ -177,7 +181,7 @@ parallelise gates that mostly take seconds.
 ## What `make check-docs` checks
 
 CI runs the same thing through the `check:docs` package script, which the
-workflows repo's `check-code.yml` calls when its `docs-check` input is on. Before
+workflows repo's `check.yml` calls when its `docs` input is on (the default). Before
 that input existed this gate ran on no CI job at all — it was a local-only
 courtesy, which is how a stale command table could reach `main`.
 
@@ -185,15 +189,16 @@ courtesy, which is how a stale command table could reach `main`.
 | --- | --- | --- |
 | Freshness | nothing — it warns | Touch `docs/`, or ignore the warning deliberately |
 | Command table | `AGENTS.md` and the Makefile's `##`-documented targets disagreeing in either direction | None. Fix whichever side is wrong |
-| Make target names | a documented target with a word that names a tool pinned in `.mise.toml` or an unscoped package | Rename the target; an exception is an<br>`--allow TARGET=REASON` in `scripts/check-docs.sh` |
-| Table width | a markdown table cell line wider than 120 visible characters | Break the cell with `<br>`; 120 is the default of `check-docs-tables` (`@blinkbitcoin/dev-config`) |
+| Make target names | a documented target with a word that names a tool pinned in `.mise.toml` or an unscoped package | Rename the target; an exception is an entry in<br>`docs.allowTargetNames` in `app-tooling.json`, target to reason |
+| Table width | a markdown table cell line wider than 120 visible characters | Break the cell with `<br>`; 120 is the default of `check-docs-tables` (`@blinkbitcoin/app-tooling`) |
 | Mermaid | a fenced `mermaid` block the parser rejects | Fix the diagram. There is no ignore |
 
 The freshness warning reads a `package.json` change as architectural only when
 a non-dependency key moved — `scripts`, `engines`, `packageManager`,
 `expo.install.exclude`, the package identity — so a version or dependency bump
-never asks for a docs update (`scripts/manifest-structural.mjs`), and a
-Dependabot PR (`PR_AUTHOR`) is exempt outright.
+never asks for a docs update, and a Dependabot PR (`PR_AUTHOR`) is exempt
+outright. The architecture-relevant paths are the `docs.architecture` list in
+`app-tooling.json`.
 
 Its diff base comes from the event: a `pull_request` compares against
 `origin/$BASE_REF`, any other CI event against `HEAD~1`, and a local run
@@ -342,12 +347,12 @@ unless every test file is marked with `!` patterns. That trade is not worth it
 here. Default mode still catches unused files, unused exports and unused
 dependencies, which is the point.
 
-There is deliberately **no** `knip` script in `package.json`. `expo-doctor`'s
-"Check package.json for common issues" fails when a script name collides with
-a binary in `node_modules/.bin`, and `make check-deps` runs `expo-doctor`. The
-Makefile and the pre-push hook both run `pnpm knip`, which resolves the binary
-from `node_modules/.bin` precisely because no script of that name exists. That
-is the supported path. Leave it alone.
+The script is `check:unused`, never `knip`. `expo-doctor`'s "Check
+package.json for common issues" fails when a script name collides with a binary
+in `node_modules/.bin`, and `make check-expo-health` runs `expo-doctor`. The
+Makefile and the pre-push hook both run `pnpm check:unused`, which calls the
+binary. Naming the script for the gate rather than the tool is the family's
+rule anyway (`check:<stem>` for a gate, `gen:<stem>` for a generator).
 
 ## Worktrees inside the checkout are not this checkout
 
@@ -393,11 +398,15 @@ also walk up for theirs, but they start from the working directory or the file
 being checked. So they find the worktree's own file before they reach the outer
 checkout.
 
-`scripts/worktree-ignores.test.mjs` (`make test-scripts`) holds every entry in
-place, and checks the Jest, Metro and ESLint ones by what they match, including
-from a root that is itself a worktree. It also fails on a zizmor command
-without the `--config` flag. A new tool that walks the tree adds its entry here
-and an assertion there. So does a tool that discovers its configuration.
+Each of these tools also skips `.workflows/`, since every CI job checks shared-workflows out there (see
+[ci.md](ci.md#workflows)). `check-ignored-directories` (from
+`@blinkbitcoin/app-tooling`, run by `make check-ci`) holds both directories'
+entries in place. It checks the Jest, Metro and ESLint entries by what
+they match, loading this repository's own configuration, and the rest by what
+their files say. It also fails on a zizmor command without the `--config` flag.
+A new tool that walks the tree adds its entry here, and, when the shared check
+does not know the tool yet, an assertion upstream. So does a tool that
+discovers its configuration.
 
 ## Commit conventions
 

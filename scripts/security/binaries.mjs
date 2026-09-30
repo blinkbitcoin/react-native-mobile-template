@@ -14,10 +14,10 @@
 //
 // Every rule is named by its MASTG test identifier (mas.owasp.org), so a
 // finding links straight to the test that explains it. Allowlists live in
-// security-policy.json under jobs.binaries.
+// security-settings.json under jobs.binaries.
 import { readFileSync } from 'node:fs';
-import { load } from './config.mjs';
 import { fromFindings } from './sarif.mjs';
+import { load } from './settings.mjs';
 
 // Android's "dangerous" runtime permissions plus the special-access ones a
 // user grants in Settings. Both are what MASTG-TEST-0254 means by a permission
@@ -368,7 +368,7 @@ export function main(
     error(`binaries.mjs: ${cause.message}`);
     return 2;
   }
-  const options = load('security-policy.json', env).options.binaries;
+  const options = load('security-settings.json', env).options.binaries;
   const text = (file) => (file ? read(file, 'utf8') : undefined);
   const json = (file) => (file ? JSON.parse(read(file, 'utf8')) : undefined);
   const findings = [];

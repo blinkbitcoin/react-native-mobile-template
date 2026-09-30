@@ -61,12 +61,12 @@ class LanesTest < Minitest::Test
   # ---------- store_notes ----------
 
   def test_store_notes_returns_text_unchanged_when_within_limit
-    ENV['RELEASE_NOTES_STORE_FILE'] = write_file("  Faster search and fewer crashes.\n")
+    ENV['STORE_NOTES_FILE'] = write_file("  Faster search and fewer crashes.\n")
     assert_equal 'Faster search and fewer crashes.', store_notes(500)
   end
 
   def test_store_notes_truncates_at_a_word_boundary_with_suffix
-    ENV['RELEASE_NOTES_STORE_FILE'] = write_file(('word ' * 60).strip)
+    ENV['STORE_NOTES_FILE'] = write_file(('word ' * 60).strip)
     notes = store_notes(100)
 
     assert notes.length <= 100, "expected <= 100 characters, got #{notes.length}"
@@ -78,12 +78,12 @@ class LanesTest < Minitest::Test
   end
 
   def test_store_notes_returns_text_unchanged_at_exactly_the_limit
-    ENV['RELEASE_NOTES_STORE_FILE'] = write_file('a' * 50)
+    ENV['STORE_NOTES_FILE'] = write_file('a' * 50)
     assert_equal 'a' * 50, store_notes(50)
   end
 
   def test_store_notes_hard_cuts_text_with_no_word_boundary
-    ENV['RELEASE_NOTES_STORE_FILE'] = write_file('a' * 200)
+    ENV['STORE_NOTES_FILE'] = write_file('a' * 200)
     notes = store_notes(50)
 
     assert_equal 50, notes.length
@@ -91,7 +91,7 @@ class LanesTest < Minitest::Test
   end
 
   def test_store_notes_ignores_a_word_boundary_that_would_lose_most_of_the_window
-    ENV['RELEASE_NOTES_STORE_FILE'] = write_file("x #{'y' * 100}")
+    ENV['STORE_NOTES_FILE'] = write_file("x #{'y' * 100}")
     notes = store_notes(30)
 
     assert_equal 30, notes.length
@@ -99,7 +99,7 @@ class LanesTest < Minitest::Test
   end
 
   def test_store_notes_handles_a_limit_smaller_than_the_suffix
-    ENV['RELEASE_NOTES_STORE_FILE'] = write_file('hello world this is long')
+    ENV['STORE_NOTES_FILE'] = write_file('hello world this is long')
 
     [1, 5, 10, 17, 18].each do |limit|
       notes = store_notes(limit)
@@ -110,12 +110,12 @@ class LanesTest < Minitest::Test
   end
 
   def test_store_notes_returns_an_empty_string_for_a_zero_limit
-    ENV['RELEASE_NOTES_STORE_FILE'] = write_file('hello world this is long')
+    ENV['STORE_NOTES_FILE'] = write_file('hello world this is long')
     assert_equal '', store_notes(0)
   end
 
   def test_store_notes_raises_when_the_file_is_not_configured
-    ENV.delete('RELEASE_NOTES_STORE_FILE')
+    ENV.delete('STORE_NOTES_FILE')
     assert_raises(KeyError) { store_notes(500) }
   end
 
@@ -550,14 +550,14 @@ class LanesTest < Minitest::Test
 
   def test_locale_store_notes_prefers_the_per_locale_json
     ENV['STORE_NOTES_JSON'] = write_file(JSON.generate({ 'en-US' => { 'play' => 'English notes' }, 'de' => { 'play' => 'Deutsche Notizen' } }))
-    ENV['RELEASE_NOTES_STORE_FILE'] = write_file('fallback')
+    ENV['STORE_NOTES_FILE'] = write_file('fallback')
 
     assert_equal 'Deutsche Notizen', locale_store_notes('de', :play, 500)
   end
 
   def test_locale_store_notes_falls_back_when_the_locale_or_file_is_missing
     ENV['STORE_NOTES_JSON'] = write_file(JSON.generate({ 'en-US' => { 'play' => 'English notes' } }))
-    ENV['RELEASE_NOTES_STORE_FILE'] = write_file('fallback text')
+    ENV['STORE_NOTES_FILE'] = write_file('fallback text')
 
     assert_equal 'fallback text', locale_store_notes('sv-SE', :play, 500)
 
@@ -624,7 +624,7 @@ class LanesTest < Minitest::Test
 
   def test_write_release_notes_refuses_a_tree_with_no_locales
     Dir.mktmpdir do |dir|
-      ENV['RELEASE_NOTES_STORE_FILE'] = write_file('Some notes.')
+      ENV['STORE_NOTES_FILE'] = write_file('Some notes.')
       error = assert_raises(UI::UserError) do
         write_release_notes!(dir, kind: :appstore, limit: 4000)
       end
@@ -635,7 +635,7 @@ class LanesTest < Minitest::Test
   def test_write_release_notes_writes_nothing_under_dry_run
     Dir.mktmpdir do |dir|
       FileUtils.mkdir_p(File.join(dir, 'en-US'))
-      ENV['RELEASE_NOTES_STORE_FILE'] = write_file('Some notes.')
+      ENV['STORE_NOTES_FILE'] = write_file('Some notes.')
       ENV['DRY_RUN'] = '1'
       written = write_release_notes!(dir, kind: :play, limit: 500, changelog_name: '42.txt')
 
@@ -650,7 +650,7 @@ class LanesTest < Minitest::Test
   def test_the_per_locale_notes_are_truncated_the_same_way_as_the_shared_file
     long = "#{'word ' * 200}end"
     ENV['STORE_NOTES_JSON'] = write_file(JSON.generate({ 'en-US' => { 'play' => long } }))
-    ENV['RELEASE_NOTES_STORE_FILE'] = write_file(long)
+    ENV['STORE_NOTES_FILE'] = write_file(long)
 
     assert_equal store_notes(500), locale_store_notes('en-US', :play, 500)
     assert(locale_store_notes('en-US', :play, 500).end_with?(STORE_NOTES_SUFFIX),
@@ -661,7 +661,7 @@ class LanesTest < Minitest::Test
 
   def test_write_build_info_artifacts_merges_the_checksums_into_a_copy
     Dir.mktmpdir do |dir|
-      source = File.join(dir, 'release-meta', 'build-info.json')
+      source = File.join(dir, 'build-info', 'build-info.json')
       FileUtils.mkdir_p(File.dirname(source))
       File.write(source, JSON.generate({ 'version' => '1.2.3', 'artifacts' => {} }))
       ENV['BUILD_INFO_FILE'] = source
@@ -1004,9 +1004,9 @@ class LaneBehaviourTest < Minitest::Test
       File.write(File.join(dir, 'artifacts', 'ios', 'App.ipa'), 'ipa')
       File.write(File.join(dir, 'artifacts', 'android', 'app-release.aab'), 'aab')
       File.write(File.join(dir, 'build-info.json'), JSON.generate({ 'version' => '1.2.3', 'buildNumber' => 42 }))
-      File.write(File.join(dir, 'notes-store.txt'), 'Faster search and fewer crashes.')
+      File.write(File.join(dir, 'store-notes.txt'), 'Faster search and fewer crashes.')
       ENV['BUILD_INFO_FILE'] = File.join(dir, 'build-info.json')
-      ENV['RELEASE_NOTES_STORE_FILE'] = File.join(dir, 'notes-store.txt')
+      ENV['STORE_NOTES_FILE'] = File.join(dir, 'store-notes.txt')
       if notes
         File.write(File.join(dir, 'store-notes.json'), JSON.generate(notes))
         ENV['STORE_NOTES_JSON'] = File.join(dir, 'store-notes.json')
@@ -2024,7 +2024,7 @@ class LaneBehaviourTest < Minitest::Test
   def test_android_upload_huawei_uploads_without_a_changelog_when_the_notes_are_too_short
     ENV['HUAWEI_UPLOADS_ENABLED'] = 'true'
     in_project do |dir|
-      File.write(File.join(dir, 'notes-store.txt'), 'Fixes.')
+      File.write(File.join(dir, 'store-notes.txt'), 'Fixes.')
       run_lane(:android, :upload_huawei)
 
       args = args_for(:huawei_appgallery_connect)

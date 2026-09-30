@@ -11,7 +11,7 @@ on:
     branches: [main]
     # Every commit except one that changes only docs. `paths` with negations,
     # not `paths-ignore`, because the last matching pattern wins: a prompt
-    # (release-notes.prompt.md feeds the store notes this build ships) ends in
+    # (store-notes.prompt.md feeds the store notes this build ships) ends in
     # .md but is not documentation, and `paths-ignore` cannot take one back.
     paths:
       - "**"
@@ -36,7 +36,7 @@ concurrency:
 jobs:
   prepare:
     name: Prepare
-    uses: blinkbitcoin/shared-workflows/.github/workflows/build-prepare.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/build-prepare.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       # `contents: write` for `reserve-tag` below (it creates the build tag);
       # `actions: read` for the green gate's `gh run list`. build-prepare
@@ -64,11 +64,11 @@ jobs:
       # the empty string, which fails input validation rather than falling back
       # to the workflow default. fromJSON turns the fallback into a real number.
       build-number-offset: ${{ fromJSON(vars.BUILD_NUMBER_OFFSET || '1000') }}
-      # `build-env` is the only way a caller gets an environment variable into
+      # `environment-variables` is the only way a caller gets an environment variable into
       # the prebuild, the lanes and the consumer scripts. Non-secret only: the
       # value is a workflow input, unmasked and visible to anyone who can read
       # the run, and build-env.sh refuses a key that looks like a credential.
-      build-env: >-
+      environment-variables: >-
         {"APP_VARIANT":"production",
         "OTA_ENABLED":"${{ vars.OTA_ENABLED }}",
         "EXPO_UPDATES_URL":"${{ vars.EXPO_UPDATES_URL }}",
@@ -82,7 +82,7 @@ jobs:
   build-ios:
     name: Build iOS
     needs: prepare
-    uses: blinkbitcoin/shared-workflows/.github/workflows/build-ios.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/build-ios.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       contents: read
     with:
@@ -91,11 +91,11 @@ jobs:
       # nothing signed to upload - cannot be expressed. Both unset means an
       # unsigned build: it still compiles, still runs verify, and needs no
       # Apple account. See docs/store-accounts.md.
-      ios-signing: ${{ vars.STORE_UPLOADS_ENABLED == 'true' || vars.IOS_SIGNING_ENABLED == 'true' }}
+      ios-signing-enabled: ${{ vars.STORE_UPLOADS_ENABLED == 'true' || vars.IOS_SIGNING_ENABLED == 'true' }}
       version: ${{ needs.prepare.outputs.version }}
       build-number: ${{ needs.prepare.outputs.build-number }}
       stage: internal
-      xcode: ${{ vars.XCODE_VERSION }}
+      xcode-version: ${{ vars.XCODE_VERSION }}
       macos-runner: ${{ vars.WORKFLOWS_MACOS_RUNNER || 'macos-26' }}
       # All five Fastfile contract variables are asserted in `before_all` for
       # every lane on both platforms, so the Android id is required here too.
@@ -105,7 +105,7 @@ jobs:
       # APP_VARIANT decides the `.dev` id suffix in app.config.ts, and
       # OTA_ENABLED / EXPO_UPDATES_URL decide whether the binary can ever
       # receive an update — none of them reach a build any other way.
-      build-env: >-
+      environment-variables: >-
         {"APP_VARIANT":"production",
         "OTA_ENABLED":"${{ vars.OTA_ENABLED }}",
         "EXPO_UPDATES_URL":"${{ vars.EXPO_UPDATES_URL }}",
@@ -125,7 +125,7 @@ jobs:
   build-android:
     name: Build Android
     needs: prepare
-    uses: blinkbitcoin/shared-workflows/.github/workflows/build-android.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/build-android.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       contents: read
     with:
@@ -134,7 +134,7 @@ jobs:
       # nothing signed to upload - cannot be expressed. Both unset means an
       # unsigned build: it still compiles, still runs verify, and needs no
       # Play account. See docs/store-accounts.md.
-      android-signing: ${{ vars.STORE_UPLOADS_ENABLED == 'true' || vars.ANDROID_SIGNING_ENABLED == 'true' }}
+      android-signing-enabled: ${{ vars.STORE_UPLOADS_ENABLED == 'true' || vars.ANDROID_SIGNING_ENABLED == 'true' }}
       version: ${{ needs.prepare.outputs.version }}
       build-number: ${{ needs.prepare.outputs.build-number }}
       stage: internal
@@ -145,7 +145,7 @@ jobs:
       # "the aab is signed" into "the aab is signed by the expected key". The
       # gate reads it straight out of the environment (`--cert-sha256` is the
       # manual override) and reports `skip` when it is missing.
-      build-env: >-
+      environment-variables: >-
         {"APP_VARIANT":"production",
         "OTA_ENABLED":"${{ vars.OTA_ENABLED }}",
         "EXPO_UPDATES_URL":"${{ vars.EXPO_UPDATES_URL }}",
@@ -175,7 +175,7 @@ jobs:
     # credentials still builds, verifies and publishes its artifacts.
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' }}
     needs: [prepare, build-ios]
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       contents: read
     with:
@@ -183,17 +183,15 @@ jobs:
       lane: upload_internal
       # Transporter (the upload path pilot/upload_to_testflight uses) only
       # ships on macOS, so this lane cannot run on ubuntu.
-      runner: ${{ vars.WORKFLOWS_MACOS_RUNNER || 'macos-26' }}
+      macos-enabled: true
+      macos-runner: ${{ vars.WORKFLOWS_MACOS_RUNNER || 'macos-26' }}
       environment: internal
       # `*` merges every artifact this run produced into $WORKFLOWS_ASSETS_DIR, which
       # is where the lane looks for <IOS_SCHEME>.ipa (gym's `output_name`),
       # build-info.json and the notes — `artifact_dir` in shared.rb prefers that
       # directory over the build output directory for exactly this reason.
       artifacts: "*"
-      env-json: '{"TESTFLIGHT_INTERNAL_GROUP": "${{ vars.TESTFLIGHT_INTERNAL_GROUP }}"}'
-      # No lane reads app.config.ts, but a lane that ever does must agree with
-      # the build about which variant it is acting on.
-      build-env: '{"APP_VARIANT":"production"}'
+      environment-variables: '{"APP_VARIANT":"production", "TESTFLIGHT_INTERNAL_GROUP": "${{ vars.TESTFLIGHT_INTERNAL_GROUP }}"}'
       version: ${{ needs.prepare.outputs.version }}
       build-number: ${{ needs.prepare.outputs.build-number }}
       ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
@@ -219,17 +217,15 @@ jobs:
     # credentials still builds, verifies and publishes its artifacts.
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' }}
     needs: [prepare, build-android]
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       contents: read
     with:
       platform: android
       lane: upload_internal
-      runner: ubuntu-latest
       environment: internal
       artifacts: "*"
-      env-json: '{"PLAY_UPDATE_PRIORITY": "${{ vars.PLAY_UPDATE_PRIORITY }}"}'
-      build-env: '{"APP_VARIANT":"production"}'
+      environment-variables: '{"APP_VARIANT":"production", "PLAY_UPDATE_PRIORITY": "${{ vars.PLAY_UPDATE_PRIORITY }}"}'
       version: ${{ needs.prepare.outputs.version }}
       build-number: ${{ needs.prepare.outputs.build-number }}
       ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
@@ -258,7 +254,7 @@ jobs:
     # not receive a build Play refused, and it must never be the only store
     # that has one.
     needs: [prepare, build-android, upload-android]
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       contents: read
     with:
@@ -267,14 +263,12 @@ jobs:
       # the same submission as the others with the testing flag set and manual
       # review skipped: automated review, hours, up to 100 testers.
       lane: upload_huawei_internal
-      runner: ubuntu-latest
       environment: internal
-      # Every artifact of the run, not just release-meta: the lane needs the
+      # Every artifact of the run, not just build-info: the lane needs the
       # build info and the store notes as well as the Android App Bundle this
       # run just built, and all of them land in the same assets directory.
       artifacts: "*"
-      env-json: '{"HUAWEI_APP_ID": "${{ vars.HUAWEI_APP_ID }}", "HUAWEI_UPLOADS_ENABLED": "${{ vars.HUAWEI_UPLOADS_ENABLED }}", "HUAWEI_SUBMIT_DELAY_SECONDS": "${{ vars.HUAWEI_SUBMIT_DELAY_SECONDS }}", "HUAWEI_FEEDBACK_EMAIL": "${{ vars.HUAWEI_FEEDBACK_EMAIL }}", "HUAWEI_TEST_DAYS": "${{ vars.HUAWEI_TEST_DAYS }}"}'
-      build-env: '{"APP_VARIANT":"production"}'
+      environment-variables: '{"APP_VARIANT":"production", "HUAWEI_APP_ID": "${{ vars.HUAWEI_APP_ID }}", "HUAWEI_UPLOADS_ENABLED": "${{ vars.HUAWEI_UPLOADS_ENABLED }}", "HUAWEI_SUBMIT_DELAY_SECONDS": "${{ vars.HUAWEI_SUBMIT_DELAY_SECONDS }}", "HUAWEI_FEEDBACK_EMAIL": "${{ vars.HUAWEI_FEEDBACK_EMAIL }}", "HUAWEI_TEST_DAYS": "${{ vars.HUAWEI_TEST_DAYS }}"}'
       version: ${{ needs.prepare.outputs.version }}
       build-number: ${{ needs.prepare.outputs.build-number }}
       ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
@@ -304,14 +298,14 @@ jobs:
     # never hold up or fail the pre-release this run is built around.
     needs: [prepare, build-ios, build-android, upload-ios, upload-android]
     if: ${{ !cancelled() && !failure() && needs.build-ios.result == 'success' && needs.build-android.result == 'success' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-github-release.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-github-release.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       # The called job creates a release; a called workflow can only narrow the
       # caller's token, so `contents: write` has to be granted here.
       contents: write
     with:
       mode: create-prerelease
-      tag: v${{ needs.prepare.outputs.version }}-build.${{ needs.prepare.outputs.build-number }}
+      release-tag: v${{ needs.prepare.outputs.version }}-build.${{ needs.prepare.outputs.build-number }}
       sha: ${{ github.sha }}
       title: v${{ needs.prepare.outputs.version }} build ${{ needs.prepare.outputs.build-number }}
       assets-artifacts: "*"
@@ -334,7 +328,7 @@ jobs:
       cancel-in-progress: false
     needs: [prepare, github-prerelease]
     if: ${{ vars.OTA_ENABLED == 'true' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-ota.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-ota.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       contents: read
     with:
@@ -351,6 +345,6 @@ jobs:
       # working one until a user opens the app. smoke.sh defaults to the ios
       # platform, so the iOS fingerprint is the runtime version to ask for.
       manifest-url: ${{ vars.EXPO_UPDATES_URL }}
-      runtime-version: ${{ needs.prepare.outputs.fp-ios }}
+      runtime-version: ${{ needs.prepare.outputs.fingerprint-ios }}
     secrets:
       OTA_PUBLISH_TOKEN: ${{ secrets.OTA_PUBLISH_TOKEN }}

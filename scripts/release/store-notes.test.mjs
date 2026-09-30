@@ -1,13 +1,14 @@
 // The store notes as CD drafts them, run through the real code end to end:
-// cd-release.yml's build-env, shared-workflows' build-env.sh, pr-notes.sh and
-// notes.sh, and this repository's own notes.mjs with its prompt. Only two
+// cd-release.yml's environment-variables, shared-workflows' build-env.sh,
+// pr-store-notes.sh and gen-store-notes.sh, and the gen-store-notes program
+// they run with this repository's store-notes.prompt.md. Only two
 // things are stood in for: `gh` (a shim serving a real release-please PR body
 // and recording the edit) and the model (a local OpenAI-compatible endpoint).
 //
 // Unit tests prove each half on its own; this proves they still fit - that the
-// variables cd-release.yml sends survive build-env's validation, that the
-// flags notes.sh passes are the ones notes.mjs reads, and that the section
-// pr-notes.sh writes is the one build-prepare reads back from the release.
+// variables cd-release.yml sends survive build-env.sh's validation, and that
+// the section pr-store-notes.sh writes is the one build-prepare reads back
+// from the release.
 //
 // The shared scripts come from $WORKFLOWS_DIR, the checkout this run's
 // workflows were called at: locally the cases
@@ -31,7 +32,6 @@ import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
-const PR_BODY = path.join(root, 'scripts', 'release', 'fixtures', 'release-pr-body.md');
 const BEGIN = '<!-- workflows:append:Store notes -->';
 const PROSE =
   'You can now keep the security gate on your own machine, and a blank laptop is ready for Android and iOS in one step.';
@@ -55,14 +55,17 @@ function sharedScripts() {
     };
   }
   const scripts = path.resolve(dir, 'scripts');
-  if (!existsSync(path.join(scripts, 'release', 'pr-notes.sh'))) {
+  if (!existsSync(path.join(scripts, 'release', 'pr-store-notes.sh'))) {
     throw new Error(`no shared release scripts under ${scripts}`);
   }
-  return { scripts };
+  // A real release-please PR body, the one shared-workflows tests its own
+  // generator against.
+  const prBody = path.resolve(dir, 'packages/app-tooling/fixtures/store-notes/release-pr-body.md');
+  return { scripts, prBody };
 }
 
 /**
- * cd-release.yml's store-notes build-env with the repository variables filled
+ * cd-release.yml's store-notes environment-variables with the repository variables filled
  * in, evaluated the way GitHub does for the two expression shapes it uses. Any
  * other expression fails: this test must be told how to evaluate it.
  */
@@ -72,13 +75,13 @@ function evaluate(template, vars) {
     if (match) return JSON.stringify(vars[match[1]] || '');
     match = /^vars\.(\w+)$/.exec(expression);
     if (match) return vars[match[1]] ?? '';
-    throw new Error(`cd-notes.test.mjs cannot evaluate \${{ ${expression} }}`);
+    throw new Error(`store-notes.test.mjs cannot evaluate \${{ ${expression} }}`);
   });
 }
 
-function renderBuildEnv(vars) {
+function renderEnvironmentVariables(vars) {
   const workflow = parse(readFileSync(path.join(root, '.github/workflows/cd-release.yml'), 'utf8'));
-  return evaluate(workflow.jobs['store-notes'].with['build-env'], vars);
+  return evaluate(workflow.jobs['store-notes'].with['environment-variables'], vars);
 }
 
 /** `$GITHUB_ENV` as a map: both the `KEY=value` and the `KEY<<DELIMITER` forms. */
@@ -164,12 +167,12 @@ function ghShim(dir) {
 }
 
 /**
- * The store-notes job, step by step: build-env from cd-release.yml's
- * expression and `vars`, then pr-notes.sh on the fixture release PR with the
- * published environment and `secrets`.
+ * The store-notes job, step by step: environment-variables from
+ * cd-release.yml's expression and `vars`, then pr-store-notes.sh on the
+ * fixture release PR with the published environment and `secrets`.
  */
-async function draftIntoReleasePr(scripts, { vars = {}, secrets = {} } = {}) {
-  const dir = mkdtempSync(path.join(tmpdir(), 'cd-notes-'));
+async function draftIntoReleasePr({ scripts, prBody }, { vars = {}, secrets = {} } = {}) {
+  const dir = mkdtempSync(path.join(tmpdir(), 'store-notes-'));
   dirs.push(dir);
   const bin = ghShim(dir);
   const files = {
@@ -190,21 +193,21 @@ async function draftIntoReleasePr(scripts, { vars = {}, secrets = {} } = {}) {
   };
   const published = await run(path.join(scripts, 'release', 'build-env.sh'), [], {
     ...base,
-    WORKFLOWS_BUILD_ENV: renderBuildEnv(vars),
+    WORKFLOWS_BUILD_ENV: renderEnvironmentVariables(vars),
   });
   assert.equal(
     published.code,
     0,
-    `build-env.sh refused cd-release.yml's build-env:\n${published.stderr}`,
+    `build-env.sh refused cd-release.yml's environment-variables:\n${published.stderr}`,
   );
 
-  const drafted = await run(path.join(scripts, 'release', 'pr-notes.sh'), ['67'], {
+  const drafted = await run(path.join(scripts, 'release', 'pr-store-notes.sh'), ['67'], {
     ...base,
     ...readGithubEnv(files.githubEnv),
     GH_REPO: 'acme/app',
     GH_TOKEN: 'unused-by-the-shim',
-    NOTES_LOCALES: 'en-US',
-    GH_SHIM_BODY: PR_BODY,
+    STORE_NOTES_LOCALES: 'en-US',
+    GH_SHIM_BODY: prBody,
     GH_SHIM_LOG: files.log,
     GH_SHIM_EDITED: files.edited,
     ...secrets,
@@ -214,7 +217,8 @@ async function draftIntoReleasePr(scripts, { vars = {}, secrets = {} } = {}) {
     dir,
     edited: existsSync(files.edited) ? readFileSync(files.edited, 'utf8') : null,
     ghCalls: existsSync(files.log) ? readFileSync(files.log, 'utf8').trim().split('\n') : [],
-    release: path.join(dir, 'out', 'release-meta'),
+    release: path.join(dir, 'out', 'build-info'),
+    prBody,
   };
 }
 
@@ -225,16 +229,16 @@ function sectionOf(body) {
   return body.slice(start, end);
 }
 
-test('the build-env cd-release.yml sends is valid JSON for any value a variable may hold', () => {
+test('the environment-variables cd-release.yml sends is valid JSON for any value a variable may hold', () => {
   for (const extra of ['', '{"response_format": null}', '{"reasoning": {"effort": "low"}}']) {
     const parsed = JSON.parse(
-      renderBuildEnv({
-        RELEASE_NOTES_LLM_PROVIDER: 'openai',
-        RELEASE_NOTES_LLM_EXTRA_PARAMS: extra,
+      renderEnvironmentVariables({
+        STORE_NOTES_LLM_PROVIDER: 'openai',
+        STORE_NOTES_LLM_EXTRA_PARAMS: extra,
       }),
     );
-    assert.equal(parsed.RELEASE_NOTES_LLM_EXTRA_PARAMS, extra);
-    assert.equal(parsed.RELEASE_NOTES_LLM_PROVIDER, 'openai');
+    assert.equal(parsed.STORE_NOTES_LLM_EXTRA_PARAMS, extra);
+    assert.equal(parsed.STORE_NOTES_LLM_PROVIDER, 'openai');
   }
   // An expression this file does not know how to evaluate is a failure, not an
   // empty string that happens to parse.
@@ -250,20 +254,20 @@ test('the build-env cd-release.yml sends is valid JSON for any value a variable 
 function leftAsItWas(result) {
   if (result.edited === null) return true;
   const trim = (text) => text.replace(/\s+$/, '');
-  return trim(result.edited) === trim(readFileSync(PR_BODY, 'utf8'));
+  return trim(result.edited) === trim(readFileSync(result.prBody, 'utf8'));
 }
 
 test('with no provider the release PR keeps the generated notes it already has', async (t) => {
   const shared = sharedScripts();
   if (shared.skip) return t.skip(shared.skip);
-  const result = await draftIntoReleasePr(shared.scripts);
+  const result = await draftIntoReleasePr(shared);
   assert.equal(result.code, 0, result.stderr);
   // The fixture already carries the generated section, so a correct run
   // rebuilds exactly the same body.
   assert.equal(result.ghCalls[0], 'pr view 67 --repo acme/app --json body --jq .body');
   assert.ok(leftAsItWas(result), `the release PR body changed:\n${result.edited}`);
   assert.match(
-    readFileSync(path.join(result.release, 'notes-store.txt'), 'utf8'),
+    readFileSync(path.join(result.release, 'store-notes.txt'), 'utf8'),
     /^New\n• Add the local half of the security gate\./,
   );
 });
@@ -273,18 +277,18 @@ test('a provider set through the repository variables rewrites the section, repl
   if (shared.skip) return t.skip(shared.skip);
   const model = await stubModel({ status: 200, content: JSON.stringify({ 'en-US': PROSE }) });
   try {
-    const result = await draftIntoReleasePr(shared.scripts, {
+    const result = await draftIntoReleasePr(shared, {
       vars: {
-        RELEASE_NOTES_LLM_PROVIDER: 'openai',
-        RELEASE_NOTES_LLM_MODEL: 'any-model',
-        RELEASE_NOTES_LLM_EFFORT: 'none',
-        RELEASE_NOTES_LLM_EXTRA_PARAMS: '{"response_format": null}',
+        STORE_NOTES_LLM_PROVIDER: 'openai',
+        STORE_NOTES_LLM_MODEL: 'any-model',
+        STORE_NOTES_LLM_EFFORT: 'none',
+        STORE_NOTES_LLM_EXTRA_PARAMS: '{"response_format": null}',
         OPENAI_BASE_URL: model.baseUrl,
       },
       secrets: { OPENAI_API_KEY: 'sk-test' },
     });
     assert.equal(result.code, 0, result.stderr);
-    assert.doesNotMatch(result.stderr, /release notes: /);
+    assert.doesNotMatch(result.stderr, /store notes: /);
     assert.equal(model.requests.length, 1);
     const [{ url, body }] = model.requests;
     assert.equal(url, '/v1/chat/completions');
@@ -309,8 +313,8 @@ test('a model that fences its answer still rewrites the section', async (t) => {
   const fenced = `\`\`\`json\n${JSON.stringify({ 'en-US': PROSE })}\n\`\`\``;
   const model = await stubModel({ status: 200, content: fenced });
   try {
-    const result = await draftIntoReleasePr(shared.scripts, {
-      vars: { RELEASE_NOTES_LLM_PROVIDER: 'openai', OPENAI_BASE_URL: model.baseUrl },
+    const result = await draftIntoReleasePr(shared, {
+      vars: { STORE_NOTES_LLM_PROVIDER: 'openai', OPENAI_BASE_URL: model.baseUrl },
       secrets: { OPENAI_API_KEY: 'sk-test' },
     });
     assert.equal(result.code, 0, result.stderr);
@@ -325,12 +329,12 @@ test('a model that fails leaves the generated notes and a warning, never a faile
   if (shared.skip) return t.skip(shared.skip);
   const model = await stubModel({ status: 500, content: '' });
   try {
-    const result = await draftIntoReleasePr(shared.scripts, {
-      vars: { RELEASE_NOTES_LLM_PROVIDER: 'openai', OPENAI_BASE_URL: model.baseUrl },
+    const result = await draftIntoReleasePr(shared, {
+      vars: { STORE_NOTES_LLM_PROVIDER: 'openai', OPENAI_BASE_URL: model.baseUrl },
       secrets: { OPENAI_API_KEY: 'sk-test' },
     });
     assert.equal(result.code, 0, result.stderr);
-    assert.match(result.stderr, /release notes: openai rewrite failed \(openai: HTTP 500\)/);
+    assert.match(result.stderr, /store notes: openai rewrite failed \(openai: HTTP 500\)/);
     assert.ok(leftAsItWas(result), `the release PR body changed:\n${result.edited}`);
   } finally {
     await model.close();
@@ -343,8 +347,8 @@ test('the section written into the release PR is what the release lanes read bac
   const model = await stubModel({ status: 200, content: JSON.stringify({ 'en-US': PROSE }) });
   let drafted;
   try {
-    drafted = await draftIntoReleasePr(shared.scripts, {
-      vars: { RELEASE_NOTES_LLM_PROVIDER: 'openai', OPENAI_BASE_URL: model.baseUrl },
+    drafted = await draftIntoReleasePr(shared, {
+      vars: { STORE_NOTES_LLM_PROVIDER: 'openai', OPENAI_BASE_URL: model.baseUrl },
       secrets: { OPENAI_API_KEY: 'sk-test' },
     });
   } finally {
@@ -361,10 +365,10 @@ test('the section written into the release PR is what the release lanes read bac
   const releaseBody = path.join(drafted.dir, 'release-body.md');
   writeFileSync(releaseBody, lines.slice(first + 1, last).join('\n'));
 
-  // build-prepare with `release-tag`: notes.sh on the release body, with no
-  // model settings at all - the CD lanes carry none.
+  // build-prepare with `release-tag`: gen-store-notes.sh on the release body,
+  // with no model settings at all - the CD lanes carry none.
   const out = path.join(drafted.dir, 'lanes');
-  const read = await run(path.join(shared.scripts, 'release', 'notes.sh'), [], {
+  const read = await run(path.join(shared.scripts, 'release', 'gen-store-notes.sh'), [], {
     PATH: `${path.dirname(process.execPath)}:/usr/bin:/bin`,
     HOME: drafted.dir,
     GITHUB_WORKSPACE: root,
@@ -372,11 +376,8 @@ test('the section written into the release PR is what the release lanes read bac
     RUNNER_TEMP: drafted.dir,
     WORKFLOWS_OUT: out,
     RELEASE_BODY_FILE: releaseBody,
-    NOTES_LOCALES: 'en-US',
+    STORE_NOTES_LOCALES: 'en-US',
   });
   assert.equal(read.code, 0, read.stderr);
-  assert.equal(
-    readFileSync(path.join(out, 'release-meta', 'notes-store.txt'), 'utf8'),
-    `${PROSE}\n`,
-  );
+  assert.equal(readFileSync(path.join(out, 'build-info', 'store-notes.txt'), 'utf8'), `${PROSE}\n`);
 });

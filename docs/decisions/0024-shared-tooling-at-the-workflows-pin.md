@@ -5,7 +5,7 @@
 
 ## Context
 
-shared-workflows ships `@blinkbitcoin/dev-config`: the consumer contract, its
+shared-workflows ships `@blinkbitcoin/app-tooling`: the consumer contract, its
 checker and the pinned tool table. CI ran the checker from its own checkout of
 the pinned commit, but a laptop had none, so the template kept copies of shared
 code and compared them in CI. The package is published to GitHub Packages,
@@ -17,10 +17,10 @@ install of a public template, on every laptop and CI job, would need one.
 Install the package from shared-workflows itself, at the commit the workflows
 pin, so one commit covers both and no registry or token is involved:
 
-- `package.json` — `github:blinkbitcoin/shared-workflows#<pin>&path:/packages/dev-config`.
-- `check-lockfile` (from the package, run by `pnpm deps:audit`) — allows that one git source, at that commit, and nothing else.
+- `package.json` — `github:blinkbitcoin/shared-workflows#<pin>&path:/packages/app-tooling`.
+- `check-lockfile` (from the package, run by `pnpm check:audit`) — allows that one git source, at that commit, and nothing else.
 - `fix-tooling-pin` (from the package, `make fix-tooling-pin`) — repoints every package of the family at the pin and relocks.
-- `check-consumer-contract`'s `pin.one-commit` row (`make check-contract`, CI's Checks / Contract) — fails while the package and the pin disagree.
+- `check-contract`'s `pin.one-commit` row (`make check-contract`, CI's Checks / Contract) — fails while the package and the pin disagree.
 
 These three were the template's own `scripts/check-lockfile.sh`, `scripts/tooling-pin.mjs` and
 `scripts/workflow-contract.test.mjs` until shared-workflows v0.18.0 shipped them.

@@ -113,7 +113,7 @@ STORE_NOTES_SUFFIX = ' [+more on GitHub]'.freeze
 # is counted in characters, which is how both stores count. The result is never
 # nil and never longer than `limit`, whatever `limit` is.
 def store_notes(limit)
-  truncate_store_text(File.read(ENV.fetch('RELEASE_NOTES_STORE_FILE')).strip, limit)
+  truncate_store_text(File.read(ENV.fetch('STORE_NOTES_FILE')).strip, limit)
 end
 
 # The one truncation rule. Both callers -- the single-locale file and the
@@ -379,9 +379,9 @@ def metadata_locales(metadata_path)
      .sort
 end
 
-# store-notes.json (written by scripts/release/notes.mjs) holds per-locale text
+# store-notes.json (written by the shared gen-store-notes program) holds per-locale text
 # for each surface: { "<locale>": { "testflight": ..., "play": ..., "appstore": ... } }.
-# Absent, the single-locale notes-store.txt is still a correct answer, so the
+# Absent, the single-locale store-notes.txt is still a correct answer, so the
 # lanes fall back rather than fail.
 def store_notes_json
   path = ENV['STORE_NOTES_JSON'].to_s.strip
@@ -397,7 +397,7 @@ def locale_store_notes(locale, kind, limit, notes_json = store_notes_json)
   if text.empty?
     # The fallback needs the single-locale file. Say so with the runbook pointer
     # every other missing input here gets, rather than a bare KeyError.
-    require_env!(%w[RELEASE_NOTES_STORE_FILE])
+    require_env!(%w[STORE_NOTES_FILE])
     return store_notes(limit)
   end
   truncate_store_text(text, limit)

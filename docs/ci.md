@@ -28,11 +28,11 @@ flowchart TD
     direction LR
     checks["Checks"] --> unit["Unit"] -->|"e2e-changed"| e2e["E2E Android"] --> badges["Badges"]
     unit -.->|"E2E_IOS on a push to main,<br/>e2e:ios label on a PR"| e2eios["E2E iOS"] -.-> badges
-    checks -.->|"SECURITY_ENABLED"| sec["Security<br/>(source scanners; + bundle, OpenAnt<br/>on the release PR)"]
+    checks -.->|"SECURITY_ENABLED"| sec["Security<br/>(source scanners; + bundle, codebase review<br/>on the release PR)"]
     sec -->|"verdict"| badges
   end
 
-  CI -->|"push to main"| rp["CD / Release<br/>(release-please, then the release notes<br/>drafted into the release PR)"]
+  CI -->|"push to main"| rp["CD / Release<br/>(release-please, then the store notes<br/>drafted into the release PR)"]
   CI -->|"push to main"| internal
 
   subgraph internal["CD / Internal"]
@@ -88,10 +88,10 @@ twenty-minute Android suite or a macOS runner. `Unit` runs on every change;
 
 Dotted edges are the configurable ones: a feature that exists, drawn where it
 belongs, with the variable that turns it on. `Security` is on unless the
-repository variable `SECURITY_ENABLED` is `false`, and `security-policy.json`
+repository variable `SECURITY_ENABLED` is `false`, and `security-settings.json`
 decides which scanners inside it run. On a pull request it runs the source
 scanners (and the LLM review, once configured); on the release pull request it
-adds the bundle scan and OpenAnt. On the production dispatch a second
+adds the bundle scan and the codebase review (OpenAnt). On the production dispatch a second
 `Security` job checks the release's own binaries, and every store job waits for
 it. What each scanner reads, how to disable one, and what "skipped" means are in
 [security.md](security.md).
@@ -121,7 +121,7 @@ commit lands on `main` in between, nothing matches and the retry no-ops.
 of a release at all: two jobs, iOS and Android, both on the `production`
 environment and therefore behind its reviewers, running `sync_metadata` (push)
 or `pull_metadata` (pull) against `fastlane/metadata/**`. It uploads no binary,
-moves no track and writes no version's release notes. It shares the `release`
+moves no track and writes no version's store notes. It shares the `release`
 concurrency group with the promoting workflows, so a listing edit and a store
 submission are never open against the same app at once.
 
@@ -129,25 +129,25 @@ submission are never open against the same app at once.
 
 | File | Trigger | Calls | Notes |
 | --- | --- | --- | --- |
-| `ci.yml` | `push` to `main` (all paths), `pull_request` (`opened`, `synchronize`, `reopened`, `labeled`), `workflow_dispatch` | `check-code.yml`, `check-unit.yml`, `check-e2e.yml`, `check-security.yml`, `publish-badges.yml` | `unit`, `e2e` and `security` all `needs: checks`. `unit` runs on every change; `e2e` skips<br>when `checks` reports `e2e-changed` false, on a push as well as a PR<br>([Skipping a suite](#skipping-a-suite-the-change-cannot-affect)); `security` skips on `docs-only`<br>and when `SECURITY_ENABLED` is `false` ([security.md](security.md)); `badges` needs all three,<br>runs under `always()` and publishes this branch's badges (see [Badges](#badges)) |
+| `ci.yml` | `push` to `main` (all paths), `pull_request` (`opened`, `synchronize`, `reopened`, `labeled`), `workflow_dispatch` | `check.yml`, `test-unit.yml`, `test-e2e.yml`, `check-security.yml`, `publish-badges.yml` | `unit`, `e2e` and `security` all `needs: checks`. `unit` runs on every change; `e2e` skips<br>when `checks` reports `e2e-changed` false, on a push as well as a PR<br>([Skipping a suite](#skipping-a-suite-the-change-cannot-affect)); `security` skips on `docs-only`<br>and when `SECURITY_ENABLED` is `false` ([security.md](security.md)); `badges` needs all three,<br>runs under `always()` and publishes this branch's badges (see [Badges](#badges)) |
 | `ci-web.yml` | `pull_request`, `workflow_dispatch` (`deploy`) | `build-web.yml` | PR = production export + Playwright smoke, skipped by the called workflow's `Changes` job<br>when `web-changed` is false; a `deploy` dispatch from `cd-release.yml` at the tag = the same<br>export + Pages deploy (never skipped: a dispatch has no diff base, so the classifier fails open),<br>with `base-url` = `/<repo>` unless a custom domain is set, and `+not-found.html` copied to<br>`404.html` so a deep link boots the router |
 | `ci-pr-closed.yml` | `pull_request: closed` | `pr-closed.yml` | cancels the closed PR's in-flight runs and drops its `gh-pages` badge directory; needs `actions: write` and `contents: write` |
-| `ci-pr-title.yml` | `pull_request: edited` (only when the title changed) | `pr-title.yml` | `opened`/`synchronize` are already covered by `check-code.yml`'s `commitlint` |
-| `ci-codeql.yml` | `push` to `main`, `pull_request` to `main`, `schedule` (Mon 06:17 UTC) | `check-codeql.yml` | CodeQL advanced setup. Informational — **never** a required check.<br>Config in `.github/codeql/codeql-config.yml`; `make check-code-scanning` runs the same queries locally |
+| `ci-pr-title.yml` | `pull_request: edited` (only when the title changed) | `pr-title.yml` | `opened`/`synchronize` are already covered by `check.yml`'s `commits` |
+| `ci-codeql.yml` | `push` to `main`, `pull_request` to `main`, `schedule` (Mon 06:17 UTC) | `check-code-scanning.yml` | CodeQL advanced setup. Informational — **never** a required check.<br>Config in `.github/codeql/codeql-config.yml`; `make check-code-scanning` runs the same queries locally |
 
 `push` is deliberately scoped to `main` only: a PR branch in this repo would
 otherwise fire both `push` and `pull_request` and run the whole suite twice for
 the same commit.
 
 `ci.yml` carries **no `paths-ignore`**, deliberately. It used to, back when the
-reusable `check-code.yml` derived its diff base from `github.event.pull_request.base.sha`
+reusable checks workflow derived its diff base from `github.event.pull_request.base.sha`
 alone — empty on a push, so the classifier only ever classified PRs and every
 merge to `main` ran the full matrix. `paths-ignore` was the workaround, and it
 was a second docs rule sitting next to the classifier's: narrower (it missed
-`LICENSE` and the issue/PR templates) and free to drift further. `check-code.yml`
+`LICENSE` and the issue/PR templates) and free to drift further. `check.yml`
 now falls back to `github.event.before` on a push, so one rule answers both
 events and the `changes` job is the single source. Widen what counts as docs
-with the `docs-globs` input, never with a second list here. Those alternatives
+with the `docs-patterns` input, never with a second list here. Those alternatives
 are joined into one ERE, so a stray leading, trailing or doubled `|` is
 **refused outright** rather than appended: an empty alternative matches every
 path, which would classify every change as docs-only and skip the whole matrix
@@ -157,19 +157,20 @@ keeps a path filter of its own: that one is not a docs classification but a
 "do not cut a build for this" rule, and it calls no classifier. It is a `paths`
 list with negations rather than `paths-ignore`, because the last matching
 pattern wins there: `*.prompt.md` ends in `.md` but is not documentation
-(`release-notes.prompt.md` shapes the store notes the build ships), and only a
+(`store-notes.prompt.md` shapes the store notes the build ships), and only a
 `paths` list can take it back. `scripts/release-workflows.test.mjs` evaluates
 the filter the way GitHub does.
 
 ### Running CI locally
 
 `make ci` runs everything CI runs except E2E, which needs a simulator or an
-emulator. `make check` is the `check-code` workflow's half of that on its own.
+emulator. `make check` is the `check` workflow's half of that on its own.
 
 Two gates are opt-in in CI and grouped locally as `make check-slow`:
 `check-prebuild` and the bundle scan (`make check-security-bundle`), both minutes rather than
-seconds. Enable the `prebuild-check` and `bundle-secrets` inputs on the
-`checks` call where the coverage earns the wall clock.
+seconds. Enable the `prebuild` input on the `checks` call where the coverage
+earns the wall clock; the bundle scan is `check-security.yml`'s `bundle` job,
+which `ci.yml` already turns on for the release pull request.
 
 That `make ci` and CI agree is enforced here, by this repo's own CI: the
 `Checks / Contract` job runs shared-workflows' contract checker against this
@@ -178,8 +179,8 @@ direction. See
 [quality.md](quality.md#make-check-is-the-ci-gate-set-and-that-is-enforced).
 
 What that costs: only `e2e` and `security` skip on a docs-only change.
-`check-code.yml`'s `code` job has no `docs-only` gate, so a documentation push to
-`main` now runs typecheck, lint, format, knip, spell and audit — a couple of
+`check.yml`'s `code` job has no `docs-only` gate, so a documentation push to
+`main` now runs the type check, lint, format, unused-code and spell gates and the audit — a couple of
 minutes that used to be zero, because the workflow did not trigger at all.
 That is the trade: those are exactly the checks a documentation change can
 break. The expensive half, the native matrix, still skips.
@@ -228,14 +229,14 @@ follow:
 `scripts/ci-suite-gates.test.mjs` evaluates the `unit`, `e2e` and `badges` jobs
 together as a graph, for each kind of change and for failed, cancelled and
 unclassified runs, and holds `unit` to having no gate. The shared contract check (`make check-contract`, CI's
-Checks / Contract) checks that every output `ci.yml` reads is one `check-code.yml` declares at the pin. A renamed output would read as
+Checks / Contract) checks that every output `ci.yml` reads is one `check.yml` declares at the pin. A renamed output would read as
 empty and quietly run every suite.
 
 ### Release and OTA
 
 | File | Trigger | Calls | Notes |
 | --- | --- | --- | --- |
-| `cd-release.yml` | `push` to `main` (all paths), `workflow_dispatch` | `googleapis/release-please-action@v5`, `pr-release-notes.yml` | Keeps one release PR open, dispatches `ci.yml` on its branch and drafts the<br>`## Store notes` section into its body (the only job that may call an LLM).<br>On a cut release, dispatches `cd-beta.yml` and `ci-web.yml` at the tag |
+| `cd-release.yml` | `push` to `main` (all paths), `workflow_dispatch` | `googleapis/release-please-action@v5`, `pr-store-notes.yml` | Keeps one release PR open, dispatches `ci.yml` on its branch and drafts the<br>`## Store notes` section into its body (the only job that may call an LLM).<br>On a cut release, dispatches `cd-beta.yml` and `ci-web.yml` at the tag |
 | `cd-internal.yml` | `push` to `main` (skipping `docs/**`, `**.md`), `workflow_dispatch` | `build-prepare.yml`, `build-ios.yml`, `build-android.yml`,<br>`publish-store.yml`, `publish-github-release.yml`, `publish-ota.yml` | The only workflow that builds binaries |
 | `cd-beta.yml` | `workflow_dispatch` (`tag`), from `cd-release.yml` or by hand | `build-prepare.yml`, `publish-store.yml`, `publish-github-release.yml`, `publish-ota.yml` | Promotes the binary internal already built and tested. Never builds |
 | `cd-production.yml` | `workflow_dispatch` (`tag`, `action`) | `build-prepare.yml`, `check-security.yml`, `publish-store.yml`, `publish-github-release.yml`, `publish-ota.yml`, `build-web.yml` | `action` selects release, rollout, halt, resume or complete;<br>on `release` the store jobs wait for `security`, and `web` redeploys Pages<br>with the same `base-url` as `ci-web.yml` |
@@ -256,21 +257,20 @@ locally means the same commands passed the same way in CI.
 
 | CI job | Scripts it runs | Local equivalent |
 | --- | --- | --- |
-| `check-code.yml` | `typecheck`, `lint`, `format:check`, `knip`, `spell`, `expo-doctor`, `pnpm audit --prod`,<br>commitlint, actionlint, zizmor, shellcheck, `check:docs`, `check:release`, `check:secrets`.<br>`check:ci` also runs the shell-locale and workflow-name guards, `check:docs` the make-target-name guard<br>(all three from `@blinkbitcoin/dev-config`) | `make check-code`, `make check-deps`, `make check-ci`, `make check-docs`,<br>`make check-release`, `make check-secrets` (`make check` runs all of it) |
-| `check-unit.yml` | `test:coverage`, `test:scripts` | `make test-coverage`, `make test-scripts` (`make test-unit` runs `test` + `test:scripts`);<br>both gate coverage at 100%; `test:scripts` includes the `make setup` suite |
-| `check-e2e.yml` | Maestro flows in `.maestro/` against a debug build | `make test-e2e-ios` / `make test-e2e-android` (after `make dev-api`, `make dev`, `make dev-ios`/`make dev-android`) |
+| `check.yml` | `check:types`, `check:lint`, `check:format`, `check:unused`, `check:spell`, `check:generated`,<br>`check:expo-health`, `check:audit`, `check:licenses`, commitlint, `check:ci`, `check:docs`, `check:release`,<br>`check:secrets`. `check:ci` also runs the shell-locale, workflow-name and ignored-directories guards,<br>`check:docs` the make-target-name guard (all from `@blinkbitcoin/app-tooling`) | `make check-code`, `make check-generated`, `make check-expo-health`, `make check-audit`,<br>`make check-licenses`, `make check-ci`, `make check-docs`, `make check-release`,<br>`make check-secrets` (`make check` runs all of it) |
+| `test-unit.yml` | `test:coverage`, `test:scripts` | `make test-coverage`, `make test-scripts` (`make test-unit` runs `test` + `test:scripts`);<br>both gate coverage at 100%; `test:scripts` includes the `make setup` suite |
+| `test-e2e.yml` | Maestro flows in `.maestro/` against a debug build | `make test-e2e-ios` / `make test-e2e-android` (after `make dev-api`, `make dev`, `make dev-ios`/`make dev-android`) |
 | `build-web.yml` | `build:web`, `test:e2e:web` | `make build-web`, `make test-e2e-web` |
-| `check-codeql.yml` | no consumer script: the CodeQL action reads `.github/codeql/codeql-config.yml` | `make check-code-scanning` (same config, same suite, same packs) |
+| `check-code-scanning.yml` | no consumer script: the CodeQL action reads `.github/codeql/codeql-config.yml` | `make check-code-scanning` (same config, same suite, same packs) |
 
 Two script-contract details are load-bearing:
 
-- `knip` is deliberately **not** a `package.json` script. The workflows'
-  `run-script.sh` runs `pnpm run NAME` when the script exists and `pnpm exec
-  NAME` when only `node_modules/.bin/NAME` does — both reach the same binary
-  here, but a script literally named `knip` fails `expo-doctor`'s
+- Every script is named for the gate, never the tool: `check:unused` runs
+  `knip`. A script literally named `knip` would fail `expo-doctor`'s
   "Check package.json for common issues" ("scripts in package.json conflict
-  with the contents of node_modules/.bin"), which `check-code.yml` also runs. The
-  binary fallback is the supported path; leave it alone.
+  with the contents of node_modules/.bin"), which `check:expo-health` runs.
+  The workflows' `run-script.sh` runs `pnpm run NAME` when the script exists
+  and `pnpm exec NAME` when only `node_modules/.bin/NAME` does.
 - `test:e2e:web` is `bash scripts/e2e/web.sh`, which skips its own export when
   `PLAYWRIGHT_SKIP_EXPORT` is set. `build-web.yml` exports once in its `build` job,
   uploads the result as the `web-dist` artifact, and sets that variable for the
@@ -282,7 +282,7 @@ Two script-contract details are load-bearing:
 ## E2E: iOS runs on main, and on a PR only when asked
 
 macOS GitHub-hosted runners bill at 10x **on a private repo**, which is why
-`check-e2e.yml`'s `ios` input defaults to `false` — the safe default for the app
+`test-e2e.yml`'s `ios` input defaults to `false` — the safe default for the app
 repos generated from this template. **On a public repo standard runners are
 free, macOS included**, so this repo sets `E2E_IOS=true`. There is no cost
 argument for skipping it here.
@@ -354,7 +354,7 @@ Consequences encoded in this repo:
 
 ## Mock-API hooks
 
-The flows talk to the local GraphQL mock API (`pnpm mock-api`, on
+The flows talk to the local GraphQL mock API (`pnpm dev:api`, on
 `APP_PORT_BASE` + 2). `ci.yml` wires the workflows' generic E2E hooks to two
 small scripts in this repo:
 
@@ -363,7 +363,7 @@ e2e-setup-script: scripts/e2e/ci-mock-api-up.sh
 e2e-teardown-script: scripts/e2e/ci-mock-api-down.sh
 ```
 
-- **Setup** starts `pnpm mock-api` with `nohup`, writes its pid to
+- **Setup** starts `pnpm dev:api` with `nohup`, writes its pid to
   `$WORKFLOWS_OUT/mock-api.pid` (falling back to `/tmp` outside CI), and blocks on
   `scripts/e2e/wait-for-mock-api.sh` until the server answers a real GraphQL
   query. A missing setup script is fatal — the job fails before the suite runs.
@@ -387,10 +387,10 @@ run's summary page first:
 
 | Artifact | From | Contents |
 | --- | --- | --- |
-| `forensics-ios` | `check-e2e.yml`'s `ios` job | Maestro's `--debug-output` tree (per-flow `commands-*.json`, failure screenshots, `maestro.log`),<br>the simulator screen recording, Metro's log, the device system log,<br>and any crash report from `DiagnosticReports` newer than the run's start stamp<br>(older ones are filtered out so a previous job's crash on the same runner cannot be misread as this one's) |
-| `forensics-android` | `check-e2e.yml`'s `android` job | The same Maestro debug tree, the emulator screen recording, Metro's log and `logcat` |
-| `playwright-report` | `build-web.yml`'s `playwright` job | The Playwright HTML report (traces, screenshots) |
-| `coverage` | `check-unit.yml` | `coverage/`, uploaded on every run (30-day retention) |
+| `forensics-ios` | `test-e2e.yml`'s `ios` job | Maestro's `--debug-output` tree (per-flow `commands-*.json`, failure screenshots, `maestro.log`),<br>the simulator screen recording, Metro's log, the device system log,<br>and any crash report from `DiagnosticReports` newer than the run's start stamp<br>(older ones are filtered out so a previous job's crash on the same runner cannot be misread as this one's) |
+| `forensics-android` | `test-e2e.yml`'s `android` job | The same Maestro debug tree, the emulator screen recording, Metro's log and `logcat` |
+| `playwright-report` | `build-web.yml`'s `e2e` job | The Playwright HTML report (traces, screenshots) |
+| `coverage` | `test-unit.yml` | `coverage/`, uploaded on every run (30-day retention) |
 
 The two E2E jobs also pass their builds between jobs as `ios-app` and
 `android-apk`; those are plumbing, not forensics.
@@ -417,10 +417,12 @@ gh-pages
 | `coverage.svg` | `coverage/coverage-summary.json` from the `coverage` artifact — Jest's `json-summary` reporter, never scraped HTML |
 | `security.svg` | `check-security.yml`'s `verdict` output — the verdict's own word from `.security/verdict.json`,<br>never the job's result (see below) |
 
-Rendering is this repo's job (`scripts/badges/`, `pnpm badges:render`, run
-locally with `make gen-badges`); publishing is the workflows repo's
-(`scripts/ci/publish-badges.sh`). That is the same seam `check-code.yml` uses for
-typecheck and lint: the reusable workflow calls a named consumer script.
+Rendering and publishing are both the workflows repo's: `publish-badges.yml`
+draws the badges with the shared tooling package's `gen-badges`, from its own
+checkout, and publishes them with `scripts/ci/publish-badges.sh`. This
+repository ships no renderer of its own (`badges-script` stays empty);
+`make gen-badges` runs the same `gen-badges` from `@blinkbitcoin/app-tooling`
+to preview them locally.
 
 These details are deliberate:
 
@@ -453,11 +455,11 @@ instead (see [security.md](security.md#where-the-verdict-goes)):
 | `informational` | `<highest> findings`: yellow for low or medium, orange for high or critical |
 | `skipped` | grey `skipped` |
 | `fail` (findings block, a scanner crashed, or the Security run broke before its verdict) | red `failing` |
-| `disabled` (`SECURITY_ENABLED=false`, or `"enabled": false` in `security-policy.json`) | grey `disabled` |
+| `disabled` (`SECURITY_ENABLED=false`, or `"enabled": false` in `security-settings.json`) | grey `disabled` |
 | nothing could block (`severity` is `none` or `failOn` is empty) | the message above plus `(advisory)` |
 
 - **A skipped Security keeps its published badge.** A docs-only change skips
-  the `security` job, hands over no verdict, and the render script writes no
+  the `security` job, hands over no verdict, and `gen-badges` writes no
   `security.svg`, so the branch's last real answer stays.
 - **Security switched off shows `disabled`.** A stale green badge for a gate
   that no longer runs would be the one wrong answer.
@@ -481,7 +483,7 @@ one, and several carry many: `cd-production.yml` alone has twelve.
 `cd-beta-retry.yml` calls no reusable workflow at all.
 
 ```yaml
-uses: blinkbitcoin/shared-workflows/.github/workflows/check-code.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+uses: blinkbitcoin/shared-workflows/.github/workflows/check.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
 ```
 
 A shared-workflows release changes nothing here by itself
@@ -490,16 +492,16 @@ A shared-workflows release changes nothing here by itself
 pin, release workflows included, and that PR's Unit job runs the new shared
 code against this repository before any CD run can:
 
-- The shared contract check (`check-consumer-contract` from `@blinkbitcoin/dev-config`,
+- The shared contract check (`check-contract` from `@blinkbitcoin/app-tooling`,
   CI's Checks / Contract) checks every call's inputs, their types and secrets,
   and every output a caller reads, against what the called workflow declares
   at the new commit, and that every pin and the tooling package are on that
   one commit.
-- `scripts/release/cd-notes.test.mjs` runs the store-notes chain through the
+- `scripts/release/store-notes.test.mjs` runs the store-notes chain through the
   shared scripts and our generator, end to end.
 
 The same Unit job fails until one more thing moves. The shared tooling package
-(`@blinkbitcoin/dev-config`, behind `make check-contract`) is a git dependency
+(`@blinkbitcoin/app-tooling`, behind `make check-contract`) is a git dependency
 on shared-workflows at the pinned commit
 ([ADR 0024](decisions/0024-shared-tooling-at-the-workflows-pin.md)), and
 Dependabot cannot move a git dependency with the pins. Check out the PR's
@@ -518,10 +520,14 @@ and the script contract, and mixing versions across them is untested.
 Every job checks the workflows repo out into `$GITHUB_WORKSPACE/.workflows` and
 reaches its scripts through `$WORKFLOWS_DIR`. Nothing in this repo references
 `shared-workflows` paths directly. Local tooling that walks the whole tree
-ignores it, in all seven places the consumer guide's
+ignores it, in every place the consumer guide's
 [`.workflows/` ignore list](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/consumer-guide.md#workflows-ignore-list-for-consumers)
 names: `biome.json` (`!**/.workflows`), `eslint.config.mjs` (`.workflows/**`),
 `tsconfig.json` (`exclude`), `knip.json` (every glob is rooted, so none reaches
 it), `typos.toml` (`extend-exclude`), `jest.config.ts`
-(`testPathIgnorePatterns`) and `.gitignore` (`/.workflows`). The contract check
-reports any of them this repository loses.
+(`testPathIgnorePatterns` and `modulePathIgnorePatterns`, anchored to
+`<rootDir>`), `metro.config.js` (`resolver.blockList`), `.semgrepignore`,
+the CodeQL configuration and `.gitignore` (`/.workflows`).
+`check-ignored-directories` (from `@blinkbitcoin/app-tooling`, run by
+`make check-ci`) asks each of those tools whether it still skips the
+directory, and the contract check reports any of them this repository loses.

@@ -206,9 +206,9 @@ importers:
       '@biomejs/biome':
         specifier: ^2.5.11
         version: 2.5.11
-      '@blinkbitcoin/dev-config':
-        specifier: github:blinkbitcoin/shared-workflows#2d14d403fec6e47b89a3afed9bb23658ce86187e&path:/packages/dev-config
-        version: https://codeload.github.com/blinkbitcoin/shared-workflows/tar.gz/2d14d403fec6e47b89a3afed9bb23658ce86187e#path:/packages/dev-config
+      '@blinkbitcoin/app-tooling':
+        specifier: github:blinkbitcoin/shared-workflows#a4c04be723959094d85b6db9660f709aa9507f5c&path:/packages/app-tooling
+        version: https://codeload.github.com/blinkbitcoin/shared-workflows/tar.gz/a4c04be723959094d85b6db9660f709aa9507f5c#path:/packages/app-tooling(5dfd4c12eb1b14f8f0fa10ac317d7ad0)
       '@commitlint/cli':
         specifier: ^21.2.2
         version: 21.2.2(@types/node@26.4.1)(conventional-commits-parser@7.1.2)(typescript@6.0.3)
@@ -840,11 +840,46 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@blinkbitcoin/dev-config@https://codeload.github.com/blinkbitcoin/shared-workflows/tar.gz/2d14d403fec6e47b89a3afed9bb23658ce86187e#path:/packages/dev-config':
-    resolution: {gitHosted: true, integrity: sha512-+fnXFO7UEoIDNfJSRUdeqi1uQj1uw2Ikp1yx2wXfa9LLT7lVGzU2zgbvuZG9TngMqlW+e9aNNe6dvFB+dzgdeg==, path: /packages/dev-config, tarball: https://codeload.github.com/blinkbitcoin/shared-workflows/tar.gz/2d14d403fec6e47b89a3afed9bb23658ce86187e}
-    version: 0.10.0
-    engines: {node: '>=20'}
+  '@blinkbitcoin/app-tooling@https://codeload.github.com/blinkbitcoin/shared-workflows/tar.gz/a4c04be723959094d85b6db9660f709aa9507f5c#path:/packages/app-tooling':
+    resolution: {gitHosted: true, integrity: sha512-xHSzlBP1IKFYOOPE/Wmk7MmKYmBxcov9jIaiTXZM9dV+5mKxqmmr+woTRAmS8Z7vu7su75+hUeHPOVhwaIa2Vw==, path: /packages/app-tooling, tarball: https://codeload.github.com/blinkbitcoin/shared-workflows/tar.gz/a4c04be723959094d85b6db9660f709aa9507f5c}
+    version: 0.1.1
+    engines: {node: '>=22.12'}
     hasBin: true
+    peerDependencies:
+      '@biomejs/biome': '>=2.5.0'
+      '@commitlint/config-conventional': '>=21.0.0'
+      '@expo/fingerprint': '>=0.20.0'
+      '@playwright/test': '>=1.62.0'
+      eslint: '>=9.22.0'
+      eslint-config-expo: '>=57.0.0'
+      globals: '>=17.0.0'
+      jest: '>=30.0.0'
+      jest-expo: '>=57.0.0'
+      lefthook: '>=2.0.0'
+      typescript: '>=5.0.0'
+    peerDependenciesMeta:
+      '@biomejs/biome':
+        optional: true
+      '@commitlint/config-conventional':
+        optional: true
+      '@expo/fingerprint':
+        optional: true
+      '@playwright/test':
+        optional: true
+      eslint:
+        optional: true
+      eslint-config-expo:
+        optional: true
+      globals:
+        optional: true
+      jest:
+        optional: true
+      jest-expo:
+        optional: true
+      lefthook:
+        optional: true
+      typescript:
+        optional: true
 
   '@colors/colors@1.5.0':
     resolution: {integrity: sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==}
@@ -7898,7 +7933,19 @@ snapshots:
   '@biomejs/cli-win32-x64@2.5.11':
     optional: true
 
-  '@blinkbitcoin/dev-config@https://codeload.github.com/blinkbitcoin/shared-workflows/tar.gz/2d14d403fec6e47b89a3afed9bb23658ce86187e#path:/packages/dev-config': {}
+  '@blinkbitcoin/app-tooling@https://codeload.github.com/blinkbitcoin/shared-workflows/tar.gz/a4c04be723959094d85b6db9660f709aa9507f5c#path:/packages/app-tooling(5dfd4c12eb1b14f8f0fa10ac317d7ad0)':
+    optionalDependencies:
+      '@biomejs/biome': 2.5.11
+      '@commitlint/config-conventional': 21.2.2
+      '@expo/fingerprint': 0.20.13(supports-color@8.1.1)
+      '@playwright/test': 1.62.1
+      eslint: 9.39.5(jiti@2.7.0)(supports-color@8.1.1)
+      eslint-config-expo: 57.0.2(eslint@9.39.5(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
+      globals: 17.12.0
+      jest: 30.5.1(@types/node@26.4.1)(supports-color@8.1.1)(ts-node@10.9.2(@types/node@26.4.1)(typescript@6.0.3))
+      jest-expo: 57.0.5(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(expo@57.0.23)(jest@30.5.1(@types/node@26.4.1)(supports-color@8.1.1)(ts-node@10.9.2(@types/node@26.4.1)(typescript@6.0.3)))(react-native@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.87.1(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1)
+      lefthook: 2.1.14
+      typescript: 6.0.3
 
   '@colors/colors@1.5.0':
     optional: true

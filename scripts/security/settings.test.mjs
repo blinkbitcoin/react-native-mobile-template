@@ -4,8 +4,10 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { EFFORTS as PACKAGE_EFFORTS } from '@blinkbitcoin/app-tooling/llm';
 import {
   DEFAULTS,
+  EFFORTS,
   LLM,
   load,
   main,
@@ -14,12 +16,12 @@ import {
   parseTyped,
   resolve,
   snake,
-} from './config.mjs';
+} from './settings.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../..');
 
-// Every SECURITY_* variable config.mjs reads, so tests that rely on the
+// Every SECURITY_* variable settings.mjs reads, so tests that rely on the
 // default `env = process.env` parameter aren't hostage to whatever a
 // developer or runner happens to have exported.
 const SECURITY_ENV_KEYS = [
@@ -28,7 +30,7 @@ const SECURITY_ENV_KEYS = [
   'SECURITY_FAIL_ON',
   ...Object.keys(DEFAULTS.jobs).map((name) => `SECURITY_${name.toUpperCase()}`),
   ...Object.entries(OPTIONS).flatMap(([job, schema]) =>
-    Object.keys(schema).map((key) => `SECURITY_${job.toUpperCase()}_${snake(key)}`),
+    Object.keys(schema).map((key) => `SECURITY_${snake(job)}_${snake(key)}`),
   ),
   ...Object.keys(LLM).map((key) => `SECURITY_LLM_${snake(key)}`),
 ];
@@ -54,19 +56,22 @@ test('defaults apply when the file and the environment are silent', () => {
   assert.equal(settings.enabled, true);
   assert.equal(settings.severity, 'high');
   assert.deepEqual(settings.failOn, ['deterministic']);
-  assert.equal(settings.jobs.deps, true);
+  assert.equal(settings.jobs.dependencies, true);
   assert.equal(settings.jobs.review, false);
 });
 
 test('the file overrides a default', () => {
-  const settings = resolve({ jobs: { deps: { enabled: false } }, severity: 'low' }, {});
-  assert.equal(settings.jobs.deps, false);
+  const settings = resolve({ jobs: { dependencies: { enabled: false } }, severity: 'low' }, {});
+  assert.equal(settings.jobs.dependencies, false);
   assert.equal(settings.severity, 'low');
 });
 
 test('the environment overrides the file', () => {
-  const settings = resolve({ jobs: { deps: { enabled: false } } }, { SECURITY_DEPS: 'true' });
-  assert.equal(settings.jobs.deps, true);
+  const settings = resolve(
+    { jobs: { dependencies: { enabled: false } } },
+    { SECURITY_DEPENDENCIES: 'true' },
+  );
+  assert.equal(settings.jobs.dependencies, true);
 });
 
 test('SECURITY_ENABLED is the master switch and follows the same order', () => {
@@ -76,13 +81,13 @@ test('SECURITY_ENABLED is the master switch and follows the same order', () => {
 
 test('a value that is not a boolean fails the run rather than reading as off', () => {
   assert.throws(
-    () => parseBoolean('yes', 'SECURITY_DEPS'),
-    /SECURITY_DEPS: expected true or false, got "yes"/,
+    () => parseBoolean('yes', 'SECURITY_DEPENDENCIES'),
+    /SECURITY_DEPENDENCIES: expected true or false, got "yes"/,
   );
   assert.throws(() => resolve({}, { SECURITY_CODE: '1' }), /SECURITY_CODE/);
   assert.throws(
     () => resolve({ jobs: { code: { enabled: 'on' } } }, {}),
-    /security-policy.json: jobs.code/,
+    /security-settings.json: jobs.code/,
   );
 });
 
@@ -117,7 +122,7 @@ const capture = () => {
 
 test('get prints one setting, a list comma-joined', () => {
   const io = capture();
-  assert.equal(main(['get', 'jobs.deps'], { ...io, env: {} }), 0);
+  assert.equal(main(['get', 'jobs.dependencies'], { ...io, env: {} }), 0);
   assert.equal(main(['get', 'failOn'], { ...io, env: {} }), 0);
   assert.deepEqual(io.out, ['true', 'deterministic']);
 });
@@ -134,7 +139,7 @@ test('an unknown key and a missing argument both exit 2', () => {
   assert.equal(main([], { ...io, env: {} }), 2);
   assert.deepEqual(io.out, [
     'no such setting: jobs.nope',
-    'usage: config.mjs get <dotted.key> | --json',
+    'usage: settings.mjs get <dotted.key> | --json',
   ]);
 });
 
@@ -154,7 +159,7 @@ test('environment boolean string false is parsed correctly', () => {
 });
 
 test('load reads and parses the policy file', () => {
-  const settings = load('security-policy.json', {});
+  const settings = load('security-settings.json', {});
   assert.equal(settings.enabled, true);
   assert.equal(settings.severity, 'high');
 });
@@ -170,7 +175,7 @@ test('parseBoolean accepts string true and false', () => {
 });
 
 test('resolve with string false in environment', () => {
-  assert.equal(resolve({}, { SECURITY_DEPS: 'false' }).jobs.deps, false);
+  assert.equal(resolve({}, { SECURITY_DEPENDENCIES: 'false' }).jobs.dependencies, false);
 });
 
 test('get handles deeply nested nonexistent paths', () => {
@@ -182,7 +187,7 @@ test('get handles deeply nested nonexistent paths', () => {
 test('get without a key argument exits 2', () => {
   const io = capture();
   assert.equal(main(['get'], { ...io, env: {} }), 2);
-  assert.equal(io.out[0], 'usage: config.mjs get <dotted.key> | --json');
+  assert.equal(io.out[0], 'usage: settings.mjs get <dotted.key> | --json');
 });
 
 test('Array.isArray branch in value output', () => {
@@ -205,7 +210,7 @@ test('parseList with spaces in comma-separated values', () => {
 
 test('policy jobs object without a specific job falls back to default', () => {
   const settings = resolve({ jobs: {} }, {});
-  assert.equal(settings.jobs.deps, true); // DEFAULTS.jobs.deps
+  assert.equal(settings.jobs.dependencies, true); // DEFAULTS.jobs.dependencies
   assert.equal(settings.jobs.review, false); // DEFAULTS.jobs.review
 });
 
@@ -219,14 +224,14 @@ test('resolve with default env parameter', () => {
 
 test('load with default env parameter', () => {
   withoutSecurityEnv(() => {
-    const settings = load('security-policy.json');
+    const settings = load('security-settings.json');
     assert.equal(settings.enabled, true);
   });
 });
 
 test('job in policy without enabled property falls back to default', () => {
-  const settings = resolve({ jobs: { deps: {} } }, {});
-  assert.equal(settings.jobs.deps, true); // Falls back to DEFAULTS.jobs.deps
+  const settings = resolve({ jobs: { dependencies: {} } }, {});
+  assert.equal(settings.jobs.dependencies, true); // Falls back to DEFAULTS.jobs.dependencies
 });
 
 test('file policy with string false value in job is parsed correctly', () => {
@@ -257,43 +262,43 @@ test('enabled with boolean value true from policy', () => {
   assert.equal(settings.enabled, true);
 });
 
-test('as a command it reads security-policy.json from the working directory', () => {
-  const script = path.join(here, 'config.mjs');
+test('as a command it reads security-settings.json from the working directory', () => {
+  const script = path.join(here, 'settings.mjs');
   // The inherited environment keeps NODE_V8_COVERAGE, so the child counts,
   // and it also runs the file as the entry point rather than an import, so
   // `import.meta.main` is true here the way it never is under `node --test`.
   // SECURITY_* keys are stripped so a developer's or runner's real
-  // environment can't change what the child reports for jobs.deps.
+  // environment can't change what the child reports for jobs.dependencies.
   const childEnv = { ...process.env };
   for (const key of SECURITY_ENV_KEYS) delete childEnv[key];
   const run = (...args) =>
     spawnSync(process.execPath, [script, ...args], { encoding: 'utf8', env: childEnv });
-  const got = run('get', 'jobs.deps');
+  const got = run('get', 'jobs.dependencies');
   assert.equal(got.status, 0);
   assert.equal(got.stdout.trim(), 'true');
 });
 
-// The defect this guards against: security-policy.json shipped sbom, bundle
+// The defect this guards against: security-settings.json shipped sbom, bundle
 // and binaries as enabled while DEFAULTS (and the fallback every consumer
 // gets with no policy file at all) agreed - both wrong, in the same
 // direction, so a reviewer comparing the two files saw no disagreement. Only
 // comparing against the actual runners on disk (the next test) would have
 // caught it; this test catches the narrower case of the two settings
 // sources silently drifting apart from each other.
-test('security-policy.json and DEFAULTS agree, key for key', () => {
-  const policy = JSON.parse(readFileSync(path.join(repoRoot, 'security-policy.json'), 'utf8'));
+test('security-settings.json and DEFAULTS agree, key for key', () => {
+  const policy = JSON.parse(readFileSync(path.join(repoRoot, 'security-settings.json'), 'utf8'));
   const policyNames = Object.keys(policy.jobs).sort();
   const defaultNames = Object.keys(DEFAULTS.jobs).sort();
   assert.deepEqual(
     policyNames,
     defaultNames,
-    'security-policy.json and DEFAULTS.jobs must name exactly the same jobs',
+    'security-settings.json and DEFAULTS.jobs must name exactly the same jobs',
   );
   for (const name of defaultNames) {
     assert.equal(
       policy.jobs[name].enabled,
       DEFAULTS.jobs[name],
-      `jobs.${name}.enabled in security-policy.json disagrees with DEFAULTS.jobs.${name}`,
+      `jobs.${name}.enabled in security-settings.json disagrees with DEFAULTS.jobs.${name}`,
     );
   }
 });
@@ -323,7 +328,7 @@ test('every option and the llm block resolve to their defaults', () => {
     cleartextHosts: ['localhost', '127.0.0.1'],
   });
   assert.equal(settings.options.review.maxDiffBytes, 200000);
-  assert.deepEqual(settings.options.openant, { limit: 0, verify: false });
+  assert.deepEqual(settings.options['review-codebase'], { limit: 0, verify: false });
   assert.deepEqual(settings.llm, { provider: '', model: '', effort: 'max' });
 });
 
@@ -331,13 +336,14 @@ test('the deterministic jobs are on by default and the two LLM jobs are off', ()
   const { jobs } = resolve({}, {});
   for (const name of ['sbom', 'bundle', 'mobile', 'binaries']) assert.equal(jobs[name], true);
   assert.equal(jobs.review, false);
-  assert.equal(jobs.openant, false);
+  assert.equal(jobs['review-codebase'], false);
 });
 
 test('snake turns a camelCase key into its environment spelling', () => {
   assert.equal(snake('androidPermissions'), 'ANDROID_PERMISSIONS');
   assert.equal(snake('maxDiffBytes'), 'MAX_DIFF_BYTES');
   assert.equal(snake('limit'), 'LIMIT');
+  assert.equal(snake('review-codebase'), 'REVIEW_CODEBASE');
 });
 
 test('an option comes from the file, and its environment twin wins over the file', () => {
@@ -390,11 +396,11 @@ test('an option of the wrong type fails the run, naming where it came from', () 
 test('an invalid option reaches the error with its source', () => {
   assert.throws(
     () => resolve({ jobs: { review: { maxDiffBytes: 'big' } } }, {}),
-    /security-policy.json: jobs.review.maxDiffBytes: expected a whole number/,
+    /security-settings.json: jobs.review.maxDiffBytes: expected a whole number/,
   );
   assert.throws(
-    () => resolve({}, { SECURITY_OPENANT_LIMIT: 'all' }),
-    /SECURITY_OPENANT_LIMIT: expected a whole number/,
+    () => resolve({}, { SECURITY_REVIEW_CODEBASE_LIMIT: 'all' }),
+    /SECURITY_REVIEW_CODEBASE_LIMIT: expected a whole number/,
   );
   assert.throws(() => resolve({}, { SECURITY_LLM_EFFORT: 'extreme' }), /SECURITY_LLM_EFFORT/);
 });
@@ -405,8 +411,8 @@ test('a key the schema does not know is a typo, and fails the run', () => {
     /unknown setting jobs.binaries.androidPermission/,
   );
   assert.throws(
-    () => resolve({ jobs: { deps: { hosts: [] } } }, {}),
-    /unknown setting jobs.deps.hosts/,
+    () => resolve({ jobs: { dependencies: { hosts: [] } } }, {}),
+    /unknown setting jobs.dependencies.hosts/,
   );
   assert.throws(() => resolve({ jobs: { lint: { enabled: true } } }, {}), /unknown job jobs.lint/);
   assert.throws(() => resolve({ llm: { temperature: 1 } }, {}), /unknown setting llm.temperature/);
@@ -432,7 +438,7 @@ test('get prints an option list comma-joined and an empty setting as an empty li
 
 test('the repository policy file resolves cleanly', () => {
   withoutSecurityEnv(() => {
-    const settings = load(path.join(repoRoot, 'security-policy.json'), {});
+    const settings = load(path.join(repoRoot, 'security-settings.json'), {});
     assert.equal(settings.jobs.binaries, true);
     assert.deepEqual(settings.options.bundle.cleartextHosts, [
       'localhost',
@@ -444,14 +450,14 @@ test('the repository policy file resolves cleanly', () => {
   });
 });
 
-test('an empty option or llm twin is unset, as build-env delivers an unset repository variable', () => {
+test('an empty option or llm twin is unset, as environment-variables delivers an unset repository variable', () => {
   const env = {
     SECURITY_LLM_PROVIDER: '',
     SECURITY_LLM_MODEL: '',
     SECURITY_LLM_EFFORT: '',
     SECURITY_BUNDLE_PLATFORMS: '',
     SECURITY_REVIEW_MAX_DIFF_BYTES: '',
-    SECURITY_OPENANT_VERIFY: '',
+    SECURITY_REVIEW_CODEBASE_VERIFY: '',
   };
   const fromFile = resolve({ llm: { effort: 'high', provider: 'openai' } }, env);
   assert.equal(fromFile.llm.effort, 'high');
@@ -460,7 +466,7 @@ test('an empty option or llm twin is unset, as build-env delivers an unset repos
   assert.deepEqual(defaults.llm, { provider: '', model: '', effort: 'max' });
   assert.deepEqual(defaults.options.bundle.platforms, ['ios', 'android']);
   assert.equal(defaults.options.review.maxDiffBytes, 200000);
-  assert.equal(defaults.options.openant.verify, false);
+  assert.equal(defaults.options['review-codebase'].verify, false);
   // A value that is there and wrong still fails the run.
   assert.throws(() => resolve({}, { SECURITY_LLM_EFFORT: ' ' }), /SECURITY_LLM_EFFORT/);
 });
@@ -469,4 +475,17 @@ test('the job switches and failOn keep their meaning for an empty value', () => 
   // An empty failOn is a deliberate "nothing blocks"; an empty switch is not a boolean.
   assert.deepEqual(resolve({}, { SECURITY_FAIL_ON: '' }).failOn, []);
   assert.throws(() => resolve({}, { SECURITY_CODE: '' }), /SECURITY_CODE: expected true or false/);
+});
+
+test('the efforts are the ones the shared LLM adapters accept', () => {
+  assert.deepEqual(EFFORTS, PACKAGE_EFFORTS);
+});
+
+test('a dashed job name reads its environment twin with an underscore', () => {
+  const settings = resolve(
+    {},
+    { SECURITY_REVIEW_CODEBASE: 'true', SECURITY_REVIEW_CODEBASE_LIMIT: '3' },
+  );
+  assert.equal(settings.jobs['review-codebase'], true);
+  assert.equal(settings.options['review-codebase'].limit, 3);
 });

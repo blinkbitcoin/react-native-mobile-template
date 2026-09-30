@@ -15,7 +15,7 @@ pidfile="$out/mock-api.pid"
 # EXPO_PUBLIC_API_URL.
 eval "$(node scripts/ports.mjs --sh)"
 
-nohup pnpm mock-api >"$log" 2>&1 &
+nohup pnpm dev:api >"$log" 2>&1 &
 echo $! >"$pidfile"
 echo "mock-api started (pid $(cat "$pidfile"), port $MOCK_API_PORT, log $log)"
 

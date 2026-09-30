@@ -111,7 +111,7 @@ test('main reads the bundles and .env.example and prints one SARIF document', ()
     const out = [];
     const code = main([file], {
       log: (l) => out.push(l),
-      env: { SECURITY_POLICY_FILE: path.join(dir, 'none.json') },
+      env: { SECURITY_SETTINGS_FILE: path.join(dir, 'none.json') },
       read: (name, encoding) => (encoding ? String(files[name]) : files[name]),
     });
     assert.equal(code, 0);

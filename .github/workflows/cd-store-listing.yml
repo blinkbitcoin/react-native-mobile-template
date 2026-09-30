@@ -2,7 +2,7 @@ name: CD / Store listing
 # The store page, not a release. It pushes fastlane/metadata/** to App Store
 # Connect and Google Play at any time, independent of a version, and pulls the
 # consoles' copy back so the tree can be seeded from what they already hold.
-# Per-version release notes stay with CD (cd-production.yml): this
+# Per-version store notes stay with CD (cd-production.yml): this
 # workflow uploads no binary, moves no track, submits nothing for review and
 # never writes a version's "What's new".
 #
@@ -44,22 +44,21 @@ jobs:
     # template cannot overwrite a live store page from a mistaken dispatch.
     # The lane asserts the same variable itself - this only saves the runner.
     if: ${{ vars.STORE_METADATA_SYNC_ENABLED == 'true' && inputs.platforms != 'android' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       contents: read
     with:
       platform: ios
       lane: ${{ inputs.direction == 'pull' && 'pull_metadata' || 'sync_metadata' }}
-      # No Xcode, no binary: the listing is pure App Store Connect API.
-      runner: ubuntu-latest
+      # No Xcode, no binary, so no macOS runner: the listing is pure App Store Connect API.
       # Required reviewers live on this environment; a listing edit is as
       # public as a release, so it is gated the same way.
       environment: production
-      env-json: >-
-        {"STORE_METADATA_SYNC_ENABLED":"${{ vars.STORE_METADATA_SYNC_ENABLED }}",
+      environment-variables: >-
+        {"APP_VARIANT":"production",
+        "STORE_METADATA_SYNC_ENABLED":"${{ vars.STORE_METADATA_SYNC_ENABLED }}",
         "IOS_METADATA_EDIT_LIVE":"${{ vars.IOS_METADATA_EDIT_LIVE }}",
         "DRY_RUN":"${{ inputs.dry_run && '1' || '0' }}"}
-      build-env: '{"APP_VARIANT":"production"}'
       # The Fastfile's before_all asserts all five contract variables for every
       # lane, and this one acts on no version at all - so they are filled with
       # the identifiers plus a version of 0.0.0 that nothing reads.
@@ -73,7 +72,7 @@ jobs:
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
-      # Secrets, not env-json: a reviewer demo login is a real credential and
+      # Secrets, not environment-variables: a reviewer demo login is a real credential and
       # both of those inputs are printed to the log.
       APP_REVIEW_EMAIL: ${{ secrets.APP_REVIEW_EMAIL }}
       APP_REVIEW_FIRST_NAME: ${{ secrets.APP_REVIEW_FIRST_NAME }}
@@ -86,19 +85,18 @@ jobs:
   android:
     name: ${{ inputs.direction == 'pull' && 'Pull Android listing' || 'Push Android listing' }}
     if: ${{ vars.STORE_METADATA_SYNC_ENABLED == 'true' && inputs.platforms != 'ios' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       contents: read
     with:
       platform: android
       lane: ${{ inputs.direction == 'pull' && 'pull_metadata' || 'sync_metadata' }}
-      runner: ubuntu-latest
       environment: production
-      env-json: >-
-        {"STORE_METADATA_SYNC_ENABLED":"${{ vars.STORE_METADATA_SYNC_ENABLED }}",
+      environment-variables: >-
+        {"APP_VARIANT":"production",
+        "STORE_METADATA_SYNC_ENABLED":"${{ vars.STORE_METADATA_SYNC_ENABLED }}",
         "PLAY_METADATA_TRACK":"${{ vars.PLAY_METADATA_TRACK }}",
         "DRY_RUN":"${{ inputs.dry_run && '1' || '0' }}"}
-      build-env: '{"APP_VARIANT":"production"}'
       version: 0.0.0
       build-number: "0"
       ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}

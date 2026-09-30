@@ -1,0 +1,34 @@
+{
+  "testSiblings": {
+    "sources": {
+      "scripts/**/*.mjs": [".test.mjs"],
+      "src/**/*.{ts,tsx}": [".test.ts", ".test.tsx"],
+      "plugins/*.ts": [".test.ts", ".test.tsx"],
+      "modules/*/index.ts": [".test.ts", ".test.tsx"]
+    },
+    "exclude": [
+      "src/graphql/generated/**",
+      "src/i18n/locales/**",
+      "src/test/**",
+      "src/__tests__/**",
+      "**/*.d.ts"
+    ],
+    "mirror": {
+      "src/app/": "src/__tests__/app/"
+    }
+  },
+  "docs": {
+    "architecture": [
+      "app.config.ts",
+      "plugins/",
+      "modules/",
+      "src/graphql/",
+      "scripts/",
+      "Makefile"
+    ],
+    "allowTargetNames": {
+      "gen-graphql": "GraphQL is what it generates, the typed documents, not the tool that does it",
+      "check-expo-health": "Expo is the SDK whose health it checks, the same stem shared-workflows' expo-health gate uses"
+    }
+  }
+}

@@ -358,7 +358,7 @@ test('main runs both platforms and writes one SARIF document', () => {
           '--ios-entitlements',
           f['entitlements.json'],
         ],
-        { log: (l) => out.push(l), env: { SECURITY_POLICY_FILE: path.join(dir, 'none.json') } },
+        { log: (l) => out.push(l), env: { SECURITY_SETTINGS_FILE: path.join(dir, 'none.json') } },
       );
       assert.equal(code, 0);
       const run = JSON.parse(out[0]).runs[0];
@@ -390,7 +390,7 @@ test('a note means part of the checks did not run: the run is skipped, not clean
       ],
       {
         log: (l) => out.push(l),
-        env: { SECURITY_POLICY_FILE: path.join(dir, 'none.json') },
+        env: { SECURITY_SETTINGS_FILE: path.join(dir, 'none.json') },
       },
     );
     const [invocation] = JSON.parse(out[0]).runs[0].invocations;
@@ -408,7 +408,7 @@ test('main with no evidence at all is a clean, empty run; a bad flag exits 2', (
   assert.equal(
     main([], {
       log: (l) => out.push(l),
-      env: { SECURITY_POLICY_FILE: '/nonexistent/policy.json' },
+      env: { SECURITY_SETTINGS_FILE: '/nonexistent/policy.json' },
     }),
     0,
   );
@@ -432,7 +432,7 @@ test('main with a manifest and no signer output still checks the manifest', () =
     const out = [];
     main(['--android-manifest', f['manifest.txt'], '--android-file', 'x.apk'], {
       log: (l) => out.push(l),
-      env: { SECURITY_POLICY_FILE: path.join(dir, 'none.json') },
+      env: { SECURITY_SETTINGS_FILE: path.join(dir, 'none.json') },
     });
     assert.deepEqual(JSON.parse(out[0]).runs[0].results, []);
   });

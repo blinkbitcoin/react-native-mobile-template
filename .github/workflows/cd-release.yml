@@ -5,7 +5,7 @@ name: CD / Release
 # is what `cd-beta.yml` listens for.
 #
 # Merge that PR with **squash** (or rebase). `resolve-version.sh` (the shared
-# script; `make version` runs it from @blinkbitcoin/dev-config) reads the
+# script; `make version` runs it from @blinkbitcoin/app-tooling) reads the
 # release commit's `chore(main): release X.Y.Z` subject to stamp the build
 # that ships with the release — cd-internal runs on the same push and
 # the tag does not exist yet, so the subject is the only source that is right on
@@ -116,7 +116,7 @@ jobs:
           BRANCH: ${{ steps.pr.outputs.branch }}
         run: gh workflow run ci.yml --repo "$REPO" --ref "$BRANCH"
 
-  # The store release notes, drafted once into the release PR body for a human
+  # The store notes, drafted once into the release PR body for a human
   # to review with the version bump. release-please carries the section into
   # the GitHub release body on merge, and beta and production read it back
   # verbatim (build-prepare with release-tag), so this is the only job in the
@@ -124,12 +124,12 @@ jobs:
   # deterministic notes from commits. Its own job, after the dispatches above:
   # a red draft never withholds a release, and `gh run rerun --failed` re-drafts.
   # A hand edit to the section in the PR lasts until the next push to main;
-  # edit release-notes.prompt.md instead, or the release body after merging.
+  # edit store-notes.prompt.md instead, or the release body after merging.
   store-notes:
-    name: Release notes
+    name: Store notes
     needs: release-please
     if: ${{ needs.release-please.outputs.pr-number != '' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/pr-release-notes.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/pr-store-notes.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       contents: read
       pull-requests: write
@@ -138,15 +138,15 @@ jobs:
       # The release branch, so the prompt template and the generator under
       # release are the ones that draft.
       ref: ${{ needs.release-please.outputs.pr-branch }}
-      # Non-secret only (see the build-env note in cd-internal.yml); the
+      # Non-secret only (see the environment-variables note in cd-internal.yml); the
       # two keys travel as secrets below and are only needed when the provider
       # variable selects them.
-      build-env: >-
+      environment-variables: >-
         {"STORE_NOTES_INCLUDE_CHANGELOG":"${{ vars.STORE_NOTES_INCLUDE_CHANGELOG }}",
-        "RELEASE_NOTES_LLM_PROVIDER":"${{ vars.RELEASE_NOTES_LLM_PROVIDER }}",
-        "RELEASE_NOTES_LLM_MODEL":"${{ vars.RELEASE_NOTES_LLM_MODEL }}",
-        "RELEASE_NOTES_LLM_EFFORT":"${{ vars.RELEASE_NOTES_LLM_EFFORT }}",
-        "RELEASE_NOTES_LLM_EXTRA_PARAMS":${{ toJSON(vars.RELEASE_NOTES_LLM_EXTRA_PARAMS || '') }},
+        "STORE_NOTES_LLM_PROVIDER":"${{ vars.STORE_NOTES_LLM_PROVIDER }}",
+        "STORE_NOTES_LLM_MODEL":"${{ vars.STORE_NOTES_LLM_MODEL }}",
+        "STORE_NOTES_LLM_EFFORT":"${{ vars.STORE_NOTES_LLM_EFFORT }}",
+        "STORE_NOTES_LLM_EXTRA_PARAMS":${{ toJSON(vars.STORE_NOTES_LLM_EXTRA_PARAMS || '') }},
         "OPENAI_BASE_URL":"${{ vars.OPENAI_BASE_URL }}"}
     secrets:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

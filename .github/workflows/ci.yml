@@ -4,7 +4,7 @@ on:
     branches: [main]
     # No paths-ignore: it would be a second, narrower docs rule that already
     # disagrees with the classifier's (it misses LICENSE and the issue/PR
-    # templates). check-code.yml's `changes` job is the single source - it
+    # templates). check.yml's `changes` job is the single source - it
     # classifies pushes too, so a docs-only merge still skips e2e.
   pull_request:
     types: [opened, synchronize, reopened, labeled]
@@ -24,18 +24,17 @@ concurrency:
 jobs:
   checks:
     name: Checks
-    uses: blinkbitcoin/shared-workflows/.github/workflows/check-code.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/check.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     with:
       # Runs `pnpm check:release` (= `make check-release`): Ruby syntax, a
       # fastlane lane parse and the lane unit tests. Needs Ruby, which is why
       # the toggle is off by default in the reusable workflow.
-      release-checks: true
-      # Both off by default upstream, because a consumer without the scripts
-      # would fail; this one has them. Until these were switched on, `make
-      # check-gen` ran on developer machines and in no CI job - a green local
-      # gate implying a check CI never made.
-      i18n: true
-      graphql-codegen: true
+      release: true
+      # Off by default upstream, because a consumer without the scripts would
+      # fail; this one has them. Runs `pnpm check:generated` (= `make
+      # check-generated`): the i18n catalogs and the GraphQL documents are what
+      # their generators write.
+      generated: true
   unit:
     name: Unit
     needs: checks
@@ -45,7 +44,7 @@ jobs:
     # fastlane lane or a doc can each fail Unit. Skipping on the classifier's
     # unit list let such a change land unchecked.
     # scripts/ci-suite-gates.test.mjs holds this job to having no `if:`.
-    uses: blinkbitcoin/shared-workflows/.github/workflows/check-unit.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/test-unit.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
   e2e:
     name: E2E
     # `unit` as well as `checks`, so a failed unit run never reaches E2E. On a
@@ -64,7 +63,7 @@ jobs:
       needs.checks.result == 'success' &&
       contains(fromJSON('["success", "skipped"]'), needs.unit.result) &&
       needs.checks.outputs.e2e-changed != 'false'
-    uses: blinkbitcoin/shared-workflows/.github/workflows/check-e2e.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/test-e2e.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     with:
       # iOS runs on a push to main (and a manual run) when the repo variable
       # E2E_IOS is true, and on a PR only when it carries the `e2e:ios` label
@@ -77,7 +76,7 @@ jobs:
       ios: ${{ (github.event_name != 'pull_request' && vars.E2E_IOS == 'true') || contains(github.event.pull_request.labels.*.name, 'e2e:ios') }}
       macos-runner: ${{ vars.WORKFLOWS_MACOS_RUNNER || 'macos-26' }}
       # Android only. The iOS suite runs a Release build below, which embeds the
-      # bundle and has no dev launcher, so check-e2e.yml forces dev-client off there.
+      # bundle and has no dev launcher, so test-e2e.yml forces dev-client off there.
       dev-client: true
       # Release, because the Debug/dev-client path never ran twice in a row on a
       # runner. It needed Metro up, a deep link delivered, an iOS "Open in
@@ -99,7 +98,7 @@ jobs:
       # a different runner from, the job that starts the mock API. 8082 is
       # `BASE_DEFAULT` 8080 plus `mockApi.offset` 2 from `scripts/ports.mjs`,
       # deterministic on a runner because nothing sets `APP_PORT_BASE` there.
-      build-env: '{"EXPO_PUBLIC_API_URL":"http://localhost:8082/graphql"}'
+      environment-variables: '{"EXPO_PUBLIC_API_URL":"http://localhost:8082/graphql"}'
       e2e-setup-script: scripts/e2e/ci-mock-api-up.sh
       e2e-teardown-script: scripts/e2e/ci-mock-api-down.sh
   security:
@@ -108,7 +107,7 @@ jobs:
     # SECURITY_ENABLED is the per-repository master switch, opt-out because a
     # generated app gets the deterministic scanners on. A skipped job is green,
     # so turning it off never holds up require-green-workflow: ci.yml. Which
-    # scanners actually run is security-policy.json's decision; the inputs below
+    # scanners actually run is security-settings.json's decision; the inputs below
     # only say what this tier allows.
     if: ${{ needs.checks.outputs.docs-only != 'true' && vars.SECURITY_ENABLED != 'false' }}
     # The verdict job uploads SARIF to code scanning, on main only; a pull
@@ -119,21 +118,21 @@ jobs:
       contents: read
       actions: read
       security-events: write
-    uses: blinkbitcoin/shared-workflows/.github/workflows/check-security.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/check-security.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     with:
       # The diff review runs on pull requests, and on the release pull request,
       # whose CI is the workflow_dispatch cd-release.yml starts on its branch -
       # so it is recognised by github.ref_name. github.head_ref is empty there.
       review: ${{ github.event_name == 'pull_request' || startsWith(github.ref_name, 'release-please--') }}
       # The release pull request is the last stop before a tag: it adds the
-      # minutes-long bundle scan and OpenAnt, and reviews everything since the
+      # minutes-long bundle scan and the codebase review (OpenAnt), and reviews everything since the
       # last release rather than one pull request's diff.
       bundle: ${{ startsWith(github.ref_name, 'release-please--') }}
-      openant: ${{ startsWith(github.ref_name, 'release-please--') }}
+      review-codebase: ${{ startsWith(github.ref_name, 'release-please--') }}
       review-full-range: ${{ startsWith(github.ref_name, 'release-please--') }}
       # Non-secret only. The provider and model are repository variables; the
       # keys travel as secrets below and reach only the two LLM scan steps.
-      build-env: >-
+      environment-variables: >-
         {"SECURITY_LLM_PROVIDER":"${{ vars.SECURITY_LLM_PROVIDER }}",
         "SECURITY_LLM_MODEL":"${{ vars.SECURITY_LLM_MODEL }}",
         "SECURITY_LLM_EFFORT":"${{ vars.SECURITY_LLM_EFFORT }}",
@@ -164,7 +163,7 @@ jobs:
       !(needs.unit.result == 'skipped' && needs.e2e.result == 'skipped')
     permissions:
       contents: write # publish-badges.sh pushes the gh-pages branch
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-badges.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-badges.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     with:
       unit-result: ${{ needs.unit.result }}
       e2e-result: ${{ needs.e2e.result }}

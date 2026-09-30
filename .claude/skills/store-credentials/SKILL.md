@@ -204,7 +204,7 @@ every `vars.*`/`secrets.*` name the workflows read, exactly, so a new
 workflow variable needs its name in the script and a runbook row). In short: variables are non-sensitive — visible in every log —
 and everything else is a secret, including all seven `APP_REVIEW_*` values
 (a reviewer demo login is a real credential, even though the lanes also
-accept it through `env-json`-style input elsewhere).
+accept it through an `environment-variables`-style input elsewhere).
 
 | | Variables (33) | Secrets (23) |
 |---|---|---|

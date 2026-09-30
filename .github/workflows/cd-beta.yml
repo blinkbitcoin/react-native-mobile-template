@@ -25,7 +25,7 @@ concurrency:
 jobs:
   prepare:
     name: Prepare
-    uses: blinkbitcoin/shared-workflows/.github/workflows/build-prepare.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/build-prepare.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       contents: read
       # `require-green-workflow` runs `gh run list` against the gated workflow,
@@ -48,7 +48,7 @@ jobs:
       # the gate dispatches cd-internal at this tag once and waits for it.
       # Merge the release PR whenever; the pipeline sorts the rest out.
       require-green-dispatch: true
-      build-env: >-
+      environment-variables: >-
         {"APP_VARIANT":"production",
         "OTA_ENABLED":"${{ vars.OTA_ENABLED }}",
         "EXPO_UPDATES_URL":"${{ vars.EXPO_UPDATES_URL }}",
@@ -63,18 +63,16 @@ jobs:
     # credentials still runs everything that does not need one.
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' }}
     needs: prepare
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       contents: read
     with:
       platform: ios
       lane: promote_beta
-      # Promotion is an App Store Connect API call; no Xcode, no macOS minutes.
-      runner: ubuntu-latest
+      # Promotion is an App Store Connect API call; no Xcode, so no macOS runner.
       environment: beta
-      artifacts: release-meta
-      env-json: '{"TESTFLIGHT_EXTERNAL_GROUP": "${{ vars.TESTFLIGHT_EXTERNAL_GROUP }}"}'
-      build-env: '{"APP_VARIANT":"production"}'
+      artifacts: build-info
+      environment-variables: '{"APP_VARIANT":"production", "TESTFLIGHT_EXTERNAL_GROUP": "${{ vars.TESTFLIGHT_EXTERNAL_GROUP }}"}'
       version: ${{ needs.prepare.outputs.version }}
       build-number: ${{ needs.prepare.outputs.build-number }}
       ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
@@ -85,7 +83,7 @@ jobs:
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
       # The Beta App Review contact and demo account. Secrets rather than
-      # env-json/build-env because a reviewer demo login is a real credential
+      # environment-variables because a reviewer demo login is a real credential
       # and both of those inputs are printed to the log. `promote_beta` omits
       # the whole argument when none of them is set — pilot PATCHes every key it
       # is given, so blanks would erase the contact in App Store Connect.
@@ -103,16 +101,15 @@ jobs:
     # credentials still runs everything that does not need one.
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' }}
     needs: prepare
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       contents: read
     with:
       platform: android
       lane: promote_beta
-      runner: ubuntu-latest
       environment: beta
-      artifacts: release-meta
-      build-env: '{"APP_VARIANT":"production"}'
+      artifacts: build-info
+      environment-variables: '{"APP_VARIANT":"production"}'
       version: ${{ needs.prepare.outputs.version }}
       build-number: ${{ needs.prepare.outputs.build-number }}
       ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
@@ -128,12 +125,12 @@ jobs:
     # uses a status function.
     needs: [prepare, promote-ios, promote-android]
     if: ${{ !cancelled() && !failure() }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-github-release.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-github-release.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       contents: write
     with:
       mode: promote
-      tag: ${{ inputs.tag }}
+      release-tag: ${{ inputs.tag }}
       # The promoted release must ship the bytes internal testers actually ran.
       # `from-tag` re-uploads the pre-release's ipa/aab/apk/dSYM/mapping to this
       # tag and regenerates SHA256SUMS over the merged set; a rebuild from the
@@ -154,7 +151,7 @@ jobs:
       # build-info.json and the store notes from this run ride along, so the
       # release is the single record of what beta got — and so the OTA gate
       # below has a fingerprint baseline to download.
-      assets-artifacts: release-meta
+      assets-artifacts: build-info
 
   # ---- Huawei AppGallery (opt-in, additional store) ------------------------
 
@@ -195,7 +192,7 @@ jobs:
     # and the release itself are already done or independent of it.
     needs: [prepare, promote-android, huawei-binary]
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && vars.HUAWEI_UPLOADS_ENABLED == 'true' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       contents: read
     with:
@@ -205,14 +202,12 @@ jobs:
       # submission with manual review left on - 1 to 3 working days, up to
       # 5,000 testers.
       lane: promote_huawei_beta
-      runner: ubuntu-latest
       environment: beta
-      # Every artifact of the run, not just release-meta: the lane needs the
-      # build info and the store notes from release-meta and the bundle from
+      # Every artifact of the run, not just build-info: the lane needs the
+      # build info and the store notes from build-info and the bundle from
       # huawei-binary, and both land in the same assets directory.
       artifacts: "*"
-      env-json: '{"HUAWEI_APP_ID": "${{ vars.HUAWEI_APP_ID }}", "HUAWEI_UPLOADS_ENABLED": "${{ vars.HUAWEI_UPLOADS_ENABLED }}", "HUAWEI_SUBMIT_DELAY_SECONDS": "${{ vars.HUAWEI_SUBMIT_DELAY_SECONDS }}", "HUAWEI_FEEDBACK_EMAIL": "${{ vars.HUAWEI_FEEDBACK_EMAIL }}", "HUAWEI_TEST_DAYS": "${{ vars.HUAWEI_TEST_DAYS }}"}'
-      build-env: '{"APP_VARIANT":"production"}'
+      environment-variables: '{"APP_VARIANT":"production", "HUAWEI_APP_ID": "${{ vars.HUAWEI_APP_ID }}", "HUAWEI_UPLOADS_ENABLED": "${{ vars.HUAWEI_UPLOADS_ENABLED }}", "HUAWEI_SUBMIT_DELAY_SECONDS": "${{ vars.HUAWEI_SUBMIT_DELAY_SECONDS }}", "HUAWEI_FEEDBACK_EMAIL": "${{ vars.HUAWEI_FEEDBACK_EMAIL }}", "HUAWEI_TEST_DAYS": "${{ vars.HUAWEI_TEST_DAYS }}"}'
       version: ${{ needs.prepare.outputs.version }}
       build-number: ${{ needs.prepare.outputs.build-number }}
       ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
@@ -233,23 +228,23 @@ jobs:
   # The section is re-uploaded under a name that is deliberately *not* one of
   # publish-github-release's fixed asset globs: `append` uploads whatever of that set is
   # in the download directory and regenerates SHA256SUMS over it, so handing it
-  # `release-meta` here would replace the checksums of the promoted binaries
+  # `build-info` here would replace the checksums of the promoted binaries
   # with the checksums of four metadata files.
   store-notes-section:
-    name: Stage release notes
+    name: Stage store notes
     needs: [prepare, github-release]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/download-artifact@v8
         with:
-          name: release-meta
+          name: build-info
           path: meta
       - name: Rename the notes so it is not one of the release's fixed assets
         run: |
           set -euo pipefail
           mkdir -p section
-          cp meta/notes-store.txt section/store-notes-section.md
+          cp meta/store-notes.txt section/store-notes-section.md
       - uses: actions/upload-artifact@v7
         with:
           name: release-store-notes
@@ -257,24 +252,24 @@ jobs:
           if-no-files-found: error
 
   store-notes:
-    name: Attach release notes
+    name: Attach store notes
     needs: [prepare, store-notes-section]
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-github-release.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-github-release.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       contents: write
     with:
       # Marker-delimited and idempotent across re-runs, so a retry is safe.
       mode: append
-      tag: ${{ inputs.tag }}
+      release-tag: ${{ inputs.tag }}
       append-title: Store notes
-      notes-artifact: release-store-notes
-      notes-file: store-notes-section.md
+      release-notes-artifact: release-store-notes
+      release-notes-file: store-notes-section.md
 
   ota-beta:
     name: OTA
     needs: [prepare, github-release]
     if: ${{ vars.OTA_ENABLED == 'true' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-ota.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-ota.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       contents: read
     with:
@@ -289,6 +284,6 @@ jobs:
       # The release being promoted is the binary now on the beta track.
       baseline-tag: ${{ inputs.tag }}
       manifest-url: ${{ vars.EXPO_UPDATES_URL }}
-      runtime-version: ${{ needs.prepare.outputs.fp-ios }}
+      runtime-version: ${{ needs.prepare.outputs.fingerprint-ios }}
     secrets:
       OTA_PUBLISH_TOKEN: ${{ secrets.OTA_PUBLISH_TOKEN }}

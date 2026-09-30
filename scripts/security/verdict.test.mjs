@@ -86,7 +86,7 @@ test("summarize threads a run's rules through to grade results that carry no sev
   const bare = { ruleId: 'CVE-2026-41907', level: 'warning', message: { text: 'boom' } };
   const s = summarize([
     entry(
-      'deps',
+      'dependencies',
       doc('osv-scanner', [bare], true, [
         { id: 'CVE-2026-41907', properties: { 'security-severity': '7.5' } },
       ]),
@@ -96,15 +96,15 @@ test("summarize threads a run's rules through to grade results that carry no sev
 });
 
 test('every job maps to an engine class', () => {
-  assert.equal(ENGINE_OF.deps, 'deterministic');
+  assert.equal(ENGINE_OF.dependencies, 'deterministic');
   assert.equal(ENGINE_OF.binaries, 'deterministic');
   assert.equal(ENGINE_OF.review, 'review');
-  assert.equal(ENGINE_OF.openant, 'openant');
+  assert.equal(ENGINE_OF['review-codebase'], 'openant');
 });
 
 test('counts, highest severity and skipped jobs', () => {
   const s = summarize([
-    entry('deps', doc('osv-scanner', [result('high'), result('low')])),
+    entry('dependencies', doc('osv-scanner', [result('high'), result('low')])),
     entry('code', doc('semgrep', [], false)),
   ]);
   assert.deepEqual(s.counts, { critical: 0, high: 1, medium: 0, low: 1 });
@@ -114,7 +114,7 @@ test('counts, highest severity and skipped jobs', () => {
 
 test('a finding at the threshold from a fail-on engine fails', () => {
   const v = verdict({
-    entries: [entry('deps', doc('osv-scanner', [result('high')]))],
+    entries: [entry('dependencies', doc('osv-scanner', [result('high')]))],
     severity: 'high',
     failOn: ['deterministic'],
   });
@@ -124,7 +124,7 @@ test('a finding at the threshold from a fail-on engine fails', () => {
 
 test('the same finding below the threshold passes', () => {
   const v = verdict({
-    entries: [entry('deps', doc('osv-scanner', [result('medium')]))],
+    entries: [entry('dependencies', doc('osv-scanner', [result('medium')]))],
     severity: 'high',
     failOn: ['deterministic'],
   });
@@ -144,7 +144,7 @@ test('a finding from an engine that is not in fail-on is informational', () => {
 
 test('severity none never fails', () => {
   const v = verdict({
-    entries: [entry('deps', doc('osv-scanner', [result('critical')]))],
+    entries: [entry('dependencies', doc('osv-scanner', [result('critical')]))],
     severity: 'none',
     failOn: ['deterministic'],
   });
@@ -156,7 +156,7 @@ test('an unrecognized severity throws rather than behaving like none', () => {
   assert.throws(
     () =>
       verdict({
-        entries: [entry('deps', doc('osv-scanner', [result('critical')]))],
+        entries: [entry('dependencies', doc('osv-scanner', [result('critical')]))],
         severity: 'bogus',
         failOn: ['deterministic'],
       }),
@@ -164,7 +164,7 @@ test('an unrecognized severity throws rather than behaving like none', () => {
   );
 });
 
-// config.mjs's parseList accepts any comma-separated string, so a dropped
+// settings.mjs's parseList accepts any comma-separated string, so a dropped
 // letter (SECURITY_FAIL_ON=deterministc) or a stray value never reaches
 // ENGINE_CLASSES - failOn.includes(...) just quietly never matches, every
 // finding reads as informational, and nothing can ever block, however
@@ -175,7 +175,7 @@ test('an unrecognized failOn entry throws rather than silently disarming the gat
   assert.throws(
     () =>
       verdict({
-        entries: [entry('deps', doc('osv-scanner', [result('high')]))],
+        entries: [entry('dependencies', doc('osv-scanner', [result('high')]))],
         severity: 'high',
         failOn: ['deterministc'],
       }),
@@ -187,7 +187,7 @@ test('every failOn entry must be a known engine class, not just the first', () =
   assert.throws(
     () =>
       verdict({
-        entries: [entry('deps', doc('osv-scanner', [result('high')]))],
+        entries: [entry('dependencies', doc('osv-scanner', [result('high')]))],
         severity: 'high',
         failOn: ['deterministic', 'not-a-class'],
       }),
@@ -202,7 +202,7 @@ test('every failOn entry must be a known engine class, not just the first', () =
 // be the only one read.
 test('an empty failOn is allowed, but never blocks, and says so in the summary', () => {
   const v = verdict({
-    entries: [entry('deps', doc('osv-scanner', [result('critical')]))],
+    entries: [entry('dependencies', doc('osv-scanner', [result('critical')]))],
     severity: 'high',
     failOn: [],
   });
@@ -213,7 +213,7 @@ test('an empty failOn is allowed, but never blocks, and says so in the summary',
 
 test('a non-empty failOn carries no such note', () => {
   const v = verdict({
-    entries: [entry('deps', doc('osv-scanner', [result('critical')]))],
+    entries: [entry('dependencies', doc('osv-scanner', [result('critical')]))],
     severity: 'high',
     failOn: ['deterministic'],
   });
@@ -241,7 +241,7 @@ test('a SARIF from an unrecognized job fails loudly rather than becoming unblock
 test('a suppressed result is not a finding, but is visible as suppressed, not absent', () => {
   const suppressed = { ...result('critical'), suppressions: [{ kind: 'inSource' }] };
   const v = verdict({
-    entries: [entry('deps', doc('osv-scanner', [suppressed]))],
+    entries: [entry('dependencies', doc('osv-scanner', [suppressed]))],
     severity: 'high',
     failOn: ['deterministic'],
   });
@@ -258,7 +258,7 @@ test('summarize counts suppressed results across documents and jobs', () => {
   const suppressedOnce = { ...result('high'), suppressions: [{ kind: 'inSource' }] };
   const suppressedTwice = { ...result('low', 'other-rule'), suppressions: [{ kind: 'external' }] };
   const s = summarize([
-    entry('deps', doc('osv-scanner', [suppressedOnce])),
+    entry('dependencies', doc('osv-scanner', [suppressedOnce])),
     entry('code', doc('semgrep', [suppressedTwice, result('medium')])),
   ]);
   assert.equal(s.suppressed, 2);
@@ -278,11 +278,11 @@ test('the summary names skipped jobs so they are never read as clean', () => {
 
 test('a job that ran and found nothing is clean', () => {
   const v = verdict({
-    entries: [entry('deps', doc('osv-scanner', []))],
+    entries: [entry('dependencies', doc('osv-scanner', []))],
     severity: 'high',
     failOn: ['deterministic'],
   });
-  assert.ok(v.lines.some((line) => /deps: clean/.test(line)));
+  assert.ok(v.lines.some((line) => /dependencies: clean/.test(line)));
 });
 
 // On a laptop missing osv-scanner and semgrep, both jobs skip and only the
@@ -294,7 +294,7 @@ test('a job that ran and found nothing is clean', () => {
 test('a run with zero findings is "skipped", not "pass", when any job skipped', () => {
   const allSkipped = verdict({
     entries: [
-      entry('deps', doc('osv-scanner', [], false)),
+      entry('dependencies', doc('osv-scanner', [], false)),
       entry('code', doc('semgrep', [], false)),
     ],
     severity: 'high',
@@ -305,7 +305,10 @@ test('a run with zero findings is "skipped", not "pass", when any job skipped', 
   assert.ok(allSkipped.lines.some((line) => /^security: skipped, /.test(line)));
 
   const oneSkippedOneClean = verdict({
-    entries: [entry('deps', doc('osv-scanner', [], false)), entry('policy', doc('policy', []))],
+    entries: [
+      entry('dependencies', doc('osv-scanner', [], false)),
+      entry('policy', doc('policy', [])),
+    ],
     severity: 'high',
     failOn: ['deterministic'],
   });
@@ -315,7 +318,7 @@ test('a run with zero findings is "skipped", not "pass", when any job skipped', 
 
 test('a run with zero findings and nothing skipped is still "pass"', () => {
   const v = verdict({
-    entries: [entry('deps', doc('osv-scanner', []))],
+    entries: [entry('dependencies', doc('osv-scanner', []))],
     severity: 'high',
     failOn: ['deterministic'],
   });
@@ -324,7 +327,7 @@ test('a run with zero findings and nothing skipped is still "pass"', () => {
 
 test('the CLI prints the summary and returns the exit code', () => {
   const out = [];
-  const readEntries = () => [entry('deps', doc('osv-scanner', [result('critical')]))];
+  const readEntries = () => [entry('dependencies', doc('osv-scanner', [result('critical')]))];
   const code = main(['.security'], {
     log: (l) => out.push(l),
     error: () => {},
@@ -354,7 +357,7 @@ test('the real directory reader lists *.sarif files and parses them', () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'verdict-read-'));
   try {
     writeFileSync(
-      path.join(dir, 'deps.sarif'),
+      path.join(dir, 'dependencies.sarif'),
       JSON.stringify(doc('osv-scanner', [result('critical')])),
     );
     writeFileSync(path.join(dir, 'code.sarif'), JSON.stringify(doc('semgrep', [], false)));
@@ -366,7 +369,7 @@ test('the real directory reader lists *.sarif files and parses them', () => {
       env: { SECURITY_SEVERITY: 'high', SECURITY_FAIL_ON: 'deterministic' },
     });
     assert.equal(code, 1);
-    assert.ok(out.some((line) => /deps: 1 finding\(s\)/.test(line)));
+    assert.ok(out.some((line) => /dependencies: 1 finding\(s\)/.test(line)));
     assert.ok(out.some((line) => /code: skipped/.test(line)));
     assert.ok(out.some((line) => /security: fail/.test(line)));
     assert.deepEqual(JSON.parse(readFileSync(path.join(dir, 'verdict.json'), 'utf8')), {
@@ -456,20 +459,20 @@ test('an unreadable SARIF file names itself, distinct from a malformed one', (t)
 // result with no ruleId or message.
 
 test('a document with no runs at all counts nothing and is not skipped', () => {
-  const s = summarize([entry('deps', {})]);
+  const s = summarize([entry('dependencies', {})]);
   assert.deepEqual(s.counts, { critical: 0, high: 0, medium: 0, low: 0 });
   assert.deepEqual(s.skipped, []);
 });
 
 test('a run with no results and no invocations is clean, not skipped', () => {
-  const s = summarize([entry('deps', { runs: [{}] })]);
+  const s = summarize([entry('dependencies', { runs: [{}] })]);
   assert.deepEqual(s.counts, { critical: 0, high: 0, medium: 0, low: 0 });
   assert.deepEqual(s.skipped, []);
 });
 
 test('a finding with no ruleId or message text still gets recorded, with placeholders', () => {
   const bare = { level: 'note', locations: [] };
-  const s = summarize([entry('deps', doc('tool', [bare]))]);
+  const s = summarize([entry('dependencies', doc('tool', [bare]))]);
   assert.equal(s.findings[0].ruleId, '<no rule>');
   assert.equal(s.findings[0].message, '');
 });
@@ -538,14 +541,14 @@ test('a skipped job with a run that reports no invocations at all still finds th
 
 // import.meta.main only runs when the file is its own entry point - never
 // when it is merely imported under `node --test`. Spawn it as a child
-// process, the way config.test.mjs and codeql-findings.test.mjs both do, so
+// process, the way settings.test.mjs and codeql-findings.test.mjs both do, so
 // that arm is actually covered rather than assumed.
 test('as a command it reads *.sarif files from the directory named on the command line', () => {
   const script = path.join(here, 'verdict.mjs');
   const dir = mkdtempSync(path.join(tmpdir(), 'verdict-cli-'));
   try {
     writeFileSync(
-      path.join(dir, 'deps.sarif'),
+      path.join(dir, 'dependencies.sarif'),
       JSON.stringify(doc('osv-scanner', [result('critical')])),
     );
     // The inherited environment keeps NODE_V8_COVERAGE, so the child counts,
@@ -579,7 +582,7 @@ test('as a command it reads *.sarif files from the directory named on the comman
 test('a blocking finding annotates as an error and a reported one as a warning', () => {
   const v = verdict({
     entries: [
-      entry('deps', doc('osv-scanner', [result('critical', 'GHSA-1')])),
+      entry('dependencies', doc('osv-scanner', [result('critical', 'GHSA-1')])),
       entry('review', doc('review', [result('high', 'llm/1')])),
       entry('code', doc('semgrep', [result('low', 'minor')])),
     ],
@@ -624,7 +627,7 @@ test('the CLI prints annotations on a runner only', () => {
       log: (l) => out.push(l),
       error: () => {},
       env,
-      readEntries: () => [entry('deps', doc('osv-scanner', [result('critical')]))],
+      readEntries: () => [entry('dependencies', doc('osv-scanner', [result('critical')]))],
       writeVerdict: () => {},
     });
     return out.filter((line) => line.startsWith('::'));
@@ -636,7 +639,7 @@ test('the CLI prints annotations on a runner only', () => {
 });
 
 test('canBlock says whether anything in this run could have failed it', () => {
-  const entries = [entry('deps', doc('osv-scanner', []))];
+  const entries = [entry('dependencies', doc('osv-scanner', []))];
   assert.equal(verdict({ entries, severity: 'high', failOn: ['deterministic'] }).canBlock, true);
   assert.equal(verdict({ entries, severity: 'high', failOn: [] }).canBlock, false);
   assert.equal(verdict({ entries, severity: 'none', failOn: ['deterministic'] }).canBlock, false);
@@ -648,7 +651,7 @@ test('the CLI hands the verdict file its word, highest severity and canBlock', (
     log: () => {},
     error: () => {},
     env: { SECURITY_SEVERITY: 'high', SECURITY_FAIL_ON: 'deterministic' },
-    readEntries: () => [entry('deps', doc('osv-scanner', [result('critical')]))],
+    readEntries: () => [entry('dependencies', doc('osv-scanner', [result('critical')]))],
     writeVerdict: (dir, outcome) => written.push({ dir, outcome }),
   });
   assert.equal(code, 1);
@@ -665,7 +668,7 @@ test('a verdict file that cannot be written exits 2 and names the file', () => {
     log: () => {},
     error: (l) => out.push(l),
     env: {},
-    readEntries: () => [entry('deps', doc('osv-scanner', []))],
+    readEntries: () => [entry('dependencies', doc('osv-scanner', []))],
     writeVerdict: () => {
       throw new Error('EROFS');
     },

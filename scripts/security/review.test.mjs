@@ -33,7 +33,7 @@ const DIFF = [
 // Settings come from a policy file that does not exist, so only what the test
 // puts in the environment decides the run.
 const ENV = {
-  SECURITY_POLICY_FILE: '/nonexistent/security-policy.json',
+  SECURITY_SETTINGS_FILE: '/nonexistent/security-settings.json',
   SECURITY_LLM_PROVIDER: 'anthropic',
   ANTHROPIC_API_KEY: 'sk-ant-test',
   SECURITY_REVIEW_BASE: 'abc123',
@@ -288,7 +288,7 @@ test('runs as a script', () => {
     encoding: 'utf8',
     env: {
       ...process.env,
-      SECURITY_POLICY_FILE: '/nonexistent/policy.json',
+      SECURITY_SETTINGS_FILE: '/nonexistent/policy.json',
       SECURITY_LLM_PROVIDER: '',
     },
   });

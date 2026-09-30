@@ -52,7 +52,7 @@ concurrency:
 jobs:
   prepare:
     name: Prepare
-    uses: blinkbitcoin/shared-workflows/.github/workflows/build-prepare.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/build-prepare.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       contents: read
       # build-prepare declares `actions: read` statically (its green-workflow
@@ -67,7 +67,7 @@ jobs:
       release-tag: ${{ inputs.tag }}
       stage: production
       build-number-offset: ${{ fromJSON(vars.BUILD_NUMBER_OFFSET || '1000') }}
-      build-env: >-
+      environment-variables: >-
         {"APP_VARIANT":"production",
         "OTA_ENABLED":"${{ vars.OTA_ENABLED }}",
         "EXPO_UPDATES_URL":"${{ vars.EXPO_UPDATES_URL }}",
@@ -91,13 +91,13 @@ jobs:
       contents: read
       actions: read
       security-events: write
-    uses: blinkbitcoin/shared-workflows/.github/workflows/check-security.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/check-security.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     with:
       ref: ${{ inputs.tag }}
       release-tag: ${{ inputs.tag }}
       # The source scanners already ran on every pull request and on the
       # release pull request, against this same commit.
-      deps: false
+      dependencies: false
       code: false
       policy: false
       binaries: true
@@ -112,19 +112,17 @@ jobs:
     name: Release iOS
     needs: [prepare, security]
     if: ${{ !failure() && !cancelled() && vars.STORE_UPLOADS_ENABLED == 'true' && (inputs.action == 'release' && inputs.platforms != 'android') }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       contents: read
     with:
       platform: ios
       lane: release_production
-      runner: ubuntu-latest
       # Required reviewers, "prevent self-review" and the `v*` tag pattern live
       # on this environment; it is what makes production a two-person action.
       environment: production
-      artifacts: release-meta
-      env-json: '{"IOS_PHASED_RELEASE": "${{ inputs.ios_phased_release }}"}'
-      build-env: '{"APP_VARIANT":"production"}'
+      artifacts: build-info
+      environment-variables: '{"APP_VARIANT":"production", "IOS_PHASED_RELEASE": "${{ inputs.ios_phased_release }}"}'
       version: ${{ needs.prepare.outputs.version }}
       build-number: ${{ needs.prepare.outputs.build-number }}
       ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
@@ -136,7 +134,7 @@ jobs:
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
       # App Review contact and demo account for the App Store submission.
-      # Secrets, not env-json/build-env: a reviewer demo login is a real
+      # Secrets, not environment-variables: a reviewer demo login is a real
       # credential and both of those inputs are printed to the log.
       APP_REVIEW_EMAIL: ${{ secrets.APP_REVIEW_EMAIL }}
       APP_REVIEW_FIRST_NAME: ${{ secrets.APP_REVIEW_FIRST_NAME }}
@@ -150,17 +148,15 @@ jobs:
     name: Release Android
     needs: [prepare, security]
     if: ${{ !failure() && !cancelled() && vars.STORE_UPLOADS_ENABLED == 'true' && (inputs.action == 'release' && inputs.platforms != 'ios') }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       contents: read
     with:
       platform: android
       lane: release_production
-      runner: ubuntu-latest
       environment: production
-      artifacts: release-meta
-      env-json: '{"PLAY_ROLLOUT": "${{ inputs.play_rollout_percent }}", "PLAY_UPDATE_PRIORITY": "${{ vars.PLAY_UPDATE_PRIORITY }}"}'
-      build-env: '{"APP_VARIANT":"production"}'
+      artifacts: build-info
+      environment-variables: '{"APP_VARIANT":"production", "PLAY_ROLLOUT": "${{ inputs.play_rollout_percent }}", "PLAY_UPDATE_PRIORITY": "${{ vars.PLAY_UPDATE_PRIORITY }}"}'
       version: ${{ needs.prepare.outputs.version }}
       build-number: ${{ needs.prepare.outputs.build-number }}
       ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
@@ -205,20 +201,18 @@ jobs:
     # android-release too: AppGallery should not receive a release Play refused.
     needs: [prepare, android-release, huawei-binary]
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && vars.HUAWEI_UPLOADS_ENABLED == 'true' && (inputs.action == 'release' && inputs.platforms != 'ios') }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       contents: read
     with:
       platform: android
       lane: upload_huawei
-      runner: ubuntu-latest
       environment: production
-      # Every artifact of the run, not just release-meta: the lane needs the
-      # build info and the store notes from release-meta and the bundle from
+      # Every artifact of the run, not just build-info: the lane needs the
+      # build info and the store notes from build-info and the bundle from
       # huawei-binary, and both land in the same assets directory.
       artifacts: "*"
-      env-json: '{"HUAWEI_APP_ID": "${{ vars.HUAWEI_APP_ID }}", "HUAWEI_UPLOADS_ENABLED": "${{ vars.HUAWEI_UPLOADS_ENABLED }}", "HUAWEI_SUBMIT_DELAY_SECONDS": "${{ vars.HUAWEI_SUBMIT_DELAY_SECONDS }}"}'
-      build-env: '{"APP_VARIANT":"production"}'
+      environment-variables: '{"APP_VARIANT":"production", "HUAWEI_APP_ID": "${{ vars.HUAWEI_APP_ID }}", "HUAWEI_UPLOADS_ENABLED": "${{ vars.HUAWEI_UPLOADS_ENABLED }}", "HUAWEI_SUBMIT_DELAY_SECONDS": "${{ vars.HUAWEI_SUBMIT_DELAY_SECONDS }}"}'
       version: ${{ needs.prepare.outputs.version }}
       build-number: ${{ needs.prepare.outputs.build-number }}
       ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
@@ -237,7 +231,7 @@ jobs:
     name: Phased iOS
     needs: prepare
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && (contains(fromJSON('["halt", "resume", "complete"]'), inputs.action) && inputs.platforms != 'android') }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       contents: read
     with:
@@ -245,11 +239,10 @@ jobs:
       lane: phased
       # The lane takes pause|resume|complete; `halt` is this workflow's
       # cross-platform word for the same thing.
-      lane-args: action:${{ inputs.action == 'halt' && 'pause' || inputs.action }}
-      runner: ubuntu-latest
+      lane-arguments: action:${{ inputs.action == 'halt' && 'pause' || inputs.action }}
       environment: production
-      artifacts: release-meta
-      build-env: '{"APP_VARIANT":"production"}'
+      artifacts: build-info
+      environment-variables: '{"APP_VARIANT":"production"}'
       version: ${{ needs.prepare.outputs.version }}
       build-number: ${{ needs.prepare.outputs.build-number }}
       ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
@@ -266,17 +259,16 @@ jobs:
     name: Rollout Android
     needs: prepare
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && (contains(fromJSON('["rollout", "resume", "complete"]'), inputs.action) && inputs.platforms != 'ios') }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       contents: read
     with:
       platform: android
       lane: rollout
-      lane-args: percent:${{ inputs.action == 'complete' && '100' || inputs.play_rollout_percent }}
-      runner: ubuntu-latest
+      lane-arguments: percent:${{ inputs.action == 'complete' && '100' || inputs.play_rollout_percent }}
       environment: production
-      artifacts: release-meta
-      build-env: '{"APP_VARIANT":"production"}'
+      artifacts: build-info
+      environment-variables: '{"APP_VARIANT":"production"}'
       version: ${{ needs.prepare.outputs.version }}
       build-number: ${{ needs.prepare.outputs.build-number }}
       ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
@@ -291,16 +283,15 @@ jobs:
     name: Halt Android
     needs: prepare
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && (inputs.action == 'halt' && inputs.platforms != 'ios') }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       contents: read
     with:
       platform: android
       lane: halt
-      runner: ubuntu-latest
       environment: production
-      artifacts: release-meta
-      build-env: '{"APP_VARIANT":"production"}'
+      artifacts: build-info
+      environment-variables: '{"APP_VARIANT":"production"}'
       version: ${{ needs.prepare.outputs.version }}
       build-number: ${{ needs.prepare.outputs.build-number }}
       ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
@@ -314,19 +305,19 @@ jobs:
   github-release:
     name: Release
     # `prepare` is ordering, not data: this job keys off `inputs.tag`, but the
-    # `release-meta` artifact it attaches only exists once prepare has run.
+    # `build-info` artifact it attaches only exists once prepare has run.
     needs: [prepare, ios-release, android-release]
     # A status function in the `if` drops the implicit success() requirement, so
     # a job skipped by `platforms` does not skip this one; `!failure()` still
     # holds the line on a store job that actually failed.
     if: ${{ !failure() && !cancelled() && inputs.action == 'release' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-github-release.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-github-release.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       contents: write
     with:
       mode: latest
-      tag: ${{ inputs.tag }}
-      assets-artifacts: release-meta
+      release-tag: ${{ inputs.tag }}
+      assets-artifacts: build-info
       # Empty when uploads ran, so a real store build carries no marker.
       # Inverted on purpose: GitHub's `&&` yields its first falsy operand, so
       # `cond && '' || X` is X on both branches - the non-empty value has to sit
@@ -372,15 +363,15 @@ jobs:
     name: Attach stage note
     needs: [prepare, stage-note]
     if: ${{ !failure() && !cancelled() }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-github-release.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-github-release.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       contents: write
     with:
       mode: append
-      tag: ${{ inputs.tag }}
+      release-tag: ${{ inputs.tag }}
       append-title: Production
-      notes-artifact: release-stage
-      notes-file: production-stage.md
+      release-notes-artifact: release-stage
+      release-notes-file: production-stage.md
 
   ota-production:
     name: OTA
@@ -388,7 +379,7 @@ jobs:
     # fingerprint baseline the gate downloads.
     needs: [prepare, github-release]
     if: ${{ !failure() && !cancelled() && inputs.action == 'release' && vars.OTA_ENABLED == 'true' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-ota.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-ota.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       contents: read
     with:
@@ -402,7 +393,7 @@ jobs:
       # smoke.sh defaults to the ios platform, so the iOS fingerprint is the
       # runtime version to ask the server for.
       manifest-url: ${{ vars.EXPO_UPDATES_URL }}
-      runtime-version: ${{ needs.prepare.outputs.fp-ios }}
+      runtime-version: ${{ needs.prepare.outputs.fingerprint-ios }}
     secrets:
       OTA_PUBLISH_TOKEN: ${{ secrets.OTA_PUBLISH_TOKEN }}
 
@@ -415,7 +406,7 @@ jobs:
     # The site tracks what is actually live in the stores, so it deploys from
     # the production dispatch rather than from the tag push.
     if: ${{ !failure() && !cancelled() && inputs.action == 'release' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/build-web.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/build-web.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       contents: read
       # The called `deploy` job (environment `github-pages`) needs these, and a
@@ -428,7 +419,7 @@ jobs:
       # Deliberately on: the reviewer has already approved, and a broken site is
       # the one failure mode nothing downstream would catch. It adds a browser
       # e2e run (~15-20 min) to the dispatch on code CI already tested at merge.
-      playwright: true
+      e2e: true
       # The same base path ci-web.yml's deploy bakes in. A project Pages site is
       # served under `/<repo>/` and a custom domain at `/`; without this the
       # release redeployed the site with every asset path missing `/<repo>`.

@@ -4,7 +4,7 @@
   "severity": "high",
   "failOn": ["deterministic"],
   "jobs": {
-    "deps": { "enabled": true },
+    "dependencies": { "enabled": true },
     "code": { "enabled": true },
     "policy": { "enabled": true },
     "sbom": { "enabled": true },
@@ -37,7 +37,7 @@
       "enabled": false,
       "maxDiffBytes": 200000
     },
-    "openant": {
+    "review-codebase": {
       "$comment": "Off by default: it sends the codebase to the configured LLM provider and costs minutes and tokens. Runs on the release pull request only.",
       "enabled": false,
       "limit": 0,
@@ -45,7 +45,7 @@
     }
   },
   "llm": {
-    "$comment": "Shared by review and openant. provider is openai (any OpenAI-compatible endpoint through OPENAI_BASE_URL) or anthropic; effort is none (a model with no reasoning switch), low, medium, high or max.",
+    "$comment": "Shared by review and review-codebase. provider is openai (any OpenAI-compatible endpoint through OPENAI_BASE_URL) or anthropic; effort is none (a model with no reasoning switch), low, medium, high or max.",
     "provider": "",
     "model": "",
     "effort": "max"

@@ -49,9 +49,11 @@ const withoutScanners = (dir) => {
 
 test('a disabled job writes a skipped SARIF and exits 0', () => {
   withDir((dir) => {
-    const result = run('deps.sh', { env: { SECURITY_DIR: dir, SECURITY_DEPS: 'false' } });
+    const result = run('dependencies.sh', {
+      env: { SECURITY_DIR: dir, SECURITY_DEPENDENCIES: 'false' },
+    });
     assert.equal(result.status, 0, result.stderr);
-    const sarif = JSON.parse(readFileSync(path.join(dir, 'deps.sarif'), 'utf8'));
+    const sarif = JSON.parse(readFileSync(path.join(dir, 'dependencies.sarif'), 'utf8'));
     assert.equal(sarif.runs[0].invocations[0].executionSuccessful, false);
     assert.match(
       sarif.runs[0].invocations[0].toolExecutionNotifications[0].message.text,
@@ -62,9 +64,11 @@ test('a disabled job writes a skipped SARIF and exits 0', () => {
 
 test('a missing tool is a skip locally', () => {
   withDir((dir) => {
-    const result = run('deps.sh', { env: { SECURITY_DIR: dir, PATH: withoutScanners(dir) } });
+    const result = run('dependencies.sh', {
+      env: { SECURITY_DIR: dir, PATH: withoutScanners(dir) },
+    });
     assert.equal(result.status, 0, result.stderr);
-    const sarif = JSON.parse(readFileSync(path.join(dir, 'deps.sarif'), 'utf8'));
+    const sarif = JSON.parse(readFileSync(path.join(dir, 'dependencies.sarif'), 'utf8'));
     assert.match(
       sarif.runs[0].invocations[0].toolExecutionNotifications[0].message.text,
       /osv-scanner is not installed/,
@@ -74,7 +78,7 @@ test('a missing tool is a skip locally', () => {
 
 test('a missing tool is a failure under CI', () => {
   withDir((dir) => {
-    const result = run('deps.sh', {
+    const result = run('dependencies.sh', {
       env: { SECURITY_DIR: dir, PATH: withoutScanners(dir), CI: 'true' },
     });
     assert.equal(result.status, 1);
@@ -143,7 +147,7 @@ test('the aggregate runs the enabled jobs and reports a verdict', () => {
       env: {
         SECURITY_DIR: dir,
         SECURITY_CODE: 'false',
-        SECURITY_DEPS: 'false',
+        SECURITY_DEPENDENCIES: 'false',
         SECURITY_POLICY: 'true',
         // The minutes-long jobs have their own tests below; here they would
         // only make the aggregate slow.
@@ -152,23 +156,23 @@ test('the aggregate runs the enabled jobs and reports a verdict', () => {
       },
     });
     assert.equal(result.status, 0, result.stderr);
-    // code and deps are both switched off, policy runs clean against the real
+    // code and dependencies are both switched off, policy runs clean against the real
     // pnpm-workspace.yaml: zero findings, but two of the three jobs skipped,
     // so the headline must be "skipped", not "pass" - see verdict.mjs.
     assert.match(result.stdout, /security: skipped, /);
-    assert.match(result.stdout, /deps: skipped/);
+    assert.match(result.stdout, /dependencies: skipped/);
   });
 });
 
 // scripts/security/local.sh:10 and lib/common.sh's sec_enabled both used to
-// read `$(node scripts/security/config.mjs get ...)` directly inside a `[ ]`
-// test, which discards the command substitution's own exit status. config.mjs
+// read `$(node scripts/security/settings.mjs get ...)` directly inside a `[ ]`
+// test, which discards the command substitution's own exit status. settings.mjs
 // is deliberately designed to throw on a value it cannot parse - a malformed
-// security-policy.json, or a SECURITY_* value that is not "true"/"false"/a
+// security-settings.json, or a SECURITY_* value that is not "true"/"false"/a
 // known severity - but with the exit status discarded, `set -e` never saw the
 // failure: the captured stdout was just empty, `[ "" != "true" ]` was true,
 // and the run printed "security scanning is disabled" and exited 0. A
-// consumer with a typo in security-policy.json got a green build and no
+// consumer with a typo in security-settings.json got a green build and no
 // scanning at all - exactly what docs/security.md promises cannot happen.
 test('an invalid SECURITY_* value fails local.sh, it does not read as disabled', () => {
   withDir((dir) => {
@@ -181,34 +185,36 @@ test('an invalid SECURITY_* value fails local.sh, it does not read as disabled',
 
 test('an invalid SECURITY_* value fails a per-job runner too, it does not skip it', () => {
   withDir((dir) => {
-    // Exercises lib/common.sh's sec_enabled directly (deps.sh's only caller of
-    // it), the second call site of the same bug: SECURITY_DEPS=yes is not a
-    // boolean, and used to write a SARIF claiming deps was cleanly "disabled
-    // in security-policy.json or the environment".
-    const result = run('deps.sh', { env: { SECURITY_DIR: dir, SECURITY_DEPS: 'yes' } });
+    // Exercises lib/common.sh's sec_enabled directly (dependencies.sh's only caller of
+    // it), the second call site of the same bug: SECURITY_DEPENDENCIES=yes is not a
+    // boolean, and used to write a SARIF claiming dependencies was cleanly "disabled
+    // in security-settings.json or the environment".
+    const result = run('dependencies.sh', {
+      env: { SECURITY_DIR: dir, SECURITY_DEPENDENCIES: 'yes' },
+    });
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /SECURITY_DEPS/);
+    assert.match(result.stderr, /SECURITY_DEPENDENCIES/);
     // No SARIF was written at all - the run failed before sec_skip ever ran.
     assert.deepEqual(readdirSync(dir), []);
   });
 });
 
-// Points SECURITY_POLICY_FILE at a throwaway fixture rather than touching the
-// tracked security-policy.json at the repository root. An earlier version of
+// Points SECURITY_SETTINGS_FILE at a throwaway fixture rather than touching the
+// tracked security-settings.json at the repository root. An earlier version of
 // this test wrote malformed JSON straight into that real file and restored it
-// in `finally` - which raced verdict.test.mjs and config.test.mjs, both of
+// in `finally` - which raced verdict.test.mjs and settings.test.mjs, both of
 // which read the same file through main()'s default path whenever `node
-// --test` ran them in parallel. SECURITY_POLICY_FILE is the override
-// config.mjs's `load` now honours, precisely so no test has to touch the real
+// --test` ran them in parallel. SECURITY_SETTINGS_FILE is the override
+// settings.mjs's `load` now honours, precisely so no test has to touch the real
 // file: 10 failures in 25 runs, gone.
-test('a malformed security-policy.json fails the run, it does not read as disabled', () => {
+test('a malformed security-settings.json fails the run, it does not read as disabled', () => {
   withDir((dir) => {
     const fixtureDir = mkdtempSync(path.join(tmpdir(), 'security-policy-json-fixture-'));
     try {
-      const file = path.join(fixtureDir, 'security-policy.json');
+      const file = path.join(fixtureDir, 'security-settings.json');
       writeFileSync(file, '{ this is not valid json');
       const result = run('local.sh', {
-        env: { SECURITY_DIR: dir, SECURITY_POLICY_FILE: file },
+        env: { SECURITY_DIR: dir, SECURITY_SETTINGS_FILE: file },
       });
       assert.notEqual(result.status, 0);
       assert.doesNotMatch(result.stdout, /disabled/);

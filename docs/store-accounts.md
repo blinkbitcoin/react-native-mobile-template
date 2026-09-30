@@ -320,7 +320,7 @@ flowchart LR
   s3 -->|"secrets: on build-android,<br/>then a 600 file"| l3["android build"]
   s4 -->|"secrets: on build-ios"| l4["ios build (match)"]
   s5 -->|"secrets:, in the lane step's env"| l5["upload_huawei_internal,<br/>promote_huawei_beta, upload_huawei"]
-  v1 -->|"env-json on the Huawei jobs"| l5
+  v1 -->|"environment-variables on the Huawei jobs"| l5
 ```
 
 Two things the picture is precise about. **Secrets can be scoped to an

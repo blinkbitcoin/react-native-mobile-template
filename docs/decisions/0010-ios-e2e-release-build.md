@@ -27,11 +27,11 @@ prompted one; every later one is alert-free and has never failed.
 
 CI builds the iOS E2E app as **Release** (`ios-configuration: Release` in
 `.github/workflows/ci.yml`), passes the mock API URL into the build through
-`build-env`, and `00-launch` opens the session's first URL itself on a link
+`environment-variables`, and `00-launch` opens the session's first URL itself on a link
 that is a no-op on Home.
 
 - `.github/workflows/ci.yml` — `ios-configuration: Release`;
-  `build-env: '{"EXPO_PUBLIC_API_URL":"http://localhost:8082/graphql"}'` (a
+  `environment-variables: '{"EXPO_PUBLIC_API_URL":"http://localhost:8082/graphql"}'` (a
   literal, because the build job runs before and apart from the job that
   starts the mock API; pinned to `scripts/ports.mjs` by `scripts/ports.test.mjs`).
 - `.maestro/flows/00-launch.yaml` — after Home is visible, iOS only:
@@ -51,7 +51,7 @@ The iOS suite no longer exercises the Metro dev path; Android (still Debug +
 dev-client) is the only remaining coverage of it, and `src/config/env.ts`'s
 `localhost` → `10.0.2.2` rewrite is `__DEV__`-only, so flipping Android to
 Release needs that handled too. A change to `EXPO_PUBLIC_*` values reaches the
-iOS E2E app only through `build-env`, never through a dotenv file — and the
+iOS E2E app only through `environment-variables`, never through a dotenv file — and the
 value is folded into the `.app` cache key, so changing it rebuilds.
 
 A flow that opens a URL must never be the first to do so in a session, and

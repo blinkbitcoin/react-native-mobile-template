@@ -1,9 +1,9 @@
 // The gates this repo defines and the gates CI runs have to be the same gates.
 //
-// shared-workflows prefers this repo's own script for i18n, codegen, Expo
-// doctor, the audit and the CI linters, falling back to its own only when we
+// shared-workflows prefers this repo's own script for generated files, Expo
+// health, the audit and the CI linters, falling back to its own only when we
 // ship none (scripts/checks/run-consumer-or.sh over there). Where the two would
-// do the same thing, ours now calls the shared one from @blinkbitcoin/dev-config,
+// do the same thing, ours now calls the shared one from @blinkbitcoin/app-tooling,
 // and the tests below pin those calls.
 //
 // The cross-repo half of this contract - that `make ci` and CI run the same
@@ -22,25 +22,25 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const read = (rel) => readFileSync(path.join(root, rel), 'utf8');
 const pkg = JSON.parse(read('package.json'));
 
-// Every script name shared-workflows' check-code.yml and check-unit.yml ask this
+// Every script name shared-workflows' check.yml and test-unit.yml ask this
 // consumer for. Adding a CI step that calls a script we do not ship fails the
 // step with "consumer package.json has no ... script"; this list is the local
 // half of that contract, so the failure arrives in a unit test instead.
 const REQUIRED_SCRIPTS = [
-  'typecheck',
-  'lint',
-  'format:check',
-  'spell',
+  'check:types',
+  'check:lint',
+  'check:format',
+  'check:unused',
+  'check:spell',
   'check:docs',
   'check:release',
   'check:ci',
-  'i18n:check',
-  'codegen:check',
-  'deps:check',
-  'deps:audit',
-  'deps:licenses',
-  'check-prebuild',
-  'check:bundle-secrets',
+  'check:secrets',
+  'check:generated',
+  'check:expo-health',
+  'check:audit',
+  'check:licenses',
+  'check:prebuild',
   'test',
   'test:coverage',
   'test:scripts',
@@ -57,66 +57,57 @@ describe('the scripts CI calls', () => {
     );
   });
 
-  test('deps:check reports Expo SDK drift instead of failing on it', () => {
-    // Expo patches most weeks and minimumReleaseAge holds each patch for a
-    // day; a blocking drift check turned every open PR red for that day and
-    // skipped unit and E2E behind it. scripts/check-deps.sh says the rest.
-    assert.equal(pkg.scripts['deps:check'], 'bash scripts/check-deps.sh');
-    const script = readFileSync(new URL('./check-deps.sh', import.meta.url), 'utf8');
-    assert.match(script, /EXPO_DOCTOR_SKIP_DEPENDENCY_VERSION_CHECK=1 pnpm deps:doctor/);
-    assert.equal(pkg.scripts['deps:doctor'], 'expo-doctor');
-    assert.match(script, /expo install --check/);
-    assert.match(
-      script,
-      /\|\| drift_status=\$\?/,
-      'the drift exit code is captured, never propagated',
-    );
-  });
-
-  test('knip stays a binary, not a script', () => {
+  test('knip stays a binary behind check:unused, not a script of its own name', () => {
     // Deliberate: a package.json script literally named `knip` fails
     // expo-doctor's "scripts in package.json conflict with node_modules/.bin"
-    // check, and CI runs expo-doctor too. The binary fallback covers it.
+    // check, and CI runs expo-doctor too.
     assert.equal(pkg.scripts?.knip, undefined);
-    assert.ok(pkg.devDependencies?.knip, 'knip must stay a devDependency for the binary fallback');
+    assert.equal(pkg.scripts['check:unused'], 'knip');
+    assert.ok(pkg.devDependencies?.knip, 'knip must stay a devDependency');
   });
 
   test('the gates that wrap make say so, rather than duplicating it', () => {
     // The mechanism this family uses to put make into CI: the package script is
     // the interface the reusable workflow calls, make is the implementation.
-    for (const name of ['check:docs', 'check:release', 'check:ci', 'check:bundle-secrets']) {
+    for (const name of ['check:docs', 'check:release', 'check:ci', 'check:secrets']) {
       assert.match(pkg.scripts[name], /^make /, `${name} should delegate to a make target`);
     }
   });
 });
 
-// The drift, secrets and CI-lint checks are not ours any more either: CI's
-// check-code.yml runs shared-workflows' scripts/checks/*.sh and ci/lint-ci.sh,
-// and @blinkbitcoin/dev-config ships byte-identical copies, so the gates below
-// run exactly those. Their behaviour (untracked output counts as drift, the
-// shallow-clone refusal, the pinned linters) is tested over there.
-describe('the drift, secrets and CI-lint gates run the shared scripts', () => {
-  const PACKAGE = 'node_modules/@blinkbitcoin/dev-config';
+// The drift, Expo health, licence and lockfile checks are not ours any more
+// either: CI's check.yml runs shared-workflows' scripts, and
+// @blinkbitcoin/app-tooling ships byte-identical copies or the same programs,
+// so the gates below run exactly those. Their behaviour (untracked output
+// counts as drift, SDK drift as a warning, the licence allowlist) is tested
+// over there.
+describe('the generated, Expo health, licence and audit gates run the shared tooling', () => {
+  const PACKAGE = 'node_modules/@blinkbitcoin/app-tooling';
 
-  test('i18n:check and codegen:check run the packaged drift checks', () => {
-    assert.equal(pkg.scripts['i18n:check'], `bash ${PACKAGE}/checks/i18n.sh`);
-    assert.equal(pkg.scripts['codegen:check'], `bash ${PACKAGE}/checks/codegen.sh`);
-    // What the shared checks run and diff: Lingui's extract has to compile too,
-    // or the committed messages.ts would drift unseen.
-    assert.equal(pkg.scripts['i18n:extract'], 'lingui extract --clean && lingui compile');
-    assert.match(pkg.scripts.codegen, /^graphql-codegen /);
+  test('check:generated runs the packaged drift check over both generators', () => {
+    assert.equal(pkg.scripts['check:generated'], `bash ${PACKAGE}/checks/generated.sh`);
+    // What the shared check runs and diffs: Lingui's extract has to compile
+    // too, or the committed messages.ts would drift unseen.
+    assert.equal(pkg.scripts['gen:i18n'], 'lingui extract --clean && lingui compile');
+    assert.match(pkg.scripts['gen:graphql'], /^graphql-codegen /);
   });
 
-  test('deps:audit ends with the shared lockfile provenance check', () => {
-    assert.match(pkg.scripts['deps:audit'], / && check-lockfile$/);
+  test('check:expo-health runs the packaged check, which reports SDK drift instead of failing on it', () => {
+    assert.equal(pkg.scripts['check:expo-health'], `bash ${PACKAGE}/checks/expo-health.sh`);
+  });
+
+  test('check:licenses and check:audit run the package programs', () => {
+    assert.equal(pkg.scripts['check:licenses'], 'check-licenses');
+    assert.match(pkg.scripts['check:audit'], / && check-lockfile$/);
   });
 
   test('the packaged scripts the gates call are installed', () => {
     for (const rel of [
-      'checks/i18n.sh',
-      'checks/codegen.sh',
+      'checks/generated.sh',
+      'checks/expo-health.sh',
       'checks/secrets.sh',
-      'ci/lint-ci.sh',
+      'ci/check-ci.sh',
+      'hooks/install-if-lockfile-changed.sh',
     ]) {
       assert.ok(existsSync(path.join(root, PACKAGE, rel)), `${PACKAGE}/${rel} is not installed`);
     }
@@ -161,13 +152,14 @@ test('no trace of the old abbreviated namespace survives', () => {
   assert.deepEqual(offenders, [], `these still carry the old prefix: ${offenders.join(', ')}`);
 });
 
-// Six guards, the version script, the pin fixer and the lockfile check are not ours any more: they come from
-// @blinkbitcoin/dev-config, at the commit the workflows pin. A copy deleted in
-// favour of a bin is only as good as the call that replaced it, so each call is
-// pinned here, in the gate CI runs it from: `check:ci` (make check-ci) and
-// `check:docs` (make check-docs) run on every change in the Checks job.
+// The guards, the version script, the pin fixer and the lockfile check are
+// not ours any more: they come from @blinkbitcoin/app-tooling, at the commit
+// the workflows pin. A copy deleted in favour of a program is only as good as
+// the call that replaced it, so each call is pinned here, in the gate CI runs
+// it from: `check:ci` (make check-ci), `check:docs` (make check-docs) and
+// `test:scripts` run on every change.
 describe('the shared tooling guards run where CI runs them', () => {
-  const PACKAGE = 'node_modules/@blinkbitcoin/dev-config';
+  const PACKAGE = 'node_modules/@blinkbitcoin/app-tooling';
   const RESOLVE_VERSION = `${PACKAGE}/release/resolve-version.sh`;
 
   /** The recipe lines of a Makefile target, joined. */
@@ -183,11 +175,6 @@ describe('the shared tooling guards run where CI runs them', () => {
     return body.join('\n');
   }
 
-  const code = (rel) =>
-    read(rel)
-      .split('\n')
-      .filter((line) => !line.trimStart().startsWith('#'))
-      .join('\n');
   const makefile = read('Makefile');
 
   test('the recipe reader stops at the next target', () => {
@@ -196,17 +183,18 @@ describe('the shared tooling guards run where CI runs them', () => {
     assert.equal(recipe(sample, 'b'), '\tthree');
   });
 
-  test('make check-ci runs the shared CI lint over scripts and skills, and the locale and workflow name guards', () => {
+  test('make check-ci runs the shared CI lint over scripts and skills, and the locale, workflow name and ignored directory guards', () => {
     const ci = recipe(makefile, 'check-ci');
     assert.match(
       ci,
       new RegExp(
-        `^\\tWORKFLOWS_SHELLCHECK_PATHS="scripts \\.claude/skills" bash ${PACKAGE}/ci/lint-ci\\.sh$`,
+        `^\\tWORKFLOWS_SHELLCHECK_PATHS="scripts \\.claude/skills" bash ${PACKAGE}/ci/check-ci\\.sh$`,
         'm',
       ),
     );
     assert.match(ci, /pnpm exec check-shell-locale/);
     assert.match(ci, /pnpm exec check-workflow-names --group ci=CI --group cd=CD/);
+    assert.match(ci, /pnpm exec check-ignored-directories/);
   });
 
   test('make check-secrets and make fix-tooling-pin run the shared script and program', () => {
@@ -214,15 +202,17 @@ describe('the shared tooling guards run where CI runs them', () => {
     assert.equal(recipe(makefile, 'fix-tooling-pin'), '\tpnpm exec fix-tooling-pin');
   });
 
-  test('check-docs.sh runs the tables, diagrams and make target name guards', () => {
-    const docs = code('scripts/check-docs.sh');
-    assert.match(docs, /pnpm exec check-docs-tables/);
-    assert.match(
-      docs,
-      /if \[ -n "\$\{EVENT_NAME:-\}" \]; then\n\s*pnpm exec check-diagrams --all\nelse\n\s*pnpm exec check-diagrams\n/,
-      'check-diagrams must check every diagram under CI (EVENT_NAME set)',
-    );
-    assert.match(docs, /pnpm exec check-make-target-names \\\n\s*--allow 'gen-graphql=\S/);
+  test('make check-docs runs the shared docs check, with the rules in app-tooling.json', () => {
+    assert.equal(recipe(makefile, 'check-docs'), '\tpnpm exec check-docs');
+    const settings = JSON.parse(read('app-tooling.json'));
+    assert.match(settings.docs.allowTargetNames['gen-graphql'], /\S/);
+    assert.ok(settings.docs.architecture.includes('Makefile'));
+  });
+
+  test('test:scripts starts with the sibling-test guard, whose rules are in app-tooling.json', () => {
+    assert.match(pkg.scripts['test:scripts'], /^check-test-siblings && node --test /);
+    const settings = JSON.parse(read('app-tooling.json'));
+    assert.deepEqual(settings.testSiblings.mirror, { 'src/app/': 'src/__tests__/app/' });
   });
 
   test('test:coverage runs the empty-row guard from the package', () => {

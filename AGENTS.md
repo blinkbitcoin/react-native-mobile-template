@@ -6,8 +6,8 @@ output, never source. CI lives in a reusable-workflow repo
 (`blinkbitcoin/shared-workflows`); this repo only pins and calls it.
 
 Read this file before touching anything. `make help` is the source of truth for
-commands, and `scripts/check-docs.sh` fails the build if it and the table below
-drift apart.
+commands, and `make check-docs` (the shared `check-docs`) fails the build if it
+and the table below drift apart.
 
 ## Layout
 
@@ -25,10 +25,9 @@ src/test/           jest setup, render helper, mocks
 plugins/            Expo config plugins (with-*.ts) + their tests
 modules/            local native modules (hello-native)
 mocks/              GraphQL mock API (server.ts, msw.ts, schema.graphql)
-scripts/            check-*.sh, doctor, init, hooks/, release/ (verify, notes, build-info), e2e/, badges/
+scripts/            check-*.sh, doctor, init, ports, release/ (verify, store-notes test), e2e/
 scripts/setup/      make setup: toolchain, Maestro, Android SDK + emulator, iOS (setup.test.mjs)
 scripts/security/   the check-security scanners, their settings resolver and the verdict
-scripts/lib/llm/    provider-portable LLM adapters (store notes, security review)
 .maestro/           Maestro flows (native e2e); e2e/web/ is Playwright
 fastlane/           store lanes + metadata; deploy/ota/ is the update server
 docs/               architecture, local-dev, quality, testing, ci, native-extensions,
@@ -83,7 +82,7 @@ aggregates.
 
 | Gates | |
 |---|---|
-| `make check` | Every static gate the `check-code` workflow runs (no tests/builds) |
+| `make check` | Every static gate the `check` workflow runs (no tests/builds) |
 | `make ci` | Everything CI runs except E2E — `check` plus coverage and the script tests |
 | `make check-slow` | The minutes-long gates: prebuild output + the bundle scan (off by default in CI too) |
 | `make check-code` | `check-types` + `check-lint` + `check-format` + `check-unused` + `check-spell` |
@@ -92,16 +91,18 @@ aggregates.
 | `make check-format` | Check formatting without writing (`make fix-format` writes) |
 | `make check-unused` | Unused files, exports and dependencies |
 | `make check-spell` | Spell-check with typos |
-| `make check-gen` | Generated-file drift (i18n, codegen) |
-| `make check-deps` | SDK drift, audit, lockfile provenance, licenses |
-| `make check-ci` | Shared CI lint (actionlint, zizmor, shellcheck) + workflow names + shell locale prefixes |
-| `make check-docs` | Docs freshness, this file's command table vs the Makefile, make target names, table widths,<br>mermaid blocks |
+| `make check-generated` | Generated-file drift (i18n catalogs, GraphQL documents) |
+| `make check-expo-health` | Expo SDK drift (a warning), then expo-doctor |
+| `make check-audit` | Vulnerability audit of production dependencies + lockfile provenance |
+| `make check-licenses` | Production dependency licenses against the allowlist |
+| `make check-ci` | Shared CI lint (actionlint, zizmor, shellcheck) + workflow names + shell locale prefixes<br>+ ignored directories |
+| `make check-docs` | Docs freshness, this file's command table vs the Makefile, make target names, table widths,<br>mermaid blocks (the shared `check-docs`; its rules are in `app-tooling.json`) |
 | `make check-skills` | Only the offline skill tests under `.claude/skills/` (part of `make check-release`, which CI runs) |
 | `make check-prebuild` | Prebuild both platforms in a temp dir, assert plugin output |
 | `make check-release` | Ruby syntax + fastlane lane parse + lane unit tests + skill tests |
 | `make check-secrets` | gitleaks over the whole git history (the shared script); allowlisted test data in `.gitleaks.toml` |
 | `make check-security` | Every enabled security scanner, then the verdict (see `docs/security.md`) |
-| `make check-security-deps` | Known vulnerabilities and malicious packages in the lockfile (osv-scanner) |
+| `make check-security-dependencies` | Known vulnerabilities and malicious packages in the lockfile (osv-scanner) |
 | `make check-security-code` | Semgrep over app source: TypeScript, secrets, OWASP packs plus `rules/` |
 | `make check-security-policy` | Assert the pnpm install policy: release cooldown, no implicit builds, no trust downgrade |
 | `make check-security-sbom` | CycloneDX bill of materials from the lockfile into `.security/sbom.cdx.json` |
@@ -126,7 +127,7 @@ aggregates.
 | Release | |
 |---|---|
 | `make version` | Print what CI would build for HEAD |
-| `make release-notes` | Preview store notes for HEAD (`TAG=vX.Y.Z` uses that release body, `PR=N` that release PR's body) |
+| `make store-notes` | Preview store notes for HEAD (`TAG=vX.Y.Z` uses that release body, `PR=N` that release PR's body) |
 | `make verify-ios` | Verify a built .app/.ipa/.xcarchive (`ARTIFACT=...`) |
 | `make verify-android` | Verify AAB+APK (`AAB=... APK=...`) |
 
@@ -135,7 +136,7 @@ aggregates.
 - **Native output is never committed.** `ios/` and `android/` are gitignored
   prebuild output. `src/graphql/generated/**` and `src/i18n/locales/*/messages.ts`
   *are* committed, but only ever as the output of `make gen-graphql` / `make gen-i18n` —
-  never hand-edited; `make check-gen` fails on drift.
+  never hand-edited; `make check-generated` fails on drift.
 - **Never `cp -R generated/. .`** when scaffolding from a generator: it clobbers
   `.git/`. Use `rsync -a --exclude .git generated/ .`.
 - **Never hardcode a port.** Every port is `APP_PORT_BASE` (default 8080) plus a
@@ -149,7 +150,7 @@ aggregates.
   `env LC_ALL=C grep ...`, not `LC_ALL=C grep ...`: with the prefix a Homebrew
   bash on macOS switches its own locale inside `$(...)` or a pipeline and now
   and then dies with SIGSEGV (status 139). `check-shell-locale` (from
-  `@blinkbitcoin/dev-config`, run by `make check-ci`) fails on the prefix and
+  `@blinkbitcoin/app-tooling`, run by `make check-ci`) fails on the prefix and
   names the line.
 - **User-visible strings go through Lingui** (`t`/`Trans` macros), then
   `make gen-i18n`. No bare literals in JSX.
@@ -170,9 +171,10 @@ aggregates.
 - **Worktrees under `.claude/worktrees/` are not this checkout.** Claude Code
   puts whole checkouts there, node_modules included, so every tool that walks
   the tree excludes the directory itself (Jest and Metro anchored to the root,
-  since a worktree's own root is under it too). A new tool adds its entry;
-  `scripts/worktree-ignores.test.mjs` holds the existing ones, and
-  `docs/quality.md` lists them.
+  since a worktree's own root is under it too). The same goes for `.workflows/`,
+  where every CI job checks this repository out. A new tool adds its entry;
+  `check-ignored-directories` (from `@blinkbitcoin/app-tooling`, run by
+  `make check-ci`) holds the existing ones, and `docs/quality.md` lists them.
 - **Routes-only rule:** files in `src/app/` compose screens from `src/features`
   and `src/components` and may not import `@apollo/client`, `@/graphql`,
   `@/services` or `@/lib`. Only `src/app/_layout.tsx` and
@@ -192,9 +194,9 @@ aggregates.
 - **Releases are release-please's job.** Merge (squash) the release PR; never
   `sed` a version into `package.json`, `app.config.ts` or the manifest. The
   store notes are drafted into the release PR body by `cd-release.yml`
-  from `release-notes.prompt.md`; to change them, edit the prompt (the next
+  from `store-notes.prompt.md`; to change them, edit the prompt (the next
   push regenerates) or the release body after merging, then preview with
-  `make release-notes` — see `docs/release-runbook.md`.
+  `make store-notes` — see `docs/release-runbook.md`.
 - **No vague abbreviations, anywhere a human reads.** Write the word:
   identifiers, organisation, credentials, repository, configuration,
   environment. This applies to prose, plans, commit messages, comments and
@@ -207,11 +209,11 @@ aggregates.
   that does it.** `check-unused`, not `check-knip`; `check-code-scanning`, not
   `check-codeql`. A tool's name tells a reader nothing until they already know
   the tool; it belongs in the `##` description, where `make help` shows it.
-  `check-make-target-names` (from `@blinkbitcoin/dev-config`, run by
+  `check-make-target-names` (from `@blinkbitcoin/app-tooling`, run by
   `make check-docs`) fails on a target with a word that names a tool pinned in
   `.mise.toml` or a package in `package.json`; a `setup-` target installs the
-  tool it names, and any other exception needs an `--allow TARGET=REASON` in
-  `scripts/check-docs.sh`.
+  tool it names, and any other exception needs an entry in the
+  `docs.allowTargetNames` section of `app-tooling.json`, target to reason.
 - **Workflow files carry their stage in the name.** GitHub reads only the top
   level of `.github/workflows/`, so the prefix is the only grouping there is:
   `ci.yml` and `ci-*.yml` run on every change and display as `CI` /
@@ -249,8 +251,10 @@ aggregates.
   path under `src/__tests__/app/` (`src/app/details/[id].tsx` →
   `src/__tests__/app/details/[id].test.tsx`). Scope: `scripts/**/*.mjs`,
   `src/**/*.ts(x)`, `plugins/*.ts` and `modules/*/index.ts`, less generated
-  code, `*.d.ts` and `src/test/`. `scripts/test-siblings.test.mjs` fails
-  naming every file without one. **No exceptions, no allowlist**: a module
+  code, `*.d.ts` and `src/test/`. `check-test-siblings` (from
+  `@blinkbitcoin/app-tooling`, the first step of `make test-scripts`, its rules
+  in the `testSiblings` section of `app-tooling.json`) fails naming every file
+  without one. **No exceptions, no allowlist**: a module
   that needs a device, a simulator, a native build or the network is tested
   against fakes of them, and the check fails if an allowlist comes back. A
   shell script is held to the same rule, with its test named after it
@@ -258,8 +262,8 @@ aggregates.
   `PATH`). The family's rule and its fake-tool pattern are written once in
   [shared-workflows' AGENTS.md](https://github.com/blinkbitcoin/shared-workflows/blob/main/AGENTS.md),
   whose check enforces it for every shell script the template hands over;
-  `scripts/test-siblings.test.mjs` does not check this repository's own shell
-  scripts yet.
+  `check-test-siblings` does not check this repository's own shell scripts
+  yet: `app-tooling.json` lists only `scripts/**/*.mjs` as sources there.
 - **Docs and diagrams ship in the same PR as the change, never as a
   follow-up.** Any change to a name, input, output, job, file, flow, count or
   default updates every doc that describes it, in the same PR: prose, tables,
@@ -283,13 +287,13 @@ aggregates.
 |---|---|---|
 | Units, components, router, Apollo (MSW) | `src/**/*.test.ts(x)`, one beside each module | `make test-unit` |
 | Routes (`src/app/`), one per route file | `src/__tests__/app/**/*.test.ts(x)` | `make test-unit` |
-| That every source file has a sibling test | `scripts/test-siblings.test.mjs` | `make test-scripts` |
+| That every source file has a sibling test | `check-test-siblings`, rules in `app-tooling.json` | `make test-scripts` |
 | Config plugins | `plugins/*.test.ts` | `make test-unit` |
 | Node scripts (release, doctor, init, checks), 100% coverage | `scripts/**/*.test.mjs` | `make test-scripts` |
 | Machine setup (`make setup`), bash against fake tools | `scripts/setup/setup.test.mjs` | `make test-scripts` |
 | The native-setup skill's commands and paths | `.claude/skills/native-setup/tests/` | `make check-skills` |
 | Fastlane lanes | `fastlane/test/` | `make check-release` |
-| CD against the pinned shared workflows: every call's contract, the store-notes chain | `make check-contract` (the shared contract check),<br>`scripts/release/cd-notes.test.mjs` | CI's Checks / Contract; `make test-scripts` (CI always; locally with `WORKFLOWS_DIR`) |
+| CD against the pinned shared workflows: every call's contract, the store-notes chain | `make check-contract` (the shared contract check),<br>`scripts/release/store-notes.test.mjs` | CI's Checks / Contract; `make test-scripts` (CI always; locally with `WORKFLOWS_DIR`) |
 | Native e2e | `.maestro/flows/` | `make test-e2e-ios`, `make test-e2e-android` |
 | Web e2e | `e2e/web/` | `make test-e2e-web` |
 
@@ -299,7 +303,7 @@ assert goes in `coveragePathIgnorePatterns` **with a one-line reason**; an entry
 without one is not mergeable, and a native module's TS wrapper does not qualify
 just because the native half is Swift/Kotlin. `make test-coverage` (and CI,
 through `test:coverage`) also fails on any file with zero statements
-(`check-coverage-empty`, from `@blinkbitcoin/dev-config`), so a re-export
+(`check-coverage-empty`, from `@blinkbitcoin/app-tooling`), so a re-export
 barrel cannot lift the number while testing nothing.
 
 Global coverage says every line ran somewhere, not that its own test ran it.
@@ -320,7 +324,7 @@ in-process; the entry itself is only an `import.meta.main` guard that sets
 - CI and CD are eleven caller workflows into `blinkbitcoin/shared-workflows`,
   every call pinned to one commit SHA that Dependabot moves in one PR, and a PR
   runs the CD calls against that pin (`docs/decisions/0023-cd-verified-before-release.md`).
-  The shared tooling package (`@blinkbitcoin/dev-config`) is a git dependency
+  The shared tooling package (`@blinkbitcoin/app-tooling`) is a git dependency
   at that same commit; run `make fix-tooling-pin` on the Dependabot PR
   (`docs/decisions/0024-shared-tooling-at-the-workflows-pin.md`).
   `docs/ci.md` maps each `make` target to its CI job and explains `.workflows/`.

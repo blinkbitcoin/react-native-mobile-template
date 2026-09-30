@@ -227,8 +227,8 @@ that half.)
 | --- | --- |
 | `pre-commit` | Biome check with `--write` on staged files, ESLint on staged `src/**/*.{ts,tsx}`, typos on staged files,<br>gitleaks on the staged diff |
 | `commit-msg` | commitlint on the message |
-| `pre-push` | `pnpm typecheck`, `pnpm knip`, and Jest limited to what changed since `origin/main` |
-| `post-merge`, `post-checkout` | Reinstall dependencies when the lockfile changed between the two revisions |
+| `pre-push` | `pnpm check:types`, `pnpm check:unused`, and Jest limited to what changed since `origin/main` |
+| `post-merge`, `post-checkout` | Reinstall dependencies when the lockfile changed between the two revisions<br>(the shared tooling package's `hooks/install-if-lockfile-changed.sh`) |
 
 Escape hatches, for when a hook is wrong and you know why:
 
@@ -252,7 +252,7 @@ commits already passed the hook once.
 | Metro serves stale JS, or a module resolves oddly | `pnpm start --clear`, or `make clean` for the caches and generated projects |
 | `Watchman` errors, or file changes are not picked up | `watchman watch-del-all`, then restart Metro. `make doctor` checks watchman is installed |
 | iOS build fails on a pod that was just added | `make prebuild`, which reruns pod install, or delete `ios/` and let `make dev-ios` regenerate it |
-| `make check-deps` warns about Expo SDK drift | `pnpm expo install --check` is the fix path, once `minimumReleaseAge` lets the patch in. The drift is a warning,<br>not a failure: `scripts/check-deps.sh` says why. Genuine exceptions go in `expo.install.exclude` in `package.json` |
+| `make check-expo-health` warns about Expo SDK drift | `pnpm expo install --check` is the fix path, once `minimumReleaseAge` lets the patch in. The drift is a warning,<br>not a failure: [ADR 0012](decisions/0012-expo-sdk-drift-is-advisory.md) says why. Genuine exceptions go in `expo.install.exclude` in `package.json` |
 | A `pnpm install` fails on a package that is too new | `minimumReleaseAge` in `pnpm-workspace.yaml` is 1 day.<br>Wait, or add an exact `name@version` entry to `minimumReleaseAgeExclude` with a comment saying why |
 | A `pnpm install` fails with a trust-policy / provenance-downgrade error | `trustPolicy: no-downgrade` in `pnpm-workspace.yaml`.<br>pnpm compares publish dates across every major of a package, so a later, stronger release can still read as a downgrade.<br>Confirm with `pnpm audit` that the package is not actually vulnerable, then add an exact `name@version` entry<br>to `trustPolicyExclude` with a comment saying why |
 | `Cannot find native module 'HelloNative'` | You are on web or in Expo Go. Build a dev client: `make dev-ios` or `make dev-android` |

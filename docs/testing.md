@@ -29,7 +29,7 @@ measures them):
 
 | Module | Its test |
 | --- | --- |
-| `scripts/badges/render.mjs` | `scripts/badges/render.test.mjs` |
+| `scripts/ports.mjs` | `scripts/ports.test.mjs` |
 | `src/components/Card.tsx` | `src/components/Card.test.tsx` |
 | `src/i18n/i18n.ts` | `src/i18n/i18n.test.tsx` (a `.ts` module may be tested in JSX) |
 | `src/features/settings/NativeDemoCard.web.tsx` | `src/features/settings/NativeDemoCard.web.test.tsx` |
@@ -56,20 +56,25 @@ route's own logic is under test.
 Check one module against its own test before pushing:
 
 ```sh
-node --test --experimental-test-coverage --test-coverage-include=scripts/badges/render.mjs scripts/badges/render.test.mjs
+node --test --experimental-test-coverage --test-coverage-include=scripts/ports.mjs scripts/ports.test.mjs
 pnpm exec jest src/components/Card.test.tsx --coverage --collectCoverageFrom=src/components/Card.tsx
 ```
 
 Jest applies the global 100% thresholds to the one file it measures, so the
 second command fails below 100%.
 
-`scripts/test-siblings.test.mjs` (`make test-scripts`) enforces that the
-sibling exists. It lists tracked files with `git ls-files` and names every
-one without a sibling. In scope: `scripts/**/*.mjs`, `src/**/*.ts(x)`,
-`plugins/*.ts` and `modules/*/index.ts`. Out of scope: test files, `*.d.ts`,
+`check-test-siblings` (from `@blinkbitcoin/app-tooling`, the first step of
+`make test-scripts`) enforces that the sibling exists. It reads the tracked
+files, plus untracked ones git does not ignore, and names every one without a
+sibling. Its rules are the `testSiblings` section of `app-tooling.json`. In
+scope: `scripts/**/*.mjs`, `src/**/*.ts(x)`, `plugins/*.ts` and
+`modules/*/index.ts`. Out of scope: test files, `*.d.ts`,
 `src/graphql/generated/`, `src/i18n/locales/` and `src/test/` (the harness,
-which has its own tests anyway). The same test fails on a test file under
-`src/app/` and on a route test whose route was renamed or deleted. There is no
+which has its own tests anyway). The same check fails on a test file under
+`src/app/` and on a route test whose route was renamed or deleted (the
+`mirror` rule, `src/app/` to `src/__tests__/app/`). An exclude must be a glob
+or a directory; one naming a single file is refused as the allowlist entry it
+would be. There is no
 allowlist and no exception: a file that needs a device, a simulator, a native
 build or the network is tested against fakes of them, and the check fails if
 an allowlist comes back. That the one file covers its
@@ -102,26 +107,23 @@ which is why they sit at the top level and not in either project.
 Native, and fails below 100% — see [Script coverage](#script-coverage). The
 include keeps the gate on this repository's scripts: a test that runs
 shared-workflows' scripts from `$WORKFLOWS_DIR` (or `pnpm` from outside mise)
-would otherwise have that code measured too. The suites include:
+would otherwise have that code measured too. The script runs
+`check-test-siblings` first (see
+[One test file per module](#one-test-file-per-module)). The suites include:
 
 | Suite | Covers |
 | --- | --- |
 | `scripts/doctor.test.mjs` | The toolchain check |
-| `scripts/check-licenses.test.mjs` | The SPDX allowlist logic |
 | `scripts/init.test.mjs` | The template rename and web-removal script behind `make init` |
-| `scripts/hooks/install-if-lockfile-changed.test.mjs` | The post-merge / post-checkout lockfile-install hook |
-| `scripts/release/notes.test.mjs` | Store notes from a release body or from commits |
 | `scripts/release/verify.test.mjs` | The artifact verification helpers |
 | `scripts/release/fingerprint.test.mjs` | The fingerprint and OTA plumbing |
-| `scripts/test-siblings.test.mjs` | That every source file has its own sibling test, and that no route test sits under `src/app/`<br>(see [One test file per module](#one-test-file-per-module)) |
-| `scripts/worktree-ignores.test.mjs` | That every tool which walks the tree skips `.claude/worktrees/`, anchored to the root<br>(see [quality.md](quality.md#worktrees-inside-the-checkout-are-not-this-checkout)) |
 | `scripts/coverage-completeness.test.mjs` | Loads every `scripts/**/*.mjs` module, so one no test imports still counts |
 | `scripts/ci-suite-gates.test.mjs` | `ci.yml`'s `unit`, `e2e` and `badges` jobs evaluated together for each kind of change, and `unit` held to having<br>no gate (see [ci.md](ci.md#skipping-a-suite-the-change-cannot-affect)) |
-| `scripts/release/cd-notes.test.mjs` | The store notes the way CD drafts them: cd-release's build-env through the shared `build-env.sh`, `pr-notes.sh` on<br>a real release PR body with a `gh` shim and a local model, then the shared `notes.sh` reading the section back |
-| `scripts/security/config.test.mjs` | Settings resolution: environment, then `security-policy.json`, then defaults |
+| `scripts/release/store-notes.test.mjs` | The store notes the way CD drafts them: cd-release's `environment-variables` through the shared `build-env.sh`,<br>`pr-store-notes.sh` and `gen-store-notes` on a real release PR body with a `gh` shim, a local model and this<br>repository's `store-notes.prompt.md`, then the shared `gen-store-notes.sh` reading the section back |
+| `scripts/security/settings.test.mjs` | Settings resolution: environment, then `security-settings.json`, then defaults |
 | `scripts/security/sarif.test.mjs` | The SARIF document builders: a skipped run and a findings run |
 | `scripts/security/verdict.test.mjs` | Merging SARIF documents, the severity threshold, the `failOn` engine gate<br>and the pull request annotations |
-| `scripts/security/runners.test.mjs` | The bash runners (`deps.sh`, `code.sh`, `policy.sh`, `local.sh`): enabled, disabled and missing-tool paths |
+| `scripts/security/runners.test.mjs` | The bash runners (`dependencies.sh`, `code.sh`, `policy.sh`, `local.sh`): enabled, disabled and missing-tool paths |
 
 These run in `make ci` (and in CI's Unit job), **not** in `make check`, which
 is the static gates only. The port guard in `scripts/ports.test.mjs` and the
@@ -231,7 +233,7 @@ A re-export barrel or a type-only module has zero statements. istanbul prints
 it as 0% in every column while the totals stay at 100%, so it is a silent way
 to add an untested file without moving the number.
 
-`test:coverage` runs `check-coverage-empty` (from `@blinkbitcoin/dev-config`)
+`test:coverage` runs `check-coverage-empty` (from `@blinkbitcoin/app-tooling`)
 after Jest, so `make test-coverage` and CI's Unit job both make the check. It
 reads `coverage/coverage-summary.json` — which is why `json-summary` is in
 `coverageReporters` — and fails naming any file with `statements.total === 0`.
@@ -332,7 +334,7 @@ Notes on RNTL 14 and React 19:
 MSW is started in `src/test/setup.ts` with
 `onUnhandledRequest: 'error'`, so an unexpected request fails the test rather
 than hanging. The handlers execute the same executable schema the
-`pnpm mock-api` server does (`mocks/README.md`), so a test cannot pass against
+`pnpm dev:api` server does (`mocks/README.md`), so a test cannot pass against
 a response the real server would never produce.
 
 Override one operation for a single test with `server.use(...)`:
@@ -420,7 +422,7 @@ mock API, open the `expo-development-client` deep link (see
 
 `ci.yml` passes `ios-configuration: Release`: the bundle is embedded, no Metro,
 no dev launcher, no prompt at launch. Two things follow. `EXPO_PUBLIC_*`
-values reach that app only through the `build-env` input — a Release bundle
+values reach that app only through the `environment-variables` input — a Release bundle
 resolves `.env.production`, not `.env.development`, and an exported variable
 beats the dotenv file — so `ci.yml` passes the mock API URL explicitly.
 And the iOS suite no longer covers the Metro dev path; Android still does.

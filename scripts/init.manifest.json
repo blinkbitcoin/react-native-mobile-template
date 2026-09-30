@@ -65,10 +65,6 @@
         ]
       },
       {
-        "path": "scripts/release/fixtures/release-body.md",
-        "replace": [["github.com/acme/rn-mobile-template", "github.com/{{owner}}/{{slug}}", "+"]]
-      },
-      {
         "path": ".github/CODEOWNERS",
         "optional": true,
         "replace": [["@blinkbitcoin/", "@{{owner}}/", "+"]]
@@ -137,7 +133,6 @@
       "scripts/e2e/maestro-ios.sh",
       "scripts/release/fixtures/ota/AndroidManifest.xml",
       "scripts/release/fixtures/ota/strings.xml",
-      "scripts/release/fixtures/release-body.md",
       "scripts/release/verify.test.mjs",
       "src/lib/native-intent.test.ts",
       "src/lib/native-intent.ts"
@@ -511,7 +506,7 @@
         "optional": true,
         "$comment": "The layout block names the init script and its doc page; both are going away, and a line scrub would take the whole inventory line.",
         "replace": [
-          ["check-*.sh, doctor, init, hooks/, release/", "check-*.sh, doctor, hooks/, release/"],
+          ["check-*.sh, doctor, init, ports, release/", "check-*.sh, doctor, ports, release/"],
           [
             "ota, ota-and-crash-reporting, template-usage, decisions/",
             "ota, ota-and-crash-reporting, decisions/"

@@ -120,10 +120,10 @@ included - is the one to read. A private consumer that finds a full run per
 release-PR update too expensive drops that single step in `cd-release.yml`.
 
 The PR body carries a `## Store notes` section: the prose the stores will
-get, drafted by the `Release notes` job of `cd-release.yml` from the
+get, drafted by the `Store notes` job of `cd-release.yml` from the
 changelog the PR carries (and rewritten by the optional LLM pass when one is
 configured). **Review it with the version bump** — see
-[Store notes](#store-notes). To change it, edit `release-notes.prompt.md` and
+[Store notes](#store-notes). To change it, edit `store-notes.prompt.md` and
 the next push to `main` regenerates it; a hand edit to the section in the PR
 lasts only until that next push, because release-please rewrites the whole
 body. After merging, the section is in the release body, and editing it there
@@ -267,7 +267,7 @@ and takes Play to 100%. `action: halt` stops both. See
 ## Versions and build numbers
 
 - **Version** comes from `resolve-version.sh`, the shared script CI runs and
-  `make version` runs from `node_modules/@blinkbitcoin/dev-config/release/`: a
+  `make version` runs from `node_modules/@blinkbitcoin/app-tooling/release/`: a
   stable `vX.Y.Z` tag on HEAD → a HEAD subject of
   `chore(<scope>): release X.Y.Z` → the open release PR's title → the newest
   stable tag with its patch bumped → `0.0.1`.
@@ -320,11 +320,14 @@ and takes Play to 100%. `action: halt` stops both. See
 
 ## Store notes
 
-`scripts/release/notes.mjs` renders the notes every store gets. The
-deterministic renderer always runs: it strips links, PR references, commit
+`gen-store-notes` renders the notes every store gets. It is a program of the
+shared tooling package (`@blinkbitcoin/app-tooling`): CI runs it from the
+workflows checkout in `build-prepare.yml` and `pr-store-notes.yml`, and this
+repository ships no generator of its own. The deterministic renderer always
+runs: it strips links, PR references, commit
 hashes and ticket keys, groups changes into New / Improved / Fixed and
 truncates at a word boundary to 4000 characters (TestFlight, App Store), 500
-(Play) or 300 (AppGallery). Output is `store-notes.json` + `notes-store.txt`;
+(Play) or 300 (AppGallery). Output is `store-notes.json` + `store-notes.txt`;
 the lanes read those files.
 
 Where the text comes from differs per tier, and that is the design:
@@ -332,12 +335,12 @@ Where the text comes from differs per tier, and that is the design:
 | Tier | Source | Generated or copied |
 | --- | --- | --- |
 | Internal (every push to `main`) | Commit subjects since the last tag | Generated, deterministic only; the LLM never runs here |
-| The release PR | The changelog the PR carries | Generated once, by `Release notes` in `cd-release.yml`; the LLM pass runs here when configured. **This is the review point** |
+| The release PR | The changelog the PR carries | Generated once, by `Store notes` in `cd-release.yml`; the LLM pass runs here when configured. **This is the review point** |
 | Beta and production | The `## Store notes` section of the release body | Copied verbatim; nothing is regenerated, so both tiers ship the reviewed text |
 
 release-please builds the release body from the PR body, so the section a
 human reviewed in the PR is the section beta and production read. The
-`Release notes` job is its own job after the beta and web dispatches: a red
+`Store notes` job is its own job after the beta and web dispatches: a red
 draft never withholds a release, and `gh run rerun --failed` re-drafts.
 
 Two costs that come with drafting into the PR: every push to `main` now
@@ -345,7 +348,8 @@ rewrites the release PR (release-please skips its update only on a body it
 wrote itself) and re-dispatches CI on it; and a hand edit to the section in
 the PR lasts until that next push.
 
-Preview locally with `make release-notes` (`TAG=vX.Y.Z` renders that release's
+Preview locally with `make store-notes`, which runs
+`pnpm exec gen-store-notes --preview` (`TAG=vX.Y.Z` renders that release's
 body, `PR=N` that release PR's body).
 
 **Human override.** Edit the `## Store notes` section in the GitHub release
@@ -367,9 +371,10 @@ Both append jobs upload their section under a filename that is deliberately
 `SHA256SUMS` over whatever of the fixed set it finds, and an artifact carrying
 one of those names would replace the checksums of the release's binaries.
 
-**Locales.** `notes.mjs` emits one entry per locale directory under
-`fastlane/metadata/ios` unless `--locales` or `$NOTES_LOCALES` (which is what
-`build-prepare`'s `notes-locales` input becomes) says otherwise. Use the
+**Locales.** `gen-store-notes` emits one entry per locale directory under
+`fastlane/metadata/ios` unless `--locales` or `$STORE_NOTES_LOCALES` (which is
+what the `store-notes-locales` input of `build-prepare` and `pr-store-notes`
+becomes) says otherwise. Use the
 *metadata* locale names there — `en-US`, not `en`: the lanes look a locale up in
 `store-notes.json` by directory name, and a key they cannot find sends every
 locale back to the single-locale fallback and throws the LLM pass away.
@@ -386,26 +391,29 @@ error, unparseable JSON, a missing locale, a leaked commit hash — is a warning
 and a fall back to the deterministic prose. A release never fails because a
 model was unavailable.
 
-The whole system prompt is `release-notes.prompt.md` at the repository root:
-product, audience, tone, locales, the store limits and the output rules. Edit
-that file to change how the notes read; the generator only fills in
-`{{locales}}` and `{{limit}}`, and an unknown placeholder fails the run rather
-than reaching the model. The validator that checks the model's answer is not
-part of the prompt and cannot be relaxed from it.
+The system prompt has two parts. The shared tooling package's own
+`store-notes.prompt.md` comes first and owns the locales, the store limits and
+the answer format. This repository's `store-notes.prompt.md`, at the root,
+follows it and owns the product, the audience and the tone; where it is more
+specific it wins, but it never changes the output format. Edit the root file to
+change how the notes read. Both parts may use `{{locales}}` and `{{limit}}`,
+and an unknown placeholder fails the run rather than reaching the model. The
+validator that checks the model's answer is not part of the prompt and cannot
+be relaxed from it.
 
 | Name | Kind | Meaning |
 | --- | --- | --- |
-| `RELEASE_NOTES_LLM_PROVIDER` | repo variable | `anthropic` or `openai`; anything else disables the pass |
-| `RELEASE_NOTES_LLM_MODEL` | repo variable | Model override |
-| `RELEASE_NOTES_LLM_EFFORT` | repo variable | `none`, `low`, `medium`, `high` or `max` (the default); any other value fails the draft.<br>`none` sends no effort field, for a model with no reasoning switch |
-| `RELEASE_NOTES_LLM_EXTRA_PARAMS` | repo variable | A JSON object merged into the request, for a vendor-specific switch; may not set `model`, `messages` or `system`.<br>A key set to `null` removes that field: `{"response_format": null}` |
+| `STORE_NOTES_LLM_PROVIDER` | repo variable | `anthropic` or `openai`; anything else disables the pass |
+| `STORE_NOTES_LLM_MODEL` | repo variable | Model override |
+| `STORE_NOTES_LLM_EFFORT` | repo variable | `none`, `low`, `medium`, `high` or `max` (the default); any other value fails the draft.<br>`none` sends no effort field, for a model with no reasoning switch |
+| `STORE_NOTES_LLM_EXTRA_PARAMS` | repo variable | A JSON object merged into the request, for a vendor-specific switch; may not set `model`, `messages` or `system`.<br>A key set to `null` removes that field: `{"response_format": null}` |
 | `OPENAI_BASE_URL` | repo variable | OpenAI-compatible endpoint; see [Provider recipes](#provider-recipes) |
 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | **secret** | Key for the chosen provider |
 
-The three variables reach `notes.mjs` through the `Release notes` job's
-`build-env`; the two keys are declared secrets on `pr-release-notes.yml`,
-because `build-env` is a workflow input and would publish them in the run's
-parameters. No CD lane receives them: the LLM runs in that one job.
+The four variables and `OPENAI_BASE_URL` reach `gen-store-notes` through the
+`Store notes` job's `environment-variables`; the two keys are declared secrets
+on `pr-store-notes.yml`, because `environment-variables` is a workflow input
+and would publish them in the run's parameters. No CD lane receives them: the LLM runs in that one job.
 
 An effort that thinks (anything but `none`) gets 16000 output tokens on top of
 the text budget: both APIs count thinking against `max_tokens`, and without
@@ -418,7 +426,7 @@ works; the key goes in `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` (a secret),
 the rest in repository variables. Use `none` for the effort unless the model
 reasons, and check the vendor's model list for current names.
 
-| Provider | `RELEASE_NOTES_LLM_PROVIDER` | `OPENAI_BASE_URL` | Model example | Effort |
+| Provider | `STORE_NOTES_LLM_PROVIDER` | `OPENAI_BASE_URL` | Model example | Effort |
 | --- | --- | --- | --- | --- |
 | Anthropic | `anthropic` | (not used) | `claude-sonnet-5` (the default) | `max` |
 | OpenAI | `openai` | (not set) | `gpt-5` (the default) | `max` |
@@ -436,22 +444,22 @@ organisation administrator can still turn it off. Ollama needs a non-empty
 `OPENAI_API_KEY` of any value and is reachable only from your own machine.
 
 If an endpoint answers HTTP 400 to a default field, remove that field in
-`RELEASE_NOTES_LLM_EXTRA_PARAMS`: `{"response_format": null}` when it has no
+`STORE_NOTES_LLM_EXTRA_PARAMS`: `{"response_format": null}` when it has no
 JSON mode, or `{"max_tokens": null, "max_completion_tokens": 4000}` for a
 reasoning model that wants OpenAI's newer name. The adapter strips a markdown
 code fence around the answer, so a model without JSON mode still validates.
 
 Preview any recipe on your machine before setting the repository variables.
-`make release-notes` with no arguments drafts from the commits since the last
+`make store-notes` with no arguments drafts from the commits since the last
 tag and passes your shell's variables through; `TAG=` and `PR=` read the
 `## Store notes` section already in that body, which is final, so they never
 call a model:
 
 ```bash
-env RELEASE_NOTES_LLM_PROVIDER=openai OPENAI_BASE_URL=http://localhost:11434/v1 OPENAI_API_KEY=ollama RELEASE_NOTES_LLM_MODEL=qwen3:8b RELEASE_NOTES_LLM_EFFORT=low make release-notes
+env STORE_NOTES_LLM_PROVIDER=openai OPENAI_BASE_URL=http://localhost:11434/v1 OPENAI_API_KEY=ollama STORE_NOTES_LLM_MODEL=qwen3:8b STORE_NOTES_LLM_EFFORT=low make store-notes
 ```
 
-A `release notes: ...` line on stderr means the draft fell back to the
+A `store notes: ...` line on stderr means the draft fell back to the
 generated prose, and says why.
 
 ## Store listing metadata
@@ -465,7 +473,7 @@ from a version release.
 
 | CD owns per version | sync owns | Console-only |
 | --- | --- | --- |
-| Release notes / What's new, the binary,<br>the review submission, track and rollout | Name, subtitle, description, keywords,<br>promotional text, URLs, copyright,<br>age rating, review contact, the version's<br>review attachment (deleted on every push;<br>re-upload it in the console after a sync if<br>you use one), iOS screenshots under<br>`fastlane/screenshots/<locale>/`, Play icon,<br>feature graphic and screenshots | Apple: categories (until the category files<br>exist — see below), App Privacy labels,<br>pricing and availability, agreements,<br>TestFlight groups, bundle id.<br>Play: content rating, data safety, target<br>audience, app access, countries, tracks<br>and testers |
+| Store notes / What's new, the binary,<br>the review submission, track and rollout | Name, subtitle, description, keywords,<br>promotional text, URLs, copyright,<br>age rating, review contact, the version's<br>review attachment (deleted on every push;<br>re-upload it in the console after a sync if<br>you use one), iOS screenshots under<br>`fastlane/screenshots/<locale>/`, Play icon,<br>feature graphic and screenshots | Apple: categories (until the category files<br>exist — see below), App Privacy labels,<br>pricing and availability, agreements,<br>TestFlight groups, bundle id.<br>Play: content rating, data safety, target<br>audience, app access, countries, tracks<br>and testers |
 
 **Apple's edit-version constraint.** Live mode
 (`IOS_METADATA_EDIT_LIVE=true`, or `live:true`) edits the description,
@@ -589,7 +597,7 @@ produced is an `.ipa`, so the `ios-ipa` artifact upload is skipped too.
 
 | Runs from the first push | Waits for `STORE_UPLOADS_ENABLED=true` |
 | --- | --- |
-| Version and build number, fingerprints, `build-info.json`, release notes | `fastlane match` certificates |
+| Version and build number, fingerprints, `build-info.json`, store notes | `fastlane match` certificates |
 | Both native builds, and `verify-ios` / `verify-android` | TestFlight upload and external groups |
 | The GitHub release: tag, assets, `SHA256SUMS`, promote | Play track uploads |
 | Store-notes generation and the changelog section | Phased release and staged rollout |
@@ -627,21 +635,21 @@ is the wiring; that page is the sourcing.
 Repository **variables** (Settings → Secrets and variables → Actions →
 Variables). None are sensitive; all are visible in logs.
 
-Most of them reach a runner through the callers' `build-env` input — a flat JSON
-object of non-secret environment published to `$GITHUB_ENV` before the prebuild,
-the lanes and the consumer scripts run. It is the only channel for arbitrary
+Most of them reach a runner through the callers' `environment-variables` input
+— a flat JSON object of non-secret environment published to `$GITHUB_ENV`
+before the prebuild, the lanes and the consumer scripts run. It is the only channel for arbitrary
 environment in this workflow family, and it **refuses** a key that reads as a
 credential (anything ending in `_KEY`, `_TOKEN`, `_PASSWORD`, `_PASSPHRASE`,
 `_SECRET`, `_CREDENTIAL(S)`): a workflow input is unmasked and readable by
 anyone who can see the run. Credentials go in `secrets:` instead.
 
-Four channels, and which one a value takes is decided by what the value *is*,
+Four paths, and which one a value takes is decided by what the value *is*,
 not by where it is needed:
 
 ```mermaid
 flowchart LR
-  var["repository or<br/>environment variable"] -->|"build-env input"| bev["build-env.sh"]
-  var -->|"env-json input"| ejs["env-json.sh"]
+  var["repository or<br/>environment variable"] -->|"environment-variables input,<br/>build and prepare workflows"| bev["build-env.sh"]
+  var -->|"environment-variables input,<br/>publish-store.yml"| ejs["env-json.sh"]
   sec["repository or<br/>environment secret"] -->|"secrets: on the<br/>reusable workflow"| dec["decode-secrets.sh"]
   sec -->|"secrets: on the<br/>reusable workflow"| step["the lane step's env"]
 
@@ -655,12 +663,14 @@ flowchart LR
   lane -->|"otherwise"| api["the store API"]
 ```
 
-Both input channels are unmasked workflow inputs, printed in the run, and both
-go through the same `scripts/lib/env-validate.mjs`: a key that reads like a
-credential (`*_KEY`, `*_TOKEN`, `*_PASSWORD`, `*_PASSPHRASE`, `*_SECRET`,
-`*_CREDENTIAL(S)`) is refused outright rather than published. `env-json`
-additionally allows lower-case keys, because fastlane's own option names are
-lower-case; that is the only difference between the two. A base64 secret
+The input has one name everywhere, but two shared scripts publish it. Both
+paths are unmasked workflow inputs, printed in the run, and both go through the
+same `scripts/lib/env-validate.mjs`: a key that reads like a credential
+(`*_KEY`, `*_TOKEN`, `*_PASSWORD`, `*_PASSPHRASE`, `*_SECRET`,
+`*_CREDENTIAL(S)`) is refused outright rather than published. On
+`publish-store.yml` the input additionally allows lower-case keys, because
+fastlane's own option names are lower-case; that is the only difference between
+the two. A base64 secret
 (`ASC_KEY_P8_BASE64`, `ANDROID_UPLOAD_KEYSTORE_BASE64`) and the raw
 `PLAY_SERVICE_ACCOUNT_JSON` are materialised as `600` files whose paths are
 published, while everything else simply lands in the lane step's environment.
@@ -679,39 +689,39 @@ lane still walks end to end
 | `IOS_SIGNING_ENABLED` | repo variable; `build-ios` in `cd-internal` | `true` signs and exports an `.ipa`.<br>Unset archives unsigned, which needs no Apple account |
 | `ANDROID_SIGNING_ENABLED` | repo variable; `build-android` in `cd-internal` | `true` signs with the upload keystore.<br>Unset falls back to the debug keystore, which needs no Play account |
 | `STORE_UPLOADS_ENABLED` | repo variable; every store job in all three release workflows | `true` turns on TestFlight and Play uploads.<br>Unset means off, and the store credentials below<br>are only needed once it is on — see<br>[Before you have store accounts](#before-you-have-store-accounts) |
-| `HUAWEI_UPLOADS_ENABLED` | repo variable; every Huawei job in all three release<br>workflows and the three Huawei lanes via `env-json` | `true` turns on the Huawei AppGallery upload,<br>on top of `STORE_UPLOADS_ENABLED`. Unset means off<br>and no Huawei job runs — see [Huawei AppGallery](#huawei-appgallery) |
-| `SECURITY_ENABLED` | repo variable; the `security` job in `ci.yml` and `cd-production.yml` | `false` turns the security scanners off for the repository.<br>Unset means on; which scanners run is `security-policy.json`'s decision ([security.md](security.md)) |
-| `SECURITY_LLM_PROVIDER`, `SECURITY_LLM_MODEL`,<br>`SECURITY_LLM_EFFORT`, `SECURITY_LLM_EXTRA_PARAMS` | repo variables; `ci.yml`'s `security` job via `build-env` | The provider, model and effort of the two LLM scanners, which are off in `security-policy.json` until you turn them on.<br>`OPENAI_BASE_URL` is shared with the store notes |
-| `HUAWEI_APP_ID` | every Huawei job in all three release workflows,<br>via `env-json` | The numeric app id under the AppGallery Connect<br>app record's information page. An identifier, not a<br>credential, so it is a variable and appears in the log |
-| `HUAWEI_SUBMIT_DELAY_SECONDS` | the three Huawei lanes via `env-json` | Optional. Whole seconds to wait between the upload<br>and the submit; default `60`. Raise it if AppGallery<br>refuses the submit because the bundle is still compiling |
-| `HUAWEI_FEEDBACK_EMAIL` | `android upload_huawei_internal` and<br>`android promote_huawei_beta` via `env-json` | Optional. The address AppGallery shows testers for<br>feedback; omitted from the submit when unset. It is an<br>unmasked workflow input, acceptable because AppGallery<br>publishes it to testers anyway — move it to `secrets:`<br>on the two jobs if you would rather it stayed out of logs |
-| `HUAWEI_TEST_DAYS` | `android upload_huawei_internal` and<br>`android promote_huawei_beta` via `env-json` | Optional. Length of the test window in days; default<br>`80`. AppGallery refuses more than 90, so the lane caps<br>it at `89` and says so |
+| `HUAWEI_UPLOADS_ENABLED` | repo variable; every Huawei job in all three release<br>workflows and the three Huawei lanes via `environment-variables` | `true` turns on the Huawei AppGallery upload,<br>on top of `STORE_UPLOADS_ENABLED`. Unset means off<br>and no Huawei job runs — see [Huawei AppGallery](#huawei-appgallery) |
+| `SECURITY_ENABLED` | repo variable; the `security` job in `ci.yml` and `cd-production.yml` | `false` turns the security scanners off for the repository.<br>Unset means on; which scanners run is `security-settings.json`'s decision ([security.md](security.md)) |
+| `SECURITY_LLM_PROVIDER`, `SECURITY_LLM_MODEL`,<br>`SECURITY_LLM_EFFORT`, `SECURITY_LLM_EXTRA_PARAMS` | repo variables; `ci.yml`'s `security` job via `environment-variables` | The provider, model and effort of the two LLM scanners, which are off in `security-settings.json` until you turn them on.<br>`OPENAI_BASE_URL` is shared with the store notes |
+| `HUAWEI_APP_ID` | every Huawei job in all three release workflows,<br>via `environment-variables` | The numeric app id under the AppGallery Connect<br>app record's information page. An identifier, not a<br>credential, so it is a variable and appears in the log |
+| `HUAWEI_SUBMIT_DELAY_SECONDS` | the three Huawei lanes via `environment-variables` | Optional. Whole seconds to wait between the upload<br>and the submit; default `60`. Raise it if AppGallery<br>refuses the submit because the bundle is still compiling |
+| `HUAWEI_FEEDBACK_EMAIL` | `android upload_huawei_internal` and<br>`android promote_huawei_beta` via `environment-variables` | Optional. The address AppGallery shows testers for<br>feedback; omitted from the submit when unset. It is an<br>unmasked workflow input, acceptable because AppGallery<br>publishes it to testers anyway — move it to `secrets:`<br>on the two jobs if you would rather it stayed out of logs |
+| `HUAWEI_TEST_DAYS` | `android upload_huawei_internal` and<br>`android promote_huawei_beta` via `environment-variables` | Optional. Length of the test window in days; default<br>`80`. AppGallery refuses more than 90, so the lane caps<br>it at `89` and says so |
 | `STORE_METADATA_SYNC_ENABLED` | repo variable; both jobs in `cd-store-listing.yml`<br>and the `sync_metadata` lanes | `true` lets a lane write the public store page.<br>Unset means off and the lane refuses |
-| `IOS_METADATA_EDIT_LIVE` | `ios sync_metadata` via `env-json` | `true` edits the live version's editable subset<br>when no version is in preparation.<br>`pull_metadata` ignores it: `deliver`'s<br>download always takes the latest version |
-| `PLAY_METADATA_TRACK` | `android sync_metadata` / `pull_metadata` via `env-json` | Track whose release the listing edit rides on;<br>default first of `production`, `beta`, `internal`<br>with one |
+| `IOS_METADATA_EDIT_LIVE` | `ios sync_metadata` via `environment-variables` | `true` edits the live version's editable subset<br>when no version is in preparation.<br>`pull_metadata` ignores it: `deliver`'s<br>download always takes the latest version |
+| `PLAY_METADATA_TRACK` | `android sync_metadata` / `pull_metadata` via `environment-variables` | Track whose release the listing edit rides on;<br>default first of `production`, `beta`, `internal`<br>with one |
 | `BUILD_NUMBER_OFFSET` | every `build-prepare` call | Integer, default `1000`. Raise only |
 | `WORKFLOWS_MACOS_RUNNER` | iOS build + iOS internal upload | Runner label, default `macos-26` |
 | `TESTFLIGHT_INTERNAL_GROUP` | `cd-internal` iOS upload | Group name in App Store Connect → TestFlight |
 | `TESTFLIGHT_EXTERNAL_GROUP` | `cd-beta` iOS promote | External group name; must already exist and be approved |
 | `PLAY_UPDATE_PRIORITY` | Android upload / production | `0`–`5`, Play in-app update priority |
-| `ANDROID_UPLOAD_CERT_SHA256` | `verify-android.sh`, read from the environment (via `build-env`); `--cert-sha256` is the manual override | `keytool -list -v -keystore upload.keystore`, the SHA-256 line.<br>**Leave it unset and the signature check reports `skip`** —<br>the gate that exists to catch a wrong signing identity stops checking |
-| `OTA_ENABLED` | `app.config.ts` at build time (via `build-env`) and the `if:` on every `ota-*` job | `true` to turn OTA on; see [ota.md](ota.md) |
-| `EXPO_UPDATES_URL` | `app.config.ts` at build time (via `build-env`) and the OTA manifest smoke check | Public origin of the update server |
+| `ANDROID_UPLOAD_CERT_SHA256` | `verify-android.sh`, read from the environment (via `environment-variables`); `--cert-sha256` is the manual override | `keytool -list -v -keystore upload.keystore`, the SHA-256 line.<br>**Leave it unset and the signature check reports `skip`** —<br>the gate that exists to catch a wrong signing identity stops checking |
+| `OTA_ENABLED` | `app.config.ts` at build time (via `environment-variables`) and the `if:` on every `ota-*` job | `true` to turn OTA on; see [ota.md](ota.md) |
+| `EXPO_UPDATES_URL` | `app.config.ts` at build time (via `environment-variables`) and the OTA manifest smoke check | Public origin of the update server |
 | `OTA_CLI_VERSION` | `publish-ota` | Exact `eoas` version; the publish script refuses to run unpinned |
-| `STORE_NOTES_INCLUDE_CHANGELOG` | `notes.mjs` in internal's `build-prepare` and in `Release notes` (via `build-env`) | `true` appends the changelog where notes are generated |
-| `RELEASE_NOTES_LLM_PROVIDER` | `notes.mjs` in `Release notes` (via `build-env`) | `anthropic` or `openai`; anything else disables the optional LLM pass |
-| `RELEASE_NOTES_LLM_MODEL` | `notes.mjs` in `Release notes` (via `build-env`) | Model override for that provider |
-| `RELEASE_NOTES_LLM_EFFORT` | `notes.mjs` in `Release notes` (via `build-env`) | Reasoning effort, `max` when unset, `none` for a model with no reasoning switch.<br>The same adapter as the security reviewer (`scripts/lib/llm/`) |
-| `RELEASE_NOTES_LLM_EXTRA_PARAMS` | `notes.mjs` in `Release notes` (via `build-env`) | JSON object merged into the request; a `null` value removes that field |
-| `OPENAI_BASE_URL` | `notes.mjs` in `Release notes` (via `build-env`) | OpenAI-compatible endpoint |
-| `EXPO_PUBLIC_API_URL` | the bundle, through `src/config/env.ts` (via `build-env`) | **Required for a CI build**: `env.ts` validates it as a URL and the app fails to start without it |
+| `STORE_NOTES_INCLUDE_CHANGELOG` | `gen-store-notes` in internal's `build-prepare` and in `Store notes`<br>(via `environment-variables`) | `true` appends the changelog where notes are generated |
+| `STORE_NOTES_LLM_PROVIDER` | `gen-store-notes` in `Store notes` (via `environment-variables`) | `anthropic` or `openai`; anything else disables the optional LLM pass |
+| `STORE_NOTES_LLM_MODEL` | `gen-store-notes` in `Store notes` (via `environment-variables`) | Model override for that provider |
+| `STORE_NOTES_LLM_EFFORT` | `gen-store-notes` in `Store notes` (via `environment-variables`) | Reasoning effort, `max` when unset, `none` for a model with no reasoning switch.<br>The same adapter as the security reviewer (`@blinkbitcoin/app-tooling/llm`) |
+| `STORE_NOTES_LLM_EXTRA_PARAMS` | `gen-store-notes` in `Store notes` (via `environment-variables`) | JSON object merged into the request; a `null` value removes that field |
+| `OPENAI_BASE_URL` | `gen-store-notes` in `Store notes` (via `environment-variables`) | OpenAI-compatible endpoint |
+| `EXPO_PUBLIC_API_URL` | the bundle, through `src/config/env.ts` (via `environment-variables`) | **Required for a CI build**: `env.ts` validates it as a URL and the app fails to start without it |
 | `EXPO_PUBLIC_APP_NAME` | same | **Required for a CI build** (non-empty string) |
 | `EXPO_PUBLIC_WEB_DOMAIN` | same, plus `app.config.ts` universal links | Your web domain; empty disables the associated-domain / intent-filter entries |
 | `EXPO_PUBLIC_ALLOW_INSECURE_WEB_STORAGE` | same | `true`/`false`; the callers substitute `false` when the variable is unset, because `env.ts` rejects an empty string |
 | `E2E_IOS` | `ci.yml` | `true` runs iOS E2E on every push to `main`; a PR runs it only with the `e2e:ios` label.<br>Free on a public repo, 10x the Linux rate on a private one |
 
 `APP_VARIANT` is not a repo variable: the callers hard-code
-`"APP_VARIANT":"production"` in `build-env` for every release job. Without it
+`"APP_VARIANT":"production"` in `environment-variables` for every release job. Without it
 `app.config.ts` falls back to `development` and appends `.dev` to the bundle id
 and package name, which would then disagree with the `IOS_BUNDLE_ID` /
 `ANDROID_PACKAGE` the lanes assert.
@@ -740,7 +750,7 @@ you want a reviewer between a token and production.
 | `HUAWEI_CLIENT_ID` | every Huawei lane job: internal, beta and release | AppGallery Connect → Users and permissions → API key → Connect API → Create; the client id half of the pair |
 | `HUAWEI_CLIENT_SECRET` | same three jobs | Same page, the client secret half. It is shown exactly once |
 | `OTA_PUBLISH_TOKEN` | every `ota-*` job | One of the update server's `EOO_TOKENS`; scope per environment |
-| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | `Release notes` in `cd-release.yml` (`notes.mjs`), and the `Review` and `OpenAnt` steps of `ci.yml`'s `security` job | Only needed when `RELEASE_NOTES_LLM_PROVIDER` or `SECURITY_LLM_PROVIDER` selects that provider.<br>The notes fall back to deterministic prose without them, and the two scanners report skipped |
+| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | `Store notes` in `cd-release.yml` (`gen-store-notes`),<br>and the `Review` and `Review codebase` jobs of `ci.yml`'s `security` job | Only needed when `STORE_NOTES_LLM_PROVIDER` or `SECURITY_LLM_PROVIDER` selects that provider.<br>The notes fall back to deterministic prose without them, and the two scanners report skipped |
 | `APP_REVIEW_EMAIL`, `APP_REVIEW_FIRST_NAME`, `APP_REVIEW_LAST_NAME`, `APP_REVIEW_PHONE` | iOS `promote_beta` and `release_production` lanes | The contact Apple reaches for review questions |
 | `APP_REVIEW_DEMO_USER`, `APP_REVIEW_DEMO_PASSWORD` | same | A working login for the reviewer; omit both if the app needs no account |
 | `APP_REVIEW_NOTES` | same | Free-text notes for the reviewer |
@@ -749,7 +759,7 @@ you want a reviewer between a token and production.
 the secrets above too, reporting the same three statuses per name without
 ever printing a value.
 
-The seven `APP_REVIEW_*` values are **secrets, not `build-env` or `env-json`
+The seven `APP_REVIEW_*` values are **secrets, not `environment-variables`
 values**: a reviewer demo login is a real credential and both of those inputs are
 printed to the log. The lanes omit the whole argument when none of them is set —
 `pilot` PATCHes every key it is given, so blanks would erase the contact already
@@ -887,7 +897,7 @@ own locale inside a forked subshell, which calls into CoreFoundation where that
 is not fork-safe, and now and then the subshell dies with SIGSEGV:
 `FAIL dev-server: could not scan the bundle: grep failed with status 139`,
 intermittently, on a bundle that was fine. `check-shell-locale` (from
-`@blinkbitcoin/dev-config`, run by `make check-ci`) keeps the prefix out of
+`@blinkbitcoin/app-tooling`, run by `make check-ci`) keeps the prefix out of
 every tracked shell file.
 
 **`--strict`** turns a skip caused by a *missing tool* into a `FAIL`, so a gate
@@ -934,9 +944,9 @@ records `artifacts.aabSha256` and `artifacts.apkSha256` (the AAB it produced and
 the universal APK extracted from that same bundle) into a **copy** of
 build-info.json written to `$WORKFLOWS_OUTPUT_DIR/build-info.json`, next to the
 artifacts. That copy is the gate's default source; `BUILD_INFO_FILE` overrides
-it. CI currently sets `BUILD_INFO_FILE` to the `release-meta` copy, which the
-build lane does not touch, so the check reports `skip` in the build job until
-the workflows repo points it at the output directory.
+it. CI's verify step points `BUILD_INFO_FILE` at that output-directory copy,
+not at the `build-info` artifact's, which the build lane does not touch, so the
+check runs in the build job.
 
 Both gates check every `EXPO_PUBLIC_*` name in `.env.example`: Expo inlines the
 *values*, so for each name that is set and non-empty in the environment at
@@ -980,7 +990,7 @@ Two things only ever **warn**:
 
 `make check-release` runs the same lane checks CI runs (Ruby syntax, a fastlane
 lane parse, the lane unit tests) and is wired to `pnpm check:release`, which
-`ci.yml` turns on via `release-checks: true`. It needs the Ruby gems, which
+`ci.yml` turns on via the `checks` call's `release: true`. It needs the Ruby gems, which
 `make install` installs into `vendor/bundle`.
 
 **bundletool.** The `android build` lane derives the universal APK from the
@@ -1010,13 +1020,13 @@ PR. Give the lanes the two files a real run would have:
 ```bash
 # a build-info.json for the commit under test, written to /tmp/build-info.json
 APP_VERSION=1.2.3 APP_BUILD_NUMBER=1054 WORKFLOWS_RELEASE_META_DIR=/tmp \
-  bash node_modules/@blinkbitcoin/dev-config/release/build-info.sh --standalone
+  bash node_modules/@blinkbitcoin/app-tooling/release/build-info.sh --standalone
 # store notes for the same range
-node scripts/release/notes.mjs --from-commits --out /tmp/notes
+pnpm exec gen-store-notes --from-commits --out /tmp/notes
 
 export DRY_RUN=1 APP_VERSION=1.2.3 APP_BUILD_NUMBER=1054
 export BUILD_INFO_FILE=/tmp/build-info.json
-export RELEASE_NOTES_STORE_FILE=/tmp/notes/notes-store.txt
+export STORE_NOTES_FILE=/tmp/notes/store-notes.txt
 export STORE_NOTES_JSON=/tmp/notes/store-notes.json
 export IOS_BUNDLE_ID=... IOS_SCHEME=... ANDROID_PACKAGE=...
 export TESTFLIGHT_EXTERNAL_GROUP=... PLAY_SERVICE_ACCOUNT_JSON='{"type":"service_account"}'
@@ -1047,7 +1057,7 @@ takes the upload path — the "already has a version under review, skipping the
 upload" message can only be seen against a real app record.
 
 One thing to expect. Under `DRY_RUN=1` the lanes do **not** write into
-`fastlane/metadata/`: the release notes and `changelogs/<versionCode>.txt` a real
+`fastlane/metadata/`: the store notes and `changelogs/<versionCode>.txt` a real
 run would produce are logged as `[dry-run] would write <path>` instead, so a
 rehearsal leaves the working tree exactly as it found it. And both
 `release_production` lanes

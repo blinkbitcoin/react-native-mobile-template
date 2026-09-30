@@ -15,7 +15,7 @@
     "mocks/**/*.ts",
     "scripts/**/*.mjs"
   ],
-  "ignoreDependencies": ["ts-node", "expo-system-ui"],
+  "ignoreDependencies": ["ts-node", "expo-system-ui", "expo-doctor"],
   "ignoreBinaries": ["typos", "make", "mise", "shasum"],
   "jest": {
     "config": "jest.config.ts"
