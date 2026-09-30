@@ -69,10 +69,10 @@ one without a sibling. In scope: `scripts/**/*.mjs`, `src/**/*.ts(x)`,
 `plugins/*.ts` and `modules/*/index.ts`. Out of scope: test files, `*.d.ts`,
 `src/graphql/generated/`, `src/i18n/locales/` and `src/test/` (the harness,
 which has its own tests anyway). The same test fails on a test file under
-`src/app/` and on a route test whose route was renamed or deleted. A file that
-truly has nothing to assert goes in its `ALLOWLIST` with a one-line reason,
-the same bar as `coveragePathIgnorePatterns`; an entry whose file gains a
-test, or disappears, fails until it is removed. That the one file covers its
+`src/app/` and on a route test whose route was renamed or deleted. There is no
+allowlist and no exception: a file that needs a device, a simulator, a native
+build or the network is tested against fakes of them, and the check fails if
+an allowlist comes back. That the one file covers its
 module at 100% is not measured per file by CI, so review holds it, with the
 commands above.
 
@@ -108,8 +108,6 @@ would otherwise have that code measured too. The suites include:
 | --- | --- |
 | `scripts/doctor.test.mjs` | The toolchain check |
 | `scripts/check-licenses.test.mjs` | The SPDX allowlist logic |
-| `scripts/check-lockfile.test.mjs` | Lockfile provenance: only registry resolution shapes pass, plus the shared tooling package at the workflows pin |
-| `scripts/tooling-pin.test.mjs` | The shared tooling package's pin: the one workflows commit, and `make fix-tooling-pin` |
 | `scripts/init.test.mjs` | The template rename and web-removal script behind `make init` |
 | `scripts/hooks/install-if-lockfile-changed.test.mjs` | The post-merge / post-checkout lockfile-install hook |
 | `scripts/release/notes.test.mjs` | Store notes from a release body or from commits |
@@ -118,7 +116,6 @@ would otherwise have that code measured too. The suites include:
 | `scripts/test-siblings.test.mjs` | That every source file has its own sibling test, and that no route test sits under `src/app/`<br>(see [One test file per module](#one-test-file-per-module)) |
 | `scripts/worktree-ignores.test.mjs` | That every tool which walks the tree skips `.claude/worktrees/`, anchored to the root<br>(see [quality.md](quality.md#worktrees-inside-the-checkout-are-not-this-checkout)) |
 | `scripts/coverage-completeness.test.mjs` | Loads every `scripts/**/*.mjs` module, so one no test imports still counts |
-| `scripts/workflow-contract.test.mjs` | Every shared-workflows call pinned to the same commit SHA with its version beside it, the shared tooling package<br>at that commit, and every call's inputs, secrets and read outputs against what the called workflow declares<br>at `$WORKFLOWS_DIR`, which must be that commit |
 | `scripts/ci-suite-gates.test.mjs` | `ci.yml`'s `unit`, `e2e` and `badges` jobs evaluated together for each kind of change, and `unit` held to having<br>no gate (see [ci.md](ci.md#skipping-a-suite-the-change-cannot-affect)) |
 | `scripts/release/cd-notes.test.mjs` | The store notes the way CD drafts them: cd-release's build-env through the shared `build-env.sh`, `pr-notes.sh` on<br>a real release PR body with a `gh` shim and a local model, then the shared `notes.sh` reading the section back |
 | `scripts/security/config.test.mjs` | Settings resolution: environment, then `security-policy.json`, then defaults |

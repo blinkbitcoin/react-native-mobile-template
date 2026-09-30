@@ -18,9 +18,12 @@ Install the package from shared-workflows itself, at the commit the workflows
 pin, so one commit covers both and no registry or token is involved:
 
 - `package.json` — `github:blinkbitcoin/shared-workflows#<pin>&path:/packages/dev-config`.
-- `scripts/check-lockfile.sh` — allows that one git source, at that commit, and nothing else.
-- `scripts/tooling-pin.mjs` — `make fix-tooling-pin` repoints the package at the pin and relocks.
-- `scripts/workflow-contract.test.mjs` — fails while the package and the pin disagree.
+- `check-lockfile` (from the package, run by `pnpm deps:audit`) — allows that one git source, at that commit, and nothing else.
+- `fix-tooling-pin` (from the package, `make fix-tooling-pin`) — repoints every package of the family at the pin and relocks.
+- `check-consumer-contract`'s `pin.one-commit` row (`make check-contract`, CI's Checks / Contract) — fails while the package and the pin disagree.
+
+These three were the template's own `scripts/check-lockfile.sh`, `scripts/tooling-pin.mjs` and
+`scripts/workflow-contract.test.mjs` until shared-workflows v0.18.0 shipped them.
 - `.github/dependabot.yml` — npm updates leave the package alone.
 - `Makefile` — `make check-contract` runs the checker from the package.
 

@@ -155,9 +155,9 @@ fix-lint: ## Apply Biome's and ESLint's own fixes (writes)
 
 # Dependabot moves the workflow pins and cannot move the shared tooling package,
 # a git dependency at the same commit, so its pin-bump PR stays red until this
-# runs on it (scripts/workflow-contract.test.mjs names this target).
+# runs on it (the contract check's pin.one-commit row blocks until then).
 fix-tooling-pin: ## Point the shared tooling package at the commit the workflows pin, and relock (writes)
-	node scripts/tooling-pin.mjs
+	pnpm exec fix-tooling-pin
 
 check-format: ## Check formatting without writing
 	pnpm format:check
@@ -188,10 +188,10 @@ check-deps: ## SDK drift, vulnerability audit, lockfile provenance, licenses
 # because zizmor otherwise looks for it at the nearest directory holding a
 # `.git` directory, and a worktree's `.git` is a file: under .claude/worktrees/
 # it would read the outer checkout's policy instead of this one's.
-check-ci: ## Lint the CI itself: actionlint + zizmor + workflow names (workflows), shellcheck + locale prefixes (shell code)
-	bash scripts/shellcheck.sh
+check-ci: ## Lint the CI itself: actionlint + zizmor + shellcheck (the shared lint-ci.sh), locale prefixes, workflow names
+	WORKFLOWS_SHELLCHECK_PATHS="scripts .claude/skills" bash node_modules/@blinkbitcoin/dev-config/ci/lint-ci.sh
 	pnpm exec check-shell-locale
-	@if [ -d .github/workflows ]; then actionlint && zizmor --offline --min-severity medium --config .github/zizmor.yml .github && pnpm exec check-workflow-names --group ci=CI --group cd=CD; else echo "no workflows yet"; fi
+	pnpm exec check-workflow-names --group ci=CI --group cd=CD
 
 check-docs: ## Docs freshness, AGENTS.md command table, make target names, table widths, mermaid blocks
 	bash scripts/check-docs.sh
@@ -212,7 +212,7 @@ check-skills: ## Only the skill tests (offline, fakes only; needs bundle install
 # History, not the working tree: a key committed and deleted later is still in
 # the repository. Allowlisted test data, each entry with its reason: .gitleaks.toml.
 check-secrets: ## Scan the whole git history for committed secrets (gitleaks)
-	gitleaks git --redact --no-banner .
+	bash node_modules/@blinkbitcoin/dev-config/checks/secrets.sh
 
 # Not in `make check` or `make ci`: external CLIs and minutes, the same reason
 # `check-code-scanning` is out. This is the deliberate deeper pass; the pre-push gate

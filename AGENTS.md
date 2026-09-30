@@ -79,7 +79,7 @@ aggregates.
 |---|---|
 | `make fix-format` | Format everything with Biome (writes) |
 | `make fix-lint` | Apply Biome's and ESLint's own fixes (writes) |
-| `make fix-tooling-pin` | Point the shared tooling package at the commit the workflows pin, and relock (writes) |
+| `make fix-tooling-pin` | Point the shared tooling packages at the commit the workflows pin, and relock (writes) |
 
 | Gates | |
 |---|---|
@@ -94,12 +94,12 @@ aggregates.
 | `make check-spell` | Spell-check with typos |
 | `make check-gen` | Generated-file drift (i18n, codegen) |
 | `make check-deps` | SDK drift, audit, lockfile provenance, licenses |
-| `make check-ci` | actionlint + zizmor + workflow names (workflows), shellcheck + locale prefixes (shell code) |
+| `make check-ci` | Shared CI lint (actionlint, zizmor, shellcheck) + workflow names + shell locale prefixes |
 | `make check-docs` | Docs freshness, this file's command table vs the Makefile, make target names, table widths,<br>mermaid blocks |
 | `make check-skills` | Only the offline skill tests under `.claude/skills/` (part of `make check-release`, which CI runs) |
 | `make check-prebuild` | Prebuild both platforms in a temp dir, assert plugin output |
 | `make check-release` | Ruby syntax + fastlane lane parse + lane unit tests + skill tests |
-| `make check-secrets` | gitleaks over the whole git history; allowlisted test data in `.gitleaks.toml` |
+| `make check-secrets` | gitleaks over the whole git history (the shared script); allowlisted test data in `.gitleaks.toml` |
 | `make check-security` | Every enabled security scanner, then the verdict (see `docs/security.md`) |
 | `make check-security-deps` | Known vulnerabilities and malicious packages in the lockfile (osv-scanner) |
 | `make check-security-code` | Semgrep over app source: TypeScript, secrets, OWASP packs plus `rules/` |
@@ -250,8 +250,16 @@ aggregates.
   `src/__tests__/app/details/[id].test.tsx`). Scope: `scripts/**/*.mjs`,
   `src/**/*.ts(x)`, `plugins/*.ts` and `modules/*/index.ts`, less generated
   code, `*.d.ts` and `src/test/`. `scripts/test-siblings.test.mjs` fails
-  naming every file without one; an exception is an entry in its allowlist
-  with a one-line reason, the same bar as `coveragePathIgnorePatterns`.
+  naming every file without one. **No exceptions, no allowlist**: a module
+  that needs a device, a simulator, a native build or the network is tested
+  against fakes of them, and the check fails if an allowlist comes back. A
+  shell script is held to the same rule, with its test named after it
+  (`foo.sh` → `foo.test.mjs`, running the script against fake tools on
+  `PATH`). The family's rule and its fake-tool pattern are written once in
+  [shared-workflows' AGENTS.md](https://github.com/blinkbitcoin/shared-workflows/blob/main/AGENTS.md),
+  whose check enforces it for every shell script the template hands over;
+  `scripts/test-siblings.test.mjs` does not check this repository's own shell
+  scripts yet.
 - **Docs and diagrams ship in the same PR as the change, never as a
   follow-up.** Any change to a name, input, output, job, file, flow, count or
   default updates every doc that describes it, in the same PR: prose, tables,
@@ -281,7 +289,7 @@ aggregates.
 | Machine setup (`make setup`), bash against fake tools | `scripts/setup/setup.test.mjs` | `make test-scripts` |
 | The native-setup skill's commands and paths | `.claude/skills/native-setup/tests/` | `make check-skills` |
 | Fastlane lanes | `fastlane/test/` | `make check-release` |
-| CD against the pinned shared workflows: every call's contract, the store-notes chain | `scripts/workflow-contract.test.mjs`,<br>`scripts/release/cd-notes.test.mjs` | `make test-scripts` (CI always; locally with `WORKFLOWS_DIR`) |
+| CD against the pinned shared workflows: every call's contract, the store-notes chain | `make check-contract` (the shared contract check),<br>`scripts/release/cd-notes.test.mjs` | CI's Checks / Contract; `make test-scripts` (CI always; locally with `WORKFLOWS_DIR`) |
 | Native e2e | `.maestro/flows/` | `make test-e2e-ios`, `make test-e2e-android` |
 | Web e2e | `e2e/web/` | `make test-e2e-web` |
 
