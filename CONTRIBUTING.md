@@ -73,7 +73,7 @@ need `make check-prebuild`. Release-facing changes (`fastlane/`,
 `scripts/release/`, workflow pins) need `make check-release`.
 
 Git hooks run a fast subset for you — Biome, ESLint, typos and gitleaks on staged files at
-commit time; typecheck, knip and changed-file tests at push time. They are a
+commit time; the type check, the unused-code check and changed-file tests at push time. They are a
 safety net, not a substitute for `make check`. Escape hatches exist
 (`git commit --no-verify`, `LEFTHOOK=0 git push`) for genuinely broken tooling;
 CI still runs the full gate.

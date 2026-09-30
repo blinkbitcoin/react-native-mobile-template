@@ -29,7 +29,7 @@ place, so the template's adoption script can strip it completely in one pass.
 ## Consequences
 
 A mobile-only app declines web once, at adoption, and never sees Playwright or
-`react-native-web` again; `make check`, `make test-unit` and `pnpm knip` must stay
+`react-native-web` again; `make check`, `make test-unit` and `make check-unused` must stay
 green after the strip. The cost: a new web-only file has to join the list.
 
 ## Alternatives

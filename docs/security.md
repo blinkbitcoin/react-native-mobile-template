@@ -17,12 +17,12 @@ request, the built binaries only once a release is built.
 
 | Job | Make target | Reads | Runs in CI |
 | --- | --- | --- | --- |
-| `deps` | `check-security-deps` | `pnpm-lock.yaml` (osv-scanner) | every pull request, every push to `main` |
+| `dependencies` | `check-security-dependencies` | `pnpm-lock.yaml` (osv-scanner) | every pull request, every push to `main` |
 | `code` | `check-security-code` | app source, `rules/` (Semgrep CE) | every pull request, every push to `main` |
 | `policy` | `check-security-policy` | `pnpm-workspace.yaml` | every pull request, every push to `main` |
 | `review` | `check-security-review` | the diff (an LLM, off by default) | pull requests; the release pull request reviews everything since the last release tag |
 | `bundle` | `check-security-bundle` | the exported JavaScript bundle | the release pull request, and the production dispatch |
-| `openant` | `check-security-review-codebase` | the codebase (knostic/OpenAnt, an LLM, off by default) | the release pull request |
+| `review-codebase` | `check-security-review-codebase` | the codebase (knostic/OpenAnt, an LLM, off by default) | the release pull request |
 | `mobile` | `check-security-mobile` | a fresh prebuild of `android/` and `ios/` (mobsfscan) | the production dispatch |
 | `binaries` | `check-security-binaries` | the release's `.apk` and `.ipa` (OWASP MASTG checks) | the production dispatch, before any store job |
 | `sbom` | `check-security-sbom` | `pnpm-lock.yaml`; writes `.security/sbom.cdx.json` | the production dispatch |
@@ -116,18 +116,18 @@ last `make check-security`.
   known severity, or the whole answer is dropped. Generated files and the
   lockfile are left out; files beyond `review.maxDiffBytes` are named as
   unreviewed rather than silently cut.
-- **`openant`** runs [OpenAnt](https://github.com/knostic/OpenAnt), pinned by
-  commit in `scripts/security/openant.sh`, with dynamic (Docker) testing off.
+- **`review-codebase`** runs [OpenAnt](https://github.com/knostic/OpenAnt), pinned by
+  commit in `scripts/security/review-codebase.sh`, with dynamic (Docker) testing off.
   CI builds it from that commit; on a laptop, build it yourself and put
   `openant` on `PATH`.
 
 ## Turning the LLM jobs on
 
 Both LLM jobs use one provider, set in the `llm` block of
-`security-policy.json` or through its environment twins, and both are off
+`security-settings.json` or through its environment twins, and both are off
 until a repository turns them on:
 
-1. `"review": { "enabled": true }` and/or `"openant": { "enabled": true }`
+1. `"review": { "enabled": true }` and/or `"review-codebase": { "enabled": true }`
    under `jobs`.
 2. `llm.provider`: `openai` for OpenAI or any OpenAI-compatible endpoint
    (OpenRouter, Gemini, Groq, Mistral, DeepSeek, Kimi, Qwen, GitHub Models -
@@ -138,7 +138,7 @@ until a repository turns them on:
 
 In CI, step 2 is the repository variables `SECURITY_LLM_PROVIDER`,
 `SECURITY_LLM_MODEL`, `SECURITY_LLM_EFFORT`, `SECURITY_LLM_EXTRA_PARAMS` and
-`OPENAI_BASE_URL`, which `ci.yml` passes through `build-env`, and step 3 is a
+`OPENAI_BASE_URL`, which `ci.yml` passes through `environment-variables`, and step 3 is a
 repository secret. The production dispatch carries none of them: model calls
 stay out of the CD lanes, and the release pull request is where they run.
 
@@ -156,17 +156,18 @@ A missing provider, key, model or prompt makes the job write "skipped" with
 the reason, never "clean", and a model that does not answer, refuses, or
 answers with something that does not validate does the same: a model being
 down must never fail a pull request. The store-notes rewrite shares the same
-adapters (`scripts/lib/llm/`), with `RELEASE_NOTES_LLM_EFFORT` and
-`RELEASE_NOTES_LLM_EXTRA_PARAMS` as its own two settings.
+adapters (`@blinkbitcoin/app-tooling/llm`, which `scripts/security/review.mjs`
+imports), with `STORE_NOTES_LLM_EFFORT` and
+`STORE_NOTES_LLM_EXTRA_PARAMS` as its own two settings.
 
 ## Turning things off
 
 Three layers, resolved in one order: an environment variable wins over
-`security-policy.json`, which wins over the built-in default.
+`security-settings.json`, which wins over the built-in default.
 
 | To do this | Do it like this |
 | --- | --- |
-| Turn everything off for a repository | `SECURITY_ENABLED=false`, or `"enabled": false` in `security-policy.json` |
+| Turn everything off for a repository | `SECURITY_ENABLED=false`, or `"enabled": false` in `security-settings.json` |
 | Turn one scanner off | `SECURITY_CODE=false`, or `"jobs": { "code": { "enabled": false } }` |
 | Change what fails a run | `"severity": "critical"`, or `SECURITY_SEVERITY=critical` |
 | Give an engine class teeth | `"failOn": ["deterministic", "review"]` |
@@ -174,7 +175,7 @@ Three layers, resolved in one order: an environment variable wins over
 | Pick the LLM provider | `"llm": { "provider": "openai", "model": "kimi-k3" }`, or `SECURITY_LLM_PROVIDER` and `SECURITY_LLM_MODEL` |
 
 Every option has an environment twin named `SECURITY_<JOB>_<KEY>`, the key in
-upper snake case:
+upper snake case (`review-codebase` becomes `REVIEW_CODEBASE`):
 
 | Option | Type | Default | Environment twin |
 | --- | --- | --- | --- |
@@ -185,15 +186,15 @@ upper snake case:
 | `jobs.binaries.exportedComponents` | list | empty | `SECURITY_BINARIES_EXPORTED_COMPONENTS` |
 | `jobs.binaries.atsExceptionDomains` | list | empty | `SECURITY_BINARIES_ATS_EXCEPTION_DOMAINS` |
 | `jobs.review.maxDiffBytes` | whole number | `200000` | `SECURITY_REVIEW_MAX_DIFF_BYTES` |
-| `jobs.openant.limit` | whole number, `0` for none | `0` | `SECURITY_OPENANT_LIMIT` |
-| `jobs.openant.verify` | boolean | `false` | `SECURITY_OPENANT_VERIFY` |
+| `jobs.review-codebase.limit` | whole number, `0` for none | `0` | `SECURITY_REVIEW_CODEBASE_LIMIT` |
+| `jobs.review-codebase.verify` | boolean | `false` | `SECURITY_REVIEW_CODEBASE_VERIFY` |
 | `llm.provider` | `openai`, `anthropic` or empty | empty | `SECURITY_LLM_PROVIDER` |
 | `llm.model` | string | empty | `SECURITY_LLM_MODEL` |
 | `llm.effort` | `none`, `low`, `medium`, `high`, `max` | `max` | `SECURITY_LLM_EFFORT` |
 
 In the environment a list is comma-separated, and an **empty** option or
 `llm` twin counts as unset, so the file or the default applies: CI passes every
-twin through `build-env`, where a repository variable nobody set arrives as an
+twin through `environment-variables`, where a repository variable nobody set arrives as an
 empty string. To empty a list, set it to `[]` in the file. A value that does not parse -
 not `true` or `false`, not a whole number, a list entry outside its set, an
 effort or provider outside the vocabulary - fails the run rather than reading
@@ -251,9 +252,9 @@ goes for a partial run: `binaries` without `aapt2`, or a review whose diff
 outgrew `review.maxDiffBytes`, reports the part that did not run as skipped
 even when the rest found nothing.
 
-A job switched off in `security-policy.json` behaves differently in the two
+A job switched off in `security-settings.json` behaves differently in the two
 places. Locally, `make check-security` still runs its script, which writes
-"skipped: disabled", so with `review` and `openant` off by default the local
+"skipped: disabled", so with `review` and `review-codebase` off by default the local
 headline reads `skipped`. In CI the job is not started at all, so it is
 absent from the verdict and the headline can read `pass`.
 
@@ -263,7 +264,7 @@ Each scanner reads its own config, and every suppression carries a reason:
 `osv-scanner.toml` for advisories, `.semgrepignore` and `rules/` for source
 patterns, `.mobsf` for mobsfscan, `.gitleaks.toml` for secrets,
 `.github/zizmor.yml` for workflows, and the allowlists under `jobs.bundle` and
-`jobs.binaries` in `security-policy.json` for the bundle and binary checks.
+`jobs.binaries` in `security-settings.json` for the bundle and binary checks.
 Never raise the severity threshold to hide one finding - that hides the next
 one too.
 
@@ -302,10 +303,10 @@ change would require re-evaluating the decision.
 Unlike a Semgrep or gitleaks suppression, an osv-scanner ignore leaves no
 trace in run output: `osv-scanner` drops an `IgnoredVulns` match from its
 SARIF entirely rather than emitting it with a suppression marker, so
-`verdict.mjs` has nothing to count and `make check-security-deps` simply
-reports `deps: clean` - the summary line's suppressed count stays `0`
+`verdict.mjs` has nothing to count and `make check-security-dependencies` simply
+reports `dependencies: clean` - the summary line's suppressed count stays `0`
 regardless. `osv-scanner.toml` and this section are therefore the only
-places these two accepted risks are visible; do not read a clean `deps`
+places these two accepted risks are visible; do not read a clean `dependencies`
 run, on its own, as nothing being carried.
 
 ## Known limitations
@@ -363,7 +364,7 @@ assuming a new fixture file "just works".
 installed and `APK` pointing at the v0.6.2 release's universal APK, reports
 no finding at or above `high`, so nothing blocks:
 
-- `deps`, `policy`, `bundle`, `sbom`: clean (the bill lists 1,502 components;
+- `dependencies`, `policy`, `bundle`, `sbom`: clean (the bill lists 1,502 components;
   the four accepted advisories above are filtered out).
 - `code`: 11 Semgrep findings, the highest medium (mutable GitHub Actions
   tags, service-account strings in docs paths, the minimum-release-age policy

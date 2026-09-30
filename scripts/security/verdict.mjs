@@ -10,11 +10,11 @@
 // answer the pipeline will give.
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { load, SEVERITIES } from './config.mjs';
+import { load, SEVERITIES } from './settings.mjs';
 
 /** Which engine class each job belongs to. failOn names classes, not jobs. */
 export const ENGINE_OF = {
-  deps: 'deterministic',
+  dependencies: 'deterministic',
   code: 'deterministic',
   policy: 'deterministic',
   sbom: 'deterministic',
@@ -22,7 +22,7 @@ export const ENGINE_OF = {
   mobile: 'deterministic',
   binaries: 'deterministic',
   review: 'review',
-  openant: 'openant',
+  'review-codebase': 'openant',
 };
 
 export const ORDER = ['low', 'medium', 'high', 'critical'];
@@ -140,7 +140,7 @@ export const verdict = ({ entries, severity, failOn }) => {
       `severity: expected one of ${SEVERITIES.join(', ')}, got ${JSON.stringify(severity)}`,
     );
   }
-  // Same reasoning as severity: `config.mjs`'s parseList accepts any string,
+  // Same reasoning as severity: `settings.mjs`'s parseList accepts any string,
   // so a dropped letter ("deterministc") or an unrelated word never reaches
   // ENGINE_CLASSES and `failOn.includes(...)` just quietly never matches -
   // every finding reads as informational and nothing can ever block, exactly
@@ -302,7 +302,7 @@ export function main(
     }
     return 2;
   }
-  const settings = load('security-policy.json', env);
+  const settings = load('security-settings.json', env);
   const outcome = verdict({ entries, severity: settings.severity, failOn: settings.failOn });
   for (const line of outcome.lines) log(line);
   // Only on a runner: on a laptop, `make check-security` would print them as

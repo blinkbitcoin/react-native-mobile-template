@@ -54,7 +54,7 @@ const RENAME_TOKENS =
 // not - that repo, and the tooling package it ships (a git dependency on it,
 // docs/decisions/0024-shared-tooling-at-the-workflows-pin.md). Blanking the
 // second is what makes the first greppable.
-const WORKFLOWS_REPO = /blinkbitcoin\/shared-workflows|@blinkbitcoin\/dev-config/g;
+const WORKFLOWS_REPO = /blinkbitcoin\/shared-workflows|@blinkbitcoin\/app-tooling/g;
 const namesTheOwner = (text) => text.replace(WORKFLOWS_REPO, '').includes('blinkbitcoin');
 // `react-native-webview` and `--dev-client` are native, not web: the negative
 // lookaheads keep the sweep from flagging them.
@@ -969,7 +969,7 @@ describe('init --yes --no-web', async () => {
     );
     assert.match(runbook, /tag=vX\.Y\.Z`, and `ci\.yml` on the\n/);
     assert.match(runbook, /│ {2}CD \/ Beta dispatched\n/);
-    assert.match(runbook, /`Release notes` job is its own job after the beta dispatch: a red\n/);
+    assert.match(runbook, /`Store notes` job is its own job after the beta dispatch: a red\n/);
     const readme = readFileSync(path.join(root, 'README.md'), 'utf8');
     assert.match(
       readme,
@@ -1049,7 +1049,7 @@ describe('init --yes --no-web', async () => {
     assert.deepEqual(removedLines(REPO, root, 'AGENTS.md'), [
       // Two layout lines are rewritten, not deleted: they name the init script
       // and its doc page, both of which are gone afterwards.
-      'scripts/            check-*.sh, doctor, init, hooks/, release/ (verify, notes, build-info), e2e/, badges/',
+      'scripts/            check-*.sh, doctor, init, ports, release/ (verify, store-notes test), e2e/',
       '.maestro/           Maestro flows (native e2e); e2e/web/ is Playwright',
       '                    release-runbook, ota, ota-and-crash-reporting, template-usage, decisions/',
       '| `make init` | Rename this template into your app, then delete itself (template only; `docs/template-usage.md`) |',
@@ -1222,7 +1222,7 @@ describe('init preflight', () => {
 // A failing gate must leave the adopter somewhere they can get out of.
 //
 // The old order deleted scripts/init.mjs and its manifest *before* running
-// `pnpm install`, `pnpm codegen` and `make check-code`. A first adopter on a
+// `pnpm install`, `pnpm gen:graphql` and `make check-code`. A first adopter on a
 // flaky network therefore ended up renamed, with nothing installed, nothing
 // committed, and the one command that would redo the work gone — and
 // `git checkout .` would have thrown away the rename they came for. The
@@ -1455,8 +1455,8 @@ describe('init against a miniature repository', () => {
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(calls, [
       'pnpm install',
-      'pnpm codegen',
-      'pnpm i18n:check',
+      'pnpm gen:graphql',
+      'pnpm check:generated',
       'make check-code',
       'git add -A',
       'git commit -m chore(app): initialize acme-wallet from react-native-mobile-template',

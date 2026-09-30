@@ -22,18 +22,18 @@ sec_skip() {
 }
 
 # Exits the runner early when the job is switched off. An invalid setting
-# (a malformed security-policy.json, or a SECURITY_* value config.mjs cannot
+# (a malformed security-settings.json, or a SECURITY_* value settings.mjs cannot
 # parse) must fail the run, never read as "disabled" - the command
-# substitution below would otherwise swallow config.mjs's own nonzero exit
+# substitution below would otherwise swallow settings.mjs's own nonzero exit
 # and `[ "" = "true" ]` would silently take the skip branch.
 sec_enabled() {
   local job="$1" value
-  if ! value="$(node scripts/security/config.mjs get "jobs.$job")"; then
-    echo "config.mjs failed resolving jobs.$job - security-policy.json or a SECURITY_* value is invalid (see the error above); that fails the run, it does not disable it" >&2
+  if ! value="$(node scripts/security/settings.mjs get "jobs.$job")"; then
+    echo "settings.mjs failed resolving jobs.$job - security-settings.json or a SECURITY_* value is invalid (see the error above); that fails the run, it does not disable it" >&2
     exit 1
   fi
   [ "$value" = "true" ] && return 0
-  sec_skip "$job" "disabled in security-policy.json or the environment"
+  sec_skip "$job" "disabled in security-settings.json or the environment"
   exit 0
 }
 
@@ -57,8 +57,8 @@ sec_require() {
 # failure, never an empty string a runner would quietly read as "none".
 sec_setting() {
   local key="$1" value
-  if ! value="$(node scripts/security/config.mjs get "$key")"; then
-    echo "config.mjs failed resolving $key - security-policy.json or a SECURITY_* value is invalid (see the error above); that fails the run" >&2
+  if ! value="$(node scripts/security/settings.mjs get "$key")"; then
+    echo "settings.mjs failed resolving $key - security-settings.json or a SECURITY_* value is invalid (see the error above); that fails the run" >&2
     exit 1
   fi
   printf '%s' "$value"

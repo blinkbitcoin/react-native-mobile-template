@@ -5,6 +5,8 @@ android/
 dist/
 coverage/
 .claude/worktrees/
+# Every CI job's checkout of shared-workflows, not this repository's source.
+.workflows/
 .expo/
 src/i18n/locales/
 src/graphql/__generated__/

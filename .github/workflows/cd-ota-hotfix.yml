@@ -52,7 +52,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       tag: ${{ steps.resolve.outputs.tag }}
-      fp-ios: ${{ steps.resolve.outputs.fp-ios }}
+      fingerprint-ios: ${{ steps.resolve.outputs.fingerprint-ios }}
     steps:
       - name: Resolve the fingerprint baseline tag
         id: resolve
@@ -87,13 +87,13 @@ jobs:
             fp="$(node -e 'process.stdout.write(String(require("./build-info.json")?.fingerprint?.ios ?? ""))' 2>/dev/null || true)"
           fi
           [ -n "$fp" ] || echo "no fingerprint.ios on $tag; the manifest smoke check will be skipped" >&2
-          echo "fp-ios=$fp" >>"$GITHUB_OUTPUT"
+          echo "fingerprint-ios=$fp" >>"$GITHUB_OUTPUT"
 
   publish:
     name: Publish
     needs: baseline
     if: ${{ vars.OTA_ENABLED == 'true' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-ota.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-ota.yml@a5ddc2e4f72c52d5566a03482959e3694e22775c # v0.19.0
     permissions:
       contents: read
     with:
@@ -111,7 +111,7 @@ jobs:
       # Recovered from the baseline release above, so a hotfix gets the same
       # "did the server actually serve this?" check as every other publish. An
       # empty runtime version skips the check rather than failing the publish.
-      manifest-url: ${{ needs.baseline.outputs.fp-ios != '' && vars.EXPO_UPDATES_URL || '' }}
-      runtime-version: ${{ needs.baseline.outputs.fp-ios }}
+      manifest-url: ${{ needs.baseline.outputs.fingerprint-ios != '' && vars.EXPO_UPDATES_URL || '' }}
+      runtime-version: ${{ needs.baseline.outputs.fingerprint-ios }}
     secrets:
       OTA_PUBLISH_TOKEN: ${{ secrets.OTA_PUBLISH_TOKEN }}

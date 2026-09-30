@@ -69,7 +69,7 @@ script itself hard-codes no paths.
 owner. `scripts/init.manifest.json` is the authoritative list; in summary it
 covers `app.config.ts`, `package.json`, `release-please-config.json`, the
 `.env*` files, `.maestro/flows/deep-link.yaml`, the Maestro launch scripts,
-`fastlane/metadata/**`, `release-notes.prompt.md`,
+`fastlane/metadata/**`, `store-notes.prompt.md`,
 `fastlane/lanes/android.rb`, the `certs/README.md` example command, the local
 Expo module podspec, `plugins/with-android-release-signing.ts`, the release
 fixtures, `src/lib/native-intent.ts` with its test, `deploy/ota/*`, and every
@@ -78,10 +78,11 @@ plus `.github/CODEOWNERS` and `.github/ISSUE_TEMPLATE/*.yml`, where the
 `blinkbitcoin` owner segment becomes your `--owners` value.
 
 **Then, in order:** `pnpm install` (the lockfile picks up the new package name
-and, with `--no-web`, the removed dependencies), `pnpm codegen` and
-`pnpm i18n:check` (both must be no-ops — renaming touches no GraphQL document
-and no message id), Biome's formatter (invoked directly, not through `pnpm
-format` — see the comment in `scripts/init.mjs`), and `make check-code`.
+and, with `--no-web`, the removed dependencies), `pnpm gen:graphql` and
+`pnpm check:generated` (both must be no-ops — renaming touches no GraphQL
+document and no message id), Biome's formatter (invoked directly, not through
+`pnpm fix:format` — see the comment in `scripts/init.mjs`), and
+`make check-code`.
 
 **If any of that fails** — a registry hiccup during `pnpm install` is the
 likely one — the run stops and prints what state the tree is in and what to

@@ -20,17 +20,18 @@ production dispatch. Deterministic scanners can block; an LLM reviewer
 annotates until a consumer explicitly gives it teeth, because a gate that
 flakes gets disabled or teaches people to merge past red.
 
-- `scripts/security/deps.sh`, `code.sh`, `policy.sh`, `sbom.sh`, `bundle.sh`,
-  `mobile.sh`, `binaries.sh`, `review.sh`, `openant.sh` - one scanner each,
+- `scripts/security/dependencies.sh`, `code.sh`, `policy.sh`, `sbom.sh`, `bundle.sh`,
+  `mobile.sh`, `binaries.sh`, `review.sh`, `review-codebase.sh` - one scanner each,
   one SARIF each, never failing on their own finding. The two LLM jobs share
-  one provider-portable adapter (`scripts/lib/llm/`) with the store notes and
+  one provider-portable adapter (`@blinkbitcoin/app-tooling/llm`, the template's
+  `scripts/lib/llm/` until shared-workflows v0.19.0) with the store notes and
   are off until a repository configures a provider and a key.
 - `scripts/security/verdict.mjs` - merges the SARIFs and applies the
   threshold; the only script allowed to fail a run.
 - `scripts/security/local.sh` - runs every enabled scanner, then the verdict;
   `make check-security` runs it.
 
-Tunables live in `security-policy.json`, one file in the repository, with an
+Tunables live in `security-settings.json`, one file in the repository, with an
 environment variable able to override any of them. `make check-security*` is
 what a laptop runs today and what a reusable workflow will call once it
 lands, so the two are designed to give the same answer - CI does not call it

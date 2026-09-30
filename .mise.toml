@@ -9,9 +9,9 @@ ruby = "3.3"
 # Pinned, not "latest": shared-workflows pins the same version, so the two
 # repos can never disagree about what counts as a typo.
 typos = "1.50.1"
-# Same pin as shared-workflows (packages/dev-config/versions.json); the
+# Same pin as shared-workflows (packages/app-tooling/versions.json); the
 # pre-commit hook runs it directly. actionlint, shellcheck and zizmor are not
-# pinned here: `make check-ci` runs them through the shared lint-ci.sh at the
+# pinned here: `make check-ci` runs them through the shared check-ci.sh at the
 # versions shared-workflows pins.
 gitleaks = "8.30.1"
 # Security scanners. Pinned for the same reason as the linters above: CI and a

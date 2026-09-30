@@ -82,7 +82,7 @@ done
 # build-info.json is the release's provenance record; the `android build` lane
 # merges `artifacts.aabSha256` / `artifacts.apkSha256` into a copy of it next to
 # the artifacts it just produced. That copy is therefore the default here, and
-# $BUILD_INFO_FILE (which CI sets to the release-meta copy) overrides it.
+# $BUILD_INFO_FILE (which CI sets to the build-info artifact copy) overrides it.
 build_info="${BUILD_INFO_FILE:-}"
 if [ -z "$build_info" ]; then
   build_info="$(dirname "$apk")/build-info.json"

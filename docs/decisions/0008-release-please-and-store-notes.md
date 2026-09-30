@@ -18,17 +18,19 @@ Conventional commits in, one release PR out; merging it is the only human step.
   mode only** — an inline `release-type` makes the action ignore both files.
 - The release PR **must be squash- or rebase-merged**: a merge commit hides the
   release subject, so `resolve-version.sh` also reads `HEAD^2` (the shared
-  script; `make version` runs it from `@blinkbitcoin/dev-config`).
+  script; `make version` runs it from `@blinkbitcoin/app-tooling`).
   Order: HEAD tag → release commit → `RELEASE_PR_TITLE` → open PR → patch+1.
 - Build number = first-parent commit count + `BUILD_NUMBER_OFFSET` (default
   1000): cross-platform, monotonic, idempotent; set in `app.config.ts`, no `sed`.
-- `scripts/release/notes.mjs` — deterministic "New / Improved / Fixed" prose,
+- `gen-store-notes` (the template's `scripts/release/notes.mjs` until
+  shared-workflows v0.19.0 shipped it in `@blinkbitcoin/app-tooling`) —
+  deterministic "New / Improved / Fixed" prose,
   truncated at word boundaries (4000 TestFlight, 500 Play), optionally
-  rewritten by a validated LLM pass (`RELEASE_NOTES_LLM_PROVIDER` = `anthropic`
+  rewritten by a validated LLM pass (`STORE_NOTES_LLM_PROVIDER` = `anthropic`
   or `openai`), falling back to it; `STORE_NOTES_INCLUDE_CHANGELOG` appends.
   *Refined 2026-09-22 by [0021](0021-store-notes-drafted-on-the-release-pr.md):
   the LLM pass moved from build time to the release PR, and the prompt to
-  `release-notes.prompt.md`.*
+  `store-notes.prompt.md`.*
 
 ## Consequences
 

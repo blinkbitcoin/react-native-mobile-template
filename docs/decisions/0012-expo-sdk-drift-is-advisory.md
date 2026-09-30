@@ -19,18 +19,20 @@ the guard to a day did not close the gap either.
 The drift is reported, never enforced. The guard alone decides when a patch
 comes in.
 
-- `scripts/check-deps.sh` — runs `expo install --check`, prints its table,
+- the shared tooling package's `checks/expo-health.sh` (a copy of the
+  template's own script until shared-workflows v0.19.0 shipped it) — runs
+  `expo install --check`, prints its table,
   annotates a CI warning, and lets expo-doctor decide the exit code with its
   own version check switched off (`EXPO_DOCTOR_SKIP_DEPENDENCY_VERSION_CHECK`,
   the same check having just run). Doctor's other checks still block.
-- `package.json` — `deps:check` runs the script; `deps:doctor` exists so knip
-  sees the devDependency in use.
+- `package.json` — `check:expo-health` runs the script; `knip.json` lists
+  `expo-doctor` under `ignoreDependencies`, since only that script runs it.
 - `scripts/gates.test.mjs` — pins the shape.
 
 ## Consequences
 
 A drift that outlives the guard is only a warning too; someone has to read the
-annotation or run `make check-deps`. The bump itself stays a `chore(deps)` PR
+annotation or run `make check-expo-health`. The bump itself stays a `chore(deps)` PR
 made the day the guard opens (`pnpm exec expo install --fix`).
 
 ## Alternatives

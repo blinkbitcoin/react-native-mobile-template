@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // An LLM security review of a diff, on whichever provider the repository
-// configured (llm.provider in security-policy.json: an OpenAI-compatible
+// configured (llm.provider in security-settings.json: an OpenAI-compatible
 // endpoint through OPENAI_BASE_URL, or Anthropic). It is advisory by design:
 // the verdict blocks on it only when a repository adds "review" to failOn.
 //
@@ -19,10 +19,10 @@
 // fail a pull request; only a finding, through the verdict, can do that.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { adapterFor, KEY_ENV, parseExtraParams } from '../lib/llm/index.mjs';
-import { unfence } from '../lib/llm/request.mjs';
-import { load } from './config.mjs';
+import { adapterFor, KEY_ENV, parseExtraParams } from '@blinkbitcoin/app-tooling/llm';
+import { unfence } from '@blinkbitcoin/app-tooling/llm-request';
 import { fromFindings, noted, skipped } from './sarif.mjs';
+import { load } from './settings.mjs';
 
 export const PROMPT_FILE = 'security-review.prompt.md';
 export const SEVERITIES = ['critical', 'high', 'medium', 'low'];
@@ -146,7 +146,7 @@ export async function review({
   read = readFileSync,
   exists = existsSync,
 } = {}) {
-  const settings = load('security-policy.json', env);
+  const settings = load('security-settings.json', env);
   const { provider, model, effort } = settings.llm;
   const adapter = adapterFor(provider);
   if (!adapter)
@@ -215,7 +215,7 @@ export async function main({ log = console.log, error = console.error, ...option
     log(JSON.stringify(await review(options), null, 2));
     return 0;
   } catch (cause) {
-    // Only a configuration error reaches here (config.mjs or the extra
+    // Only a configuration error reaches here (settings.mjs or the extra
     // parameters): that is the run's failure, never a skip.
     error(`review: ${cause.message}`);
     return 1;

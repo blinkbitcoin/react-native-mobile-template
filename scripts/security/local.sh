@@ -14,20 +14,20 @@ cd "$(dirname "$0")/../.."
 source scripts/security/lib/common.sh
 
 # Captured into a variable rather than compared inline: `[ "$(cmd)" != x ]`
-# discards cmd's own exit status, so a malformed security-policy.json or an
-# invalid SECURITY_* value - both of which config.mjs is designed to throw
+# discards cmd's own exit status, so a malformed security-settings.json or an
+# invalid SECURITY_* value - both of which settings.mjs is designed to throw
 # on - would read as an empty string, never equal "true", and this would
 # print "disabled" and exit 0 instead of failing the run.
-if ! enabled="$(node scripts/security/config.mjs get enabled)"; then
-  echo "config.mjs failed resolving enabled - security-policy.json or a SECURITY_* value is invalid (see the error above); that fails the run, it does not disable it" >&2
+if ! enabled="$(node scripts/security/settings.mjs get enabled)"; then
+  echo "settings.mjs failed resolving enabled - security-settings.json or a SECURITY_* value is invalid (see the error above); that fails the run, it does not disable it" >&2
   exit 1
 fi
 if [ "$enabled" != "true" ]; then
-  echo "security scanning is disabled (SECURITY_ENABLED or security-policy.json)"
+  echo "security scanning is disabled (SECURITY_ENABLED or security-settings.json)"
   exit 0
 fi
 
-all_jobs=(deps code policy sbom bundle mobile binaries review openant)
+all_jobs=(dependencies code policy sbom bundle mobile binaries review review-codebase)
 if [ $# -eq 0 ]; then
   jobs=("${all_jobs[@]}")
 else

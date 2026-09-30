@@ -11,8 +11,8 @@ source scripts/security/lib/common.sh
 
 sec_enabled policy
 out="$(sec_out_dir)"
-# Renamed from SECURITY_POLICY_FILE (2026-09-24): that name now belongs to
-# config.mjs's own settings file (security-policy.json) - `sec_enabled`
+# Renamed from SECURITY_SETTINGS_FILE (2026-09-24): that name now belongs to
+# settings.mjs's own settings file (security-settings.json) - `sec_enabled`
 # above reads it through the environment this script inherits, so the two
 # could not share a name without one colliding into the other whenever both
 # were set at once, which a fixture-file test does routinely.

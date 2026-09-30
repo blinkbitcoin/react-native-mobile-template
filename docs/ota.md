@@ -51,11 +51,11 @@ One variable, read in three places:
 The build-time value comes from the `OTA_ENABLED` environment variable. A GitHub
 repository *variable* is never automatically an environment variable, so the
 release callers forward it (and `EXPO_UPDATES_URL`) explicitly through the
-`build-env` input on `build-prepare.yml` / `build-ios.yml` /
+`environment-variables` input on `build-prepare.yml` / `build-ios.yml` /
 `build-android.yml`:
 
 ```yaml
-      build-env: >-
+      environment-variables: >-
         {"APP_VARIANT":"production",
         "OTA_ENABLED":"${{ vars.OTA_ENABLED }}",
         "EXPO_UPDATES_URL":"${{ vars.EXPO_UPDATES_URL }}", ...}
@@ -64,7 +64,7 @@ release callers forward it (and `EXPO_UPDATES_URL`) explicitly through the
 Without that forwarding the binary would compile with `updates: { enabled: false }`
 and no URL while the OTA jobs published happily — a completely silent failure in
 which no installed app ever receives an update. Both names are non-secret, which
-is what makes `build-env` the right channel; it refuses anything that reads as a
+is what makes `environment-variables` the right channel; it refuses anything that reads as a
 credential.
 
 The reusable `publish-ota.yml` has its own `ota-enabled` master switch too,
@@ -128,7 +128,7 @@ the workflow fetches the manifest a client would fetch, with the same `expo-*`
 headers, and fails when it does not come back. A publish that "succeeded" but
 serves nothing is otherwise indistinguishable from a working one until a user
 opens the app. The check defaults to the iOS platform, so the callers pair it
-with `runtime-version: ${{ needs.prepare.outputs.fp-ios }}`. `cd-ota-hotfix.yml`
+with `runtime-version: ${{ needs.prepare.outputs.fingerprint-ios }}`. `cd-ota-hotfix.yml`
 has no prepare job, but it does resolve a baseline release — and that release's
 `build-info.json` carries the `fingerprint.ios` of the binary currently
 installed on the channel, which is exactly the runtime version to ask for. Its

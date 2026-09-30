@@ -1,5 +1,5 @@
 // The six runners the release gate added: sbom, bundle, mobile, binaries,
-// review and openant. Each is run for real as a bash script against this
+// review and review-codebase (OpenAnt). Each is run for real as a bash script against this
 // repository, with every external tool replaced by a fake on PATH - the real
 // ones (expo export, a prebuild, mobsfscan, aapt2, an LLM) take minutes, need
 // an SDK or a key, and are not what these tests are about: the runner's own
@@ -22,6 +22,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { snake } from './settings.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -96,7 +97,7 @@ const run = (script, { env = {}, args = [] } = {}) =>
       CI: '',
       ANDROID_HOME: '',
       ANDROID_SDK_ROOT: '',
-      SECURITY_POLICY_FILE: '/nonexistent/security-policy.json',
+      SECURITY_SETTINGS_FILE: '/nonexistent/security-settings.json',
       ...env,
     },
   });
@@ -107,11 +108,11 @@ const note = (doc) =>
 const ruleIds = (doc) => doc.runs[0].results.map((r) => r.ruleId);
 
 // Every runner starts the same way. One loop instead of six copies.
-for (const job of ['sbom', 'bundle', 'mobile', 'binaries', 'review', 'openant']) {
+for (const job of ['sbom', 'bundle', 'mobile', 'binaries', 'review', 'review-codebase']) {
   test(`${job}: switched off, it writes a skipped SARIF and exits 0`, () => {
     withDir((dir) => {
       const result = run(`${job}.sh`, {
-        env: { SECURITY_DIR: dir, [`SECURITY_${job.toUpperCase()}`]: 'false' },
+        env: { SECURITY_DIR: dir, [`SECURITY_${snake(job)}`]: 'false' },
       });
       assert.equal(result.status, 0, result.stderr);
       assert.match(note(sarif(dir, job)), /disabled/);
@@ -205,7 +206,7 @@ test('bundle: an empty platform list is a skip, not an empty pass', () => {
     // In the file: an empty environment twin means unset, not an empty list.
     const policy = path.join(dir, 'policy.json');
     writeFileSync(policy, JSON.stringify({ jobs: { bundle: { platforms: [] } } }));
-    const result = run('bundle.sh', { env: { SECURITY_DIR: dir, SECURITY_POLICY_FILE: policy } });
+    const result = run('bundle.sh', { env: { SECURITY_DIR: dir, SECURITY_SETTINGS_FILE: policy } });
     assert.equal(result.status, 0, result.stderr);
     assert.match(note(sarif(dir, 'bundle')), /bundle\.platforms is empty/);
   });
@@ -542,10 +543,10 @@ test('review: without git it skips locally and fails under CI', () => {
   });
 });
 
-// ---------- openant ----------
+// ---------- review-codebase (OpenAnt) ----------
 
 const OPENANT_ON = {
-  SECURITY_OPENANT: 'true',
+  SECURITY_REVIEW_CODEBASE: 'true',
   SECURITY_LLM_PROVIDER: 'openai',
   SECURITY_LLM_MODEL: 'kimi-k3',
   OPENAI_API_KEY: 'sk-test-openant',
@@ -573,7 +574,7 @@ if [ "$1" = report ]; then
 fi`,
   });
 
-test('openant: every missing piece of configuration is a skip with its reason', () => {
+test('review-codebase: every missing piece of configuration is a skip with its reason', () => {
   withDir((dir) => {
     const cases = [
       [{ SECURITY_LLM_PROVIDER: '' }, /no LLM provider configured/],
@@ -586,22 +587,24 @@ test('openant: every missing piece of configuration is a skip with its reason', 
       [{ PATH: minimalPath(dir) }, /openant is not installed/],
     ];
     for (const [overrides, reason] of cases) {
-      const result = run('openant.sh', { env: { SECURITY_DIR: dir, ...OPENANT_ON, ...overrides } });
+      const result = run('review-codebase.sh', {
+        env: { SECURITY_DIR: dir, ...OPENANT_ON, ...overrides },
+      });
       assert.equal(result.status, 0, result.stderr);
-      assert.match(note(sarif(dir, 'openant')), reason);
+      assert.match(note(sarif(dir, 'review-codebase')), reason);
     }
   });
 });
 
-test('openant: scans with a private configuration built from the llm settings, then reports SARIF', () => {
+test('review-codebase: scans with a private configuration built from the llm settings, then reports SARIF', () => {
   withDir((dir) => {
     const bin = fakeOpenant(dir);
-    const result = run('openant.sh', {
+    const result = run('review-codebase.sh', {
       env: {
         SECURITY_DIR: dir,
         ...OPENANT_ON,
-        SECURITY_OPENANT_LIMIT: '25',
-        SECURITY_OPENANT_VERIFY: 'true',
+        SECURITY_REVIEW_CODEBASE_LIMIT: '25',
+        SECURITY_REVIEW_CODEBASE_VERIFY: 'true',
         PATH: `${bin}:${process.env.PATH}`,
       },
     });
@@ -624,16 +627,16 @@ test('openant: scans with a private configuration built from the llm settings, t
       readFileSync(path.join(dir, 'report-args'), 'utf8'),
       /results_verified\.json -f sarif -o /,
     );
-    assert.equal(sarif(dir, 'openant').runs[0].tool.driver.name, 'OpenAnt');
+    assert.equal(sarif(dir, 'review-codebase').runs[0].tool.driver.name, 'OpenAnt');
     // The key must never reach the job log.
     assert.doesNotMatch(result.stdout + result.stderr, /sk-test-openant/);
   });
 });
 
-test('openant: an Anthropic provider gets no base URL, and default limits add no flags', () => {
+test('review-codebase: an Anthropic provider gets no base URL, and default limits add no flags', () => {
   withDir((dir) => {
     const bin = fakeOpenant(dir, { scan: 0 });
-    const result = run('openant.sh', {
+    const result = run('review-codebase.sh', {
       env: {
         SECURITY_DIR: dir,
         ...OPENANT_ON,
@@ -649,10 +652,10 @@ test('openant: an Anthropic provider gets no base URL, and default limits add no
   });
 });
 
-test('openant: a failed scan (exit 2 or more) fails the job', () => {
+test('review-codebase: a failed scan (exit 2 or more) fails the job', () => {
   withDir((dir) => {
     const bin = fakeOpenant(dir, { scan: 2 });
-    const result = run('openant.sh', {
+    const result = run('review-codebase.sh', {
       env: { SECURITY_DIR: dir, ...OPENANT_ON, PATH: `${bin}:${process.env.PATH}` },
     });
     assert.equal(result.status, 1);
@@ -660,20 +663,20 @@ test('openant: a failed scan (exit 2 or more) fails the job', () => {
   });
 });
 
-test('openant: a scan with no results file is a skip, and a broken report a failure', () => {
+test('review-codebase: a scan with no results file is a skip, and a broken report a failure', () => {
   withDir((dir) => {
     const empty = fakeOpenant(dir, { scan: 0, results: false });
     assert.equal(
-      run('openant.sh', {
+      run('review-codebase.sh', {
         env: { SECURITY_DIR: dir, ...OPENANT_ON, PATH: `${empty}:${process.env.PATH}` },
       }).status,
       0,
     );
-    assert.match(note(sarif(dir, 'openant')), /without a results file/);
+    assert.match(note(sarif(dir, 'review-codebase')), /without a results file/);
   });
   withDir((dir) => {
     const broken = fakeOpenant(dir, { report: 3 });
-    const result = run('openant.sh', {
+    const result = run('review-codebase.sh', {
       env: { SECURITY_DIR: dir, ...OPENANT_ON, PATH: `${broken}:${process.env.PATH}` },
     });
     assert.equal(result.status, 1);
@@ -681,9 +684,12 @@ test('openant: a scan with no results file is a skip, and a broken report a fail
   });
 });
 
-test('openant: under CI a missing binary is built from the pinned commit, and reused after', () => {
+test('review-codebase: under CI a missing binary is built from the pinned commit, and reused after', () => {
   withDir((dir) => {
-    const openantScript = readFileSync(path.join(root, 'scripts/security/openant.sh'), 'utf8');
+    const openantScript = readFileSync(
+      path.join(root, 'scripts/security/review-codebase.sh'),
+      'utf8',
+    );
     const commit = /^OPENANT_COMMIT=(\w+)$/m.exec(openantScript)[1];
     // A fake git that "fetches" nothing, and a fake mise whose go build drops
     // a fake openant into bin/ - the one the scan then runs.
@@ -703,7 +709,7 @@ test('openant: under CI a missing binary is built from the pinned commit, and re
       OPENANT_HOME: home,
       PATH: `${bin}:${minimalPath(dir)}`,
     };
-    const first = run('openant.sh', { env });
+    const first = run('review-codebase.sh', { env });
     assert.equal(first.status, 0, first.stderr);
     const log = readFileSync(path.join(dir, 'build-log'), 'utf8');
     assert.match(
@@ -714,7 +720,7 @@ test('openant: under CI a missing binary is built from the pinned commit, and re
     assert.ok(statSync(path.join(home, commit, 'apps/openant-cli/bin/openant')).isFile());
     // The second run finds the build in place and does not fetch again.
     rmSync(path.join(dir, 'build-log'));
-    assert.equal(run('openant.sh', { env }).status, 0);
+    assert.equal(run('review-codebase.sh', { env }).status, 0);
     assert.equal(existsSync(path.join(dir, 'build-log')), false);
   });
 });
@@ -731,7 +737,7 @@ test('local.sh with job names runs only those, and an unknown one exits 2', () =
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /^sbom: clean$/m);
     assert.match(result.stdout, /security: pass, highest none, 0 finding\(s\)/);
-    assert.equal(existsSync(path.join(dir, 'deps.sarif')), false);
+    assert.equal(existsSync(path.join(dir, 'dependencies.sarif')), false);
     const bad = run('local.sh', { env: { SECURITY_DIR: dir }, args: ['sbom', 'lint'] });
     assert.equal(bad.status, 2);
     assert.match(bad.stderr, /unknown security job: lint/);

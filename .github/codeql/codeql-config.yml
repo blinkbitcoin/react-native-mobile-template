@@ -1,5 +1,5 @@
 # CodeQL configuration, read by BOTH the CI analysis
-# (.github/workflows/ci-codeql.yml calls check-codeql.yml, whose `config-file`
+# (.github/workflows/ci-codeql.yml calls check-code-scanning.yml, whose `configuration-file`
 # input defaults to this path and hands it to github/codeql-action/init) and
 # the local run (`make check-code-scanning`, which
 # parses the suite and the packs out of this file). One file, so local and CI cannot

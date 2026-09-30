@@ -35,11 +35,12 @@ minimumReleaseAgeExclude:
 # The recurring case worth naming: `expo install --check` (and expo-doctor's
 # version check) demand whatever patch the SDK currently expects, while the
 # guard above refuses anything younger than the cooldown. At 3 days the two
-# were in permanent conflict - Expo patches more often than that - and the deps
+# were in permanent conflict - Expo patches more often than that - and the dependency
 # gate sat red for days on a version this repo had chosen not to install yet.
 # At 1 day they still disagreed for a day after every Expo patch, and that day
 # turned every open PR red and skipped its unit and E2E jobs. So the drift
-# check is advisory now - `scripts/check-deps.sh` prints the table and CI
+# check is advisory now - the shared `checks/expo-health.sh` (`make
+# check-expo-health`) prints the table and CI
 # annotates a warning - and the guard is the only thing that decides when a
 # patch comes in.
 #

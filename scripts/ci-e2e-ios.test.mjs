@@ -17,7 +17,7 @@ const ci = readFileSync(
   'utf8',
 );
 
-/** The `ios:` input ci.yml passes to check-e2e.yml, without the ${{ }}. */
+/** The `ios:` input ci.yml passes to test-e2e.yml, without the ${{ }}. */
 function iosExpression() {
   const lines = ci.split('\n').filter((l) => /^\s+ios: /.test(l));
   assert.equal(lines.length, 1, 'ci.yml should pass exactly one ios: input');

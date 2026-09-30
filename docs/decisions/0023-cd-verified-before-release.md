@@ -22,11 +22,12 @@ runs the CD logic against the pinned shared code:
 - `.github/workflows/*.yml` — every shared `uses:` is `@<sha> # vX.Y.Z`, all the same.
 - `.github/dependabot.yml` — the `shared-workflows` group moves every pin in one PR, without the cooldown.
 - `.github/zizmor.yml` — `hash-pin` for shared-workflows, `ref-pin` for the rest.
-- `check-consumer-contract` (from `@blinkbitcoin/dev-config` at the pin; `make check-contract`, CI's Checks / Contract) — every call
+- `check-contract` (from `@blinkbitcoin/app-tooling` at the pin; `make check-contract`, CI's Checks / Contract) — every call
   against the inputs, their types, the secrets and the outputs its workflow declares, and one commit across every pin.
   Until shared-workflows v0.18.0 this was the template's own `scripts/workflow-contract.test.mjs`.
-- `scripts/release/cd-notes.test.mjs` — cd-release's build-env, the shared `build-env.sh`, `pr-notes.sh` and `notes.sh`,
-  and our `notes.mjs`, end to end, then read back the way the release lanes read it.
+- `scripts/release/store-notes.test.mjs` — cd-release's `environment-variables`, the shared `build-env.sh`,
+  `pr-store-notes.sh` and `gen-store-notes.sh`, and the `gen-store-notes` program with our prompt, end to end,
+  then read back the way the release lanes read it.
 
 ## Consequences
 
@@ -35,7 +36,7 @@ merged, and that PR's Unit job has run the new shared code against this
 repository. The price is one PR per shared release. A fix no longer arrives by
 itself: someone has to merge it. The PR CI still stands in for `gh`, the model
 and release-please's body split; a dry-run of the whole workflow on GitHub is
-the next step (the shared `pr-release-notes.yml` `dry-run` input).
+the next step (the shared `pr-store-notes.yml` `dry-run` input).
 
 ## Alternatives
 

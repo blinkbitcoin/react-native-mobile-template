@@ -7,7 +7,7 @@
 # `build-` produces an artifact, `dev-` runs the app locally, `gen-` writes
 # generated files, `fix-` rewrites source in place, `verify-` inspects a built
 # artifact. `check`, `test` and `ci` are the aggregates; `init`, `doctor`,
-# `install`, `clean`, `reset`, `ports`, `version`, `release-notes`, `prebuild`
+# `install`, `clean`, `reset`, `ports`, `version`, `store-notes`, `prebuild`
 # and `help` are one-off entry points that belong to no family.
 # `prebuild` keeps Expo's own word for it on purpose: `build-native` would be
 # harder to map back to the command it runs.
@@ -79,7 +79,7 @@ dev-web: ## Expo web dev server (web target)
 	@$(PORTS) && pnpm web
 
 dev-api: ## Local GraphQL mock API (APP_PORT_BASE+2)
-	@$(PORTS) && pnpm mock-api
+	@$(PORTS) && pnpm dev:api
 
 prebuild: ## Regenerate ios/ and android/ locally (debugging plugins only; never commit them)
 	pnpm prebuild
@@ -90,7 +90,7 @@ build-web: ## Static web export into dist/
 # The script CI's build-prepare runs, from the shared tooling package at the
 # same commit, so the answer here is the one CI will give.
 version: ## Print what CI would build for HEAD
-	bash node_modules/@blinkbitcoin/dev-config/release/resolve-version.sh
+	bash node_modules/@blinkbitcoin/app-tooling/release/resolve-version.sh
 
 # ARTIFACT, not PATH: a variable set on make's command line is exported to every
 # recipe, so `make verify-ios PATH=...` would replace the shell's PATH.
@@ -102,56 +102,43 @@ verify-android: ## Verify AAB+APK (AAB=... APK=... [ARGS=--cert-sha256 X])
 	@[ -n "$(AAB)" ] && [ -n "$(APK)" ] || { echo "usage: make verify-android AAB=artifacts/android/app-release.aab APK=artifacts/android/app-universal.apk"; exit 2; }
 	bash scripts/release/verify-android.sh "$(AAB)" "$(APK)" $(ARGS)
 
-release-notes: ## Preview store notes for HEAD (TAG=vX.Y.Z uses that release body, PR=N that release PR's body)
-	@set -euo pipefail; \
-	if [ -n "$(TAG)" ]; then \
-		body="$$(mktemp)"; \
-		trap 'rm -f "$$body"' EXIT; \
-		gh release view "$(TAG)" --json body -q .body > "$$body" \
-			|| { echo "gh release view $(TAG) failed" >&2; exit 1; }; \
-		[ -s "$$body" ] || { echo "empty release body for $(TAG)" >&2; exit 1; }; \
-		node scripts/release/notes.mjs --from-body "$$body" --body-section --out -; \
-	elif [ -n "$(PR)" ]; then \
-		body="$$(mktemp)"; \
-		trap 'rm -f "$$body"' EXIT; \
-		gh pr view "$(PR)" --json body -q .body > "$$body" \
-			|| { echo "gh pr view $(PR) failed" >&2; exit 1; }; \
-		[ -s "$$body" ] || { echo "empty body for PR $(PR)" >&2; exit 1; }; \
-		node scripts/release/notes.mjs --from-body "$$body" --body-section --out -; \
-	else \
-		node scripts/release/notes.mjs --from-commits --out -; \
-	fi
+# The generator build-prepare.yml and pr-store-notes.yml run, from the shared
+# tooling package at the same commit. --preview picks the source from TAG or
+# PR (make passes its command-line variables through the environment), else
+# the commits since the last v* tag.
+store-notes: ## Preview store notes for HEAD (TAG=vX.Y.Z uses that release body, PR=N that release PR's body)
+	pnpm exec gen-store-notes --preview
 
 # ---------- Codegen ----------
 gen-i18n: ## Extract + compile message catalogs
-	pnpm i18n:extract
+	pnpm gen:i18n
 
 gen-graphql: ## Regenerate typed GraphQL documents
-	pnpm codegen
+	pnpm gen:graphql
 
 # ---------- Quality gates ----------
-# `make check` is the `check-code` workflow's gate set and `make ci` adds the `check-unit`
+# `make check` is the `check` workflow's gate set and `make ci` adds the `test-unit`
 # workflow's, so a green run here is the same set of gates CI makes - not a
 # similar one. That used to be a comment claiming as much while five gates
-# (i18n, codegen, SDK drift, lockfile provenance, licences) ran here and in no
-# CI job at all. It is now enforced from the other side: consumer-contract.bats
-# in shared-workflows reads this Makefile and the workflow YAML and fails
-# when they disagree.
+# (generated files, SDK drift, lockfile provenance, licences) ran here and in no
+# CI job at all. It is now enforced from the other side: the contract check
+# (`make check-contract`, CI's Checks / Contract) reads this Makefile and the
+# workflow YAML and fails when they disagree.
 #
 # E2E is the deliberate exception: it needs a simulator or an emulator, so it
 # stays in its own targets (`make test-e2e-ios`, `test-e2e-android`,
 # `test-e2e-web`).
 check-types: ## tsc --noEmit
-	pnpm typecheck
+	pnpm check:types
 
 check-lint: ## Biome lint + ESLint (React/Expo rules)
-	pnpm lint
+	pnpm check:lint
 
 fix-format: ## Format everything with Biome (writes)
-	pnpm format
+	pnpm fix:format
 
 fix-lint: ## Apply Biome's and ESLint's own fixes (writes)
-	pnpm lint:fix
+	pnpm fix:lint
 
 # Dependabot moves the workflow pins and cannot move the shared tooling package,
 # a git dependency at the same commit, so its pin-bump PR stays red until this
@@ -160,39 +147,45 @@ fix-tooling-pin: ## Point the shared tooling package at the commit the workflows
 	pnpm exec fix-tooling-pin
 
 check-format: ## Check formatting without writing
-	pnpm format:check
+	pnpm check:format
 
 check-unused: ## Unused files, exports and dependencies (default mode; production mode flags test-only exports)
-	pnpm knip
+	pnpm check:unused
 
 check-spell: ## Spell-check with typos
-	pnpm spell
+	pnpm check:spell
 
-check-gen: ## Generated-file drift (i18n, codegen)
-	pnpm i18n:check
-	pnpm codegen:check
+check-generated: ## Generated-file drift (i18n catalogs, GraphQL documents)
+	pnpm check:generated
 
 check-prebuild: ## Prebuild both platforms into a temp dir and assert plugin output
-	pnpm check-prebuild
+	pnpm check:prebuild
 
 check-code: check-types check-lint check-format check-unused check-spell ## Fast local gate: types + lint + format + unused code + spell
 
-check-deps: ## SDK drift, vulnerability audit, lockfile provenance, licenses
-	pnpm deps:check
-	pnpm deps:audit
-	pnpm deps:licenses
+check-expo-health: ## Expo SDK drift (a warning) then expo-doctor
+	pnpm check:expo-health
 
-# actionlint, zizmor and shellcheck all come from shared-workflows' lint-ci.sh,
-# at the versions it pins, which also hands zizmor this repository's
+check-audit: ## Vulnerability audit of production dependencies + lockfile provenance
+	pnpm check:audit
+
+check-licenses: ## Production dependency licenses against the allowlist
+	pnpm check:licenses
+
+# actionlint, zizmor and shellcheck all come from the shared check-ci.sh, at
+# the versions it pins, which also hands zizmor this repository's
 # .github/zizmor.yml explicitly (a worktree's `.git` is a file, so zizmor's own
-# search would find the outer checkout's policy).
-check-ci: ## Lint the CI itself: actionlint + zizmor + shellcheck (the shared lint-ci.sh), locale prefixes, workflow names
-	WORKFLOWS_SHELLCHECK_PATHS="scripts .claude/skills" bash node_modules/@blinkbitcoin/dev-config/ci/lint-ci.sh
+# search would find the outer checkout's policy). check-ignored-directories is
+# here because it is about CI too: every job checks this repository out under
+# .workflows/, which no tool may walk into.
+check-ci: ## Lint the CI itself: actionlint + zizmor + shellcheck, locale prefixes, workflow names, ignored directories
+	WORKFLOWS_SHELLCHECK_PATHS="scripts .claude/skills" bash node_modules/@blinkbitcoin/app-tooling/ci/check-ci.sh
 	pnpm exec check-shell-locale
 	pnpm exec check-workflow-names --group ci=CI --group cd=CD
+	pnpm exec check-ignored-directories
 
 check-docs: ## Docs freshness, AGENTS.md command table, make target names, table widths, mermaid blocks
-	bash scripts/check-docs.sh
+	pnpm exec check-docs
 
 # The skills' tests run here, in the recipe rather than as a prerequisite: they
 # need the same Ruby and bundle, and CI's Release job runs this target by name.
@@ -210,7 +203,7 @@ check-skills: ## Only the skill tests (offline, fakes only; needs bundle install
 # History, not the working tree: a key committed and deleted later is still in
 # the repository. Allowlisted test data, each entry with its reason: .gitleaks.toml.
 check-secrets: ## Scan the whole git history for committed secrets (gitleaks)
-	bash node_modules/@blinkbitcoin/dev-config/checks/secrets.sh
+	bash node_modules/@blinkbitcoin/app-tooling/checks/secrets.sh
 
 # Not in `make check` or `make ci`: external CLIs and minutes, the same reason
 # `check-code-scanning` is out. This is the deliberate deeper pass; the pre-push gate
@@ -221,8 +214,8 @@ check-security: ## Every enabled security scanner, then the verdict (see docs/se
 # One scanner each, then the same verdict CI applies, so every target below
 # ends in the pass/fail answer the pipeline would give for that scanner alone.
 # Each writes its SARIF into .security/; a disabled job reports "skipped".
-check-security-deps: ## Known vulnerabilities and malicious packages in the lockfile (osv-scanner)
-	bash scripts/security/local.sh deps
+check-security-dependencies: ## Known vulnerabilities and malicious packages in the lockfile (osv-scanner)
+	bash scripts/security/local.sh dependencies
 
 check-security-code: ## Semgrep over app source: TypeScript, secrets, OWASP packs plus rules/
 	bash scripts/security/local.sh code
@@ -251,9 +244,9 @@ check-security-review: ## LLM security review of the diff (off by default; needs
 	bash scripts/security/local.sh review
 
 check-security-review-codebase: ## LLM security review of the whole codebase with OpenAnt (off by default; needs llm.provider and a key)
-	bash scripts/security/local.sh openant
+	bash scripts/security/local.sh review-codebase
 
-check: check-code check-gen check-deps check-ci check-docs check-release check-secrets ## Every static gate the check-code workflow runs (no tests/builds)
+check: check-code check-generated check-expo-health check-audit check-licenses check-ci check-docs check-release check-secrets ## Every static gate the check workflow runs (no tests/builds)
 
 # The two expensive gates are not in `check` and are off by default in CI for
 # the same reason: a prebuild of both platforms and a web export are minutes
@@ -266,7 +259,7 @@ ci: check test-coverage test-scripts ## Everything CI runs except E2E (which nee
 # pack (minutes) and every run needs a CodeQL CLI, which no other gate does.
 # CI runs the same queries through .github/workflows/ci-codeql.yml.
 check-code-scanning: ## CodeQL code scanning locally, with the same config CI uses (needs a CodeQL CLI)
-	bash scripts/codeql-local.sh
+	pnpm exec check-code-scanning
 
 # Not in `make check` either: CI's `Checks / Contract` job already runs this
 # checker, from its own checkout of the commit the workflows pin, and a gate
@@ -274,7 +267,7 @@ check-code-scanning: ## CodeQL code scanning locally, with the same config CI us
 # check from the installed package (the same commit, docs/decisions/0024-...),
 # for a laptop, before pushing.
 check-contract: ## Everything the called shared workflows need from this repository, in one report
-	pnpm exec check-consumer-contract
+	pnpm exec check-contract
 
 test-scripts: ## node:test for scripts/**/*.test.mjs, with the 100% script coverage gate
 	pnpm test:scripts
@@ -292,7 +285,7 @@ test-coverage: ## Tests with coverage thresholds and the empty-row check (what C
 # BADGE_SECURITY to a verdict line to try another, or to empty for none.
 gen-badges: ## Render the CI badges into coverage/badge/ (run make test-coverage first, make check-security for Security)
 	@BADGE_UNIT="$${BADGE_UNIT:-success}" BADGE_E2E="$${BADGE_E2E:-success}" \
-		BADGE_SECURITY="$${BADGE_SECURITY-$$(cat .security/verdict.json 2>/dev/null)}" pnpm badges:render
+		BADGE_SECURITY="$${BADGE_SECURITY-$$(cat .security/verdict.json 2>/dev/null)}" pnpm exec gen-badges
 
 # ---------- End-to-end ----------
 test-e2e-ios: ## Maestro flows on iOS (needs: make dev-api, make dev, make dev-ios)
@@ -315,4 +308,4 @@ reset: clean ## clean + reinstall
 help: ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: init doctor install setup setup-toolchain setup-android setup-ios setup-maestro ports dev dev-ios dev-android dev-web dev-api prebuild build-web version verify-ios verify-android release-notes gen-i18n gen-graphql check-types check-lint fix-format fix-lint fix-tooling-pin check-format check-unused check-spell check-gen check-prebuild check-code check-deps check-ci check-docs check-skills check-secrets check-security check-security-deps check-security-code check-security-policy check-security-sbom check-security-bundle check-security-mobile check-security-binaries check-security-review check-security-review-codebase check-release check check-slow ci check-code-scanning check-contract test-scripts test-unit test-coverage gen-badges test-e2e-ios test-e2e-android test-e2e-web test clean reset help
+.PHONY: init doctor install setup setup-toolchain setup-android setup-ios setup-maestro ports dev dev-ios dev-android dev-web dev-api prebuild build-web version verify-ios verify-android store-notes gen-i18n gen-graphql check-types check-lint fix-format fix-lint fix-tooling-pin check-format check-unused check-spell check-generated check-prebuild check-code check-expo-health check-audit check-licenses check-ci check-docs check-skills check-secrets check-security check-security-dependencies check-security-code check-security-policy check-security-sbom check-security-bundle check-security-mobile check-security-binaries check-security-review check-security-review-codebase check-release check check-slow ci check-code-scanning check-contract test-scripts test-unit test-coverage gen-badges test-e2e-ios test-e2e-android test-e2e-web test clean reset help

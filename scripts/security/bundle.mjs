@@ -16,8 +16,8 @@
 // print, read here so the check does not depend on binutils being installed.
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { load } from './config.mjs';
 import { fromFindings } from './sarif.mjs';
+import { load } from './settings.mjs';
 
 /** Printable ASCII runs of at least `min` bytes, as `strings` would find them. */
 export const printableRuns = (buffer, min = 4) => {
@@ -130,7 +130,7 @@ export function main(
     error('usage: bundle.mjs <bundle>...');
     return 2;
   }
-  const settings = load('security-policy.json', env);
+  const settings = load('security-settings.json', env);
   const { hosts, cleartextHosts } = settings.options.bundle;
   const names = privateNames(read('.env.example', 'utf8'));
   const findings = argv.flatMap((file) =>

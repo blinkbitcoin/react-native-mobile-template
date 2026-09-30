@@ -16,12 +16,15 @@ internal testers see. The prompt was split between a fastlane file and code.
 Generate the store notes once, into the release PR body, and treat that text
 as final downstream.
 
-- `.github/workflows/cd-release.yml` — the `Release notes` job calls the
-  shared `pr-release-notes.yml` with the PR's number and branch; it is the only
+- `.github/workflows/cd-release.yml` — the `Store notes` job calls the
+  shared `pr-store-notes.yml` with the PR's number and branch; it is the only
   job that may call an LLM.
-- `release-notes.prompt.md` — the whole system prompt, versioned at the root.
-- `scripts/release/notes.mjs` — a verbatim `## Store notes` section ends at a
-  marker or a rule, and is never regenerated or extended.
+- `store-notes.prompt.md` — the app's part of the system prompt (product,
+  audience, tone), versioned at the root; since shared-workflows v0.19.0 the
+  package's own prompt comes first and owns the locales, limits and format.
+- `gen-store-notes` (from `@blinkbitcoin/app-tooling`; the template's
+  `scripts/release/notes.mjs` until v0.19.0) — a verbatim `## Store notes`
+  section ends at a marker or a rule, and is never regenerated or extended.
 - the three CD callers — no LLM variables or keys; beta and production copy.
 
 ## Consequences

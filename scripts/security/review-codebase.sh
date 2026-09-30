@@ -5,7 +5,7 @@
 # configured provider and costs minutes and tokens - and in CI it runs on the
 # release pull request only. Findings do not fail this script.
 #
-# The provider is the one the reviewer uses (llm.* in security-policy.json),
+# The provider is the one the reviewer uses (llm.* in security-settings.json),
 # written into a throwaway OpenAnt configuration for every one of its pipeline
 # phases. Effort is not passed on: OpenAnt takes no effort setting.
 #
@@ -23,7 +23,7 @@ OPENANT_REPOSITORY=https://github.com/knostic/OpenAnt
 OPENANT_COMMIT=624068274c52e53578d89d403b29cf73665720bf
 GO_VERSION=1.26
 
-sec_enabled openant
+sec_enabled review-codebase
 
 provider="$(sec_setting llm.provider)"
 model="$(sec_setting llm.model)"
@@ -31,22 +31,22 @@ case "$provider" in
   openai) key_name=OPENAI_API_KEY ;;
   anthropic) key_name=ANTHROPIC_API_KEY ;;
   *)
-    sec_skip openant "no LLM provider configured (llm.provider or SECURITY_LLM_PROVIDER)"
+    sec_skip review-codebase "no LLM provider configured (llm.provider or SECURITY_LLM_PROVIDER)"
     exit 0
     ;;
 esac
 [ -n "${!key_name:-}" ] || {
-  sec_skip openant "$key_name is not set"
+  sec_skip review-codebase "$key_name is not set"
   exit 0
 }
 [ -n "$model" ] || {
-  sec_skip openant "no model configured (llm.model or SECURITY_LLM_MODEL): OpenAnt has no default for a non-Anthropic provider"
+  sec_skip review-codebase "no model configured (llm.model or SECURITY_LLM_MODEL): OpenAnt has no default for a non-Anthropic provider"
   exit 0
 }
 
 if ! command -v openant >/dev/null 2>&1; then
   if [ -z "${CI:-}" ]; then
-    sec_skip openant "openant is not installed ($OPENANT_REPOSITORY, apps/openant-cli: make build)"
+    sec_skip review-codebase "openant is not installed ($OPENANT_REPOSITORY, apps/openant-cli: make build)"
     exit 0
   fi
   home="${OPENANT_HOME:-$HOME/.cache/openant}/$OPENANT_COMMIT"
@@ -88,8 +88,8 @@ process.stdout.write(JSON.stringify({
 ' > "$XDG_CONFIG_HOME/openant/config.json"
 )
 
-limit="$(sec_setting options.openant.limit)"
-verify="$(sec_setting options.openant.verify)"
+limit="$(sec_setting options.review-codebase.limit)"
+verify="$(sec_setting options.review-codebase.verify)"
 args=(scan . -l javascript -o "$work/scan" --llm-config security --skip-dynamic-test --no-report)
 [ "$limit" = 0 ] || args+=(--limit "$limit")
 [ "$verify" != true ] || args+=(--verify)
@@ -109,12 +109,12 @@ fi
 results="$(find "$work/scan" -name results_verified.json 2>/dev/null | head -1 || true)"
 [ -n "$results" ] || results="$(find "$work/scan" -name results.json 2>/dev/null | head -1 || true)"
 if [ -z "$results" ]; then
-  sec_skip openant "OpenAnt finished (exit $status) without a results file: nothing reachable to analyse"
+  sec_skip review-codebase "OpenAnt finished (exit $status) without a results file: nothing reachable to analyse"
   exit 0
 fi
-openant report "$results" -f sarif -o "$out/openant.sarif" > "$work/report.log" 2>&1 || {
+openant report "$results" -f sarif -o "$out/review-codebase.sarif" > "$work/report.log" 2>&1 || {
   cat "$work/report.log" >&2
   echo "openant report failed to write SARIF" >&2
   exit 1
 }
-echo "openant: wrote $out/openant.sarif"
+echo "review-codebase: wrote $out/review-codebase.sarif"

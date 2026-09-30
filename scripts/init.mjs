@@ -869,9 +869,9 @@ export async function main(argv = process.argv.slice(2), io = {}) {
   try {
     if (env.INIT_SKIP_INSTALL !== '1') {
       run('pnpm', ['install']);
-      run('pnpm', ['codegen']);
+      run('pnpm', ['gen:graphql']);
       // Renaming touches no message id, so the catalogs must come back unchanged.
-      run('pnpm', ['i18n:check']);
+      run('pnpm', ['check:generated']);
     } else {
       log('INIT_SKIP_INSTALL=1: skipping install, codegen, i18n and check-code');
     }
@@ -913,7 +913,7 @@ export async function main(argv = process.argv.slice(2), io = {}) {
     if (initialiserGone) {
       error(
         'scripts/init.mjs has already been removed, so the remaining steps are ordinary ones:\n' +
-          '  pnpm install && pnpm codegen && make check-code\n' +
+          '  pnpm install && pnpm gen:graphql && make check-code\n' +
           '  git add -A && git commit -m "chore(app): initialize ' +
           `${filled.slug} from react-native-mobile-template"`,
       );
@@ -923,7 +923,7 @@ export async function main(argv = process.argv.slice(2), io = {}) {
           'cause and re-run it:\n' +
           '  git checkout . && node scripts/init.mjs\n' +
           'or finish by hand:\n' +
-          '  pnpm install && pnpm codegen && make check-code',
+          '  pnpm install && pnpm gen:graphql && make check-code',
       );
     }
     throw failure;

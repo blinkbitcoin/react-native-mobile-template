@@ -1,4 +1,4 @@
-// The gates that let a suite skip a change it cannot affect. check-code.yml's
+// The gates that let a suite skip a change it cannot affect. check.yml's
 // `changes` job classifies the diff, and ci.yml turns `e2e-changed` into E2E's
 // `if:`. Unit has no gate - its guards read every tracked file - and badges
 // reads both suites' results. They are evaluated here as a graph: each
@@ -92,7 +92,7 @@ function runCi({
   return Object.fromEntries(Object.entries(jobs).map(([job, { result }]) => [job, result]));
 }
 
-/** check-code.yml's three outputs, as the strings its `changes` job writes. */
+/** check.yml's three outputs, as the strings its `changes` job writes. */
 const classified = (docsOnly, unit, e2e) => ({
   'docs-only': String(docsOnly),
   'unit-changed': String(unit),

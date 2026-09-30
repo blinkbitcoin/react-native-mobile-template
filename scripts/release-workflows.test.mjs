@@ -242,31 +242,31 @@ describe('cd-release.yml chains the release by dispatch', () => {
 
   test('a second job drafts the store notes into the release PR through shared-workflows', () => {
     const job =
-      /store-notes:\n\s+name: Release notes\n\s+needs: release-please\n[\s\S]*?uses: [^\n]*\/shared-workflows\/\.github\/workflows\/pr-release-notes\.yml@[0-9a-f]{40}\b/;
-    assert.match(code, job, 'no store-notes job calling pr-release-notes.yml');
+      /store-notes:\n\s+name: Store notes\n\s+needs: release-please\n[\s\S]*?uses: [^\n]*\/shared-workflows\/\.github\/workflows\/pr-store-notes\.yml@[0-9a-f]{40}\b/;
+    assert.match(code, job, 'no store-notes job calling pr-store-notes.yml');
     assert.match(code, /if: \$\{\{ needs\.release-please\.outputs\.pr-number != '' \}\}/);
     assert.match(code, /pull-requests: write/);
     assert.match(code, /pr-number: \$\{\{ needs\.release-please\.outputs\.pr-number \}\}/);
     assert.match(code, /ref: \$\{\{ needs\.release-please\.outputs\.pr-branch \}\}/);
     for (const name of [
       'STORE_NOTES_INCLUDE_CHANGELOG',
-      'RELEASE_NOTES_LLM_PROVIDER',
-      'RELEASE_NOTES_LLM_MODEL',
-      'RELEASE_NOTES_LLM_EFFORT',
+      'STORE_NOTES_LLM_PROVIDER',
+      'STORE_NOTES_LLM_MODEL',
+      'STORE_NOTES_LLM_EFFORT',
       'OPENAI_BASE_URL',
     ]) {
       assert.match(
         code,
         new RegExp(`"${name}":"\\$\\{\\{ vars\\.${name} \\}\\}"`),
-        `${name} not in build-env`,
+        `${name} not in environment-variables`,
       );
     }
     // A JSON object inside a JSON string: toJSON quotes and escapes it, where
-    // pasting it between "..." would end the build-env object at its first
+    // pasting it between "..." would end the environment-variables object at its first
     // quote and fail the job with a parse error.
     assert.match(
       code,
-      /"RELEASE_NOTES_LLM_EXTRA_PARAMS":\$\{\{ toJSON\(vars\.RELEASE_NOTES_LLM_EXTRA_PARAMS \|\| ''\) \}\}/,
+      /"STORE_NOTES_LLM_EXTRA_PARAMS":\$\{\{ toJSON\(vars\.STORE_NOTES_LLM_EXTRA_PARAMS \|\| ''\) \}\}/,
     );
     for (const key of ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY']) {
       assert.match(
@@ -292,10 +292,10 @@ describe('cd-release.yml chains the release by dispatch', () => {
         .filter((l) => !l.trimStart().startsWith('#'))
         .join('\n');
       for (const name of [
-        'RELEASE_NOTES_LLM_PROVIDER',
-        'RELEASE_NOTES_LLM_MODEL',
-        'RELEASE_NOTES_LLM_EFFORT',
-        'RELEASE_NOTES_LLM_EXTRA_PARAMS',
+        'STORE_NOTES_LLM_PROVIDER',
+        'STORE_NOTES_LLM_MODEL',
+        'STORE_NOTES_LLM_EFFORT',
+        'STORE_NOTES_LLM_EXTRA_PARAMS',
         'OPENAI_BASE_URL',
         'ANTHROPIC_API_KEY',
         'OPENAI_API_KEY',
@@ -390,8 +390,8 @@ describe('the release path without a store account', () => {
         // produced, so they have no signing inputs to derive.
         if (file !== 'cd-internal.yml') return;
         for (const [job, input, variable] of [
-          ['build-ios', 'ios-signing', 'IOS_SIGNING_ENABLED'],
-          ['build-android', 'android-signing', 'ANDROID_SIGNING_ENABLED'],
+          ['build-ios', 'ios-signing-enabled', 'IOS_SIGNING_ENABLED'],
+          ['build-android', 'android-signing-enabled', 'ANDROID_SIGNING_ENABLED'],
         ]) {
           const body = jobs[job].body.filter((l) => !l.trimStart().startsWith('#')).join('\n');
           assert.match(body, new RegExp(`${input}:`), `${job} does not pass ${input}`);
@@ -478,7 +478,7 @@ describe('the security gate', () => {
       // cd-release.yml starts the release PR's CI with `gh workflow run --ref`:
       // a workflow_dispatch, where github.head_ref is empty.
       assert.doesNotMatch(body(), /head_ref/);
-      for (const input of ['bundle', 'openant', 'review-full-range']) {
+      for (const input of ['bundle', 'review-codebase', 'review-full-range']) {
         assert.ok(
           body().includes(`${input}: \${{ ${RELEASE_PR} }}`),
           `${input} is not switched on by the release pull request's branch`,
@@ -491,19 +491,30 @@ describe('the security gate', () => {
     });
 
     test('leaves the source scanners at their default (on) and the production-only ones off', () => {
-      for (const input of ['deps', 'code', 'policy', 'binaries', 'mobile', 'sbom', 'release-tag']) {
+      for (const input of [
+        'dependencies',
+        'code',
+        'policy',
+        'binaries',
+        'mobile',
+        'sbom',
+        'release-tag',
+      ]) {
         assert.doesNotMatch(body(), new RegExp(`^\\s+${input}:`, 'm'), `ci.yml sets ${input}`);
       }
     });
 
-    test('passes the LLM settings as build-env and the keys as secrets', () => {
+    test('passes the LLM settings as environment-variables and the keys as secrets', () => {
       for (const name of [
         'SECURITY_LLM_PROVIDER',
         'SECURITY_LLM_MODEL',
         'SECURITY_LLM_EFFORT',
         'OPENAI_BASE_URL',
       ]) {
-        assert.ok(body().includes(`"${name}":"\${{ vars.${name} }}"`), `${name} not in build-env`);
+        assert.ok(
+          body().includes(`"${name}":"\${{ vars.${name} }}"`),
+          `${name} not in environment-variables`,
+        );
       }
       assert.ok(
         body().includes(
@@ -535,7 +546,7 @@ describe('the security gate', () => {
       for (const input of ['binaries', 'mobile', 'bundle', 'sbom']) {
         assert.match(body(), new RegExp(`^\\s+${input}: true$`, 'm'), `${input} is not on`);
       }
-      for (const input of ['deps', 'code', 'policy']) {
+      for (const input of ['dependencies', 'code', 'policy']) {
         assert.match(body(), new RegExp(`^\\s+${input}: false$`, 'm'), `${input} is not off`);
       }
     });
@@ -543,7 +554,7 @@ describe('the security gate', () => {
     test('carries no LLM environment', () => {
       assert.doesNotMatch(
         code('cd-production.yml'),
-        /SECURITY_LLM|review:|openant:|OPENAI_API_KEY|ANTHROPIC_API_KEY/,
+        /SECURITY_LLM|review:|review-codebase:|OPENAI_API_KEY|ANTHROPIC_API_KEY/,
       );
     });
 
@@ -599,8 +610,8 @@ describe('cd-internal.yml builds every commit to main except a docs-only one', (
   });
 
   test('a commit that changes only a prompt builds, in any directory', () => {
-    // release-notes.prompt.md feeds the store notes the internal build ships.
-    assert.equal(pushFilterRuns(push.paths, ['release-notes.prompt.md']), true);
+    // store-notes.prompt.md feeds the store notes the internal build ships.
+    assert.equal(pushFilterRuns(push.paths, ['store-notes.prompt.md']), true);
     assert.equal(pushFilterRuns(push.paths, ['docs/security-review.prompt.md']), true);
   });
 

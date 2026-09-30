@@ -139,7 +139,7 @@ Schematic renderings of the console screens the agent walks through, in the orde
 
 ![Submit the uploaded version for release](images/store-setup-flows/submit-the-uploaded-version-for-release.svg)
 
-*My apps, Distribute, Version information. This is what the upload_huawei lane does on the production dispatch: the same signed bundle, the release notes, and a submit for review. A human comes here only to check the review state afterwards.*
+*My apps, Distribute, Version information. This is what the upload_huawei lane does on the production dispatch: the same signed bundle, the store notes, and a submit for review. A human comes here only to check the review state afterwards.*
 
 
 ## Who does what, by mode

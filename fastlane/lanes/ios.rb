@@ -11,7 +11,7 @@
 # in shared.rb): the files under metadata/ios/review_information/ are blank on
 # purpose, and deliver would otherwise upload those blanks and clear the App
 # Review contact, demo account and notes.
-# App Store Connect's own caps, counted in characters (see release-notes.prompt.md).
+# App Store Connect's own caps, counted in characters (see store-notes.prompt.md).
 TESTFLIGHT_NOTES_LIMIT = 4000
 APP_STORE_NOTES_LIMIT = 4000
 
@@ -123,7 +123,7 @@ platform :ios do
 
   desc 'Upload the build to TestFlight for internal testers (idempotent)'
   lane :upload_internal do |options|
-    require_env!(%w[ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64 RELEASE_NOTES_STORE_FILE])
+    require_env!(%w[ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64 STORE_NOTES_FILE])
     build_info # asserts the artifact belongs to this version/build number
     key = api_key
     bundle_id = ENV.fetch('IOS_BUNDLE_ID')
@@ -167,7 +167,7 @@ platform :ios do
 
   desc 'Promote the existing TestFlight build to the external beta group'
   lane :promote_beta do
-    require_env!(%w[ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64 TESTFLIGHT_EXTERNAL_GROUP RELEASE_NOTES_STORE_FILE])
+    require_env!(%w[ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64 TESTFLIGHT_EXTERNAL_GROUP STORE_NOTES_FILE])
 
     # `distribute_only: true` promotes the build that is already there; nothing
     # is re-uploaded, so beta always ships the exact binary internal testers saw.

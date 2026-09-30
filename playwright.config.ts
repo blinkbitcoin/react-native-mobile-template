@@ -47,7 +47,7 @@ export default defineConfig({
   use: { baseURL: previewUrl },
   webServer: [
     {
-      command: 'pnpm mock-api',
+      command: 'pnpm dev:api',
       url: mockApiUrl,
       reuseExistingServer: true,
       timeout: 30_000,
