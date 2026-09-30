@@ -487,7 +487,7 @@ one, and several carry many: `cd-production.yml` alone has twelve.
 `cd-beta-retry.yml` calls no reusable workflow at all.
 
 ```yaml
-uses: blinkbitcoin/shared-workflows/.github/workflows/check.yml@b465b4c2fa217b37f87d308e7640f7fc1ffd6b38 # v0.21.0
+uses: blinkbitcoin/shared-workflows/.github/workflows/check.yml@5189bd2a4c4ff3cb98b01e1cfda15923f7c1ae25 # v0.22.0
 ```
 
 A shared-workflows release changes nothing here by itself
