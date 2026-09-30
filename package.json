@@ -112,7 +112,6 @@
     "check:docs": "make check-docs",
     "check:release": "make check-release",
     "check:ci": "make check-ci",
-    "check:contract": "check-consumer-contract",
     "check:secrets": "make check-secrets",
     "check:bundle-secrets": "make check-security-bundle",
     "mock-api": "tsx mocks/server.ts",

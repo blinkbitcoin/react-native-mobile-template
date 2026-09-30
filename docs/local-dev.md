@@ -54,10 +54,7 @@ has not been told to trust.
 | pnpm | 12 | installs. Any other package manager is refused by `only-allow pnpm` |
 | java | temurin-17 | Gradle and Maestro |
 | ruby | 3.3 | fastlane and CocoaPods |
-| actionlint | 1.7.12 | `make check-ci` |
-| shellcheck | 0.11.0 | `make check-ci` |
 | typos | 1.50.1 | `make check-spell` |
-| zizmor | 1.30.1 | `make check-ci` |
 | gitleaks | 8.30.1 | `make check-secrets`, the pre-commit hook |
 
 `typos` is pinned rather than `latest` so this repo and

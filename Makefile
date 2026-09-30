@@ -182,12 +182,10 @@ check-deps: ## SDK drift, vulnerability audit, lockfile provenance, licenses
 	pnpm deps:audit
 	pnpm deps:licenses
 
-# zizmor is the security half: injection, permissions, App token scope,
-# dangerous triggers. --offline keeps the answer independent of the network.
-# Policy and the one justified ignore: .github/zizmor.yml, passed by --config
-# because zizmor otherwise looks for it at the nearest directory holding a
-# `.git` directory, and a worktree's `.git` is a file: under .claude/worktrees/
-# it would read the outer checkout's policy instead of this one's.
+# actionlint, zizmor and shellcheck all come from shared-workflows' lint-ci.sh,
+# at the versions it pins, which also hands zizmor this repository's
+# .github/zizmor.yml explicitly (a worktree's `.git` is a file, so zizmor's own
+# search would find the outer checkout's policy).
 check-ci: ## Lint the CI itself: actionlint + zizmor + shellcheck (the shared lint-ci.sh), locale prefixes, workflow names
 	WORKFLOWS_SHELLCHECK_PATHS="scripts .claude/skills" bash node_modules/@blinkbitcoin/dev-config/ci/lint-ci.sh
 	pnpm exec check-shell-locale
@@ -276,7 +274,7 @@ check-code-scanning: ## CodeQL code scanning locally, with the same config CI us
 # check from the installed package (the same commit, docs/decisions/0024-...),
 # for a laptop, before pushing.
 check-contract: ## Everything the called shared workflows need from this repository, in one report
-	pnpm check:contract
+	pnpm exec check-consumer-contract
 
 test-scripts: ## node:test for scripts/**/*.test.mjs, with the 100% script coverage gate
 	pnpm test:scripts
