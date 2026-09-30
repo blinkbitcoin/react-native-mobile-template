@@ -374,9 +374,9 @@ e2e-teardown-script: scripts/e2e/ci-mock-api-down.sh
   confusing one.
 
 Setup also runs `adb reverse` for the derived mock-API port when a device is
-attached. The workflows repo reverses `WORKFLOWS_MOCK_API_PORT`, whose default still
-predates `APP_PORT_BASE`; until it derives its ports from the same base, the
-hook covers the gap.
+attached. The workflows repo reverses `WORKFLOWS_MOCK_API_PORT`, whose default (8082)
+is the mock API under the default `APP_PORT_BASE` only; until it derives its
+ports from the same base, the hook covers any other base.
 
 The paths are consumer-relative file paths run with `bash`, not `package.json`
 script names. The workflows repo's own `self-smoke.yml` points at these exact
