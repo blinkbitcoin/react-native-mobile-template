@@ -361,11 +361,19 @@ make dev-ios       # terminal 3, then
 make test-e2e-ios  # or make test-e2e-android
 ```
 
-`scripts/e2e/maestro-ios.sh` and `scripts/e2e/maestro-android.sh` wait for the
-mock API, open the `expo-development-client` deep link (see
-[local-dev.md](local-dev.md)), and run `maestro test .maestro` with
-`--debug-output .maestro/output --flatten-debug-output`. Android also sets up
-`adb reverse` for the Metro and mock-API ports.
+Both run `scripts/e2e/maestro.sh`, which derives the ports from
+`APP_PORT_BASE`, waits for the mock API, and hands the rest to the scripts CI
+runs, from `node_modules/@blinkbitcoin/app-tooling/e2e/`: on iOS
+`ios-simulator.sh pick` (the booted iPhone), `app-launch.sh ios` and
+`ios-maestro.sh`; on Android `android-maestro.sh`, which reinstalls the debug
+APK `make dev-android` built, sets up `adb reverse` for the Metro and mock-API
+ports, turns the emulator's animations off as CI does, and launches. The launch
+is the `expo-development-client` deep link (see [local-dev.md](local-dev.md)),
+and the suite is `maestro test .maestro` with the same retry and the same check
+that flows ran as in CI. The junit report and Maestro's debug output land in
+`.maestro/output/maestro/` (`WORKFLOWS_OUT` moves it). Extra arguments reach
+`maestro test`: `pnpm test:e2e:ios --include-tags smoke`. The app id and scheme
+come from the Expo config, which needs `yq` (pinned in `.mise.toml`).
 
 ### Adding a flow
 
@@ -416,7 +424,7 @@ And the iOS suite no longer covers the Metro dev path; Android still does.
 `pnpm build:web` (a production export, the flavour that deploys) and then runs
 the suite in `e2e/web/`.
 `playwright.config.ts` starts two web servers for it: the mock API and
-`scripts/e2e/serve-dist.mjs`, both on ports derived from `APP_PORT_BASE`. The
+the shared tooling's `serve-dist`, both on ports derived from `APP_PORT_BASE`. The
 latter serves `dist` the way GitHub Pages does - under `EXPO_PUBLIC_BASE_URL`
 when a deploy export was built for a sub-path, `/settings` from
 `settings.html`, and `404.html` with a 404 for a path with no file, which is
@@ -457,8 +465,8 @@ for `rerunning the suite once`. A first attempt that failed is a flake to
 fix, and the flakes in this suite have all been one event reported by the
 flow it landed on, not the flow that caused it.
 
-Locally the same Maestro debug tree lands in `.maestro/output/`, which is
-gitignored. Full detail in [ci.md](ci.md).
+Locally the same Maestro debug tree lands in `.maestro/output/maestro/`,
+which is gitignored. Full detail in [ci.md](ci.md).
 
 ## Rehearsing a release lane
 

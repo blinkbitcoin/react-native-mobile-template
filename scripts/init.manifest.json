@@ -17,18 +17,6 @@
         ]
       },
       {
-        "path": "scripts/e2e/maestro-ios.sh",
-        "replace": [
-          ["APP_ID:-sv.blink.reactnativemobiletemplate.dev", "APP_ID:-{{iosBundleId}}.dev"]
-        ]
-      },
-      {
-        "path": "scripts/e2e/maestro-android.sh",
-        "replace": [
-          ["APP_ID:-sv.blink.reactnativemobiletemplate.dev", "APP_ID:-{{androidPackage}}.dev"]
-        ]
-      },
-      {
         "path": "modules/hello-native/ios/HelloNative.podspec",
         "replace": [
           [
@@ -103,8 +91,6 @@
       "package.json",
       "plugins/with-android-release-signing.ts",
       "release-please-config.json",
-      "scripts/e2e/maestro-android.sh",
-      "scripts/e2e/maestro-ios.sh",
       "src/lib/native-intent.test.ts",
       "src/lib/native-intent.ts"
     ],
@@ -143,8 +129,6 @@
     "files": [
       "playwright.config.ts",
       "scripts/build-web.sh",
-      "scripts/e2e/serve-dist.mjs",
-      "scripts/e2e/serve-dist.test.mjs",
       "scripts/e2e/web.sh",
       ".github/workflows/ci-web.yml",
       "scripts/ci-web-gate.test.mjs",

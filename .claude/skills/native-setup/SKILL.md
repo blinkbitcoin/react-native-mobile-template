@@ -85,16 +85,16 @@ and print the exact command: installing Xcode, `sudo xcode-select -s
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| Android: all 6 flows fail, `00-launch` never sees `home-screen`, emulator ends on the launcher | `00-launch.yaml` presses Back to close the dev-menu intro, which only appears on an install's first run; with no menu, Back quits the app | `adb shell pm clear` with the app's id (`APP_ID` in `scripts/e2e/maestro-android.sh`), then re-run |
-| Android: all flows fail within milliseconds; `.maestro/output/maestro.log` has `DeviceServerDiedException ... device offline` | adb dropped the emulator for a moment | `adb wait-for-device`, re-run |
+| Android: all 6 flows fail, `00-launch` never sees `home-screen`, emulator ends on the launcher | `00-launch.yaml` presses Back to close the dev-menu intro, which only appears on an install's first run; with no menu, Back quits the app | `adb shell pm clear` with the app's id (`android.package` from `pnpm exec expo config --json`, the `.dev` id in development), then re-run |
+| Android: all flows fail within milliseconds; `.maestro/output/maestro/maestro.log` has `DeviceServerDiedException ... device offline` | adb dropped the emulator for a moment | `adb wait-for-device`, re-run |
 | Blank screen after the E2E script's deep link | The link was delivered into an already-running app pointed at a different Metro URL | Force-stop or `pm clear` the app first |
 | Code changes do not show up | Metro was started with `CI=1` ("reloads are disabled") | Restart it with `make dev`, without `CI` |
 | LogBox: `Can't perform a React state update on a component that hasn't mounted yet` from `useLinking.native.js` | expo-router's startup deep-link handling, intermittently on the first load after a large rebuild | Dismiss it; not an app bug. It can cover the tab bar, so dismiss before tapping |
 
 ## Where the evidence is
 
-- `.maestro/output/<flow>/commands.json` and `screenshots/`, and
-  `.maestro/output/maestro.log`: which step failed, and what was on screen.
+- `.maestro/output/maestro/<flow>/commands.json` and `screenshots/`, and
+  `.maestro/output/maestro/maestro.log`: which step failed, and what was on screen.
 - `$TMPDIR/emulator-<avd>.log`: an emulator started by `--boot`.
 - `adb logcat -d --pid=$(adb shell pidof <APP_ID>)`: the app's
   own log; `ReactNativeJS` lines are JavaScript.

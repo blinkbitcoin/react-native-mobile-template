@@ -93,7 +93,7 @@ jobs:
     name: Publish
     needs: baseline
     if: ${{ vars.OTA_ENABLED == 'true' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-ota.yml@5b9e2407821b402fc3b545771c6131490e6c1848 # v0.21.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-ota.yml@b465b4c2fa217b37f87d308e7640f7fc1ffd6b38 # v0.21.0
     permissions:
       contents: read
     with:

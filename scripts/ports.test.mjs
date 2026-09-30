@@ -241,8 +241,7 @@ for (const [file, needle] of [
   ['scripts/e2e/web.sh', 'node scripts/ports.mjs --sh'],
   ['mocks/server.ts', 'resolvePorts'],
   ['scripts/e2e/wait-for-mock-api.sh', 'node scripts/ports.mjs --sh'],
-  ['scripts/e2e/maestro-ios.sh', 'node scripts/ports.mjs --sh'],
-  ['scripts/e2e/maestro-android.sh', 'node scripts/ports.mjs --sh'],
+  ['scripts/e2e/maestro.sh', 'node scripts/ports.mjs --sh'],
   ['scripts/e2e/ci-mock-api-up.sh', 'node scripts/ports.mjs --sh'],
   ['Makefile', 'node scripts/ports.mjs --sh'],
 ]) {

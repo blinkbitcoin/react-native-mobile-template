@@ -1,6 +1,6 @@
 # 15. The web target deploys to a Pages sub-path, tested as the same bytes
 
-- **Status:** Accepted (refines [0006](0006-web-opt-in.md))
+- **Status:** Accepted (refines [0006](0006-web-opt-in.md)). The preview server is the shared tooling's `serve-dist` since 2026-10-01 (`pnpm exec serve-dist`); `scripts/e2e/serve-dist.mjs` is gone and the decision stands.
 - **Date:** 2026-09-19
 
 ## Context

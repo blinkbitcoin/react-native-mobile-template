@@ -1,6 +1,6 @@
 # 9. E2E launches the dev client by deep link, never from its launcher
 
-- **Status:** Accepted for Android; superseded for iOS by [0010](0010-ios-e2e-release-build.md)
+- **Status:** Accepted for Android; superseded for iOS by [0010](0010-ios-e2e-release-build.md). Since 2026-10-01 a local run launches with the shared tooling's `app-launch.sh`, the script CI runs, through `scripts/e2e/maestro.sh`; `maestro-ios.sh` and `maestro-android.sh` are gone and the decision stands.
 - **Date:** 2026-09-06
 
 ## Context

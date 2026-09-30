@@ -3,8 +3,8 @@ tags: [smoke]
 ---
 # `stopApp: false` (and no `clearState`) on purpose: the runner has already
 # foregrounded the app through the `expo-development-client` deep link
-# (`scripts/e2e/maestro-{ios,android}.sh` locally, `$WORKFLOWS_DIR/scripts/e2e/app-launch.sh`
-# in CI), which is the only reliable way to reach the bundle on a simulator or
+# (the shared tooling's `app-launch.sh`, locally through `scripts/e2e/maestro.sh`
+# and in CI from `$WORKFLOWS_DIR/scripts/e2e/`), which is the only reliable way to reach the bundle on a simulator or
 # emulator. Restarting or clearing state here would drop the dev client back on
 # its launcher screen, whose "DEVELOPMENT SERVERS" list is populated by Bonjour
 # discovery — which does not work on a simulator or in CI, so the flow would

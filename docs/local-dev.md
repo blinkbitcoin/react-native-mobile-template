@@ -181,9 +181,9 @@ adb shell am start -a android.intent.action.VIEW \
   -d "rnmt://expo-development-client/?url=http%3A%2F%2F10.0.2.2%3A$METRO_PORT"
 ```
 
-`scripts/e2e/maestro-ios.sh` and `scripts/e2e/maestro-android.sh` do exactly
-this before running the flows, and CI does the same. See
-[ci.md](ci.md) for the CI half.
+`make test-e2e-ios` and `make test-e2e-android` do exactly this before running
+the flows, with the shared tooling's `app-launch.sh` (the script CI runs), which
+reads the scheme from the Expo config. See [ci.md](ci.md) for the CI half.
 
 ## Android and `10.0.2.2`
 
@@ -192,9 +192,10 @@ places handle it:
 
 - `src/config/env.ts` rewrites `://localhost` to `://10.0.2.2` in
   `EXPO_PUBLIC_API_URL` when running in development on Android.
-- `scripts/e2e/maestro-android.sh` runs `adb reverse` for `$METRO_PORT` and
-  `$MOCK_API_PORT` so Metro and the mock API are reachable by their host ports
-  too.
+- `make test-e2e-android` runs `adb reverse` for `$METRO_PORT` and
+  `$MOCK_API_PORT` (the shared tooling's `android-emulator.sh prepare`, handed
+  both by `scripts/e2e/maestro.sh`), so Metro and the mock API are reachable by
+  their host ports too.
 
 A physical Android device needs neither: use `adb reverse` yourself, or point
 `EXPO_PUBLIC_API_URL` at the host's LAN address.
