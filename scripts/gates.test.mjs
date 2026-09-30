@@ -1,10 +1,10 @@
 // The gates this repo defines and the gates CI runs have to be the same gates.
 //
-// shared-workflows now prefers this repo's own script for i18n, codegen,
-// Expo doctor, the audit and the CI linters, falling back to its own only when
-// we ship none (scripts/checks/run-consumer-or.sh over there). That makes these
-// scripts load-bearing in CI, so the properties below are no longer a local
-// style preference.
+// shared-workflows prefers this repo's own script for i18n, codegen, Expo
+// doctor, the audit and the CI linters, falling back to its own only when we
+// ship none (scripts/checks/run-consumer-or.sh over there). Where the two would
+// do the same thing, ours now calls the shared one from @blinkbitcoin/dev-config,
+// and the tests below pin those calls.
 //
 // The cross-repo half of this contract - that `make ci` and CI run the same
 // gates - is enforced by this repo's own CI: the Checks / Contract job runs
@@ -90,22 +90,37 @@ describe('the scripts CI calls', () => {
   });
 });
 
-describe('the drift-detecting gates catch an untracked file', () => {
-  // A `git diff` only sees files git already tracks, so a brand-new catalog or
-  // generated document was invisible to these gates and they passed on a tree
-  // that was genuinely stale. The workflows repo's fallback always used the
-  // stronger form; now that CI runs ours, ours has to as well.
-  for (const rel of ['scripts/check-i18n.sh', 'scripts/check-codegen.sh']) {
-    test(`${rel} uses git status, not git diff`, () => {
-      const src = read(rel);
-      assert.match(src, /git status --porcelain/, `${rel} must detect untracked output`);
-      assert.doesNotMatch(
-        src,
-        /git diff --exit-code/,
-        `${rel} still gates on git diff, which cannot see an untracked file`,
-      );
-    });
-  }
+// The drift, secrets and CI-lint checks are not ours any more either: CI's
+// check-code.yml runs shared-workflows' scripts/checks/*.sh and ci/lint-ci.sh,
+// and @blinkbitcoin/dev-config ships byte-identical copies, so the gates below
+// run exactly those. Their behaviour (untracked output counts as drift, the
+// shallow-clone refusal, the pinned linters) is tested over there.
+describe('the drift, secrets and CI-lint gates run the shared scripts', () => {
+  const PACKAGE = 'node_modules/@blinkbitcoin/dev-config';
+
+  test('i18n:check and codegen:check run the packaged drift checks', () => {
+    assert.equal(pkg.scripts['i18n:check'], `bash ${PACKAGE}/checks/i18n.sh`);
+    assert.equal(pkg.scripts['codegen:check'], `bash ${PACKAGE}/checks/codegen.sh`);
+    // What the shared checks run and diff: Lingui's extract has to compile too,
+    // or the committed messages.ts would drift unseen.
+    assert.equal(pkg.scripts['i18n:extract'], 'lingui extract --clean && lingui compile');
+    assert.match(pkg.scripts.codegen, /^graphql-codegen /);
+  });
+
+  test('deps:audit ends with the shared lockfile provenance check', () => {
+    assert.match(pkg.scripts['deps:audit'], / && check-lockfile$/);
+  });
+
+  test('the packaged scripts the gates call are installed', () => {
+    for (const rel of [
+      'checks/i18n.sh',
+      'checks/codegen.sh',
+      'checks/secrets.sh',
+      'ci/lint-ci.sh',
+    ]) {
+      assert.ok(existsSync(path.join(root, PACKAGE, rel)), `${PACKAGE}/${rel} is not installed`);
+    }
+  });
 });
 
 // The family's variables were prefixed with the initials of the workflows
@@ -146,26 +161,7 @@ test('no trace of the old abbreviated namespace survives', () => {
   assert.deepEqual(offenders, [], `these still carry the old prefix: ${offenders.join(', ')}`);
 });
 
-test('shellcheck.sh walks the tree instead of globbing to a fixed depth', () => {
-  // `scripts/*.sh scripts/*/*.sh scripts/*/*/*.sh` silently skips anything
-  // deeper. This bug has now appeared twice in the family: the workflows repo
-  // fixed the same glob in its own Makefile during the esign/kyc port.
-  // Comments stripped first: this file's own prose quotes the old glob to
-  // explain it, and a test that reads prose as code is a false positive waiting
-  // to happen.
-  const src = read('scripts/shellcheck.sh')
-    .split('\n')
-    .filter((line) => !line.trimStart().startsWith('#'))
-    .join('\n');
-  assert.match(src, /find scripts \.claude\/skills -name '\*\.sh' -exec shellcheck -x \{\} \+/);
-  assert.doesNotMatch(
-    src,
-    /scripts\/\*\/\*\//,
-    'shellcheck.sh is back to a fixed-depth glob and will skip deeper scripts',
-  );
-});
-
-// Six guards and the version script are not ours any more: they come from
+// Six guards, the version script, the pin fixer and the lockfile check are not ours any more: they come from
 // @blinkbitcoin/dev-config, at the commit the workflows pin. A copy deleted in
 // favour of a bin is only as good as the call that replaced it, so each call is
 // pinned here, in the gate CI runs it from: `check:ci` (make check-ci) and
@@ -200,10 +196,22 @@ describe('the shared tooling guards run where CI runs them', () => {
     assert.equal(recipe(sample, 'b'), '\tthree');
   });
 
-  test('make check-ci runs the shell locale and workflow name guards', () => {
+  test('make check-ci runs the shared CI lint over scripts and skills, and the locale and workflow name guards', () => {
     const ci = recipe(makefile, 'check-ci');
+    assert.match(
+      ci,
+      new RegExp(
+        `^\\tWORKFLOWS_SHELLCHECK_PATHS="scripts \\.claude/skills" bash ${PACKAGE}/ci/lint-ci\\.sh$`,
+        'm',
+      ),
+    );
     assert.match(ci, /pnpm exec check-shell-locale/);
     assert.match(ci, /pnpm exec check-workflow-names --group ci=CI --group cd=CD/);
+  });
+
+  test('make check-secrets and make fix-tooling-pin run the shared script and program', () => {
+    assert.equal(recipe(makefile, 'check-secrets'), `\tbash ${PACKAGE}/checks/secrets.sh`);
+    assert.equal(recipe(makefile, 'fix-tooling-pin'), '\tpnpm exec fix-tooling-pin');
   });
 
   test('check-docs.sh runs the tables, diagrams and make target name guards', () => {

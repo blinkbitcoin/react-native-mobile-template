@@ -12,7 +12,7 @@
 // run from a worktree. Those two are checked by behaviour, not by text.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import test, { describe } from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -104,15 +104,26 @@ test('ESLint ignores other worktrees, not this checkout', () => {
 // zizmor looks for its policy at the nearest directory holding a `.git`
 // directory. A worktree's `.git` is a file, so without --config it reads the
 // outer checkout's policy, or none, and every tag pin turns into a finding.
+// `make check-ci` runs zizmor through shared-workflows' ci/lint-ci.sh, which
+// passes a repository's own .github/zizmor.yml explicitly (its lint-ci.bats
+// holds it to that); any zizmor this repository calls itself must do the same.
 test("zizmor is always handed this checkout's policy", () => {
-  const calls = execFileSync('git', ['grep', '-h', '-E', 'zizmor[ ]+--', '--', ':!*.md'], {
-    cwd: root,
-    encoding: 'utf8',
-  })
-    .split('\n')
-    .filter(Boolean);
-  assert.ok(calls.length > 0, 'no zizmor command found');
-  for (const call of calls) assert.match(call, /--config \.github\/zizmor\.yml /, call);
+  assert.ok(
+    existsSync(path.join(root, '.github/zizmor.yml')),
+    'the policy lint-ci.sh hands zizmor is gone',
+  );
+  let calls = '';
+  try {
+    calls = execFileSync('git', ['grep', '-h', '-E', 'zizmor[ ]+--', '--', ':!*.md'], {
+      cwd: root,
+      encoding: 'utf8',
+    });
+  } catch (error) {
+    assert.equal(error.status, 1, `git grep failed: ${error.message}`);
+  }
+  for (const call of calls.split('\n').filter(Boolean))
+    assert.match(call, /--config \.github\/zizmor\.yml /, call);
+  assert.match(read('Makefile'), /bash node_modules\/@[\w-]+\/dev-config\/ci\/lint-ci\.sh/);
 });
 
 describe('the configurations that name paths relative to the root', () => {

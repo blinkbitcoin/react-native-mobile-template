@@ -27,7 +27,7 @@ describe('ci-web.yml leaves the web gate to build-web.yml', () => {
     // classifier's base is the PR's base on a pull_request and
     // github.event.before otherwise, and a dispatch has no `before`: no base,
     // so it fails open and the deploy always builds. Checked against the pinned
-    // build-web.yml when WORKFLOWS_DIR points at it, as workflow-contract does.
+    // build-web.yml when WORKFLOWS_DIR points at it.
     assert.ok(Object.hasOwn(web.on, 'workflow_dispatch'));
     assert.match(workflow('cd-release.yml'), /gh workflow run ci-web\.yml .*-f "deploy=true"/);
     const dir = process.env.WORKFLOWS_DIR;

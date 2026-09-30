@@ -91,11 +91,11 @@ Add a rule to one side only, and record which side in the config comment.
 | `make check-spell` | `typos` | Spelling, Markdown included |
 | `make check-code` | the five above | The fast local gate |
 | `make check-gen` | `pnpm i18n:check`, `pnpm codegen:check` | Drift in generated catalogs and generated GraphQL documents |
-| `make check-deps` | `pnpm deps:check`, `pnpm deps:audit`, `pnpm deps:licenses` | Expo SDK drift (`scripts/check-deps.sh`: `expo install --check` is advisory, a CI warning;<br>`expo-doctor`'s other checks block), high-severity vulnerabilities in production dependencies,<br>lockfile provenance (`scripts/check-lockfile.sh`), and the license allowlist (`scripts/check-licenses.mjs`) |
-| `make check-ci` | `scripts/shellcheck.sh`, `check-shell-locale`, `actionlint`,<br>`zizmor --offline --min-severity medium --config .github/zizmor.yml`,<br>`check-workflow-names --group ci=CI --group cd=CD` | The CI itself: every `scripts/**/*.sh`, and the workflow files.<br>zizmor allows tag pins by policy and ignores one reviewed `workflow_run` (`.github/zizmor.yml`).<br>Fails on a `LC_ALL=C cmd` locale prefix in any tracked shell code (Makefile and workflow `run:` blocks included),<br>and on a workflow file or display name outside the `ci`/`cd` groups (see `AGENTS.md`).<br>`check-shell-locale` and `check-workflow-names` come from `@blinkbitcoin/dev-config` |
+| `make check-deps` | `pnpm deps:check`, `pnpm deps:audit`, `pnpm deps:licenses` | Expo SDK drift (`scripts/check-deps.sh`: `expo install --check` is advisory, a CI warning;<br>`expo-doctor`'s other checks block), high-severity vulnerabilities in production dependencies,<br>lockfile provenance (`check-lockfile` from `@blinkbitcoin/dev-config`),<br>and the license allowlist (`scripts/check-licenses.mjs`) |
+| `make check-ci` | shared-workflows' `ci/lint-ci.sh` (actionlint, `zizmor --offline --min-severity medium`<br>with `.github/zizmor.yml`, shellcheck over `scripts/` and `.claude/skills/`, all at the pinned versions),<br>`check-shell-locale`, `check-workflow-names --group ci=CI --group cd=CD` | The CI itself: every shell script, and the workflow files.<br>zizmor allows tag pins by policy and ignores one reviewed `workflow_run` (`.github/zizmor.yml`).<br>Fails on a `LC_ALL=C cmd` locale prefix in any tracked shell code (Makefile and workflow `run:` blocks included),<br>and on a workflow file or display name outside the `ci`/`cd` groups (see `AGENTS.md`).<br>`check-shell-locale` and `check-workflow-names` come from `@blinkbitcoin/dev-config` |
 | `make check-docs` | `scripts/check-docs.sh`, `check-make-target-names`, `check-docs-tables`,<br>`check-diagrams` (all three from `@blinkbitcoin/dev-config`) | Warns when architecture-relevant paths changed with no `docs/` change.<br>Fails when `AGENTS.md`'s command table and the Makefile's `##`-documented targets disagree in either direction,<br>when a make target is named after the tool it runs,<br>when a markdown table cell has a line wider than 120 visible characters,<br>or when a fenced `mermaid` block does not parse |
 | `make check-release` | `ruby -c` over the Fastfile and lanes, `fastlane lanes`, the minitest suite in `fastlane/test/lanes_test.rb`,<br>and every `.claude/skills/*/tests/run.sh` | That the lanes parse and that their pure logic still behaves,<br>and that the store skills still agree with the fastlane gem.<br>Needs the Ruby gems `make install` installs, and talks to no store |
-| `make check-secrets` | `gitleaks git` over the whole history | No committed secret, including one deleted in a later commit.<br>Test data that must look real is allowlisted in `.gitleaks.toml`, each entry with its reason |
+| `make check-secrets` | shared-workflows' `checks/secrets.sh`: `gitleaks git` over the whole history,<br>at the pinned version, refusing a shallow clone | No committed secret, including one deleted in a later commit.<br>Test data that must look real is allowlisted in `.gitleaks.toml`, each entry with its reason |
 
 Not in `make check`, because each is slow or needs a build:
 
@@ -153,9 +153,10 @@ running in CI: the package script is the interface, make is the implementation.
 
 For five gates — i18n, codegen, Expo doctor, the audit and the CI linters —
 `shared-workflows` prefers this repo's script and falls back to its own
-only if we ship none. That makes `scripts/check-i18n.sh`, `check-codegen.sh` and
-`shellcheck.sh` load-bearing in CI, which is why they must be at least as strict
-as the fallbacks they displace; `scripts/gates.test.mjs` holds them to it.
+only if we ship none. For i18n, codegen, secrets and the CI linters ours now
+call the shared scripts themselves, from `@blinkbitcoin/dev-config` at the
+workflows pin, so the local gate and CI's are the same code;
+`scripts/gates.test.mjs` pins those calls.
 
 ### Why CI is not one `make check` step
 

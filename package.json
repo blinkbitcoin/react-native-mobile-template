@@ -50,7 +50,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.11",
-    "@blinkbitcoin/dev-config": "github:blinkbitcoin/shared-workflows#fde851807ccba30314b8b7d7baed50c6e92ee691&path:/packages/dev-config",
+    "@blinkbitcoin/dev-config": "github:blinkbitcoin/shared-workflows#2d14d403fec6e47b89a3afed9bb23658ce86187e&path:/packages/dev-config",
     "@commitlint/cli": "^21.2.2",
     "@commitlint/config-conventional": "^21.2.2",
     "@expo/fingerprint": "^0.20.13",
@@ -105,9 +105,9 @@
     "format:check": "biome format .",
     "spell": "typos",
     "i18n:extract": "lingui extract --clean && lingui compile",
-    "i18n:check": "bash scripts/check-i18n.sh",
+    "i18n:check": "bash node_modules/@blinkbitcoin/dev-config/checks/i18n.sh",
     "codegen": "graphql-codegen --config codegen.ts",
-    "codegen:check": "bash scripts/check-codegen.sh",
+    "codegen:check": "bash node_modules/@blinkbitcoin/dev-config/checks/codegen.sh",
     "check-prebuild": "bash scripts/check-prebuild.sh",
     "check:docs": "make check-docs",
     "check:release": "make check-release",
@@ -118,7 +118,7 @@
     "mock-api": "tsx mocks/server.ts",
     "deps:check": "bash scripts/check-deps.sh",
     "deps:doctor": "expo-doctor",
-    "deps:audit": "pnpm audit --audit-level=high --prod && bash scripts/check-lockfile.sh",
+    "deps:audit": "pnpm audit --audit-level=high --prod && check-lockfile",
     "deps:licenses": "node scripts/check-licenses.mjs"
   }
 }

@@ -227,8 +227,8 @@ follow:
 
 `scripts/ci-suite-gates.test.mjs` evaluates the `unit`, `e2e` and `badges` jobs
 together as a graph, for each kind of change and for failed, cancelled and
-unclassified runs, and holds `unit` to having no gate. `scripts/workflow-contract.test.mjs` checks that every output `ci.yml` reads
-is one `check-code.yml` declares at the pin. A renamed output would read as
+unclassified runs, and holds `unit` to having no gate. The shared contract check (`make check-contract`, CI's
+Checks / Contract) checks that every output `ci.yml` reads is one `check-code.yml` declares at the pin. A renamed output would read as
 empty and quietly run every suite.
 
 ### Release and OTA
@@ -481,7 +481,7 @@ one, and several carry many: `cd-production.yml` alone has twelve.
 `cd-beta-retry.yml` calls no reusable workflow at all.
 
 ```yaml
-uses: blinkbitcoin/shared-workflows/.github/workflows/check-code.yml@fde851807ccba30314b8b7d7baed50c6e92ee691 # v0.17.0
+uses: blinkbitcoin/shared-workflows/.github/workflows/check-code.yml@2d14d403fec6e47b89a3afed9bb23658ce86187e # v0.18.0
 ```
 
 A shared-workflows release changes nothing here by itself
@@ -490,10 +490,11 @@ A shared-workflows release changes nothing here by itself
 pin, release workflows included, and that PR's Unit job runs the new shared
 code against this repository before any CD run can:
 
-- `scripts/workflow-contract.test.mjs` checks every call's inputs and secrets,
+- The shared contract check (`check-consumer-contract` from `@blinkbitcoin/dev-config`,
+  CI's Checks / Contract) checks every call's inputs, their types and secrets,
   and every output a caller reads, against what the called workflow declares
-  at the new commit, that every pin
-  is the same commit, and that the commit is the one the job checked out.
+  at the new commit, and that every pin and the tooling package are on that
+  one commit.
 - `scripts/release/cd-notes.test.mjs` runs the store-notes chain through the
   shared scripts and our generator, end to end.
 
@@ -507,7 +508,7 @@ and relocks), and push.
 
 Then read the release's notes and merge. To bump by hand, change every `uses:`
 in one pass to the new release's commit and version, then run
-`make fix-tooling-pin`; the contract test fails on two different pins or a
+`make fix-tooling-pin`; the contract check fails on two different pins or a
 tooling package left behind, and zizmor fails on anything but a hash pin for
 shared-workflows (`.github/zizmor.yml`). All callers share the `.workflows/` self-checkout
 and the script contract, and mixing versions across them is untested.

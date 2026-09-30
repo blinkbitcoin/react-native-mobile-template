@@ -13,18 +13,16 @@
 // `src/__tests__/app/` instead.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test, { describe } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
-/**
- * Files that may have no sibling test, each with the reason. The bar is the
- * one `coveragePathIgnorePatterns` sets: a file with nothing a test could
- * assert. An entry whose file gains a test, or disappears, fails below.
- */
-const ALLOWLIST = new Map([]);
+// There is no allowlist, and no way to add one: a file that needs a device, a
+// simulator, a native build or the network is tested against fakes of them.
+// The last case below fails if an allowlist comes back.
 
 const ROUTES = 'src/app/';
 const ROUTE_TESTS = 'src/__tests__/app/';
@@ -51,24 +49,12 @@ function siblingsOf(file) {
   return exts.map((e) => path.posix.join(dir, `${name}.test${e}`));
 }
 
-/** Every source file in `files` without a sibling test, less the allowlist. */
-function missingSiblings(files, allowlist) {
+/** Every source file in `files` without a sibling test. */
+function missingSiblings(files) {
   const present = new Set(files);
   return files
     .filter(isSource)
-    .filter((file) => !allowlist.has(file))
     .filter((file) => !siblingsOf(file).some((sibling) => present.has(sibling)));
-}
-
-/** What is wrong with each allowlist entry; empty when nothing is. */
-function allowlistProblems(allowlist, files) {
-  const missing = new Set(missingSiblings(files, new Map()));
-  return [...allowlist]
-    .map(([file, reason]) => {
-      if (!reason.trim()) return `${file}: give it a one-line reason`;
-      return missing.has(file) ? null : `${file}: has a test or is gone, so remove the entry`;
-    })
-    .filter(Boolean);
 }
 
 /** Test files under src/app/, which expo-router would load as routes. */
@@ -98,7 +84,7 @@ const tracked = execFileSync(
   .filter(Boolean);
 
 test('every source file has its own sibling test', () => {
-  const missing = missingSiblings(tracked, ALLOWLIST);
+  const missing = missingSiblings(tracked);
   assert.deepEqual(
     missing,
     [],
@@ -122,7 +108,7 @@ describe('the rule', () => {
       'plugins/with-g.test.ts',
       'modules/h/index.ts',
     ];
-    assert.deepEqual(missingSiblings(files, new Map()), [
+    assert.deepEqual(missingSiblings(files), [
       'scripts/lib/b.mjs',
       'src/D.tsx',
       'src/F.web.tsx',
@@ -137,7 +123,7 @@ describe('the rule', () => {
       'modules/h/index.ts',
       'modules/h/__tests__/index.test.ts',
     ];
-    assert.deepEqual(missingSiblings(files, new Map()), ['src/lib/a.ts', 'modules/h/index.ts']);
+    assert.deepEqual(missingSiblings(files), ['src/lib/a.ts', 'modules/h/index.ts']);
   });
 
   test("a script's test must be a script", () => {
@@ -153,7 +139,7 @@ describe('the rule', () => {
       'src/app/details/[id].tsx',
       'src/app/details/[id].test.tsx',
     ];
-    assert.deepEqual(missingSiblings(files, new Map()), ['src/app/details/[id].tsx']);
+    assert.deepEqual(missingSiblings(files), ['src/app/details/[id].tsx']);
   });
 
   test('leaves out generated code, test support and files that are not modules', () => {
@@ -167,33 +153,17 @@ describe('the rule', () => {
       'plugins/helpers/x.ts',
       'modules/h/src/HelloNativeModule.ts',
     ];
-    assert.deepEqual(missingSiblings(files, new Map()), []);
-  });
-
-  test('an allowlisted file needs no sibling', () => {
-    assert.deepEqual(missingSiblings(['src/a.ts'], new Map([['src/a.ts', 'why']])), []);
+    assert.deepEqual(missingSiblings(files), []);
   });
 });
 
-describe('the allowlist', () => {
-  test('every entry has a reason and still names a file without a test', () => {
-    assert.deepEqual(allowlistProblems(ALLOWLIST, tracked), []);
-  });
-
-  test('flags an entry without a reason, and one whose file has a test or is gone', () => {
-    const files = ['src/a.ts', 'src/b.ts', 'src/c.ts', 'src/c.test.ts'];
-    const allowlist = new Map([
-      ['src/a.ts', 'nothing to assert'],
-      ['src/b.ts', ' '],
-      ['src/c.ts', 'nothing to assert'],
-      ['src/gone.ts', 'nothing to assert'],
-    ]);
-    assert.deepEqual(allowlistProblems(allowlist, files), [
-      'src/b.ts: give it a one-line reason',
-      'src/c.ts: has a test or is gone, so remove the entry',
-      'src/gone.ts: has a test or is gone, so remove the entry',
-    ]);
-  });
+test('no file is excused: this check has no allowlist', () => {
+  const own = readFileSync(fileURLToPath(import.meta.url), 'utf8');
+  assert.doesNotMatch(
+    own,
+    /^const [A-Z_]*ALLOW[A-Z_]* =/m,
+    'an allowlist is back in scripts/test-siblings.test.mjs',
+  );
 });
 
 describe('route tests', () => {

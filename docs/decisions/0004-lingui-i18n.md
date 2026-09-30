@@ -24,7 +24,7 @@ when the result differs from what is committed.
   (generated, committed, excluded from Biome, ESLint, typos and knip).
 - `src/i18n/i18n.ts` — imports the compiled catalogs and activates the device
   locale; `I18nProvider.tsx` sits under the theme provider.
-- `scripts/check-i18n.sh`; `package.json` `i18n:extract` / `i18n:check`.
+- `package.json` `i18n:extract` / `i18n:check`; the check is shared-workflows' `checks/i18n.sh`, run from `@blinkbitcoin/dev-config`.
 
 ## Consequences
 
