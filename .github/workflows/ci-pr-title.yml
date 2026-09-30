@@ -11,4 +11,4 @@ jobs:
     # itself changed (`opened`/`synchronize` are already covered by ci.yml's
     # check.yml `commits` toggle, which lints the same PR title).
     if: github.event.changes.title != null
-    uses: blinkbitcoin/shared-workflows/.github/workflows/pr-title.yml@daf31b72ed45d9274323b9215ad4824b5424d963 # v0.19.1
+    uses: blinkbitcoin/shared-workflows/.github/workflows/pr-title.yml@cac53495f533066ce02fb64ef894d178c3e1286b # v0.20.0

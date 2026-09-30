@@ -129,7 +129,7 @@ jobs:
     name: Store notes
     needs: release-please
     if: ${{ needs.release-please.outputs.pr-number != '' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/pr-store-notes.yml@daf31b72ed45d9274323b9215ad4824b5424d963 # v0.19.1
+    uses: blinkbitcoin/shared-workflows/.github/workflows/pr-store-notes.yml@cac53495f533066ce02fb64ef894d178c3e1286b # v0.20.0
     permissions:
       contents: read
       pull-requests: write
