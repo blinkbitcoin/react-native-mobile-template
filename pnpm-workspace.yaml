@@ -51,7 +51,7 @@ minimumReleaseAgeExclude:
 strictDepBuilds: true
 # Refuses an install where a package's provenance is weaker than the version
 # already in the lockfile - an unsigned or unattested republish of something
-# that used to be signed. scripts/security/policy.sh asserts this line exists,
+# that used to be signed. The shared policy scanner asserts this line exists,
 # because weakening it is a one-line change that would otherwise pass review.
 trustPolicy: no-downgrade
 # Reasoned exclusions, name@version so each is pinned to the release actually

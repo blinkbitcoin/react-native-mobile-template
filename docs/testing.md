@@ -120,10 +120,6 @@ would otherwise have that code measured too. The script runs
 | `scripts/coverage-completeness.test.mjs` | Loads every `scripts/**/*.mjs` module, so one no test imports still counts |
 | `scripts/ci-suite-gates.test.mjs` | `ci.yml`'s `unit`, `e2e` and `badges` jobs evaluated together for each kind of change, and `unit` held to having<br>no gate (see [ci.md](ci.md#skipping-a-suite-the-change-cannot-affect)) |
 | `scripts/release/store-notes.test.mjs` | The store notes the way CD drafts them: cd-release's `environment-variables` through the shared `build-env.sh`,<br>`pr-store-notes.sh` and `gen-store-notes` on a real release PR body with a `gh` shim, a local model and this<br>repository's `store-notes.prompt.md`, then the shared `gen-store-notes.sh` reading the section back |
-| `scripts/security/settings.test.mjs` | Settings resolution: environment, then `security-settings.json`, then defaults |
-| `scripts/security/sarif.test.mjs` | The SARIF document builders: a skipped run and a findings run |
-| `scripts/security/verdict.test.mjs` | Merging SARIF documents, the severity threshold, the `failOn` engine gate<br>and the pull request annotations |
-| `scripts/security/runners.test.mjs` | The bash runners (`dependencies.sh`, `code.sh`, `policy.sh`, `local.sh`): enabled, disabled and missing-tool paths |
 
 These run in `make ci` (and in CI's Unit job), **not** in `make check`, which
 is the static gates only. The port guard in `scripts/ports.test.mjs` and the

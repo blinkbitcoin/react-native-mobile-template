@@ -5,7 +5,11 @@
   "failOn": ["deterministic"],
   "jobs": {
     "dependencies": { "enabled": true },
-    "code": { "enabled": true },
+    "code": {
+      "enabled": true,
+      "$rules": "This repository's own Semgrep rules, added to the community TypeScript, secrets and OWASP packs: no React Native ruleset exists upstream. make check-security-code also runs their tests (semgrep --test).",
+      "rules": ["rules/"]
+    },
     "policy": { "enabled": true },
     "sbom": { "enabled": true },
     "bundle": {
