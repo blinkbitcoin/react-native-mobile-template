@@ -296,11 +296,6 @@ const ALLOWED = [
   ['.env.development', 'the dotenv default, pinned above'],
   ['.env.example', 'the dotenv default, pinned above'],
   ['docs/local-dev.md', 'the Ports table - the one place a reader sees the numbers, pinned above'],
-  [
-    'scripts/release/lib/verify-common.sh',
-    "React Native's own built-in dev-server host:port constants, which a release bundle is scanned for - not a port this repo listens on",
-  ],
-  ['scripts/release/verify.test.mjs', 'fixtures for that scan'],
   ['docs/release-runbook.md', 'explains that same built-in React Native constant'],
   ['docs/decisions/', 'ADRs record what was true when they were accepted'],
   ['docs/superpowers/', 'archived plans and specs, not live documentation'],

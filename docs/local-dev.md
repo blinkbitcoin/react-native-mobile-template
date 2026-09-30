@@ -7,15 +7,18 @@ make setup                 # asks before accepting the Android SDK licences
 make setup ARGS="--yes"    # agrees up front (CI, or when you already have)
 ```
 
-`make setup` takes a blank Mac to one that passes `make doctor` and runs both
-platforms and both E2E suites; on Linux it sets up Android only. It is five
-idempotent steps, each its own target, so re-running any of them on a ready
-machine changes nothing:
+`make setup` takes a Mac with [mise](https://mise.jdx.dev) to one that passes
+`make doctor` and runs both platforms and both E2E suites; on Linux it sets up
+Android only. On a blank machine install mise first (`brew install mise`, or
+`curl https://mise.run | sh`), then `mise trust && mise install`. The steps
+are the shared tooling's scripts (`setup/` in `@blinkbitcoin/app-tooling`), so
+each target runs `make install` first to put them in `node_modules`. Each is
+idempotent, so re-running any of them on a ready machine changes nothing:
 
 | Target | What it does |
 | --- | --- |
-| `make setup-toolchain` | Installs mise if missing, `mise trust` + `mise install`, watchman (macOS), then `make install` |
-| `make setup-maestro` | Maestro at the version in `scripts/setup/versions.env`, into `~/.maestro`, without editing shell profiles |
+| `make setup-toolchain` | `mise trust` + `mise install`, watchman (macOS), then `make install` |
+| `make setup-maestro` | Maestro at the version the shared tooling pins (`lib/versions.sh`), into `~/.maestro`, without editing shell profiles |
 | `make setup-android` | SDK command-line tools, React Native's SDK pins, AGP's fallback packages, the `Pixel_10_API_36` emulator |
 | `make setup-ios` | Checks Xcode (selected, first launch, licence), installs the iOS runtime and CocoaPods |
 
@@ -30,8 +33,7 @@ Selecting Xcode, its first-launch step and its licence need an admin password,
 so the script stops and prints the exact `sudo` command rather than running it.
 The pitfalls behind each step, and the fixes for E2E and build failures, are in
 [`.claude/skills/native-setup/SKILL.md`](../.claude/skills/native-setup/SKILL.md).
-The scripts are tested against fakes in `scripts/setup/setup.test.mjs` (part of
-`make test-scripts`).
+The scripts are tested against fakes in shared-workflows, one bats file each.
 
 ## Toolchain
 
@@ -74,11 +76,13 @@ Then check the rest of the machine:
 make doctor
 ```
 
-`scripts/doctor.mjs` reads `scripts/doctor.requirements.json` and reports
-node, pnpm, java, ruby, watchman, xcodebuild (macOS, 26.4+), pod (macOS),
-adb, and maestro (optional), plus the `ANDROID_HOME` environment variable and
-`bundle check` (the fastlane gems `make check-release` needs — `make install`
-installs them). Each failure prints its own fix hint. Run it before asking
+The doctor is the shared tooling's (`pnpm exec doctor`). Its requirements are
+the package's `doctor.requirements.json`: node, pnpm, java, ruby, watchman,
+xcodebuild (macOS, 26.4+), pod (macOS), adb, and maestro (optional), plus the
+`ANDROID_HOME` environment variable and `bundle check` (the fastlane gems
+`make check-release` needs — `make install` installs them). A
+`doctor.requirements.json` here would add or replace entries by name; this
+repository needs none. Each failure prints its own fix hint. Run it before asking
 anyone why a build fails.
 
 ## First run

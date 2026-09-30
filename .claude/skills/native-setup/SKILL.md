@@ -14,9 +14,11 @@ allowed-tools: Bash(make setup:*), Bash(make setup-toolchain:*), Bash(make setup
 first move when the toolchain misbehaves.
 
 **Core principle:** fix the machine through `make setup-*`, never by hand. A
-fix typed into one terminal is lost on the next machine; a fix in
-`scripts/setup/` is tested (`scripts/setup/setup.test.mjs`) and runs on every
-runner. When you find a new pitfall, add it there and to the table below.
+fix typed into one terminal is lost on the next machine. The setup scripts are
+the shared tooling's (`setup/` in `@blinkbitcoin/app-tooling`, tested in
+shared-workflows with a bats file each), so a fix belongs there, where it
+reaches every app. When you find a new pitfall, fix it upstream and add it to
+the table below.
 
 ## The fast path
 
@@ -32,8 +34,8 @@ passing it. The parts, in the order `make setup` runs them:
 
 | Target | Installs |
 | --- | --- |
-| `make setup-toolchain` | mise, `mise trust` + `mise install` (node, pnpm, java 17, ruby 3.3), watchman, then `make install` |
-| `make setup-maestro` | Maestro at the version in `scripts/setup/versions.env`, into `~/.maestro` |
+| `make setup-toolchain` | `mise trust` + `mise install` (node, pnpm, java 17, ruby 3.3), watchman, then `make install` (mise itself first, on a blank machine: `brew install mise`) |
+| `make setup-maestro` | Maestro at the version the shared tooling pins (its `lib/versions.sh`), into `~/.maestro` |
 | `make setup-android` | SDK command-line tools, React Native's SDK pins, AGP's fallback packages, the emulator; writes `ANDROID_HOME` to `.env.local` |
 | `make setup-ios` | Checks Xcode, installs the iOS simulator runtime and CocoaPods |
 
@@ -103,6 +105,6 @@ and print the exact command: installing Xcode, `sudo xcode-select -s
 ## Tests
 
 ```bash
-node --test scripts/setup/setup.test.mjs   # the setup scripts, against fakes (also in make test-scripts)
+node --test scripts/mise-environment.test.mjs   # this repository's .mise.toml [env] (also in make test-scripts)
 .claude/skills/native-setup/tests/run.sh   # this file's commands and paths still exist
 ```

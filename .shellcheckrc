@@ -1,5 +1,5 @@
-# scripts/release/lib/verify-common.sh is sourced by the verify-* scripts, so
-# shellcheck must follow it to see the shared helpers. Mirrors the
-# shared-workflows repo so both resolve sources the same way.
+# Scripts here source their helpers by relative path, so shellcheck must follow
+# them. Mirrors the shared-workflows repository so both resolve sources the
+# same way.
 external-sources=true
 source-path=SCRIPTDIR

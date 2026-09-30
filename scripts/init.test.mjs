@@ -1049,7 +1049,7 @@ describe('init --yes --no-web', async () => {
     assert.deepEqual(removedLines(REPO, root, 'AGENTS.md'), [
       // Two layout lines are rewritten, not deleted: they name the init script
       // and its doc page, both of which are gone afterwards.
-      'scripts/            check-*.sh, doctor, init, ports, release/ (verify, store-notes test), e2e/',
+      'scripts/            check-*.sh, init, ports, release/ (the store-notes and fingerprint tests), e2e/',
       '.maestro/           Maestro flows (native e2e); e2e/web/ is Playwright',
       '                    release-runbook, ota, ota-and-crash-reporting, template-usage, decisions/',
       '| `make init` | Rename this template into your app, then delete itself (template only; `docs/template-usage.md`) |',

@@ -215,7 +215,7 @@ platform :android do
     args = ['bash', script, aab, apk]
     args << '--expect-debug-signing' if truthy?(options[:skip_signing])
 
-    sh(*args)
+    run_verifier(*args)
   end
 
   desc 'Upload the AAB to the internal track (idempotent)'
