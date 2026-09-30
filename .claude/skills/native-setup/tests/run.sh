@@ -48,14 +48,17 @@ for rel in $paths; do
   fi
 done
 
-echo "native-setup: variables named in SKILL.md are defined in versions.env"
+echo "native-setup: variables named in SKILL.md are pinned by the shared tooling"
+# The setup scripts and their pins are the shared tooling's, installed with the
+# dependencies (make install).
+versions="$ROOT/node_modules/@blinkbitcoin/app-tooling/lib/versions.sh"
 # shellcheck disable=SC2016 # literal backticks, as above
 for var in $(grep -oE '`ANDROID_[A-Z_]+`' "$SKILL_MD" | tr -d '`' | sort -u); do
   [ "$var" = ANDROID_HOME ] && continue
-  if grep -q "^${var}=" "$ROOT/scripts/setup/versions.env"; then
+  if grep -qE "^(export )?${var}=" "$versions"; then
     ok "$var"
   else
-    bad "$var" "not defined in scripts/setup/versions.env"
+    bad "$var" "not defined in $versions"
   fi
 done
 

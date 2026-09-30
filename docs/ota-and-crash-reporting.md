@@ -121,7 +121,7 @@ This is the part people forget, so here is exactly what exists today.
 
 The dSYMs are already load-bearing for verification: the `ios verify` lane
 passes the archive's own `dSYMs/` directory to
-`scripts/release/verify-ios.sh --dsym`, which checks that the dSYM UUIDs cover
+the shared tooling's `release/verify-ios.sh --dsym`, which checks that the dSYM UUIDs cover
 the binary's. So a build that verifies has usable symbols on disk.
 
 `fastlane/lanes/ios.rb` has the upload hook already stubbed:

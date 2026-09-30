@@ -312,13 +312,25 @@ def assert_project_version!(version, build_number)
   UI.user_error!("Generated project build number #{build_number} != APP_BUILD_NUMBER #{expected_build} (re-run prebuild)") unless build_number.to_s == expected_build
 end
 
-# Task 5 owns the verify scripts. Until they exist a verify lane must say which
-# file is missing rather than hand `bash` a path that is not there.
+# The release verifiers are the shared tooling's (release/ in
+# @blinkbitcoin/app-tooling), run from the installed package. Without an
+# install a verify lane must say which file is missing rather than hand `bash`
+# a path that is not there.
+VERIFIERS = 'node_modules/@blinkbitcoin/app-tooling/release'
+
 def verify_script!(name)
-  path = root_path('scripts', 'release', name)
-  UI.user_error!("Missing scripts/release/#{name} (release verification script)") unless File.exist?(path)
+  path = root_path(VERIFIERS, name)
+  UI.user_error!("Missing #{VERIFIERS}/#{name} (the release verifier; run pnpm install)") unless File.exist?(path)
 
   path
+end
+
+# fastlane runs an action from fastlane/, and the verifiers read the repository
+# they check from the directory they start in (build-info.json, .env.example,
+# the store metadata). Started anywhere else they would skip those checks
+# rather than fail, so they always start at the repository root.
+def run_verifier(*args)
+  Dir.chdir(repo_root) { sh(*args) }
 end
 
 # The metadata trees, anchored at the repo root for the same reason.

@@ -118,7 +118,7 @@ platform :ios do
     # the UUID check is free here; without this it is a permanent skip in CI.
     dsym = options[:dsym_path] || default_ios_dsyms(out, scheme)
     args.push('--dsym', dsym) if dsym
-    sh(*args)
+    run_verifier(*args)
   end
 
   desc 'Upload the build to TestFlight for internal testers (idempotent)'

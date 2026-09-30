@@ -29,7 +29,7 @@ init: ## Rename this template into your app (interactive; --yes for CI)
 	node scripts/init.mjs $(ARGS)
 
 doctor: ## Check the local toolchain (run this first)
-	node scripts/doctor.mjs
+	pnpm exec doctor
 
 # One step, both toolchains: `make check` ends in `check-release`, which needs
 # the fastlane gems, so a fresh clone that only ran `pnpm install` fails a gate
@@ -43,24 +43,27 @@ install: ## Install dependencies (pnpm + Ruby gems) and git hooks
 		bundle config set --local path vendor/bundle && bundle install; \
 	fi
 
-# A blank machine to a working one, in one step each. Idempotent, so they are
-# also the first thing to re-run when the toolchain misbehaves. `--yes` agrees
-# to the Android SDK licences and remote installers without asking (CI);
-# `--boot` also starts an emulator/simulator. See .claude/skills/native-setup.
-setup: ## Install everything for this OS: toolchain, Maestro, Android SDK + emulator, iOS (ARGS=--yes --boot)
-	bash scripts/setup/all.sh $(ARGS)
+# A machine with mise to a working one, in one step each. Idempotent, so they
+# are also the first thing to re-run when the toolchain misbehaves. The scripts
+# are the shared tooling's, so `install` comes first: it puts them in
+# node_modules (a blank machine installs mise before this; docs/local-dev.md).
+# `--yes` agrees to the Android SDK licences and remote installers without
+# asking (CI); `--boot` also starts an emulator/simulator. See
+# .claude/skills/native-setup.
+setup: install ## Install everything for this OS: toolchain, Maestro, Android SDK + emulator, iOS (ARGS=--yes --boot)
+	bash node_modules/@blinkbitcoin/app-tooling/setup/all.sh $(ARGS)
 
-setup-toolchain: ## mise + pinned tools (node, pnpm, java, ruby), watchman, then make install
-	bash scripts/setup/toolchain.sh $(ARGS)
+setup-toolchain: install ## mise's pinned tools (node, pnpm, java, ruby), watchman, then the dependencies
+	bash node_modules/@blinkbitcoin/app-tooling/setup/toolchain.sh $(ARGS)
 
-setup-android: ## Android SDK, build packages and the Pixel emulator; records ANDROID_HOME (ARGS=--yes --boot)
-	bash scripts/setup/android.sh $(ARGS)
+setup-android: install ## Android SDK, build packages and the Pixel emulator; records ANDROID_HOME (ARGS=--yes --boot)
+	bash node_modules/@blinkbitcoin/app-tooling/setup/android.sh $(ARGS)
 
-setup-ios: ## Xcode checks, iOS simulator runtime, CocoaPods (ARGS=--boot)
-	bash scripts/setup/ios.sh $(ARGS)
+setup-ios: install ## Xcode checks, iOS simulator runtime, CocoaPods (ARGS=--boot)
+	bash node_modules/@blinkbitcoin/app-tooling/setup/ios.sh $(ARGS)
 
-setup-maestro: ## Maestro at the pinned version, from the checksummed release archive
-	bash scripts/setup/maestro.sh
+setup-maestro: install ## Maestro at the pinned version, from the checksummed release archive
+	bash node_modules/@blinkbitcoin/app-tooling/ci/maestro-install.sh
 
 # ---------- Run ----------
 ports: ## Print the ports derived from APP_PORT_BASE
@@ -96,11 +99,11 @@ version: ## Print what CI would build for HEAD
 # recipe, so `make verify-ios PATH=...` would replace the shell's PATH.
 verify-ios: ## Verify a built .app/.ipa/.xcarchive (ARTIFACT=... [ARGS=--no-signing])
 	@[ -n "$(ARTIFACT)" ] || { echo "usage: make verify-ios ARTIFACT=artifacts/ios/App.xcarchive [ARGS=--no-signing]"; exit 2; }
-	bash scripts/release/verify-ios.sh "$(ARTIFACT)" $(ARGS)
+	bash node_modules/@blinkbitcoin/app-tooling/release/verify-ios.sh "$(ARTIFACT)" $(ARGS)
 
 verify-android: ## Verify AAB+APK (AAB=... APK=... [ARGS=--cert-sha256 X])
 	@[ -n "$(AAB)" ] && [ -n "$(APK)" ] || { echo "usage: make verify-android AAB=artifacts/android/app-release.aab APK=artifacts/android/app-universal.apk"; exit 2; }
-	bash scripts/release/verify-android.sh "$(AAB)" "$(APK)" $(ARGS)
+	bash node_modules/@blinkbitcoin/app-tooling/release/verify-android.sh "$(AAB)" "$(APK)" $(ARGS)
 
 # The generator build-prepare.yml and pr-store-notes.yml run, from the shared
 # tooling package at the same commit. --preview picks the source from TAG or

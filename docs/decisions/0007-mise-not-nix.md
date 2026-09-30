@@ -1,6 +1,6 @@
 # 7. `mise` pins the toolchain, not Nix
 
-- **Status:** Accepted
+- **Status:** Accepted. The doctor and `make setup` are the shared tooling's since 2026-10-01 (`pnpm exec doctor`, `setup/` in `@blinkbitcoin/app-tooling`); the decision stands.
 - **Date:** 2026-09-05
 
 ## Context

@@ -25,8 +25,7 @@ src/test/           jest setup, render helper, mocks
 plugins/            Expo config plugins (with-*.ts) + their tests
 modules/            local native modules (hello-native)
 mocks/              GraphQL mock API (server.ts, msw.ts, schema.graphql)
-scripts/            check-*.sh, doctor, init, ports, release/ (verify, store-notes test), e2e/
-scripts/setup/      make setup: toolchain, Maestro, Android SDK + emulator, iOS (setup.test.mjs)
+scripts/            check-*.sh, init, ports, release/ (the store-notes and fingerprint tests), e2e/
 .maestro/           Maestro flows (native e2e); e2e/web/ is Playwright
 fastlane/           store lanes + metadata; deploy/ota/ is the update server
 docs/               architecture, local-dev, quality, testing, ci, native-extensions,
@@ -289,7 +288,6 @@ aggregates.
 | That every source file has a sibling test | `check-test-siblings`, rules in `app-tooling.json` | `make test-scripts` |
 | Config plugins | `plugins/*.test.ts` | `make test-unit` |
 | Node scripts (release, doctor, init, checks), 100% coverage | `scripts/**/*.test.mjs` | `make test-scripts` |
-| Machine setup (`make setup`), bash against fake tools | `scripts/setup/setup.test.mjs` | `make test-scripts` |
 | The native-setup skill's commands and paths | `.claude/skills/native-setup/tests/` | `make check-skills` |
 | Fastlane lanes | `fastlane/test/` | `make check-release` |
 | CD against the pinned shared workflows: every call's contract, the store-notes chain | `make check-contract` (the shared contract check),<br>`scripts/release/store-notes.test.mjs` | CI's Checks / Contract; `make test-scripts` (CI always; locally with `WORKFLOWS_DIR`) |

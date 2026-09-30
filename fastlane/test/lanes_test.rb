@@ -1000,7 +1000,7 @@ class LaneBehaviourTest < Minitest::Test
       FileUtils.mkdir_p(File.join(dir, 'fastlane', 'metadata', 'ios', 'review_information'))
       FileUtils.mkdir_p(File.join(dir, 'artifacts', 'ios'))
       FileUtils.mkdir_p(File.join(dir, 'artifacts', 'android'))
-      FileUtils.mkdir_p(File.join(dir, 'scripts', 'release'))
+      FileUtils.mkdir_p(File.join(dir, VERIFIERS))
       File.write(File.join(dir, 'artifacts', 'ios', 'App.ipa'), 'ipa')
       File.write(File.join(dir, 'artifacts', 'android', 'app-release.aab'), 'aab')
       File.write(File.join(dir, 'build-info.json'), JSON.generate({ 'version' => '1.2.3', 'buildNumber' => 42 }))
@@ -1089,19 +1089,43 @@ class LaneBehaviourTest < Minitest::Test
   def test_ios_verify_names_the_missing_script
     in_project do
       error = assert_raises(UI::UserError) { run_lane(:ios, :verify) }
-      assert_includes error.message, 'scripts/release/verify-ios.sh'
+      assert_includes error.message, 'node_modules/@blinkbitcoin/app-tooling/release/verify-ios.sh'
     end
   end
 
   def test_ios_verify_passes_no_signing_through_to_the_script
     in_project do |dir|
-      File.write(File.join(dir, 'scripts', 'release', 'verify-ios.sh'), '#!/bin/bash')
+      File.write(File.join(dir, VERIFIERS, 'verify-ios.sh'), '#!/bin/bash')
       run_lane(:ios, :verify, skip_signing: 'true')
 
       command = args_for(:sh)
       assert_equal 'bash', command[0]
-      assert_equal root_path('scripts', 'release', 'verify-ios.sh'), command[1]
+      assert_equal root_path(VERIFIERS, 'verify-ios.sh'), command[1]
       assert_includes command, '--no-signing'
+    end
+  end
+
+  # fastlane runs actions from fastlane/, and a verifier started there would
+  # read the wrong directory as the repository and skip its root-relative checks.
+  def test_the_verify_lanes_start_the_verifier_at_the_repository_root
+    in_project do |dir|
+      FileUtils.mkdir_p(File.join(dir, 'fastlane', 'lanes'))
+      File.write(File.join(dir, VERIFIERS, 'verify-ios.sh'), '#!/bin/bash')
+      File.write(File.join(dir, VERIFIERS, 'verify-android.sh'), '#!/bin/bash')
+      FileUtils.mkdir_p(File.join(dir, 'artifacts', 'android'))
+      %w[app-release.aab app-universal.apk].each { |name| File.write(File.join(dir, 'artifacts', 'android', name), 'x') }
+      started = []
+      original = Object.instance_method(:sh)
+      Object.send(:define_method, :sh) { |*_command, **_options| started << Dir.pwd }
+      begin
+        Dir.chdir(File.join(dir, 'fastlane')) do
+          run_lane(:ios, :verify, skip_signing: 'true')
+          run_lane(:android, :verify)
+        end
+      ensure
+        Object.send(:define_method, :sh, original)
+      end
+      assert_equal [File.realpath(dir)] * 2, started.map { |path| File.realpath(path) }
     end
   end
 
@@ -1839,7 +1863,7 @@ class LaneBehaviourTest < Minitest::Test
 
   def test_android_verify_asserts_debug_signing_when_the_build_was_unsigned
     in_project do |dir|
-      File.write(File.join(dir, 'scripts', 'release', 'verify-android.sh'), '#!/bin/bash')
+      File.write(File.join(dir, VERIFIERS, 'verify-android.sh'), '#!/bin/bash')
       FileUtils.mkdir_p(File.join(dir, 'artifacts', 'android'))
       %w[app-release.aab app-universal.apk].each do |name|
         File.write(File.join(dir, 'artifacts', 'android', name), 'x')
@@ -1855,7 +1879,7 @@ class LaneBehaviourTest < Minitest::Test
 
   def test_android_verify_does_not_assert_debug_signing_for_a_signed_build
     in_project do |dir|
-      File.write(File.join(dir, 'scripts', 'release', 'verify-android.sh'), '#!/bin/bash')
+      File.write(File.join(dir, VERIFIERS, 'verify-android.sh'), '#!/bin/bash')
       FileUtils.mkdir_p(File.join(dir, 'artifacts', 'android'))
       %w[app-release.aab app-universal.apk].each do |name|
         File.write(File.join(dir, 'artifacts', 'android', name), 'x')

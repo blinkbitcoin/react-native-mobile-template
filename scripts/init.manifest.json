@@ -29,32 +29,6 @@
         ]
       },
       {
-        "path": "scripts/release/verify.test.mjs",
-        "replace": [
-          [
-            "package: name='sv.blink.reactnativemobiletemplate'",
-            "package: name='{{androidPackage}}'"
-          ],
-          [
-            "vc_badging_field ${arg} name`), 'sv.blink.reactnativemobiletemplate'",
-            "vc_badging_field ${arg} name`), '{{androidPackage}}'"
-          ],
-          [
-            "<key>CFBundleIdentifier</key><string>sv.blink.reactnativemobiletemplate</string>",
-            "<key>CFBundleIdentifier</key><string>{{iosBundleId}}</string>"
-          ],
-          [
-            "IOS_BUNDLE_ID: 'sv.blink.reactnativemobiletemplate'",
-            "IOS_BUNDLE_ID: '{{iosBundleId}}'",
-            2
-          ],
-          [
-            "/ok bundle-id: sv\\.blink\\.reactnativemobiletemplate/",
-            "/ok bundle-id: {{iosBundleIdRe}}/"
-          ]
-        ]
-      },
-      {
         "path": "modules/hello-native/ios/HelloNative.podspec",
         "replace": [
           [
@@ -131,9 +105,6 @@
       "release-please-config.json",
       "scripts/e2e/maestro-android.sh",
       "scripts/e2e/maestro-ios.sh",
-      "scripts/release/fixtures/ota/AndroidManifest.xml",
-      "scripts/release/fixtures/ota/strings.xml",
-      "scripts/release/verify.test.mjs",
       "src/lib/native-intent.test.ts",
       "src/lib/native-intent.ts"
     ],
@@ -506,7 +477,7 @@
         "optional": true,
         "$comment": "The layout block names the init script and its doc page; both are going away, and a line scrub would take the whole inventory line.",
         "replace": [
-          ["check-*.sh, doctor, init, ports, release/", "check-*.sh, doctor, ports, release/"],
+          ["check-*.sh, init, ports, release/", "check-*.sh, ports, release/"],
           [
             "ota, ota-and-crash-reporting, template-usage, decisions/",
             "ota, ota-and-crash-reporting, decisions/"

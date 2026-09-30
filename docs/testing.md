@@ -13,7 +13,6 @@ Five runners, each with a job. Nothing here needs a network.
 | Native module wrapper | Jest, the manual mock in `modules/hello-native/src/__mocks__/` | `modules/hello-native/index.test.ts` | `make test-unit` |
 | Config plugins | Jest, `plugins` project (plain node) | `plugins/*.test.ts` | `make test-unit` |
 | Node scripts | `node:test` | `scripts/**/*.test.mjs` | `make test-scripts` |
-| Machine setup scripts | `node:test`, bash with fake tools on `PATH` | `scripts/setup/setup.test.mjs` | `make test-scripts` |
 | Fastlane lanes | minitest | `fastlane/test/lanes_test.rb` | `make check-release` |
 | E2E, native | Maestro | `.maestro/flows/` | `make test-e2e-ios`, `make test-e2e-android` |
 | E2E, web | Playwright | `e2e/web/` | `make test-e2e-web` |
@@ -113,9 +112,7 @@ would otherwise have that code measured too. The script runs
 
 | Suite | Covers |
 | --- | --- |
-| `scripts/doctor.test.mjs` | The toolchain check |
 | `scripts/init.test.mjs` | The template rename and web-removal script behind `make init` |
-| `scripts/release/verify.test.mjs` | The artifact verification helpers |
 | `scripts/release/fingerprint.test.mjs` | The fingerprint and OTA plumbing |
 | `scripts/coverage-completeness.test.mjs` | Loads every `scripts/**/*.mjs` module, so one no test imports still counts |
 | `scripts/ci-suite-gates.test.mjs` | `ci.yml`'s `unit`, `e2e` and `badges` jobs evaluated together for each kind of change, and `unit` held to having<br>no gate (see [ci.md](ci.md#skipping-a-suite-the-change-cannot-affect)) |
@@ -174,24 +171,14 @@ test passes rather than a branch no test can take, and why `assertSilent()` is
 split out of `installConsoleGuard()` — an `afterEach` cannot observe its own
 failure, so the throwing branch needs a seam a test can call.
 
-### Setup scripts
+### Setup scripts, the doctor and the release verifiers
 
-`scripts/setup/*.sh` (`make setup` and its parts) are bash, which nothing here
-measures, so they are held to the coverage bar by construction instead:
-`scripts/setup/setup.test.mjs` runs every script for real against a throwaway
-repository and `HOME`, with `curl`, `mise`, the Android CLI, `avdmanager`,
-`adb`, `xcodebuild`, `xcrun`, `gem` and the rest replaced by fakes on `PATH`
-that log their arguments. Every `die` in the scripts has a case that reaches
-it, and every pitfall in `.claude/skills/native-setup/SKILL.md` that a script
-guards against has a case named after it. One case runs the real `mise` against
-`.mise.toml` (skipped where mise is absent) to pin the order of its `[env]`
-directives, and two run `android.sh` on a real pseudo-terminal (Python's `pty`)
-to answer the licence question yes and no. Both skip where their tool is absent.
-
-The fakes prove the logic, not the downloads. When `versions.env` changes, run
-`make setup-android` once against an empty `ANDROID_HOME` (and a scratch
-`ANDROID_AVD_HOME`), then build the app against it: Gradle should download no
-SDK package.
+`make setup` and its parts, `make doctor` and `make verify-ios` /
+`make verify-android` run the shared tooling's scripts and programs, so their
+tests are in shared-workflows: a bats file per script, against fakes on
+`PATH`, and node:test at 100% for the doctor. What stays here is the fastlane
+side: `fastlane/test/` checks that the verify lanes call the package's
+verifiers with the right arguments.
 
 ### Script coverage
 
