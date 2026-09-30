@@ -1,6 +1,6 @@
 # 22. Security scanning before release
 
-- **Status:** Accepted
+- **Status:** Accepted. Where the scanners live: refined by [0025](0025-security-scanners-from-the-shared-tooling.md) (2026-09-30); they are shared-workflows' own now.
 - **Date:** 2026-09-24
 
 ## Context

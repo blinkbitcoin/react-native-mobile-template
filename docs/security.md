@@ -4,8 +4,15 @@
 `make check-security-<job>` runs one scanner and the same verdict, so a single
 scanner on a laptop still ends in the pass/fail answer CI would give.
 
-In CI the same scripts run through the reusable `check-security.yml` from
-shared-workflows: the `security` job in `ci.yml` on every change, and the
+The scanners are not in this repository. They are shared-workflows' own,
+shipped in `@blinkbitcoin/app-tooling` and run here as `pnpm exec
+check-security [job]`. What this repository keeps is its settings,
+`security-settings.json` (every key, its default and its environment twin are
+in the package's own `security-settings.json`), and the files those settings
+name: the Semgrep rules in `rules/` (`jobs.code.rules`) and `.mobsf`.
+
+In CI the same scanners run through the reusable `check-security.yml` from
+shared-workflows, at the same commit as the package: the `security` job in `ci.yml` on every change, and the
 `security` job in `cd-production.yml` before any store job on
 `action=release`. `SECURITY_ENABLED=false` as a repository variable turns both
 off.
@@ -37,7 +44,7 @@ by `github.ref_name`. On the production dispatch the store jobs wait for the
 On a pull request, in the `Security / *` jobs and nowhere else. The `Verdict`
 job's summary carries the report, and every reportable finding is an
 annotation on the diff: an error when it blocks, a warning when it is only
-reported. `verdict.mjs` prints those annotations only under
+reported. The verdict (`security-verdict.mjs`) prints those annotations only under
 `GITHUB_ACTIONS=true`, so a laptop run stays plain text.
 
 The SARIF goes to code scanning (Security → Code scanning) from `main` only.
@@ -65,9 +72,9 @@ One verdict, several destinations, each written by the file named:
 | Destination | Written by | When |
 | --- | --- | --- |
 | the step log and the run summary | `verdict.sh` in shared-workflows | every run |
-| annotations on the diff | `verdict.mjs` | on a runner only (`GITHUB_ACTIONS=true`) |
+| annotations on the diff | `security-verdict.mjs` in the package | on a runner only (`GITHUB_ACTIONS=true`) |
 | code scanning | `check-security.yml` | from `main` only |
-| `.security/verdict.json` | `verdict.mjs` | every run that reaches a verdict, laptop included (not when a SARIF file cannot be read) |
+| `.security/verdict.json` | `security-verdict.mjs` in the package | every run that reaches a verdict, laptop included (not when a SARIF file cannot be read) |
 
 `verdict.json` is one line of JSON, for the Security badge:
 
@@ -117,7 +124,7 @@ last `make check-security`.
   lockfile are left out; files beyond `review.maxDiffBytes` are named as
   unreviewed rather than silently cut.
 - **`review-codebase`** runs [OpenAnt](https://github.com/knostic/OpenAnt), pinned by
-  commit in `scripts/security/review-codebase.sh`, with dynamic (Docker) testing off.
+  commit in shared-workflows' `scripts/security/review-codebase.sh`, with dynamic (Docker) testing off.
   CI builds it from that commit; on a laptop, build it yourself and put
   `openant` on `PATH`.
 
@@ -156,8 +163,8 @@ A missing provider, key, model or prompt makes the job write "skipped" with
 the reason, never "clean", and a model that does not answer, refuses, or
 answers with something that does not validate does the same: a model being
 down must never fail a pull request. The store-notes rewrite shares the same
-adapters (`@blinkbitcoin/app-tooling/llm`, which `scripts/security/review.mjs`
-imports), with `STORE_NOTES_LLM_EFFORT` and
+adapters (`@blinkbitcoin/app-tooling/llm`, which the package's
+`security-review.mjs` imports), with `STORE_NOTES_LLM_EFFORT` and
 `STORE_NOTES_LLM_EXTRA_PARAMS` as its own two settings.
 
 ## Turning things off
@@ -231,7 +238,7 @@ claim that most or all of it did not run at all. Turning a scanner off -
 `SECURITY_CODE=false`, a missing tool on a laptop with no `mise install`,
 `SECURITY_ENABLED` left set from a previous run - trades `pass` for
 `skipped` for as long as that job stays off, and the two must never be
-confused for each other, which is why `verdict.mjs` prints a different word
+confused for each other, which is why the verdict prints a different word
 for each rather than folding `skipped` into `pass` once nothing is left to
 report.
 
@@ -303,7 +310,7 @@ change would require re-evaluating the decision.
 Unlike a Semgrep or gitleaks suppression, an osv-scanner ignore leaves no
 trace in run output: `osv-scanner` drops an `IgnoredVulns` match from its
 SARIF entirely rather than emitting it with a suppression marker, so
-`verdict.mjs` has nothing to count and `make check-security-dependencies` simply
+the verdict has nothing to count and `make check-security-dependencies` simply
 reports `dependencies: clean` - the summary line's suppressed count stays `0`
 regardless. `osv-scanner.toml` and this section are therefore the only
 places these two accepted risks are visible; do not read a clean `dependencies`

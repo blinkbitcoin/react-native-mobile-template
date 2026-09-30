@@ -4,7 +4,7 @@
 # below is relative to that prebuild. Each entry says why; an entry without a
 # reason is not mergeable (docs/security.md, "Suppressing a finding, correctly").
 #
-# A malformed file is not ignored quietly: scripts/security/mobile.sh fails the
+# A malformed file is not ignored quietly: the shared mobile scanner fails the
 # run when mobsfscan warns that it could not read this configuration.
 - ignore-paths:
     # The debug and debugOptimized source sets exist only in development

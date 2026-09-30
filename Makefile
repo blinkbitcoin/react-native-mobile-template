@@ -209,16 +209,16 @@ check-secrets: ## Scan the whole git history for committed secrets (gitleaks)
 # `check-code-scanning` is out. This is the deliberate deeper pass; the pre-push gate
 # stays `make check && make test-unit && make test-scripts`.
 check-security: ## Every enabled security scanner, then the verdict (see docs/security.md)
-	bash scripts/security/local.sh
+	pnpm exec check-security
 
 # One scanner each, then the same verdict CI applies, so every target below
 # ends in the pass/fail answer the pipeline would give for that scanner alone.
 # Each writes its SARIF into .security/; a disabled job reports "skipped".
 check-security-dependencies: ## Known vulnerabilities and malicious packages in the lockfile (osv-scanner)
-	bash scripts/security/local.sh dependencies
+	pnpm exec check-security dependencies
 
 check-security-code: ## Semgrep over app source: TypeScript, secrets, OWASP packs plus rules/
-	bash scripts/security/local.sh code
+	pnpm exec check-security code
 	@if command -v semgrep >/dev/null 2>&1; then \
 		semgrep --test rules/; \
 	else \
@@ -226,25 +226,25 @@ check-security-code: ## Semgrep over app source: TypeScript, secrets, OWASP pack
 	fi
 
 check-security-policy: ## Assert the pnpm install policy: release cooldown, no implicit builds, no trust downgrade
-	bash scripts/security/local.sh policy
+	pnpm exec check-security policy
 
 check-security-sbom: ## CycloneDX bill of materials from the lockfile into .security/sbom.cdx.json
-	bash scripts/security/local.sh sbom
+	pnpm exec check-security sbom
 
 check-security-bundle: ## Export the bundle; flag private variable names, secrets and cleartext URLs in it
-	bash scripts/security/local.sh bundle
+	pnpm exec check-security bundle
 
 check-security-mobile: ## mobsfscan over a fresh prebuild of android/ and ios/
-	bash scripts/security/local.sh mobile
+	pnpm exec check-security mobile
 
 check-security-binaries: ## MASTG checks over built binaries (APK=... and/or IPA=...)
-	bash scripts/security/local.sh binaries
+	pnpm exec check-security binaries
 
 check-security-review: ## LLM security review of the diff (off by default; needs llm.provider and a key)
-	bash scripts/security/local.sh review
+	pnpm exec check-security review
 
 check-security-review-codebase: ## LLM security review of the whole codebase with OpenAnt (off by default; needs llm.provider and a key)
-	bash scripts/security/local.sh review-codebase
+	pnpm exec check-security review-codebase
 
 check: check-code check-generated check-expo-health check-audit check-licenses check-ci check-docs check-release check-secrets ## Every static gate the check workflow runs (no tests/builds)
 

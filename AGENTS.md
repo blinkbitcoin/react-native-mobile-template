@@ -27,7 +27,6 @@ modules/            local native modules (hello-native)
 mocks/              GraphQL mock API (server.ts, msw.ts, schema.graphql)
 scripts/            check-*.sh, doctor, init, ports, release/ (verify, store-notes test), e2e/
 scripts/setup/      make setup: toolchain, Maestro, Android SDK + emulator, iOS (setup.test.mjs)
-scripts/security/   the check-security scanners, their settings resolver and the verdict
 .maestro/           Maestro flows (native e2e); e2e/web/ is Playwright
 fastlane/           store lanes + metadata; deploy/ota/ is the update server
 docs/               architecture, local-dev, quality, testing, ci, native-extensions,
