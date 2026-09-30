@@ -115,11 +115,9 @@ would otherwise have that code measured too. The suites include:
 | `scripts/release/notes.test.mjs` | Store notes from a release body or from commits |
 | `scripts/release/verify.test.mjs` | The artifact verification helpers |
 | `scripts/release/fingerprint.test.mjs` | The fingerprint and OTA plumbing |
-| `scripts/release/build-info.test.mjs` | The per-build provenance record |
 | `scripts/test-siblings.test.mjs` | That every source file has its own sibling test, and that no route test sits under `src/app/`<br>(see [One test file per module](#one-test-file-per-module)) |
 | `scripts/worktree-ignores.test.mjs` | That every tool which walks the tree skips `.claude/worktrees/`, anchored to the root<br>(see [quality.md](quality.md#worktrees-inside-the-checkout-are-not-this-checkout)) |
 | `scripts/coverage-completeness.test.mjs` | Loads every `scripts/**/*.mjs` module, so one no test imports still counts |
-| `scripts/release/shared-copies.test.mjs` | Our `build-info.sh` against shared-workflows' copy, read from `$WORKFLOWS_DIR`.<br>CI always compares; locally it skips unless `WORKFLOWS_DIR` points at a checkout |
 | `scripts/workflow-contract.test.mjs` | Every shared-workflows call pinned to the same commit SHA with its version beside it, the shared tooling package<br>at that commit, and every call's inputs, secrets and read outputs against what the called workflow declares<br>at `$WORKFLOWS_DIR`, which must be that commit |
 | `scripts/ci-suite-gates.test.mjs` | `ci.yml`'s `unit`, `e2e` and `badges` jobs evaluated together for each kind of change, and `unit` held to having<br>no gate (see [ci.md](ci.md#skipping-a-suite-the-change-cannot-affect)) |
 | `scripts/release/cd-notes.test.mjs` | The store notes the way CD drafts them: cd-release's build-env through the shared `build-env.sh`, `pr-notes.sh` on<br>a real release PR body with a `gh` shim and a local model, then the shared `notes.sh` reading the section back |

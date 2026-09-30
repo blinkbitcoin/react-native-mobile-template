@@ -222,12 +222,8 @@ describe('the shared tooling guards run where CI runs them', () => {
     assert.equal(pkg.scripts['check:coverage-empty'], 'check-coverage-empty');
   });
 
-  test('make version and build-info.sh resolve the version with the package script', () => {
+  test('make version resolves the version with the package script', () => {
     assert.match(recipe(makefile, 'version'), new RegExp(`^\\tbash ${RESOLVE_VERSION}$`));
-    assert.ok(
-      code('scripts/release/build-info.sh').includes(`bash ${RESOLVE_VERSION})`),
-      'build-info.sh must fall back to the package resolve-version.sh',
-    );
     assert.ok(existsSync(path.join(root, RESOLVE_VERSION)), `${RESOLVE_VERSION} is not installed`);
   });
 });

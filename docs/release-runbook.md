@@ -1008,9 +1008,9 @@ log redacts credential-shaped arguments itself, so it is safe to paste into a
 PR. Give the lanes the two files a real run would have:
 
 ```bash
-# a build-info.json for the commit you are rehearsing
-APP_VERSION=1.2.3 APP_BUILD_NUMBER=1054 BUILD_INFO_PATH=/tmp/build-info.json \
-  bash scripts/release/build-info.sh
+# a build-info.json for the commit under test, written to /tmp/build-info.json
+APP_VERSION=1.2.3 APP_BUILD_NUMBER=1054 WORKFLOWS_RELEASE_META_DIR=/tmp \
+  bash node_modules/@blinkbitcoin/dev-config/release/build-info.sh --standalone
 # store notes for the same range
 node scripts/release/notes.mjs --from-commits --out /tmp/notes
 
