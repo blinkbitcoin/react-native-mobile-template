@@ -44,7 +44,7 @@ jobs:
     # template cannot overwrite a live store page from a mistaken dispatch.
     # The lane asserts the same variable itself - this only saves the runner.
     if: ${{ vars.STORE_METADATA_SYNC_ENABLED == 'true' && inputs.platforms != 'android' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@a5ddc2e4f72c52d5566a03482959e3694e22775c # v0.19.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       contents: read
     with:
@@ -85,7 +85,7 @@ jobs:
   android:
     name: ${{ inputs.direction == 'pull' && 'Pull Android listing' || 'Push Android listing' }}
     if: ${{ vars.STORE_METADATA_SYNC_ENABLED == 'true' && inputs.platforms != 'ios' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@a5ddc2e4f72c52d5566a03482959e3694e22775c # v0.19.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@a4c04be723959094d85b6db9660f709aa9507f5c # v0.19.1
     permissions:
       contents: read
     with:
