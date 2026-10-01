@@ -205,39 +205,28 @@ describe('cd-release.yml chains the release by dispatch', () => {
     .filter((l) => !l.trimStart().startsWith('#'))
     .join('\n');
 
-  test('the job may write to the Actions API', () => {
+  // release-please, the dispatches and reading the release PR are
+  // shared-workflows' pr-release.yml, tested there; what this repository
+  // decides is which of its workflows run, and that the job may start them.
+  test('the release job calls pr-release.yml at the pin and may write to the Actions API', () => {
+    assert.match(
+      code,
+      /release-please:\n\s+name: Release\n\s+uses: [^\n]*\/shared-workflows\/\.github\/workflows\/pr-release\.yml@[0-9a-f]{40}\b/,
+      'the release-please job does not call pr-release.yml',
+    );
     assert.match(code, /^\s+actions: write$/m, 'cd-release.yml lacks actions: write');
+    assert.match(code, /^\s+contents: write$/m);
+    assert.match(code, /^\s+pull-requests: write$/m);
   });
 
   // The web deploy's dispatch is pinned in ci-web-gate.test.mjs, which
-  // `make init --no-web` deletes together with ci-web.yml and that step.
-  test('a cut release dispatches cd-beta at the tag', () => {
-    assert.match(
-      code,
-      /release_created == 'true'[\s\S]*?gh workflow run cd-beta\.yml [^\n]*--ref "\$TAG"/,
-      'no dispatch of cd-beta.yml gated on release_created',
-    );
-    assert.match(code, /gh workflow run cd-beta\.yml [^\n]*-f "tag=\$TAG"/);
+  // `make init --no-web` deletes together with ci-web.yml and that line.
+  test('a cut release dispatches cd-beta at the tag, with the tag as its input', () => {
+    assert.match(code, /dispatch-on-release: \|\n(?:\s+[^\n]*\n)*?\s+cd-beta\.yml tag=\{tag\}\n/);
   });
 
   test('a created or updated release PR gets a CI run', () => {
-    assert.match(
-      code,
-      /prs_created == 'true'[\s\S]*?gh workflow run ci\.yml [^\n]*--ref "\$BRANCH"/,
-      'no CI dispatch gated on prs_created',
-    );
-    // Parsed in the shell on purpose: `fromJSON()` in `env:` is validated even
-    // when the step's `if` is false, and the output is empty on a push that
-    // produces no release PR.
-    assert.doesNotMatch(code, /fromJSON\(steps\.release\.outputs\.pr\)/);
-    assert.match(code, /PR_JSON: \$\{\{ steps\.release\.outputs\.pr \}\}/);
-    assert.match(code, /jq -r '\.headBranchName \/\/ empty'/);
-  });
-
-  test('the release PR number and branch are parsed once, in the shell, as job outputs', () => {
-    assert.match(code, /jq -r '\.number \/\/ empty'/, 'the PR number is not parsed');
-    assert.match(code, /pr-number: \$\{\{ steps\.pr\.outputs\.number \}\}/);
-    assert.match(code, /pr-branch: \$\{\{ steps\.pr\.outputs\.branch \}\}/);
+    assert.match(code, /^\s+ci-workflow: ci\.yml$/m);
   });
 
   test('a second job drafts the store notes into the release PR through shared-workflows', () => {
@@ -475,8 +464,8 @@ describe('the security gate', () => {
     });
 
     test('recognises the release pull request by its branch, never by head_ref', () => {
-      // cd-release.yml starts the release PR's CI with `gh workflow run --ref`:
-      // a workflow_dispatch, where github.head_ref is empty.
+      // cd-release.yml's pr-release.yml starts the release PR's CI with
+      // `gh workflow run --ref`: a workflow_dispatch, where github.head_ref is empty.
       assert.doesNotMatch(body(), /head_ref/);
       for (const input of ['bundle', 'review-codebase', 'review-full-range']) {
         assert.ok(

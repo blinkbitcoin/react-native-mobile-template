@@ -1,10 +1,10 @@
 name: CD / Beta Retry
 # `cd-beta.yml` refuses to promote until that commit's `cd-internal`
-# run is green. When beta is published before internal finishes (or while it is
+# run is green. When beta is dispatched before internal finishes (or while it is
 # red), the beta run fails at the gate and there is nothing to re-trigger it —
-# `release: published` fires once. This workflow closes that hole: whenever an
+# cd-release.yml dispatches it once. This workflow closes that hole: whenever an
 # internal run for main concludes successfully, it re-runs the failed jobs of a
-# beta run for the same commit.
+# beta run for the same commit, through shared-workflows' publish-retry.yml.
 on:
   workflow_run:
     # The workflow's *display name*, not its file name: `workflow_run` matches
@@ -24,41 +24,23 @@ concurrency:
   group: release-retry-${{ github.event.workflow_run.head_sha }}
   cancel-in-progress: false
 jobs:
+  # `head-sha` is the internal run's head sha, which is the release commit: the
+  # beta run cd-release.yml dispatched at the tag has the same sha. If a beta
+  # run was started some other way on a later commit, no run matches and the
+  # retry no-ops. That is accepted: the operator can re-run cd-beta by hand,
+  # and matching more loosely risks re-running a beta promotion for a
+  # different release. The shared script re-runs a run that concluded without
+  # success (failed, cancelled, timed out or evicted from a concurrency group),
+  # and only its failed jobs, so the promotion picks up where the gate stopped
+  # it instead of promoting twice.
   retry-beta:
     name: Retry Beta
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-retry.yml@cb865d40f57e179f25a8c6de9a2be25ff025411d # v0.25.0
     permissions:
       contents: read
       # `gh run rerun` writes to the Actions API.
       actions: write
-    steps:
-      - name: Re-run a beta run blocked on the green gate
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
-        run: |
-          set -euo pipefail
-          # `--commit` is the internal run's head sha, which is the release
-          # commit. A `release: published` beta run's head sha is the default
-          # branch tip at publish time, so if a commit lands on main between the
-          # release commit and this run going green, no beta run matches and the
-          # retry no-ops. That is accepted: the operator can re-run cd-beta
-          # by hand, and matching more loosely risks re-running a beta promotion
-          # for a different release.
-          #
-          # Not `--status failure`: a beta run that was cancelled or timed out
-          # (including one evicted from a concurrency group) needs the same
-          # retry, so filter on "concluded, but not successfully" instead.
-          run_id="$(gh run list --workflow cd-beta.yml --commit "$HEAD_SHA" \
-            --limit 20 --json databaseId,status,conclusion \
-            --jq '[.[] | select(.status == "completed" and .conclusion != "success" and .conclusion != "skipped")][0].databaseId // empty')"
-          if [ -z "$run_id" ]; then
-            echo "no failed cd-beta run for $HEAD_SHA - nothing to retry"
-            exit 0
-          fi
-          # --failed re-runs only the jobs that failed, so the promotion picks
-          # up where the gate stopped it instead of promoting twice.
-          gh run rerun "$run_id" --failed
+    with:
+      workflow: cd-beta.yml
+      head-sha: ${{ github.event.workflow_run.head_sha }}

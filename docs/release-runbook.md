@@ -773,10 +773,11 @@ workflow from an event that token caused**, so that workflows cannot trigger
 each other forever. A `release: published` trigger on `cd-beta.yml` or
 `ci-web.yml` would therefore never fire. The rule has two exemptions,
 `workflow_dispatch` and `repository_dispatch`, so `cd-release.yml` starts
-the follow-on work itself: `gh workflow run cd-beta.yml --ref vX.Y.Z -f
-tag=vX.Y.Z`, the same for `ci-web.yml` with `deploy=true`, and `ci.yml` on the
-release PR's branch whenever the PR is created or updated. The job needs
-`actions: write` for that, nothing else.
+the follow-on work itself, through shared-workflows' `pr-release.yml`: each
+`dispatch-on-release` line at the tag (`gh workflow run cd-beta.yml --ref
+vX.Y.Z -f tag=vX.Y.Z`, the same for `ci-web.yml` with `deploy=true`), and
+`ci-workflow` (`ci.yml`) on the release PR's branch whenever the PR is created
+or updated. The job needs `actions: write` for that, nothing else.
 
 `--ref` is the tag on purpose: the dispatched run's `github.sha` is then the
 release commit, the same sha `cd-internal` built, which is what
