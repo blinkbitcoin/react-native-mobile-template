@@ -194,9 +194,9 @@ them are in [store-accounts.md](store-accounts.md#huawei-appgallery).
 
 | Tier | Workflow | Jobs | Lane | What AppGallery does | Review |
 | --- | --- | --- | --- | --- | --- |
-| internal | `cd-internal.yml` | `Upload Huawei` | `upload_huawei_internal` | Test version, manual review<br>skipped, up to 100 testers | Automated,<br>hours |
-| beta | `cd-beta.yml` | `Promote Huawei` | `promote_huawei_beta` | Test version, open testing<br>with review, up to 5,000 testers | Manual,<br>1 to 3 days |
-| release | `cd-production.yml` | `Release Huawei` | `upload_huawei` | The formal release, testing<br>flag off | Manual,<br>days |
+| internal | `cd-internal.yml` | `Internal / Upload Huawei` | `upload_huawei_internal` | Test version, manual review<br>skipped, up to 100 testers | Automated,<br>hours |
+| beta | `cd-beta.yml` | `Beta / Promote Huawei` | `promote_huawei_beta` | Test version, open testing<br>with review, up to 5,000 testers | Manual,<br>1 to 3 days |
+| release | `cd-production.yml` | `Production / Release Huawei` | `upload_huawei` | The formal release, testing<br>flag off | Manual,<br>days |
 
 **One version slot.** AppGallery has no tracks. A tier is a flavour of the
 submit, not a destination: the same version record is submitted with the testing
@@ -363,13 +363,13 @@ rather than shipped.
 shows what the pipeline actually shipped — and an operator editing it for the
 next stage has the heading in front of them rather than typing it from memory.
 `cd-production` appends a `## Production` line the same way
-(`<action> at <time>, platforms <x>, rollout <n>%`), so the release records
-which stage it reached.
+(`<action>, platforms <x>, rollout <n>%`, with a link to the run, whose page
+carries the time), so the release records which stage it reached.
 
-Both append jobs upload their section under a filename that is deliberately
-*not* one of `github-release`'s fixed asset names: that mode regenerates
-`SHA256SUMS` over whatever of the fixed set it finds, and an artifact carrying
-one of those names would replace the checksums of the release's binaries.
+Both appends change only the release body: `append` uploads nothing and leaves
+`SHA256SUMS` alone, so the beta section is read straight from the `build-info`
+artifact's `store-notes.txt` and the production line is passed as text. There
+is no staging job and no second artifact.
 
 **Locales.** `gen-store-notes` emits one entry per locale directory under
 `fastlane/metadata/ios` unless `--locales` or `$STORE_NOTES_LOCALES` (which is
@@ -635,6 +635,12 @@ is the wiring; that page is the sourcing.
 Repository **variables** (Settings → Secrets and variables → Actions →
 Variables). None are sensitive; all are visible in logs.
 
+The CD callers read these variables and hand them to the shared pipelines as
+inputs (`store-uploads-enabled`, `huawei-uploads-enabled`, `ota-enabled`,
+`testflight-internal-group`, and so on): a pipeline reads no repository
+variable itself. Where this table says a job "uses" a variable, it means the
+job the pipeline runs with the value its caller passed.
+
 Most of them reach a runner through the callers' `environment-variables` input
 — a flat JSON object of non-secret environment published to `$GITHUB_ENV`
 before the prebuild, the lanes and the consumer scripts run. It is the only channel for arbitrary
@@ -705,7 +711,7 @@ lane still walks end to end
 | `TESTFLIGHT_EXTERNAL_GROUP` | `cd-beta` iOS promote | External group name; must already exist and be approved |
 | `PLAY_UPDATE_PRIORITY` | Android upload / production | `0`–`5`, Play in-app update priority |
 | `ANDROID_UPLOAD_CERT_SHA256` | `verify-android.sh`, read from the environment (via `environment-variables`); `--cert-sha256` is the manual override | `keytool -list -v -keystore upload.keystore`, the SHA-256 line.<br>**Leave it unset and the signature check reports `skip`** —<br>the gate that exists to catch a wrong signing identity stops checking |
-| `OTA_ENABLED` | `app.config.ts` at build time (via `environment-variables`) and the `if:` on every `ota-*` job | `true` to turn OTA on; see [ota.md](ota.md) |
+| `OTA_ENABLED` | `app.config.ts` at build time (via `environment-variables`) and the `ota-enabled` input of the pipelines, which gates every OTA job | `true` to turn OTA on; see [ota.md](ota.md) |
 | `EXPO_UPDATES_URL` | `app.config.ts` at build time (via `environment-variables`) and the OTA manifest smoke check | Public origin of the update server |
 | `OTA_CLI_VERSION` | `publish-ota` | Exact `eoas` version; the publish script refuses to run unpinned |
 | `STORE_NOTES_INCLUDE_CHANGELOG` | `gen-store-notes` in internal's `build-prepare` and in `Store notes`<br>(via `environment-variables`) | `true` appends the changelog where notes are generated |
