@@ -88,7 +88,7 @@ Add a rule to one side only, and record which side in the config comment.
 | `make check-types` | `tsc --noEmit` | Types. `strict`, plus `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`,<br>`verbatimModuleSyntax`, `noImplicitOverride`, `noFallthroughCasesInSwitch` |
 | `make check-lint` | `biome lint .` then `eslint . --max-warnings=0` | Lint, both halves. Warnings are failures |
 | `make check-format` | `biome format .` | Formatting. `make fix-format` writes |
-| `make check-unused` | `knip` | Unused files, exports, dependencies |
+| `make check-unused` | `knip`, with the ports exported | Unused files, exports, dependencies |
 | `make check-spell` | `typos` | Spelling, Markdown included |
 | `make check-code` | the five above | The fast local gate |
 | `make check-generated` | `pnpm check:generated`: shared-workflows' `checks/generated.sh`, which runs `gen:i18n`<br>and `gen:graphql` | Drift in generated catalogs and generated GraphQL documents, an untracked new catalog included |
@@ -353,6 +353,17 @@ in `node_modules/.bin`, and `make check-expo-health` runs `expo-doctor`. The
 Makefile and the pre-push hook both run `pnpm check:unused`, which calls the
 binary. Naming the script for the gate rather than the tool is the family's
 rule anyway (`check:<stem>` for a gate, `gen:<stem>` for a generator).
+
+The script exports the ports before it calls knip:
+`eval "$(node scripts/ports.mjs --sh)" && knip`. knip's Playwright plugin
+loads `playwright.config.ts` to find the specs under `e2e/web/`, and that
+config throws when `WEB_PREVIEW_PORT` is unset — deliberately, so a real run
+never guesses a port. knip only logs "Error loading playwright.config.ts" and
+still exits 0, with the specs no longer entries and `e2e/web/` unanalysed.
+`e2e/**/*.ts` is in knip's `project`, so an unused export there is reported,
+and `eval` is in `ignoreBinaries` because knip does not know the shell
+builtin. `scripts/check-unused-web.test.mjs` runs `pnpm check:unused` with
+the ports unset and fails on an "Error loading" line.
 
 ## Worktrees inside the checkout are not this checkout
 

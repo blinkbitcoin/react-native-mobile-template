@@ -127,7 +127,8 @@ existing instruction true.
 `scripts/ports.mjs` is the table, and it is the only thing that derives a port.
 `.mise.toml`'s `[env]` exports `APP_PORT_BASE` — the *input* — and nothing else;
 the Makefile's run targets `eval "$(node scripts/ports.mjs --sh)"` to get the
-three *outputs*. Keeping one producer is not tidiness: a mirrored
+three *outputs*, and so does the `check:unused` script, because knip loads
+`playwright.config.ts`. Keeping one producer is not tidiness: a mirrored
 `METRO_PORT=8081` sitting in the environment is indistinguishable from a
 deliberate override, and `APP_PORT_BASE=8090` would then quietly do nothing.
 

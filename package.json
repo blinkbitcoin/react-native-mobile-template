@@ -111,7 +111,7 @@
     "check:secrets": "make check-secrets",
     "dev:api": "tsx mocks/server.ts",
     "check:audit": "pnpm audit --audit-level=high --prod && check-lockfile",
-    "check:unused": "knip",
+    "check:unused": "eval \"$(node scripts/ports.mjs --sh)\" && knip",
     "check:generated": "bash node_modules/@blinkbitcoin/app-tooling/checks/generated.sh",
     "check:expo-health": "bash node_modules/@blinkbitcoin/app-tooling/checks/expo-health.sh",
     "check:licenses": "check-licenses"
