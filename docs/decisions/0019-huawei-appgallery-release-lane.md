@@ -27,8 +27,9 @@ toggle of its own.
 - `assert_huawei_uploads_enabled!` requires `HUAWEI_UPLOADS_ENABLED=true` on top
   of `STORE_UPLOADS_ENABLED`: a repository shipping only to Apple and Google
   must not acquire a third submission by setting the shared toggle.
-- `.github/workflows/cd-production.yml` — `huawei-binary` and
-  `huawei-release`, on `action=release` only and deliberately outside
+- `.github/workflows/cd-production.yml` — `huawei-release` (with a `huawei-binary`
+  staging job at the time; `publish-store`'s `release-assets` now downloads the
+  bundle itself), on `action=release` only and deliberately outside
   `github-release`'s `needs`, so a slow third-party store cannot hold up marking
   the release latest, the update publish or the web deploy.
 - No metadata tree: AppGallery's listing fields stay console-only, so there is
@@ -43,7 +44,7 @@ toggle of its own.
 This is the first `Pluginfile` entry, so `bundle install` becomes load-bearing:
 without the gem the option-replay test fails with "no such fastlane action", and
 `fastlane/test/validate_options.rb` has to load plugins explicitly because the
-core loader does not. `huawei-binary` exists because Huawei's production
+core loader does not. The bundle is downloaded off the tag because Huawei's production
 dispatch is its first upload rather than the promotion of a binary it already
 holds, and the `.aab` lives on the release tag as an asset, not in the run — it
 fails loudly when the tag carries none, which means the beta promote never ran.

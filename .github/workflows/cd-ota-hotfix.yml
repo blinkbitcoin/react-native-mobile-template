@@ -42,56 +42,11 @@ concurrency:
   group: release
   cancel-in-progress: false
 jobs:
-  baseline:
-    name: Fingerprint baseline
-    # Same gate as `publish`: without it a dispatch on a repo with OTA off burns
-    # a runner and then fails with "no baseline release found", which reads as a
-    # hotfix problem rather than "OTA is not enabled here".
-    if: ${{ vars.OTA_ENABLED == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      tag: ${{ steps.resolve.outputs.tag }}
-      fingerprint-ios: ${{ steps.resolve.outputs.fingerprint-ios }}
-    steps:
-      - name: Resolve the fingerprint baseline tag
-        id: resolve
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          BASELINE_TAG: ${{ inputs.baseline_tag }}
-        run: |
-          set -euo pipefail
-          tag="$BASELINE_TAG"
-          if [ -z "$tag" ]; then
-            # The store build currently installed on the channel is the latest
-            # release; `--exclude-pre-releases` keeps the `-build.N` internal
-            # pre-releases out of the answer.
-            tag="$(gh release list --limit 1 --exclude-pre-releases \
-              --json tagName --jq '.[0].tagName // empty')"
-          fi
-          if [ -z "$tag" ]; then
-            echo "no baseline release found; pass baseline_tag explicitly" >&2
-            exit 1
-          fi
-          echo "baseline: $tag"
-          echo "tag=$tag" >>"$GITHUB_OUTPUT"
-          # The baseline release carries the build-info.json of the binary now
-          # installed on the channel, and its iOS fingerprint is exactly the
-          # runtime version the update will be served under — which is what the
-          # publish's manifest smoke check has to ask the server for. Without it
-          # a hotfix, the publish most likely to be made under pressure, is the
-          # one publish nobody verifies actually served anything.
-          fp=''
-          if gh release download "$tag" --pattern build-info.json --dir . --clobber 2>/dev/null; then
-            fp="$(node -e 'process.stdout.write(String(require("./build-info.json")?.fingerprint?.ios ?? ""))' 2>/dev/null || true)"
-          fi
-          [ -n "$fp" ] || echo "no fingerprint.ios on $tag; the manifest smoke check will be skipped" >&2
-          echo "fingerprint-ios=$fp" >>"$GITHUB_OUTPUT"
-
   publish:
     name: Publish
-    needs: baseline
+    # Without the gate a dispatch on a repo with OTA off would fail with "no
+    # baseline release found", which reads as a hotfix problem rather than
+    # "OTA is not enabled here".
     if: ${{ vars.OTA_ENABLED == 'true' }}
     uses: blinkbitcoin/shared-workflows/.github/workflows/publish-ota.yml@cb865d40f57e179f25a8c6de9a2be25ff025411d # v0.25.0
     permissions:
@@ -107,11 +62,14 @@ jobs:
       # release; internal and beta do not gate.
       environment: ${{ inputs.channel == 'production' && 'production' || '' }}
       ota-cli-version: ${{ vars.OTA_CLI_VERSION }}
-      baseline-tag: ${{ needs.baseline.outputs.tag }}
-      # Recovered from the baseline release above, so a hotfix gets the same
-      # "did the server actually serve this?" check as every other publish. An
-      # empty runtime version skips the check rather than failing the publish.
-      manifest-url: ${{ needs.baseline.outputs.fingerprint-ios != '' && vars.EXPO_UPDATES_URL || '' }}
-      runtime-version: ${{ needs.baseline.outputs.fingerprint-ios }}
+      # The store build currently installed on the channel is the latest
+      # published release that is not a `-build.N` pre-release; publish-ota
+      # resolves `latest` itself. Its build-info.json is the fingerprint
+      # baseline, and its iOS fingerprint is the runtime version the update is
+      # served under, which the manifest smoke check asks the server for - so a
+      # hotfix, the publish most likely made under pressure, is verified like
+      # every other.
+      baseline-tag: ${{ inputs.baseline_tag || 'latest' }}
+      manifest-url: ${{ vars.EXPO_UPDATES_URL }}
     secrets:
       OTA_PUBLISH_TOKEN: ${{ secrets.OTA_PUBLISH_TOKEN }}

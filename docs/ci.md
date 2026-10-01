@@ -49,8 +49,7 @@ flowchart TD
   subgraph beta["CD / Beta"]
     direction LR
     bprep["Prepare"] --> promote["Promote iOS<br/>Promote Android"] --> brel["Release"]
-    brel -->|"downloads *.aab from the tag"| bbin["Stage Huawei binary"]
-    bbin --> bhuawei["Promote Huawei"]
+    brel -->|"lane downloads *.aab from the tag"| bhuawei["Promote Huawei"]
   end
 
   internal -.->|"workflow_run: Internal green"| retry["CD / Beta Retry"]
@@ -61,9 +60,7 @@ flowchart TD
   subgraph prod["CD / Production"]
     direction LR
     psec["Security<br/>(binaries, prebuild, bundle, SBOM)"] --> rel["Release iOS<br/>Release Android"] --> roll["Phased / Rollout"] --> done["Complete or Halt"]
-    psec --> pbin["Stage Huawei binary"]
-    pbin -->|"downloads *.aab from the tag"| phuawei["Release Huawei"]
-    rel --> phuawei
+    rel -->|"lane downloads *.aab from the tag"| phuawei["Release Huawei"]
   end
 
   listing["workflow_dispatch<br/>direction + platforms"] --> sm
@@ -100,10 +97,10 @@ The Huawei AppGallery jobs hang off the Google Play ones on purpose: each of
 them `needs` its tier's Android store job, so AppGallery never receives a
 bundle Play refused and is never the only store holding one. Internal uploads
 the bundle this run just built. Beta and production have no bundle in the run
-at all, so `Stage Huawei binary` downloads the `*.aab` back off the release tag
-with `gh release download` and re-uploads it as an artifact the lane then
-reads — AppGallery has no promote endpoint, so every tier is a fresh upload
-with different submission flags. All five Huawei jobs are behind
+at all, so the Huawei job passes `release-tag` and `release-assets: '*.aab'` to
+`publish-store.yml`, which downloads the bundle off the release tag into the
+directory the lane reads — AppGallery has no promote endpoint, so every tier is
+a fresh upload with different submission flags. All five Huawei jobs are behind
 `HUAWEI_UPLOADS_ENABLED` on top of `STORE_UPLOADS_ENABLED`.
 
 **CD / Beta Retry** is not in the release chain; it is the repair for one

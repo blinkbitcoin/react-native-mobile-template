@@ -58,7 +58,7 @@ const WORKFLOWS = {
     releaseJobs: ['github-prerelease'],
   },
   'cd-beta.yml': {
-    storeJobs: ['promote-ios', 'promote-android', 'huawei-binary', 'promote-huawei'],
+    storeJobs: ['promote-ios', 'promote-android', 'promote-huawei'],
     releaseJobs: ['github-release'],
   },
   'cd-production.yml': {
@@ -68,7 +68,6 @@ const WORKFLOWS = {
       'ios-phased',
       'android-rollout',
       'android-halt',
-      'huawei-binary',
       'huawei-release',
     ],
     releaseJobs: ['github-release'],
@@ -553,8 +552,12 @@ describe('the security gate', () => {
       );
     });
 
+    test('Huawei waits on the Android release, so the security gate holds it too', () => {
+      assert.match(jobs['huawei-release'].needs, /\bandroid-release\b/);
+    });
+
     test('every job that submits a binary waits on it, and survives it being switched off', () => {
-      for (const name of ['ios-release', 'android-release', 'huawei-binary']) {
+      for (const name of ['ios-release', 'android-release']) {
         assert.match(
           jobs[name].needs,
           /\bsecurity\b/,
@@ -619,5 +622,68 @@ describe('cd-internal.yml builds every commit to main except a docs-only one', (
     assert.equal(pushFilterRuns(['**.md'], ['a/b/README.md']), true);
     assert.equal(pushFilterRuns(['*.md'], ['a/README.md']), false);
     assert.equal(pushFilterRuns(['**', '!a/**'], ['a/x.ts']), false);
+  });
+});
+
+// The callers stage nothing and write no shell: every step that used to be an
+// inline job is an input of a shared workflow.
+describe('no CD caller carries an inline job', () => {
+  const dir = path.join(root, '.github/workflows');
+  const workflow = (file) => parse(readFileSync(path.join(dir, file), 'utf8'));
+
+  for (const file of readdirSync(dir).filter((f) => /^cd-.*\.yml$/.test(f))) {
+    test(`${file}: every job calls a shared workflow, so there are no steps to hold`, () => {
+      for (const [name, job] of Object.entries(workflow(file).jobs)) {
+        const via = job.uses ?? '';
+        if (via.includes('/shared-workflows/.github/workflows/')) continue;
+        assert.fail(
+          `${file}: job ${name} has no shared uses: (${JSON.stringify(Object.keys(job))})`,
+        );
+      }
+    });
+  }
+
+  test('the Huawei lanes download the bundle from the release tag', () => {
+    for (const [file, job] of [
+      ['cd-beta.yml', 'promote-huawei'],
+      ['cd-production.yml', 'huawei-release'],
+    ]) {
+      const huawei = workflow(file).jobs[job].with;
+      assert.equal(huawei['release-assets'], '*.aab', `${file} ${job}`);
+      assert.equal(huawei['release-tag'], '${{ inputs.tag }}', `${file} ${job}`);
+      assert.equal(huawei.artifacts, 'build-info', `${file} ${job}`);
+    }
+  });
+
+  test("beta's store notes come from build-info, without a staging job", () => {
+    const notes = workflow('cd-beta.yml').jobs['store-notes'].with;
+    assert.equal(notes.mode, 'append');
+    assert.equal(notes['release-notes-artifact'], 'build-info');
+    assert.equal(notes['release-notes-file'], 'store-notes.txt');
+  });
+
+  test("production's stage note is passed as text, and names the action and the run", () => {
+    const stage = workflow('cd-production.yml').jobs['stage-append'];
+    assert.equal(stage.with.mode, 'append');
+    assert.equal(stage.with['release-notes-artifact'], undefined);
+    const text = stage.with['release-notes-text'];
+    for (const part of [
+      'inputs.action',
+      'inputs.platforms',
+      'inputs.play_rollout_percent',
+      'github.run_id',
+    ]) {
+      assert.ok(text.includes(part), `the stage note leaves out ${part}`);
+    }
+    assert.equal(stage.if, '${{ !failure() && !cancelled() }}');
+  });
+
+  test('the hotfix baseline is publish-ota latest, and the smoke check reads the baseline fingerprint', () => {
+    const publish = workflow('cd-ota-hotfix.yml').jobs.publish;
+    assert.deepEqual(Object.keys(workflow('cd-ota-hotfix.yml').jobs), ['publish']);
+    assert.equal(publish.needs, undefined);
+    assert.equal(publish.with['baseline-tag'], "${{ inputs.baseline_tag || 'latest' }}");
+    assert.equal(publish.with['runtime-version'], undefined);
+    assert.equal(publish.with['manifest-url'], '${{ vars.EXPO_UPDATES_URL }}');
   });
 });

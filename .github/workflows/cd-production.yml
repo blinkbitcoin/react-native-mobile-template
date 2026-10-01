@@ -168,38 +168,12 @@ jobs:
   # ---- action=release: Huawei AppGallery (opt-in, additional store) ---------
 
   # The one store whose production dispatch is a first upload: the Android App
-  # Bundle is a release asset on the tag, not an artifact of this run, so stage
-  # it back into an artifact the lane job can download.
-  huawei-binary:
-    name: Stage Huawei binary
-    needs: [prepare, security]
-    if: ${{ !failure() && !cancelled() && vars.STORE_UPLOADS_ENABLED == 'true' && vars.HUAWEI_UPLOADS_ENABLED == 'true' && (inputs.action == 'release' && inputs.platforms != 'ios') }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      - name: Download the Android App Bundle from the release tag
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          TAG: ${{ inputs.tag }}
-        run: |
-          set -euo pipefail
-          mkdir -p staged
-          gh release download "$TAG" --pattern '*.aab' --dir staged
-          ls -l staged
-      - uses: actions/upload-artifact@v7
-        with:
-          name: huawei-binary
-          path: staged/*.aab
-          compression-level: 0
-          if-no-files-found: error
-
+  # Bundle is a release asset on the tag, not an artifact of this run, so the
+  # lane downloads it from the release.
   huawei-release:
     name: Release Huawei
     # android-release too: AppGallery should not receive a release Play refused.
-    needs: [prepare, android-release, huawei-binary]
+    needs: [prepare, android-release]
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && vars.HUAWEI_UPLOADS_ENABLED == 'true' && (inputs.action == 'release' && inputs.platforms != 'ios') }}
     uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@cb865d40f57e179f25a8c6de9a2be25ff025411d # v0.25.0
     permissions:
@@ -208,10 +182,11 @@ jobs:
       platform: android
       lane: upload_huawei
       environment: production
-      # Every artifact of the run, not just build-info: the lane needs the
-      # build info and the store notes from build-info and the bundle from
-      # huawei-binary, and both land in the same assets directory.
-      artifacts: "*"
+      # The build info and the store notes from build-info, and the bundle from
+      # the release on the tag; both land in the same assets directory.
+      artifacts: build-info
+      release-tag: ${{ inputs.tag }}
+      release-assets: '*.aab'
       environment-variables: '{"APP_VARIANT":"production", "HUAWEI_APP_ID": "${{ vars.HUAWEI_APP_ID }}", "HUAWEI_UPLOADS_ENABLED": "${{ vars.HUAWEI_UPLOADS_ENABLED }}", "HUAWEI_SUBMIT_DELAY_SECONDS": "${{ vars.HUAWEI_SUBMIT_DELAY_SECONDS }}"}'
       version: ${{ needs.prepare.outputs.version }}
       build-number: ${{ needs.prepare.outputs.build-number }}
@@ -326,42 +301,14 @@ jobs:
         ${{ vars.STORE_UPLOADS_ENABLED != 'true' && 'Store uploads were off for this build: it was never sent to TestFlight or Play. Set the repository variable STORE_UPLOADS_ENABLED to true to turn them on.' || '' }}
 
   # A production dispatch otherwise leaves no record on the release of which
-  # stage it reached — which release went out, when, to which stores, at what
-  # rollout. The section is marker-delimited and rewritten in place, so the
-  # release body always shows the *last* production action.
-  #
-  # `production-stage.md` is deliberately not one of github-release's fixed
-  # asset globs: `append` regenerates SHA256SUMS over whatever of that set is in
-  # the download directory, and an artifact carrying one of those names would
-  # replace the checksums of the release's binaries.
-  stage-note:
-    name: Record stage
-    needs: [prepare, ios-release, android-release, ios-phased, android-rollout, android-halt]
-    if: ${{ !failure() && !cancelled() }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Write the stage line
-        env:
-          ACTION: ${{ inputs.action }}
-          PLATFORMS: ${{ inputs.platforms }}
-          ROLLOUT: ${{ inputs.play_rollout_percent }}
-        run: |
-          set -euo pipefail
-          mkdir -p section
-          printf '%s at %s, platforms %s, rollout %s%%\n' \
-            "$ACTION" "$(date -u '+%Y-%m-%d %H:%M UTC')" "$PLATFORMS" "$ROLLOUT" \
-            > section/production-stage.md
-          cat section/production-stage.md
-      - uses: actions/upload-artifact@v7
-        with:
-          name: release-stage
-          path: section/production-stage.md
-          if-no-files-found: error
-
+  # stage it reached - which action, to which stores, at what rollout. The
+  # section is marker-delimited and rewritten in place, so the release body
+  # always shows the *last* production action. It names the run, whose page
+  # carries the time. `append` changes only the body, so the line goes in as
+  # text: nothing is uploaded and the release's SHA256SUMS stay as they are.
   stage-append:
     name: Attach stage note
-    needs: [prepare, stage-note]
+    needs: [prepare, ios-release, android-release, ios-phased, android-rollout, android-halt]
     if: ${{ !failure() && !cancelled() }}
     uses: blinkbitcoin/shared-workflows/.github/workflows/publish-github-release.yml@cb865d40f57e179f25a8c6de9a2be25ff025411d # v0.25.0
     permissions:
@@ -370,8 +317,8 @@ jobs:
       mode: append
       release-tag: ${{ inputs.tag }}
       append-title: Production
-      release-notes-artifact: release-stage
-      release-notes-file: production-stage.md
+      release-notes-text: >-
+        ${{ format('{0}, platforms {1}, rollout {2}% ([run {3}]({4}/{5}/actions/runs/{3}))', inputs.action, inputs.platforms, inputs.play_rollout_percent, github.run_id, github.server_url, github.repository) }}
 
   ota-production:
     name: OTA

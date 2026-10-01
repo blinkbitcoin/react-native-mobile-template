@@ -129,18 +129,16 @@ headers, and fails when it does not come back. A publish that "succeeded" but
 serves nothing is otherwise indistinguishable from a working one until a user
 opens the app. The check defaults to the iOS platform, so the callers pair it
 with `runtime-version: ${{ needs.prepare.outputs.fingerprint-ios }}`. `cd-ota-hotfix.yml`
-has no prepare job, but it does resolve a baseline release — and that release's
-`build-info.json` carries the `fingerprint.ios` of the binary currently
-installed on the channel, which is exactly the runtime version to ask for. Its
-`baseline` job downloads it and passes it on, so a hotfix (the publish most
-likely to be made under pressure) is checked like every other. When the baseline
-carries no fingerprint, the smoke check is skipped rather than failing a good
-publish on a missing header.
+has no prepare job, so it passes no `runtime-version`: with none given the smoke
+check reads the baseline release's `build-info.json`, whose `fingerprint.ios`
+is that of the binary currently installed on the channel, which is exactly the
+runtime version to ask for. A hotfix (the publish most likely to be made under
+pressure) is checked like every other.
 
-`cd-ota-hotfix.yml`'s `baseline` job carries the same `vars.OTA_ENABLED == 'true'`
-condition as its `publish` job: on a repo with OTA off a dispatch would
-otherwise burn a runner and fail with "no baseline release found", which reads
-as a hotfix problem rather than "OTA is not enabled here".
+`cd-ota-hotfix.yml`'s `publish` job carries the `vars.OTA_ENABLED == 'true'`
+condition: on a repo with OTA off a dispatch would otherwise fail with "no
+baseline release found", which reads as a hotfix problem rather than "OTA is
+not enabled here".
 
 Then rebuild and ship a store build. An OTA update can only reach a binary that
 was compiled with `OTA_ENABLED=true` and the right certificate — turning the
@@ -190,7 +188,7 @@ would pass unconditionally. What each caller points `baseline-tag` at:
 | `cd-internal.yml` | `internal` | the `vX.Y.Z-build.N` pre-release this run just created |
 | `cd-beta.yml` | `beta` | the `vX.Y.Z` release being promoted |
 | `cd-production.yml` | `production` | the dispatched `tag` |
-| `cd-ota-hotfix.yml` | dispatched | the `baseline_tag` input, or the latest non-prerelease when empty |
+| `cd-ota-hotfix.yml` | dispatched | the `baseline_tag` input, or `latest` (the newest published release that is not a pre-release) when empty |
 
 A missing tag, a missing release or a release with no `build-info.json` asset is
 fatal, by design.
