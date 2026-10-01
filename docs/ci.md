@@ -257,7 +257,7 @@ locally means the same commands passed the same way in CI.
 
 | CI job | Scripts it runs | Local equivalent |
 | --- | --- | --- |
-| `check.yml` | `check:types`, `check:lint`, `check:format`, `check:unused`, `check:spell`, `check:generated`,<br>`check:expo-health`, `check:audit`, `check:licenses`, commitlint, `check:ci`, `check:docs`, `check:release`,<br>`check:secrets`. `check:ci` also runs the shell-locale, workflow-name and ignored-directories guards,<br>`check:docs` the make-target-name guard (all from `@blinkbitcoin/app-tooling`) | `make check-code`, `make check-generated`, `make check-expo-health`, `make check-audit`,<br>`make check-licenses`, `make check-ci`, `make check-docs`, `make check-release`,<br>`make check-secrets` (`make check` runs all of it) |
+| `check.yml` | `check:types`, `check:lint`, `check:format`, `check:unused`, `check:spell`, `check:generated`,<br>`check:expo-health`, `check:audit`, `check:licenses`, commitlint, `check:ci`, `check:docs`, `check:release`,<br>`check:secrets`, `test:app`. `check:ci` also runs the shell-locale, workflow-name and ignored-directories guards,<br>`check:docs` the make-target-name guard (all from `@blinkbitcoin/app-tooling`) | `make check-code`, `make check-generated`, `make check-expo-health`, `make check-audit`,<br>`make check-licenses`, `make check-ci`, `make check-docs`, `make check-release`,<br>`make check-secrets` (`make check` runs all of it), `make test-app` |
 | `test-unit.yml` | `test:coverage`, `test:scripts` | `make test-coverage`, `make test-scripts` (`make test-unit` runs `test` + `test:scripts`);<br>both gate coverage at 100%; `test:scripts` includes the `make setup` suite |
 | `test-e2e.yml` | Maestro flows in `.maestro/` against a debug build | `make test-e2e-ios` / `make test-e2e-android` (after `make dev-api`, `make dev`, `make dev-ios`/`make dev-android`) |
 | `build-web.yml` | `build:web`, `test:e2e:web` | `make build-web`, `make test-e2e-web` |
@@ -487,7 +487,7 @@ one, and several carry many: `cd-production.yml` alone has twelve.
 `cd-beta-retry.yml` calls no reusable workflow at all.
 
 ```yaml
-uses: blinkbitcoin/shared-workflows/.github/workflows/check.yml@5189bd2a4c4ff3cb98b01e1cfda15923f7c1ae25 # v0.22.0
+uses: blinkbitcoin/shared-workflows/.github/workflows/check.yml@cb865d40f57e179f25a8c6de9a2be25ff025411d # v0.25.0
 ```
 
 A shared-workflows release changes nothing here by itself

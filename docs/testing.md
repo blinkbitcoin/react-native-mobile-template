@@ -13,6 +13,7 @@ Five runners, each with a job. Nothing here needs a network.
 | Native module wrapper | Jest, the manual mock in `modules/hello-native/src/__mocks__/` | `modules/hello-native/index.test.ts` | `make test-unit` |
 | Config plugins | Jest, `plugins` project (plain node) | `plugins/*.test.ts` | `make test-unit` |
 | Node scripts | `node:test` | `scripts/**/*.test.mjs` | `make test-scripts` |
+| Shared app suites | `node:test`, shipped in `@blinkbitcoin/app-tooling` | none here: they read this app's files | `make test-app` |
 | Fastlane lanes | minitest | `fastlane/test/lanes_test.rb` | `make check-release` |
 | E2E, native | Maestro | `.maestro/flows/` | `make test-e2e-ios`, `make test-e2e-android` |
 | E2E, web | Playwright | `e2e/web/` | `make test-e2e-web` |
@@ -113,7 +114,6 @@ would otherwise have that code measured too. The script runs
 | Suite | Covers |
 | --- | --- |
 | `scripts/init.test.mjs` | The template rename and web-removal script behind `make init` |
-| `scripts/release/fingerprint.test.mjs` | The fingerprint and OTA plumbing |
 | `scripts/coverage-completeness.test.mjs` | Loads every `scripts/**/*.mjs` module, so one no test imports still counts |
 | `scripts/ci-suite-gates.test.mjs` | `ci.yml`'s `unit`, `e2e` and `badges` jobs evaluated together for each kind of change, and `unit` held to having<br>no gate (see [ci.md](ci.md#skipping-a-suite-the-change-cannot-affect)) |
 | `scripts/release/store-notes.test.mjs` | The store notes the way CD drafts them: cd-release's `environment-variables` through the shared `build-env.sh`,<br>`pr-store-notes.sh` and `gen-store-notes` on a real release PR body with a `gh` shim, a local model and this<br>repository's `store-notes.prompt.md`, then the shared `gen-store-notes.sh` reading the section back |
@@ -222,6 +222,24 @@ reads `coverage/coverage-summary.json` — which is why `json-summary` is in
 `coverageReporters` — and fails naming any file with `statements.total === 0`.
 The fix is always the same: ignore the file with a reason, or give it code
 worth testing.
+
+## The shared app suites
+
+Some tests are about this app's own files but test shared-workflows' code: the
+OTA fingerprint is the first. They live in `@blinkbitcoin/app-tooling` and run
+against this checkout through `make test-app` (`pnpm test:app`, `make ci`, and
+CI's `Checks / App suites` job, switched on by `app-suites: true` in
+`ci.yml`). `pnpm exec test-app --list` prints which suites run and why any
+other is skipped. They move with the shared-workflows pin, so the Dependabot PR
+that changes a suite runs it here before it merges.
+
+| Suite | What it proves here |
+| --- | --- |
+| `fingerprint` | `fingerprint.config.js` loads and is `createFingerprintConfig()`'s, and a release's `APP_VERSION` /<br>`APP_BUILD_NUMBER` move neither the iOS nor the Android fingerprint, so a published update stays<br>compatible with the build it targets |
+
+To turn a suite off, give the reason in `app-tooling.json`
+(`"appSuites": { "skip": { "<suite>": "<reason>" } }`); it is printed on every
+run.
 
 ## Tests are silent
 

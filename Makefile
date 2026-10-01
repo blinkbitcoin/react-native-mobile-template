@@ -198,10 +198,10 @@ check-release: ## Ruby syntax + fastlane lane parse + lane unit tests + skill te
 	for f in fastlane/Fastfile fastlane/lanes/*.rb fastlane/test/*.rb; do ruby -c "$$f" || exit 1; done
 	FASTLANE_SKIP_ENV_ASSERT=1 bundle exec fastlane lanes
 	bundle exec ruby -Ifastlane/test fastlane/test/lanes_test.rb
-	bash scripts/check-skills.sh
+	pnpm exec check-skills
 
 check-skills: ## Only the skill tests (offline, fakes only; needs bundle install) - part of check-release
-	bash scripts/check-skills.sh
+	pnpm exec check-skills
 
 # History, not the working tree: a key committed and deleted later is still in
 # the repository. Allowlisted test data, each entry with its reason: .gitleaks.toml.
@@ -256,7 +256,7 @@ check: check-code check-generated check-expo-health check-audit check-licenses c
 # each. Run them before a release, or when you have touched a config plugin.
 check-slow: check-prebuild check-security-bundle ## The minutes-long gates: prebuild output + the bundle scan
 
-ci: check test-coverage test-scripts ## Everything CI runs except E2E (which needs a simulator)
+ci: check test-app test-coverage test-scripts ## Everything CI runs except E2E (which needs a simulator)
 
 # Deliberately NOT in `make check`: the first run downloads and compiles a query
 # pack (minutes) and every run needs a CodeQL CLI, which no other gate does.
@@ -271,6 +271,9 @@ check-code-scanning: ## CodeQL code scanning locally, with the same config CI us
 # for a laptop, before pushing.
 check-contract: ## Everything the called shared workflows need from this repository, in one report
 	pnpm exec check-contract
+
+test-app: ## The shared app suites against this app (the OTA fingerprint); pnpm exec test-app --list says which run
+	pnpm test:app
 
 test-scripts: ## node:test for scripts/**/*.test.mjs, with the 100% script coverage gate
 	pnpm test:scripts
@@ -311,4 +314,4 @@ reset: clean ## clean + reinstall
 help: ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: init doctor install setup setup-toolchain setup-android setup-ios setup-maestro ports dev dev-ios dev-android dev-web dev-api prebuild build-web version verify-ios verify-android store-notes gen-i18n gen-graphql check-types check-lint fix-format fix-lint fix-tooling-pin check-format check-unused check-spell check-generated check-prebuild check-code check-expo-health check-audit check-licenses check-ci check-docs check-skills check-secrets check-security check-security-dependencies check-security-code check-security-policy check-security-sbom check-security-bundle check-security-mobile check-security-binaries check-security-review check-security-review-codebase check-release check check-slow ci check-code-scanning check-contract test-scripts test-unit test-coverage gen-badges test-e2e-ios test-e2e-android test-e2e-web test clean reset help
+.PHONY: init doctor install setup setup-toolchain setup-android setup-ios setup-maestro ports dev dev-ios dev-android dev-web dev-api prebuild build-web version verify-ios verify-android store-notes gen-i18n gen-graphql check-types check-lint fix-format fix-lint fix-tooling-pin check-format check-unused check-spell check-generated check-prebuild check-code check-expo-health check-audit check-licenses check-ci check-docs check-skills check-secrets check-security check-security-dependencies check-security-code check-security-policy check-security-sbom check-security-bundle check-security-mobile check-security-binaries check-security-review check-security-review-codebase check-release check check-slow ci check-code-scanning check-contract test-app test-scripts test-unit test-coverage gen-badges test-e2e-ios test-e2e-android test-e2e-web test clean reset help

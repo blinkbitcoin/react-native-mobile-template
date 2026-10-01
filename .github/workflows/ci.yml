@@ -24,7 +24,7 @@ concurrency:
 jobs:
   checks:
     name: Checks
-    uses: blinkbitcoin/shared-workflows/.github/workflows/check.yml@5189bd2a4c4ff3cb98b01e1cfda15923f7c1ae25 # v0.22.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/check.yml@cb865d40f57e179f25a8c6de9a2be25ff025411d # v0.25.0
     with:
       # Runs `pnpm check:release` (= `make check-release`): Ruby syntax, a
       # fastlane lane parse and the lane unit tests. Needs Ruby, which is why
@@ -35,6 +35,10 @@ jobs:
       # check-generated`): the i18n catalogs and the GraphQL documents are what
       # their generators write.
       generated: true
+      # The shared app suites (`pnpm test:app` = `make test-app`): shared-workflows'
+      # tests run against this app's own files, starting with the OTA
+      # fingerprint a version bump must not move. Off by default upstream.
+      app-suites: true
   unit:
     name: Unit
     needs: checks
@@ -44,7 +48,7 @@ jobs:
     # fastlane lane or a doc can each fail Unit. Skipping on the classifier's
     # unit list let such a change land unchecked.
     # scripts/ci-suite-gates.test.mjs holds this job to having no `if:`.
-    uses: blinkbitcoin/shared-workflows/.github/workflows/test-unit.yml@5189bd2a4c4ff3cb98b01e1cfda15923f7c1ae25 # v0.22.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/test-unit.yml@cb865d40f57e179f25a8c6de9a2be25ff025411d # v0.25.0
   e2e:
     name: E2E
     # `unit` as well as `checks`, so a failed unit run never reaches E2E. On a
@@ -63,7 +67,7 @@ jobs:
       needs.checks.result == 'success' &&
       contains(fromJSON('["success", "skipped"]'), needs.unit.result) &&
       needs.checks.outputs.e2e-changed != 'false'
-    uses: blinkbitcoin/shared-workflows/.github/workflows/test-e2e.yml@5189bd2a4c4ff3cb98b01e1cfda15923f7c1ae25 # v0.22.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/test-e2e.yml@cb865d40f57e179f25a8c6de9a2be25ff025411d # v0.25.0
     with:
       # iOS runs on a push to main (and a manual run) when the repo variable
       # E2E_IOS is true, and on a PR only when it carries the `e2e:ios` label
@@ -118,7 +122,7 @@ jobs:
       contents: read
       actions: read
       security-events: write
-    uses: blinkbitcoin/shared-workflows/.github/workflows/check-security.yml@5189bd2a4c4ff3cb98b01e1cfda15923f7c1ae25 # v0.22.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/check-security.yml@cb865d40f57e179f25a8c6de9a2be25ff025411d # v0.25.0
     with:
       # The diff review runs on pull requests, and on the release pull request,
       # whose CI is the workflow_dispatch cd-release.yml starts on its branch -
@@ -163,7 +167,7 @@ jobs:
       !(needs.unit.result == 'skipped' && needs.e2e.result == 'skipped')
     permissions:
       contents: write # publish-badges.sh pushes the gh-pages branch
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-badges.yml@5189bd2a4c4ff3cb98b01e1cfda15923f7c1ae25 # v0.22.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-badges.yml@cb865d40f57e179f25a8c6de9a2be25ff025411d # v0.25.0
     with:
       unit-result: ${{ needs.unit.result }}
       e2e-result: ${{ needs.e2e.result }}

@@ -25,7 +25,7 @@ src/test/           jest setup, render helper, mocks
 plugins/            Expo config plugins (with-*.ts) + their tests
 modules/            local native modules (hello-native)
 mocks/              GraphQL mock API (server.ts, msw.ts, schema.graphql)
-scripts/            check-*.sh, init, ports, release/ (the store-notes and fingerprint tests), e2e/
+scripts/            check-*.sh, init, ports, release/ (the store-notes test), e2e/
 .maestro/           Maestro flows (native e2e); e2e/web/ is Playwright
 fastlane/           store lanes + metadata; deploy/ota/ is the update server
 docs/               architecture, local-dev, quality, testing, ci, native-extensions,
@@ -117,6 +117,7 @@ aggregates.
 | `make test` | Unit tests + code checks |
 | `make test-unit` | Unit + component tests |
 | `make test-scripts` | `node:test` for `scripts/**/*.test.mjs`, with the 100% coverage gate over `scripts/**/*.mjs` |
+| `make test-app` | The shared app suites against this app (the OTA fingerprint); `pnpm exec test-app --list` says which run |
 | `make test-coverage` | Tests with the coverage thresholds and the empty-row check CI enforces |
 | `make test-e2e-ios` | Maestro flows on iOS (needs `dev-api`, `dev`, `dev-ios`) |
 | `make test-e2e-android` | Maestro flows on Android (needs `dev-api`, `dev`, `dev-android`) |
@@ -288,6 +289,7 @@ aggregates.
 | That every source file has a sibling test | `check-test-siblings`, rules in `app-tooling.json` | `make test-scripts` |
 | Config plugins | `plugins/*.test.ts` | `make test-unit` |
 | Node scripts (release, doctor, init, checks), 100% coverage | `scripts/**/*.test.mjs` | `make test-scripts` |
+| That a version bump moves neither platform's OTA fingerprint, and the shared fingerprint configuration holds | the `fingerprint` app suite in `@blinkbitcoin/app-tooling` | `make test-app` (CI's Checks / App suites) |
 | The native-setup skill's commands and paths | `.claude/skills/native-setup/tests/` | `make check-skills` |
 | Fastlane lanes | `fastlane/test/` | `make check-release` |
 | CD against the pinned shared workflows: every call's contract, the store-notes chain | `make check-contract` (the shared contract check),<br>`scripts/release/store-notes.test.mjs` | CI's Checks / Contract; `make test-scripts` (CI always; locally with `WORKFLOWS_DIR`) |
