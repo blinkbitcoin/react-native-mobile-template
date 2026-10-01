@@ -38,42 +38,29 @@ concurrency:
   group: release
   cancel-in-progress: false
 jobs:
-  ios:
-    name: ${{ inputs.direction == 'pull' && 'Pull iOS listing' || 'Push iOS listing' }}
-    # Off unless the repository says otherwise, so a fresh checkout of this
-    # template cannot overwrite a live store page from a mistaken dispatch.
-    # The lane asserts the same variable itself - this only saves the runner.
-    if: ${{ vars.STORE_METADATA_SYNC_ENABLED == 'true' && inputs.platforms != 'android' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@cb865d40f57e179f25a8c6de9a2be25ff025411d # v0.25.0
+  # Both listing jobs are shared-workflows' publish-store-listing.yml, named by
+  # the direction ("Push iOS listing"). Off unless the repository says
+  # otherwise, so a fresh checkout of this template cannot overwrite a live
+  # store page from a mistaken dispatch; the lane asserts the same variable.
+  listing:
+    name: Store listing
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store-listing.yml@80e8e0efc4570209de1247ce32ee9c8f102389d2 # v0.27.0
     permissions:
       contents: read
     with:
-      platform: ios
-      lane: ${{ inputs.direction == 'pull' && 'pull_metadata' || 'sync_metadata' }}
-      # No Xcode, no binary, so no macOS runner: the listing is pure App Store Connect API.
-      # Required reviewers live on this environment; a listing edit is as
-      # public as a release, so it is gated the same way.
-      environment: production
-      environment-variables: >-
-        {"APP_VARIANT":"production",
-        "STORE_METADATA_SYNC_ENABLED":"${{ vars.STORE_METADATA_SYNC_ENABLED }}",
-        "IOS_METADATA_EDIT_LIVE":"${{ vars.IOS_METADATA_EDIT_LIVE }}",
-        "DRY_RUN":"${{ inputs.dry_run && '1' || '0' }}"}
-      # The Fastfile's before_all asserts all five contract variables for every
-      # lane, and this one acts on no version at all - so they are filled with
-      # the identifiers plus a version of 0.0.0 that nothing reads.
-      version: 0.0.0
-      build-number: "0"
+      direction: ${{ inputs.direction }}
+      platforms: ${{ inputs.platforms }}
+      dry-run: ${{ inputs.dry_run }}
       ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
       ios-scheme: ${{ vars.IOS_SCHEME }}
       android-package: ${{ vars.ANDROID_PACKAGE }}
-      timeout-minutes: 60
+      store-metadata-sync-enabled: ${{ vars.STORE_METADATA_SYNC_ENABLED == 'true' }}
+      ios-metadata-edit-live: ${{ vars.IOS_METADATA_EDIT_LIVE }}
+      play-metadata-track: ${{ vars.PLAY_METADATA_TRACK }}
     secrets:
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
-      # Secrets, not environment-variables: a reviewer demo login is a real credential and
-      # both of those inputs are printed to the log.
       APP_REVIEW_EMAIL: ${{ secrets.APP_REVIEW_EMAIL }}
       APP_REVIEW_FIRST_NAME: ${{ secrets.APP_REVIEW_FIRST_NAME }}
       APP_REVIEW_LAST_NAME: ${{ secrets.APP_REVIEW_LAST_NAME }}
@@ -81,27 +68,4 @@ jobs:
       APP_REVIEW_DEMO_USER: ${{ secrets.APP_REVIEW_DEMO_USER }}
       APP_REVIEW_DEMO_PASSWORD: ${{ secrets.APP_REVIEW_DEMO_PASSWORD }}
       APP_REVIEW_NOTES: ${{ secrets.APP_REVIEW_NOTES }}
-
-  android:
-    name: ${{ inputs.direction == 'pull' && 'Pull Android listing' || 'Push Android listing' }}
-    if: ${{ vars.STORE_METADATA_SYNC_ENABLED == 'true' && inputs.platforms != 'ios' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@cb865d40f57e179f25a8c6de9a2be25ff025411d # v0.25.0
-    permissions:
-      contents: read
-    with:
-      platform: android
-      lane: ${{ inputs.direction == 'pull' && 'pull_metadata' || 'sync_metadata' }}
-      environment: production
-      environment-variables: >-
-        {"APP_VARIANT":"production",
-        "STORE_METADATA_SYNC_ENABLED":"${{ vars.STORE_METADATA_SYNC_ENABLED }}",
-        "PLAY_METADATA_TRACK":"${{ vars.PLAY_METADATA_TRACK }}",
-        "DRY_RUN":"${{ inputs.dry_run && '1' || '0' }}"}
-      version: 0.0.0
-      build-number: "0"
-      ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
-      ios-scheme: ${{ vars.IOS_SCHEME }}
-      android-package: ${{ vars.ANDROID_PACKAGE }}
-      timeout-minutes: 60
-    secrets:
       PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}

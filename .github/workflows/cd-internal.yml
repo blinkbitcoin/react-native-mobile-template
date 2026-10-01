@@ -34,36 +34,40 @@ concurrency:
   group: release-internal-${{ github.sha }}
   cancel-in-progress: false
 jobs:
-  prepare:
-    name: Prepare
-    uses: blinkbitcoin/shared-workflows/.github/workflows/build-prepare.yml@cb865d40f57e179f25a8c6de9a2be25ff025411d # v0.25.0
+  # The whole pipeline - prepare (green gate, reserved build tag), both builds,
+  # the store uploads, the `vX.Y.Z-build.N` pre-release and the internal OTA
+  # publish - is shared-workflows' publish-internal.yml. This file keeps what
+  # only a workflow's own file can hold: the trigger and the per-commit
+  # concurrency group above, the permissions, and the secrets.
+  internal:
+    name: Internal
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-internal.yml@80e8e0efc4570209de1247ce32ee9c8f102389d2 # v0.27.0
     permissions:
-      # `contents: write` for `reserve-tag` below (it creates the build tag);
-      # `actions: read` for the green gate's `gh run list`. build-prepare
-      # inherits exactly what is granted here.
+      # `contents: write` for the reserved build tag and the pre-release;
+      # `actions: read` for the green gate's `gh run list`.
       contents: write
       actions: read
     with:
-      stage: internal
-      # The `v<version>-build.<n>` tag is created here, seconds after the push,
-      # while this commit is still main's tip - not when the release is
-      # published an hour later. GitHub refuses GITHUB_TOKEN a new tag on a
-      # commit whose workflow files differ from the tip, and by publish time a
-      # later merge may have changed one (ADR 0017: every pre-release between
-      # 01:30Z and 03:10Z on 2026-09-19 failed that way).
-      reserve-tag: true
-      # Both this workflow and ci.yml fire on the same push, so without a gate a
-      # red main still starts a macOS build and, with uploads on, still reaches a
-      # store. This blocks inside the job - polling every 30s, 45-minute cap,
-      # 5-minute discovery window - so prepare holds an ubuntu runner for as long
-      # as CI takes. A workflow_dispatch on a commit whose CI never ran fails the
-      # gate by design: "no run exists" is fatal, because a silently-skipped gate
-      # is exactly what it exists to prevent.
-      require-green-workflow: ci.yml
+      ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
+      ios-scheme: ${{ vars.IOS_SCHEME }}
+      android-package: ${{ vars.ANDROID_PACKAGE }}
       # `build-number-offset` is a `number` input, and an unset repo variable is
       # the empty string, which fails input validation rather than falling back
-      # to the workflow default. fromJSON turns the fallback into a real number.
+      # to the pipeline's default. fromJSON turns the fallback into a real number.
       build-number-offset: ${{ fromJSON(vars.BUILD_NUMBER_OFFSET || '1000') }}
+      # Both this workflow and ci.yml fire on the same push, so without a gate a
+      # red main still starts a macOS build and, with uploads on, still reaches a
+      # store: the pipeline blocks until the commit's CI is green.
+      green-workflow: ci.yml
+      # Off unless the repository says otherwise, so a checkout with no store
+      # credentials still builds, verifies and publishes its artifacts.
+      store-uploads-enabled: ${{ vars.STORE_UPLOADS_ENABLED == 'true' }}
+      ios-signing-enabled: ${{ vars.IOS_SIGNING_ENABLED == 'true' }}
+      android-signing-enabled: ${{ vars.ANDROID_SIGNING_ENABLED == 'true' }}
+      xcode-version: ${{ vars.XCODE_VERSION }}
+      macos-runner: ${{ vars.WORKFLOWS_MACOS_RUNNER || 'macos-26' }}
+      testflight-internal-group: ${{ vars.TESTFLIGHT_INTERNAL_GROUP }}
+      play-update-priority: ${{ vars.PLAY_UPDATE_PRIORITY }}
       # `environment-variables` is the only way a caller gets an environment variable into
       # the prebuild, the lanes and the consumer scripts. Non-secret only: the
       # value is a workflow input, unmasked and visible to anyone who can read
@@ -78,42 +82,11 @@ jobs:
         "EXPO_PUBLIC_APP_NAME":"${{ vars.EXPO_PUBLIC_APP_NAME }}",
         "EXPO_PUBLIC_WEB_DOMAIN":"${{ vars.EXPO_PUBLIC_WEB_DOMAIN }}",
         "EXPO_PUBLIC_ALLOW_INSECURE_WEB_STORAGE":"${{ vars.EXPO_PUBLIC_ALLOW_INSECURE_WEB_STORAGE || 'false' }}"}
-
-  build-ios:
-    name: Build iOS
-    needs: prepare
-    uses: blinkbitcoin/shared-workflows/.github/workflows/build-ios.yml@cb865d40f57e179f25a8c6de9a2be25ff025411d # v0.25.0
-    permissions:
-      contents: read
-    with:
-      environment: internal
-      # Uploads imply signing, so the invalid combination - uploading with
-      # nothing signed to upload - cannot be expressed. Both unset means an
-      # unsigned build: it still compiles, still runs verify, and needs no
-      # Apple account. See docs/store-accounts.md.
-      ios-signing-enabled: ${{ vars.STORE_UPLOADS_ENABLED == 'true' || vars.IOS_SIGNING_ENABLED == 'true' }}
-      version: ${{ needs.prepare.outputs.version }}
-      build-number: ${{ needs.prepare.outputs.build-number }}
-      stage: internal
-      xcode-version: ${{ vars.XCODE_VERSION }}
-      macos-runner: ${{ vars.WORKFLOWS_MACOS_RUNNER || 'macos-26' }}
-      # All five Fastfile contract variables are asserted in `before_all` for
-      # every lane on both platforms, so the Android id is required here too.
-      ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
-      ios-scheme: ${{ vars.IOS_SCHEME }}
-      android-package: ${{ vars.ANDROID_PACKAGE }}
-      # APP_VARIANT decides the `.dev` id suffix in app.config.ts, and
-      # OTA_ENABLED / EXPO_UPDATES_URL decide whether the binary can ever
-      # receive an update — none of them reach a build any other way.
-      environment-variables: >-
-        {"APP_VARIANT":"production",
-        "OTA_ENABLED":"${{ vars.OTA_ENABLED }}",
-        "EXPO_UPDATES_URL":"${{ vars.EXPO_UPDATES_URL }}",
-        "ANDROID_UPLOAD_CERT_SHA256":"${{ vars.ANDROID_UPLOAD_CERT_SHA256 }}",
-        "EXPO_PUBLIC_API_URL":"${{ vars.EXPO_PUBLIC_API_URL }}",
-        "EXPO_PUBLIC_APP_NAME":"${{ vars.EXPO_PUBLIC_APP_NAME }}",
-        "EXPO_PUBLIC_WEB_DOMAIN":"${{ vars.EXPO_PUBLIC_WEB_DOMAIN }}",
-        "EXPO_PUBLIC_ALLOW_INSECURE_WEB_STORAGE":"${{ vars.EXPO_PUBLIC_ALLOW_INSECURE_WEB_STORAGE || 'false' }}"}
+      ota-enabled: ${{ vars.OTA_ENABLED == 'true' }}
+      ota-cli-version: ${{ vars.OTA_CLI_VERSION }}
+      manifest-url: ${{ vars.EXPO_UPDATES_URL }}
+      huawei-uploads-enabled: ${{ vars.HUAWEI_UPLOADS_ENABLED == 'true' }}
+      huawei-environment-variables: '{"APP_VARIANT":"production", "HUAWEI_APP_ID": "${{ vars.HUAWEI_APP_ID }}", "HUAWEI_UPLOADS_ENABLED": "${{ vars.HUAWEI_UPLOADS_ENABLED }}", "HUAWEI_SUBMIT_DELAY_SECONDS": "${{ vars.HUAWEI_SUBMIT_DELAY_SECONDS }}", "HUAWEI_FEEDBACK_EMAIL": "${{ vars.HUAWEI_FEEDBACK_EMAIL }}", "HUAWEI_TEST_DAYS": "${{ vars.HUAWEI_TEST_DAYS }}"}'
     secrets:
       MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
       MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
@@ -121,230 +94,11 @@ jobs:
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
-
-  build-android:
-    name: Build Android
-    needs: prepare
-    uses: blinkbitcoin/shared-workflows/.github/workflows/build-android.yml@cb865d40f57e179f25a8c6de9a2be25ff025411d # v0.25.0
-    permissions:
-      contents: read
-    with:
-      environment: internal
-      # Uploads imply signing, so the invalid combination - uploading with
-      # nothing signed to upload - cannot be expressed. Both unset means an
-      # unsigned build: it still compiles, still runs verify, and needs no
-      # Play account. See docs/store-accounts.md.
-      android-signing-enabled: ${{ vars.STORE_UPLOADS_ENABLED == 'true' || vars.ANDROID_SIGNING_ENABLED == 'true' }}
-      version: ${{ needs.prepare.outputs.version }}
-      build-number: ${{ needs.prepare.outputs.build-number }}
-      stage: internal
-      android-package: ${{ vars.ANDROID_PACKAGE }}
-      ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
-      ios-scheme: ${{ vars.IOS_SCHEME }}
-      # ANDROID_UPLOAD_CERT_SHA256 is what turns the `android verify` lane's
-      # "the aab is signed" into "the aab is signed by the expected key". The
-      # gate reads it straight out of the environment (`--cert-sha256` is the
-      # manual override) and reports `skip` when it is missing.
-      environment-variables: >-
-        {"APP_VARIANT":"production",
-        "OTA_ENABLED":"${{ vars.OTA_ENABLED }}",
-        "EXPO_UPDATES_URL":"${{ vars.EXPO_UPDATES_URL }}",
-        "ANDROID_UPLOAD_CERT_SHA256":"${{ vars.ANDROID_UPLOAD_CERT_SHA256 }}",
-        "EXPO_PUBLIC_API_URL":"${{ vars.EXPO_PUBLIC_API_URL }}",
-        "EXPO_PUBLIC_APP_NAME":"${{ vars.EXPO_PUBLIC_APP_NAME }}",
-        "EXPO_PUBLIC_WEB_DOMAIN":"${{ vars.EXPO_PUBLIC_WEB_DOMAIN }}",
-        "EXPO_PUBLIC_ALLOW_INSECURE_WEB_STORAGE":"${{ vars.EXPO_PUBLIC_ALLOW_INSECURE_WEB_STORAGE || 'false' }}"}
-    secrets:
       ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
       ANDROID_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
       ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
       ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
       PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-
-  upload-ios:
-    name: Upload iOS
-    # The one queue every store-touching job in every release workflow shares,
-    # joined here per job rather than by the whole workflow (see the top of
-    # the file). A pending upload can still be evicted by the next pending
-    # store job - rare, since an upload takes minutes, and visible: this run
-    # goes red and `gh run rerun --failed` finishes it.
-    concurrency:
-      group: release
-      cancel-in-progress: false
-    # Off unless the repository says otherwise, so a checkout with no store
-    # credentials still builds, verifies and publishes its artifacts.
-    if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' }}
-    needs: [prepare, build-ios]
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@cb865d40f57e179f25a8c6de9a2be25ff025411d # v0.25.0
-    permissions:
-      contents: read
-    with:
-      platform: ios
-      lane: upload_internal
-      # Transporter (the upload path pilot/upload_to_testflight uses) only
-      # ships on macOS, so this lane cannot run on ubuntu.
-      macos-enabled: true
-      macos-runner: ${{ vars.WORKFLOWS_MACOS_RUNNER || 'macos-26' }}
-      environment: internal
-      # `*` merges every artifact this run produced into $WORKFLOWS_ASSETS_DIR, which
-      # is where the lane looks for <IOS_SCHEME>.ipa (gym's `output_name`),
-      # build-info.json and the notes — `artifact_dir` in shared.rb prefers that
-      # directory over the build output directory for exactly this reason.
-      artifacts: "*"
-      environment-variables: '{"APP_VARIANT":"production", "TESTFLIGHT_INTERNAL_GROUP": "${{ vars.TESTFLIGHT_INTERNAL_GROUP }}"}'
-      version: ${{ needs.prepare.outputs.version }}
-      build-number: ${{ needs.prepare.outputs.build-number }}
-      ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
-      ios-scheme: ${{ vars.IOS_SCHEME }}
-      android-package: ${{ vars.ANDROID_PACKAGE }}
-      timeout-minutes: 60
-    secrets:
-      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-      ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
-
-  upload-android:
-    name: Upload Android
-    # The one queue every store-touching job in every release workflow shares,
-    # joined here per job rather than by the whole workflow (see the top of
-    # the file). A pending upload can still be evicted by the next pending
-    # store job - rare, since an upload takes minutes, and visible: this run
-    # goes red and `gh run rerun --failed` finishes it.
-    concurrency:
-      group: release
-      cancel-in-progress: false
-    # Off unless the repository says otherwise, so a checkout with no store
-    # credentials still builds, verifies and publishes its artifacts.
-    if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' }}
-    needs: [prepare, build-android]
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@cb865d40f57e179f25a8c6de9a2be25ff025411d # v0.25.0
-    permissions:
-      contents: read
-    with:
-      platform: android
-      lane: upload_internal
-      environment: internal
-      artifacts: "*"
-      environment-variables: '{"APP_VARIANT":"production", "PLAY_UPDATE_PRIORITY": "${{ vars.PLAY_UPDATE_PRIORITY }}"}'
-      version: ${{ needs.prepare.outputs.version }}
-      build-number: ${{ needs.prepare.outputs.build-number }}
-      ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
-      ios-scheme: ${{ vars.IOS_SCHEME }}
-      android-package: ${{ vars.ANDROID_PACKAGE }}
-    secrets:
-      PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-
-  # ---- Huawei AppGallery (opt-in, additional store) ------------------------
-
-  upload-huawei:
-    name: Upload Huawei
-    # The one queue every store-touching job in every release workflow shares,
-    # joined here per job rather than by the whole workflow (see the top of
-    # the file). A pending upload can still be evicted by the next pending
-    # store job - rare, since an upload takes minutes, and visible: this run
-    # goes red and `gh run rerun --failed` finishes it.
-    concurrency:
-      group: release
-      cancel-in-progress: false
-    # Two toggles: the shared one, and Huawei's own. A repository shipping only
-    # to Apple and Google must not acquire a third submission by turning store
-    # uploads on.
-    if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && vars.HUAWEI_UPLOADS_ENABLED == 'true' }}
-    # upload-android too, like the beta and production tiers: AppGallery should
-    # not receive a build Play refused, and it must never be the only store
-    # that has one.
-    needs: [prepare, build-android, upload-android]
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@cb865d40f57e179f25a8c6de9a2be25ff025411d # v0.25.0
-    permissions:
-      contents: read
-    with:
-      platform: android
-      # AppGallery has one version slot and no tracks, so the internal tier is
-      # the same submission as the others with the testing flag set and manual
-      # review skipped: automated review, hours, up to 100 testers.
-      lane: upload_huawei_internal
-      environment: internal
-      # Every artifact of the run, not just build-info: the lane needs the
-      # build info and the store notes as well as the Android App Bundle this
-      # run just built, and all of them land in the same assets directory.
-      artifacts: "*"
-      environment-variables: '{"APP_VARIANT":"production", "HUAWEI_APP_ID": "${{ vars.HUAWEI_APP_ID }}", "HUAWEI_UPLOADS_ENABLED": "${{ vars.HUAWEI_UPLOADS_ENABLED }}", "HUAWEI_SUBMIT_DELAY_SECONDS": "${{ vars.HUAWEI_SUBMIT_DELAY_SECONDS }}", "HUAWEI_FEEDBACK_EMAIL": "${{ vars.HUAWEI_FEEDBACK_EMAIL }}", "HUAWEI_TEST_DAYS": "${{ vars.HUAWEI_TEST_DAYS }}"}'
-      version: ${{ needs.prepare.outputs.version }}
-      build-number: ${{ needs.prepare.outputs.build-number }}
-      ios-bundle-id: ${{ vars.IOS_BUNDLE_ID }}
-      ios-scheme: ${{ vars.IOS_SCHEME }}
-      android-package: ${{ vars.ANDROID_PACKAGE }}
-      # The plugin waits for AppGallery to finish compiling the uploaded bundle
-      # before it submits it, which is minutes rather than seconds.
-      timeout-minutes: 90
-    secrets:
       HUAWEI_CLIENT_ID: ${{ secrets.HUAWEI_CLIENT_ID }}
       HUAWEI_CLIENT_SECRET: ${{ secrets.HUAWEI_CLIENT_SECRET }}
-
-  github-prerelease:
-    name: Pre-release
-    # The build jobs are named directly rather than reached through the upload
-    # jobs: this release carries their artifacts and has never needed a store.
-    # `!cancelled() && !failure()` is what lets it run when the uploads are
-    # skipped - a skipped dependency skips its dependents unless the condition
-    # uses a status function. It is not enough on its own: a build job killed
-    # by its timeout reports `cancelled`, which `cancelled()` (the *run's*
-    # state) and `failure()` both miss - the first internal release shipped a
-    # pre-release with no binaries that way. So both builds are required to
-    # have succeeded, by name.
-    #
-    # `upload-huawei` is deliberately absent: AppGallery is an additive,
-    # opt-in third store with a review queue that is not ours, and it must
-    # never hold up or fail the pre-release this run is built around.
-    needs: [prepare, build-ios, build-android, upload-ios, upload-android]
-    if: ${{ !cancelled() && !failure() && needs.build-ios.result == 'success' && needs.build-android.result == 'success' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-github-release.yml@cb865d40f57e179f25a8c6de9a2be25ff025411d # v0.25.0
-    permissions:
-      # The called job creates a release; a called workflow can only narrow the
-      # caller's token, so `contents: write` has to be granted here.
-      contents: write
-    with:
-      mode: create-prerelease
-      release-tag: v${{ needs.prepare.outputs.version }}-build.${{ needs.prepare.outputs.build-number }}
-      sha: ${{ github.sha }}
-      title: v${{ needs.prepare.outputs.version }} build ${{ needs.prepare.outputs.build-number }}
-      assets-artifacts: "*"
-      # Empty when uploads ran, so a real store build carries no marker.
-      # The condition is inverted on purpose: GitHub's `&&` yields its first
-      # falsy operand, so `cond && '' || X` is X on *both* branches. The
-      # non-empty value has to sit in the `&&` slot.
-      body-note: >-
-        ${{ vars.STORE_UPLOADS_ENABLED != 'true' && 'Store uploads were off for this build: it was never sent to TestFlight or Play. Set the repository variable STORE_UPLOADS_ENABLED to true to turn them on.' || '' }}
-
-  ota-internal:
-    name: OTA
-    # The one queue every store-touching job in every release workflow shares,
-    # joined here per job rather than by the whole workflow (see the top of
-    # the file). A pending upload can still be evicted by the next pending
-    # store job - rare, since an upload takes minutes, and visible: this run
-    # goes red and `gh run rerun --failed` finishes it.
-    concurrency:
-      group: release
-      cancel-in-progress: false
-    needs: [prepare, github-prerelease]
-    if: ${{ vars.OTA_ENABLED == 'true' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-ota.yml@cb865d40f57e179f25a8c6de9a2be25ff025411d # v0.25.0
-    permissions:
-      contents: read
-    with:
-      ota-enabled: ${{ vars.OTA_ENABLED == 'true' }}
-      channel: internal
-      rollout: 100
-      environment: internal
-      ota-cli-version: ${{ vars.OTA_CLI_VERSION }}
-      # The pre-release this run just created carries the build-info.json of
-      # the binary now installed on the internal track, which is exactly the
-      # fingerprint baseline the gate has to compare against.
-      baseline-tag: v${{ needs.prepare.outputs.version }}-build.${{ needs.prepare.outputs.build-number }}
-      # A publish that "succeeded" but serves nothing looks identical to a
-      # working one until a user opens the app. smoke.sh defaults to the ios
-      # platform, so the iOS fingerprint is the runtime version to ask for.
-      manifest-url: ${{ vars.EXPO_UPDATES_URL }}
-      runtime-version: ${{ needs.prepare.outputs.fingerprint-ios }}
-    secrets:
       OTA_PUBLISH_TOKEN: ${{ secrets.OTA_PUBLISH_TOKEN }}
