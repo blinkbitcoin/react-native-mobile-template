@@ -3,7 +3,7 @@
 This repo runs almost no CI logic of its own. Nearly every job lives in
 [`blinkbitcoin/shared-workflows`](https://github.com/blinkbitcoin/shared-workflows)
 and the twelve files in `.github/workflows/` are thin callers that pick inputs.
-Two of the twelve are the exception and are described below. The workflows repo's
+The workflows repo's
 `docs/consumer-guide.md` is the contract; this page is the template's half of
 it.
 
@@ -108,13 +108,13 @@ with different submission flags. All five Huawei jobs are behind
 
 **CD / Beta Retry** is not in the release chain; it is the repair for one
 timing hole. A beta run refuses to promote until that commit's internal run is
-green, and `release-please` dispatches beta exactly once, so a beta dispatched
+green, and `cd-release.yml` dispatches beta exactly once, so a beta dispatched
 while internal is still building (or red) fails at the gate with nothing left
 to re-trigger it. `cd-beta-retry.yml` listens for `workflow_run` on a completed
-**CD / Internal** for `main`, and when the conclusion is `success` it finds a
-concluded-but-not-successful `cd-beta.yml` run for the same head commit
-and does `gh run rerun --failed` on it — only the jobs that failed, so nothing
-promotes twice. It matches on the internal run's head commit, so if another
+**CD / Internal** for `main`, and when the conclusion is `success` it calls
+`publish-retry.yml`, which finds a concluded-but-not-successful `cd-beta.yml`
+run for the same head commit and does `gh run rerun --failed` on it — only the
+jobs that failed, so nothing promotes twice. It matches on the internal run's head commit, so if another
 commit lands on `main` in between, nothing matches and the retry no-ops.
 
 **CD / Store listing** (`cd-store-listing.yml`) is a manual dispatch that is not part
@@ -236,11 +236,11 @@ empty and quietly run every suite.
 
 | File | Trigger | Calls | Notes |
 | --- | --- | --- | --- |
-| `cd-release.yml` | `push` to `main` (all paths), `workflow_dispatch` | `googleapis/release-please-action@v5`, `pr-store-notes.yml` | Keeps one release PR open, dispatches `ci.yml` on its branch and drafts the<br>`## Store notes` section into its body (the only job that may call an LLM).<br>On a cut release, dispatches `cd-beta.yml` and `ci-web.yml` at the tag |
+| `cd-release.yml` | `push` to `main` (all paths), `workflow_dispatch` | `pr-release.yml` (release-please), `pr-store-notes.yml` | Keeps one release PR open, dispatches `ci.yml` on its branch and drafts the<br>`## Store notes` section into its body (the only job that may call an LLM).<br>On a cut release, dispatches `cd-beta.yml` and `ci-web.yml` at the tag |
 | `cd-internal.yml` | `push` to `main` (skipping `docs/**`, `**.md`), `workflow_dispatch` | `build-prepare.yml`, `build-ios.yml`, `build-android.yml`,<br>`publish-store.yml`, `publish-github-release.yml`, `publish-ota.yml` | The only workflow that builds binaries |
 | `cd-beta.yml` | `workflow_dispatch` (`tag`), from `cd-release.yml` or by hand | `build-prepare.yml`, `publish-store.yml`, `publish-github-release.yml`, `publish-ota.yml` | Promotes the binary internal already built and tested. Never builds |
 | `cd-production.yml` | `workflow_dispatch` (`tag`, `action`) | `build-prepare.yml`, `check-security.yml`, `publish-store.yml`, `publish-github-release.yml`, `publish-ota.yml`, `build-web.yml` | `action` selects release, rollout, halt, resume or complete;<br>on `release` the store jobs wait for `security`, and `web` redeploys Pages<br>with the same `base-url` as `ci-web.yml` |
-| `cd-beta-retry.yml` | `workflow_run` on a completed `CD / Internal` (its display name) for `main` | nothing: it re-runs a failed beta run with `gh` | Closes the hole where the beta dispatch arrives once, before internal is green |
+| `cd-beta-retry.yml` | `workflow_run` on a completed `CD / Internal` (its display name) for `main` | `publish-retry.yml`, which re-runs a failed beta run | Closes the hole where the beta dispatch arrives once, before internal is green |
 | `cd-ota-hotfix.yml` | `workflow_dispatch` (`channel`, `ref`, rollout) | `publish-ota.yml` | JavaScript-only fixes. The fingerprint gate rejects anything native |
 | `cd-store-listing.yml` | `workflow_dispatch` (`direction`, `platforms`, `dry_run`) | `publish-store.yml` (twice: iOS and Android) | The store *page*, not a release: `sync_metadata` pushes `fastlane/metadata/**`<br>to App Store Connect and Play, `pull_metadata` reports what they hold. Both<br>jobs run on the `production` environment, behind its reviewers, and are gated<br>on `STORE_METADATA_SYNC_ENABLED` |
 
@@ -482,9 +482,8 @@ so the default `GITHUB_TOKEN` can push to it.
 ## Pinning and bumping the workflows version
 
 Every `uses:` that points at the workflows repo is pinned to one commit SHA,
-with that release's version beside it. Eleven of the twelve files carry at least
-one, and several carry many: `cd-production.yml` alone has twelve.
-`cd-beta-retry.yml` calls no reusable workflow at all.
+with that release's version beside it. Every one of the twelve files carries at
+least one, and several carry many: `cd-production.yml` alone has twelve.
 
 ```yaml
 uses: blinkbitcoin/shared-workflows/.github/workflows/check.yml@cb865d40f57e179f25a8c6de9a2be25ff025411d # v0.25.0

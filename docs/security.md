@@ -277,8 +277,9 @@ one too.
 
 ### Advisories currently accepted
 
-Two osv-scanner advisories are suppressed in `osv-scanner.toml` today, both
-with no clean upgrade available:
+These osv-scanner advisories are suppressed in `osv-scanner.toml` today, each
+with no clean upgrade available. The two `image-size` ids beside them are
+explained with `auditConfig.ignoreGhsas` in `pnpm-workspace.yaml`.
 
 - **`uuid@7.0.3`** (GHSA-w5hq-g745-h8pq, CVSS 7.5 high) - pulled in through
   `expo` > `@expo/config-plugins` > `xcode@3.0.1`, which hard-pins the dead
@@ -290,6 +291,12 @@ with no clean upgrade available:
   the entry above, this one **is** reachable at runtime through
   `query-string.parse()` on an incoming deep link - a denial-of-service
   surface the owner has knowingly accepted, not one ruled out as unreachable.
+- **`node-forge@1.4.0`** (GHSA-86w9-cpqp-85rv, high) - pulled in through
+  `expo` > `@expo/cli`, directly and through
+  `@expo/code-signing-certificates`. No fixed release exists. Unreachable:
+  only the Expo CLI loads it, on a developer machine or CI runner, and it
+  verifies only signatures it made itself or certificates the developer
+  configured; the shipped app checks update signatures in native code.
 
 ### Accepted findings in the other scanners
 

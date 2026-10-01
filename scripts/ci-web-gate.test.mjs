@@ -29,7 +29,7 @@ describe('ci-web.yml leaves the web gate to build-web.yml', () => {
     // so it fails open and the deploy always builds. Checked against the pinned
     // build-web.yml when WORKFLOWS_DIR points at it.
     assert.ok(Object.hasOwn(web.on, 'workflow_dispatch'));
-    assert.match(workflow('cd-release.yml'), /gh workflow run ci-web\.yml .*-f "deploy=true"/);
+    assert.match(workflow('cd-release.yml'), /^\s+ci-web\.yml deploy=true$/m);
     const dir = process.env.WORKFLOWS_DIR;
     if (!dir) {
       assert.notEqual(process.env.GITHUB_ACTIONS, 'true', 'WORKFLOWS_DIR is not set in CI');
@@ -49,17 +49,19 @@ describe('ci-web.yml leaves the web gate to build-web.yml', () => {
 
 // The web half of the release hop that release-workflows.test.mjs pins for
 // cd-beta.yml. It lives here because `make init --no-web` deletes this file,
-// ci-web.yml and the cd-release.yml step that dispatches it, together.
+// ci-web.yml and the cd-release.yml line that dispatches it, together.
+// pr-release.yml starts each `dispatch-on-release` line at the tag, and only
+// on a cut release; that half is tested in shared-workflows.
 describe('cd-release.yml dispatches the web deploy at a cut release', () => {
-  const steps = parse(workflow('cd-release.yml')).jobs['release-please'].steps;
-  const dispatches = steps.filter((step) => /gh workflow run ci-web\.yml /.test(step.run ?? ''));
+  const job = parse(workflow('cd-release.yml')).jobs['release-please'];
+  const dispatches = job.with['dispatch-on-release']
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('ci-web.yml'));
 
-  test('one step, gated on release_created, at the tag, with deploy=true', () => {
-    assert.equal(dispatches.length, 1, 'expected exactly one dispatch of ci-web.yml');
-    const [step] = dispatches;
-    assert.equal(unwrap(step.if), "steps.release.outputs.release_created == 'true'");
-    assert.match(step.run, /--ref "\$TAG"/);
-    assert.match(step.run, /-f "deploy=true"/);
+  test('one line, through pr-release.yml, with deploy=true', () => {
+    assert.match(job.uses, /\/shared-workflows\/\.github\/workflows\/pr-release\.yml@/);
+    assert.deepEqual(dispatches, ['ci-web.yml deploy=true']);
   });
 
   test('ci-web.yml waits on no release event and uses no App token', () => {
