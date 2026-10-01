@@ -225,7 +225,9 @@ The prebuild-diff workflow for a plugin change is in
 ## Git hooks
 
 `pnpm install` runs `lefthook install` through the `prepare` script, so the
-hooks in `lefthook.yml` are active after `make install`. (`make install` also
+hooks are active after `make install`. Most come from the shared file
+`lefthook.yml` extends (`@blinkbitcoin/app-tooling/expo/lefthook.yml`); this
+app adds only the post-merge and post-checkout installs. (`make install` also
 runs `bundle install` into `vendor/bundle`; `NO_BUNDLE=1 make install` skips
 that half.)
 

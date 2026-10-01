@@ -20,7 +20,7 @@ place, so the template's adoption script can strip it completely in one pass.
   `playwright.config.ts`, `src/app/+html.tsx`, the `.web.tsx` fallbacks), the
   same list the adoption script's manifest consumed.
 - Non-file removals: the `app.config.ts` `web:` block, the `metro.config.js`
-  web branch, `package.json` `web` / `build:web` / `test:e2e:web`, Makefile
+  web fixes (now `{ web: false }` passed to the shared Metro preset), `package.json` `web` / `build:web` / `test:e2e:web`, Makefile
   `dev-web` / `build-web` / `test-e2e-web`, `scripts/e2e/web.sh`,
   `.github/workflows/ci-web.yml`, `knip.json`'s `playwright` plugin key.
 - Deployment is GitHub Pages from the gated production dispatch, not the tag

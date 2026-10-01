@@ -1,8 +1,8 @@
 import { gql } from '@apollo/client';
+import { allowConsole } from '@blinkbitcoin/app-tooling/expo/jest/console';
 import { HttpResponse, http } from 'msw';
 import { crashReporting } from '@/lib/crash-reporting';
 import { SecureKey, secureStore } from '@/lib/secure-store';
-import { allowConsole } from '@/test/console';
 import { server } from '@/test/setup';
 import { createApolloClient } from './client';
 import { onUnauthenticated } from './links/error';

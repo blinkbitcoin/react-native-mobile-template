@@ -526,12 +526,14 @@ reaches its scripts through `$WORKFLOWS_DIR`. Nothing in this repo references
 `shared-workflows` paths directly. Local tooling that walks the whole tree
 ignores it, in every place the consumer guide's
 [`.workflows/` ignore list](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/consumer-guide.md#workflows-ignore-list-for-consumers)
-names: `biome.json` (`!**/.workflows`), `eslint.config.mjs` (`.workflows/**`),
+names: `biome.json` (`!**/.workflows`, from the shared preset it extends),
+`eslint.config.mjs` (`.workflows/**`, from the shared preset),
 `tsconfig.json` (`exclude`), `knip.json` (every glob is rooted, so none reaches
 it), `typos.toml` (`extend-exclude`), `jest.config.ts`
-(`testPathIgnorePatterns` and `modulePathIgnorePatterns`, anchored to
-`<rootDir>`), `metro.config.js` (`resolver.blockList`), `.semgrepignore`,
-the CodeQL configuration and `.gitignore` (`/.workflows`).
+(`testPathIgnorePatterns`, `modulePathIgnorePatterns` and
+`coveragePathIgnorePatterns`, anchored to `<rootDir>`, from the shared preset),
+`metro.config.js` (`resolver.blockList`, from the shared preset),
+`.semgrepignore`, the CodeQL configuration and `.gitignore` (`/.workflows`).
 `check-ignored-directories` (from `@blinkbitcoin/app-tooling`, run by
 `make check-ci`) asks each of those tools whether it still skips the
 directory, and the contract check reports any of them this repository loses.

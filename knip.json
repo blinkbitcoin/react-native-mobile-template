@@ -16,7 +16,7 @@
     "e2e/**/*.ts",
     "scripts/**/*.mjs"
   ],
-  "ignoreDependencies": ["ts-node", "expo-system-ui", "expo-doctor"],
+  "ignoreDependencies": ["ts-node", "expo-system-ui", "expo-doctor", "@commitlint/cli"],
   "ignoreBinaries": ["eval", "typos", "make", "mise"],
   "jest": {
     "config": "jest.config.ts"

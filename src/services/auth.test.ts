@@ -1,8 +1,8 @@
 import { ApolloClient, ApolloLink, execute, gql, InMemoryCache, Observable } from '@apollo/client';
+import { allowConsole } from '@blinkbitcoin/app-tooling/expo/jest/console';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { createErrorLink } from '@/graphql/links/error';
 import { logger } from '@/lib/logger';
-import { allowConsole } from '@/test/console';
 import { auth, useAuth } from './auth';
 
 const QUERY = gql`
@@ -128,8 +128,8 @@ test.each([
   ['rejects', false],
 ] as const)('useAuth ignores a token read that %s after unmount', async (_case, succeeds) => {
   // Both `mounted.current` guards protect the same thing: a setState on a hook
-  // React has already torn down, which surfaces as a console.error the guard in
-  // src/test/console.ts turns into a failure.
+  // React has already torn down, which surfaces as a console.error that the shared
+  // console guard turns into a failure.
   let finish: ((ok: boolean) => void) | undefined;
   const getToken = jest.spyOn(auth, 'getToken').mockImplementation(
     () =>

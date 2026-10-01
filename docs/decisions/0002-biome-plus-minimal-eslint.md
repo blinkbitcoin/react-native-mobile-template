@@ -24,7 +24,10 @@ design sketch assumed: `eslint-config-expo@^57` and its plugins peer on v9.
 - `biome.json` — formatter, `recommended` preset, react/test domains,
   `noConsole` (off for `src/lib/logger.ts`), `noRestrictedImports` for the
   secure-store and storage wrappers and the `src/app/**` routes-only rule.
+  Since the move to the shared Expo presets, the generic half of this lives in
+  `@blinkbitcoin/app-tooling/expo/biome`, which `biome.json` extends.
 - `eslint.config.mjs` — header states the split; each `'off'` names its twin.
+  The split itself now lives in `@blinkbitcoin/app-tooling/expo/eslint`.
 - `docs/quality.md` — the full ownership matrix.
 
 ## Consequences
