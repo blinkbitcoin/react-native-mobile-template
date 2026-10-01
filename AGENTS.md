@@ -25,7 +25,7 @@ src/test/           jest setup, render helper, mocks
 plugins/            Expo config plugins (with-*.ts) + their tests
 modules/            local native modules (hello-native)
 mocks/              GraphQL mock API (server.ts, msw.ts, schema.graphql)
-scripts/            check-*.sh, init, ports, release/ (the store-notes test), e2e/
+scripts/            check-*.sh, init, ports, e2e/
 .maestro/           Maestro flows (native e2e); e2e/web/ is Playwright
 fastlane/           store lanes + metadata; deploy/ota/ is the update server
 docs/               architecture, local-dev, quality, testing, ci, native-extensions,
@@ -159,14 +159,15 @@ aggregates.
 - **Env goes through `src/config/env`** — zod-parsed, `EXPO_PUBLIC_*` only.
   Nothing else may read `process.env` in `src/`.
 - **Logging goes through `src/lib/logger`.** `console.*` is a Biome error in
-  application code; `biome.json` turns `noConsole` off only for
-  `src/lib/logger.ts` (the sink itself) and for tooling that legitimately writes
-  to stdout: `scripts/**`, `plugins/**`, `mocks/**`, `*.config.*`, `codegen.ts`.
+  application code; `noConsole` is off only for `src/lib/logger.ts` (the sink
+  itself, in `biome.json`) and, in the shared Biome preset `biome.json` extends,
+  for tooling that legitimately writes to stdout: `scripts/**`, `plugins/**`,
+  `mocks/**`, `*.config.*`, `codegen.ts`.
 - **Tests are silent.** `console.error`/`console.warn` during a test fails it
-  (`src/test/console.ts`, both Jest projects). A console line is usually a
+  (the shared Jest preset's guard, both projects). A console line is usually a
   missing `await waitFor`, not a logging need; a deliberate one opts out with
-  `allowConsole(method, matcher)` or by spying on the method. The guard and its
-  test are the only `noConsole` exemptions besides the ones above.
+  `allowConsole(method, matcher)` from
+  `@blinkbitcoin/app-tooling/expo/jest/console`, or by spying on the method.
 - **Worktrees under `.claude/worktrees/` are not this checkout.** Claude Code
   puts whole checkouts there, node_modules included, so every tool that walks
   the tree excludes the directory itself (Jest and Metro anchored to the root,
@@ -292,13 +293,14 @@ aggregates.
 | That a version bump moves neither platform's OTA fingerprint, and the shared fingerprint configuration holds | the `fingerprint` app suite in `@blinkbitcoin/app-tooling` | `make test-app` (CI's Checks / App suites) |
 | The native-setup skill's commands and paths | `.claude/skills/native-setup/tests/` | `make check-skills` |
 | Fastlane lanes | `fastlane/test/` | `make check-release` |
-| CD against the pinned shared workflows: every call's contract, the store-notes chain | `make check-contract` (the shared contract check),<br>`scripts/release/store-notes.test.mjs` | CI's Checks / Contract; `make test-scripts` (CI always; locally with `WORKFLOWS_DIR`) |
+| CD against the pinned shared workflows: every call's contract, the store-notes chain | `make check-contract` (the shared contract check),<br>the `store-notes` app suite (`make test-app`) | CI's Checks / Contract and Checks / App suites |
 | Native e2e | `.maestro/flows/` | `make test-e2e-ios`, `make test-e2e-android` |
 | Web e2e | `e2e/web/` | `make test-e2e-web` |
 
-Coverage (`jest.config.ts`) is 100% lines, branches, functions and statements,
-globally. New code needs a test in the same commit. A file with nothing to
-assert goes in `coveragePathIgnorePatterns` **with a one-line reason**; an entry
+Coverage (the shared Jest preset that `jest.config.ts` calls) is 100% lines,
+branches, functions and statements, globally. New code needs a test in the same
+commit. A file with nothing to assert goes in `jest.config.ts`'s
+`coveragePathIgnorePatterns` **with a one-line reason**; an entry
 without one is not mergeable, and a native module's TS wrapper does not qualify
 just because the native half is Swift/Kotlin. `make test-coverage` (and CI,
 through `test:coverage`) also fails on any file with zero statements

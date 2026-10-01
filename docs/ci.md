@@ -234,16 +234,26 @@ empty and quietly run every suite.
 | File | Trigger | Calls | Notes |
 | --- | --- | --- | --- |
 | `cd-release.yml` | `push` to `main` (all paths), `workflow_dispatch` | `pr-release.yml` (release-please), `pr-store-notes.yml` | Keeps one release PR open, dispatches `ci.yml` on its branch and drafts the<br>`## Store notes` section into its body (the only job that may call an LLM).<br>On a cut release, dispatches `cd-beta.yml` and `ci-web.yml` at the tag |
-| `cd-internal.yml` | `push` to `main` (skipping `docs/**`, `**.md`), `workflow_dispatch` | `build-prepare.yml`, `build-ios.yml`, `build-android.yml`,<br>`publish-store.yml`, `publish-github-release.yml`, `publish-ota.yml` | The only workflow that builds binaries |
-| `cd-beta.yml` | `workflow_dispatch` (`tag`), from `cd-release.yml` or by hand | `build-prepare.yml`, `publish-store.yml`, `publish-github-release.yml`, `publish-ota.yml` | Promotes the binary internal already built and tested. Never builds |
-| `cd-production.yml` | `workflow_dispatch` (`tag`, `action`) | `build-prepare.yml`, `check-security.yml`, `publish-store.yml`, `publish-github-release.yml`, `publish-ota.yml`, `build-web.yml` | `action` selects release, rollout, halt, resume or complete;<br>on `release` the store jobs wait for `security`, and `web` redeploys Pages<br>with the same `base-url` as `ci-web.yml` |
+| `cd-internal.yml` | `push` to `main` (skipping `docs/**`, `**.md`), `workflow_dispatch` | `publish-internal.yml` (prepare, builds, uploads, pre-release, OTA) | The only workflow that builds binaries |
+| `cd-beta.yml` | `workflow_dispatch` (`tag`), from `cd-release.yml` or by hand | `publish-beta.yml` (prepare, promotions, release, notes, OTA) | Promotes the binary internal already built and tested. Never builds |
+| `cd-production.yml` | `workflow_dispatch` (`tag`, `action`) | `publish-production.yml` (prepare, security, releases, rollout lanes, latest, OTA, web) | `action` selects release, rollout, halt, resume or complete;<br>on `release` the store jobs wait for `security`, and `web` redeploys Pages<br>with the same `base-url` as `ci-web.yml` |
 | `cd-beta-retry.yml` | `workflow_run` on a completed `CD / Internal` (its display name) for `main` | `publish-retry.yml`, which re-runs a failed beta run | Closes the hole where the beta dispatch arrives once, before internal is green |
 | `cd-ota-hotfix.yml` | `workflow_dispatch` (`channel`, `ref`, rollout) | `publish-ota.yml` | JavaScript-only fixes. The fingerprint gate rejects anything native |
-| `cd-store-listing.yml` | `workflow_dispatch` (`direction`, `platforms`, `dry_run`) | `publish-store.yml` (twice: iOS and Android) | The store *page*, not a release: `sync_metadata` pushes `fastlane/metadata/**`<br>to App Store Connect and Play, `pull_metadata` reports what they hold. Both<br>jobs run on the `production` environment, behind its reviewers, and are gated<br>on `STORE_METADATA_SYNC_ENABLED` |
+| `cd-store-listing.yml` | `workflow_dispatch` (`direction`, `platforms`, `dry_run`) | `publish-store-listing.yml` (iOS and Android) | The store *page*, not a release: `sync_metadata` pushes `fastlane/metadata/**`<br>to App Store Connect and Play, `pull_metadata` reports what they hold. Both<br>jobs run on the `production` environment, behind its reviewers, and are gated<br>on `STORE_METADATA_SYNC_ENABLED` |
+
+The four release callers are each one `uses:` of a shared **pipeline workflow**
+(`publish-internal.yml`, `publish-beta.yml`, `publish-production.yml`,
+`publish-store-listing.yml`): the job graph, the store gating, the Huawei chain
+and the security gate live in shared-workflows and are tested there. The caller
+keeps the trigger, the concurrency group, the permissions, the secrets and the
+inputs it passes, which come from repository variables. The jobs show in the
+Actions UI as `<caller job> / <job>`, for example `Internal / Build iOS` and
+`Production / Release Android`. See
+[decision 0026](decisions/0026-cd-pipelines-from-shared-workflows.md).
 
 On a repo that never turns OTA on, the store path still works: only the `ota-*`
 jobs are skipped, through `if: vars.OTA_ENABLED == 'true'`, and `cd-ota-hotfix.yml`
-skips both of its jobs. See [ota.md](ota.md).
+skips its one job. See [ota.md](ota.md).
 
 ## How CI maps to `make`
 
@@ -480,10 +490,10 @@ so the default `GITHUB_TOKEN` can push to it.
 
 Every `uses:` that points at the workflows repo is pinned to one commit SHA,
 with that release's version beside it. Every one of the twelve files carries at
-least one, and several carry many: `cd-production.yml` alone has twelve.
+least one; the pipeline callers carry one each, and `ci.yml` and `cd-release.yml` a few.
 
 ```yaml
-uses: blinkbitcoin/shared-workflows/.github/workflows/check.yml@cb865d40f57e179f25a8c6de9a2be25ff025411d # v0.25.0
+uses: blinkbitcoin/shared-workflows/.github/workflows/check.yml@80e8e0efc4570209de1247ce32ee9c8f102389d2 # v0.27.0
 ```
 
 A shared-workflows release changes nothing here by itself
@@ -497,8 +507,8 @@ code against this repository before any CD run can:
   and every output a caller reads, against what the called workflow declares
   at the new commit, and that every pin and the tooling package are on that
   one commit.
-- `scripts/release/store-notes.test.mjs` runs the store-notes chain through the
-  shared scripts and our generator, end to end.
+- The shared `store-notes` app suite (`make test-app`, CI's Checks / App suites) runs the
+  store-notes chain through the shared scripts and our generator, end to end.
 
 The same Unit job fails until one more thing moves. The shared tooling package
 (`@blinkbitcoin/app-tooling`, behind `make check-contract`) is a git dependency
@@ -522,12 +532,14 @@ reaches its scripts through `$WORKFLOWS_DIR`. Nothing in this repo references
 `shared-workflows` paths directly. Local tooling that walks the whole tree
 ignores it, in every place the consumer guide's
 [`.workflows/` ignore list](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/consumer-guide.md#workflows-ignore-list-for-consumers)
-names: `biome.json` (`!**/.workflows`), `eslint.config.mjs` (`.workflows/**`),
+names: `biome.json` (`!**/.workflows`, from the shared preset it extends),
+`eslint.config.mjs` (`.workflows/**`, from the shared preset),
 `tsconfig.json` (`exclude`), `knip.json` (every glob is rooted, so none reaches
 it), `typos.toml` (`extend-exclude`), `jest.config.ts`
-(`testPathIgnorePatterns` and `modulePathIgnorePatterns`, anchored to
-`<rootDir>`), `metro.config.js` (`resolver.blockList`), `.semgrepignore`,
-the CodeQL configuration and `.gitignore` (`/.workflows`).
+(`testPathIgnorePatterns`, `modulePathIgnorePatterns` and
+`coveragePathIgnorePatterns`, anchored to `<rootDir>`, from the shared preset),
+`metro.config.js` (`resolver.blockList`, from the shared preset),
+`.semgrepignore`, the CodeQL configuration and `.gitignore` (`/.workflows`).
 `check-ignored-directories` (from `@blinkbitcoin/app-tooling`, run by
 `make check-ci`) asks each of those tools whether it still skips the
 directory, and the contract check reports any of them this repository loses.

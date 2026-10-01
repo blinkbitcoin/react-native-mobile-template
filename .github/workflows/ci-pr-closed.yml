@@ -8,4 +8,4 @@ permissions:
 jobs:
   pr-closed:
     name: Cleanup
-    uses: blinkbitcoin/shared-workflows/.github/workflows/pr-closed.yml@cb865d40f57e179f25a8c6de9a2be25ff025411d # v0.25.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/pr-closed.yml@80e8e0efc4570209de1247ce32ee9c8f102389d2 # v0.27.0

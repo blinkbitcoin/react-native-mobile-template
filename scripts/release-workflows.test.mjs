@@ -1,22 +1,12 @@
-// The release path must run as far as it can without an App Store Connect or
-// Play account.
-//
-// It did not. Every stage chained its GitHub release behind its store uploads —
-// `github-prerelease` needed `upload-ios` and `upload-android`, and neither
-// upload job carried a condition — so without credentials nothing past the
-// native builds ran, including the release itself, which needs only the default
-// token. On a template that fires `cd-internal` on every push to `main`,
-// that meant an adopter's first commit went red after paying for a macOS build.
-//
-// The gating is invisible in review: a `needs:` list looks identical whether or
-// not it silently blocks half a pipeline, and an absent `if:` looks like
-// nothing at all. Hence this file.
-//
-// No YAML library: the template ships none, and `yq` is not pinned in its
-// .mise.toml, so a CI runner would not have it. The parser below is small and
-// deliberately self-checking — every test asserts it found the jobs it expects
-// before asserting anything about them, so a parse that silently yields nothing
-// fails rather than passes.
+// What the CD callers still decide. The job graphs - which store jobs run
+// behind which toggle, what survives a skipped upload, how Huawei waits on
+// Android, what the security gate holds back, which rollout action moves which
+// store - are shared-workflows' publish-internal.yml, publish-beta.yml,
+// publish-production.yml and publish-store-listing.yml, and are tested there
+// (test/pipelines.test.mjs). A caller is the trigger, the concurrency group,
+// the permissions, the secrets and the inputs it passes, so this file holds
+// those, plus the release chain around them (cd-release.yml, the retry
+// listener, the beta gate and the push filter).
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -25,12 +15,11 @@ import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const GATE = 'STORE_UPLOADS_ENABLED';
 
 /** Top-level jobs of a workflow: name -> { if, needs, uses, with } as raw text. */
 function parseJobs(file) {
   const lines = readFileSync(path.join(root, '.github/workflows', file), 'utf8').split('\n');
-  const start = lines.findIndex((l) => l === 'jobs:');
+  const start = lines.indexOf('jobs:');
   assert.notEqual(start, -1, `${file} has no jobs: block`);
   const jobs = {};
   let name = null;
@@ -51,28 +40,6 @@ function parseJobs(file) {
   }
   return jobs;
 }
-
-const WORKFLOWS = {
-  'cd-internal.yml': {
-    storeJobs: ['upload-ios', 'upload-android', 'upload-huawei'],
-    releaseJobs: ['github-prerelease'],
-  },
-  'cd-beta.yml': {
-    storeJobs: ['promote-ios', 'promote-android', 'promote-huawei'],
-    releaseJobs: ['github-release'],
-  },
-  'cd-production.yml': {
-    storeJobs: [
-      'ios-release',
-      'android-release',
-      'ios-phased',
-      'android-rollout',
-      'android-halt',
-      'huawei-release',
-    ],
-    releaseJobs: ['github-release'],
-  },
-};
 
 // cd-release.yml chains everything after the cut release by dispatch. It
 // has to: the PR, tag and release are created with GITHUB_TOKEN, and GitHub
@@ -139,60 +106,36 @@ describe('the internal release queues per commit; only its store jobs share the 
       assert.equal(topGroup(strip(file)), 'release', `${file} left the release queue`);
     }
   });
-
-  test('exactly the store-touching internal jobs join the release queue, per job', () => {
-    const text = strip('cd-internal.yml');
-    const jobs = {};
-    let current = null;
-    for (const line of text.split('\n')) {
-      const header = line.match(/^ {2}([a-z][a-z0-9-]*):\s*$/);
-      if (header) {
-        current = header[1];
-        jobs[current] = '';
-      } else if (current && /^ {4}/.test(line)) jobs[current] += `${line}\n`;
-    }
-    const queued = Object.entries(jobs)
-      .filter(([, body]) => /^ {4}concurrency:\n {6}group: release\n/m.test(body))
-      .map(([id]) => id)
-      .sort();
-    assert.deepEqual(queued, ['ota-internal', 'upload-android', 'upload-huawei', 'upload-ios']);
-  });
 });
 
 // The beta gate must heal itself: when the release commit's internal run is
 // missing or red it dispatches one at the tag, which needs actions: write on
 // the calling job. Without both, a release merged at the wrong moment waits
-// for a human - which is what happened on v0.2.3, v0.2.4 and v0.2.5.
+// for a human - which is what happened on v0.2.3, v0.2.4 and v0.2.5. The
+// gate itself is publish-beta.yml's `prepare`; the caller names the workflow
+// and grants the permission.
 describe('the beta gate dispatches the build it is missing', () => {
-  const text = readFileSync(path.join(root, '.github/workflows/cd-beta.yml'), 'utf8')
-    .split('\n')
-    .filter((l) => !l.trimStart().startsWith('#'))
-    .join('\n');
-  const prepare = text.slice(text.indexOf('\n  prepare:'), text.indexOf('\n  promote-ios:'));
+  const beta = parse(readFileSync(path.join(root, '.github/workflows/cd-beta.yml'), 'utf8'));
+  const internal = parse(
+    readFileSync(path.join(root, '.github/workflows/cd-internal.yml'), 'utf8'),
+  );
 
-  test('prepare asks the gate to dispatch, at the release tag', () => {
-    assert.match(prepare, /require-green-workflow: cd-internal\.yml/);
-    assert.match(prepare, /require-green-dispatch: true/);
-    assert.match(prepare, /release-tag: \$\{\{ inputs\.tag \}\}/);
+  test('beta names the internal workflow as the one that must be green, at the release tag', () => {
+    assert.equal(beta.jobs.beta.with['green-workflow'], 'cd-internal.yml');
+    assert.equal(beta.jobs.beta.with.tag, '${{ inputs.tag }}');
   });
 
-  test('the internal release reserves its build tag at push time, with contents: write', () => {
+  test('beta grants actions: write, which the dispatch needs, and contents: write for the release', () => {
+    assert.equal(beta.jobs.beta.permissions.actions, 'write');
+    assert.equal(beta.jobs.beta.permissions.contents, 'write');
+  });
+
+  test('the internal release grants contents: write, for the build tag it reserves at push time', () => {
     // GitHub refuses GITHUB_TOKEN a new tag on a commit whose workflow files
     // differ from main's tip; an hour after the push that is often the case.
-    const internal = readFileSync(path.join(root, '.github/workflows/cd-internal.yml'), 'utf8')
-      .split('\n')
-      .filter((l) => !l.trimStart().startsWith('#'))
-      .join('\n');
-    const prep = internal.slice(
-      internal.indexOf('\n  prepare:'),
-      internal.indexOf('\n  build-ios:'),
-    );
-    assert.match(prep, /reserve-tag: true/);
-    assert.match(prep, /^\s+contents: write$/m);
-  });
-
-  test('prepare grants actions: write, which the dispatch needs', () => {
-    assert.match(prepare, /^\s+actions: write$/m);
+    assert.equal(internal.jobs.internal.permissions.contents, 'write');
+    assert.equal(internal.jobs.internal.permissions.actions, 'read');
+    assert.equal(internal.jobs.internal.with['green-workflow'], 'ci.yml');
   });
 });
 
@@ -271,14 +214,6 @@ describe('cd-release.yml chains the release by dispatch', () => {
     }
   });
 
-  test('the section title the release PR gets is the one beta appends', () => {
-    const beta = readFileSync(path.join(dir, 'cd-beta.yml'), 'utf8');
-    const title = /append-title: (.+)/.exec(beta)?.[1];
-    assert.equal(title, 'Store notes');
-    // The shared workflow defaults to the same title; passing none keeps them equal.
-    assert.doesNotMatch(code, /section-title:/);
-  });
-
   test('the LLM runs only in the release PR job, never in a CD lane', () => {
     for (const file of ['cd-internal.yml', 'cd-beta.yml', 'cd-production.yml']) {
       const text = readFileSync(path.join(dir, file), 'utf8')
@@ -330,107 +265,6 @@ describe('cd-release.yml chains the release by dispatch', () => {
   });
 });
 
-describe('the release path without a store account', () => {
-  for (const [file, spec] of Object.entries(WORKFLOWS)) {
-    describe(file, () => {
-      const jobs = parseJobs(file);
-
-      test('the parser found the jobs this file is supposed to have', () => {
-        // Guards every assertion below: a parser that silently returns nothing
-        // would make all of them pass.
-        for (const name of [...spec.storeJobs, ...spec.releaseJobs]) {
-          assert.ok(jobs[name], `${file} has no job named ${name} — the parser or the file moved`);
-        }
-      });
-
-      test('every job that talks to a store is gated', () => {
-        for (const name of spec.storeJobs) {
-          assert.match(
-            jobs[name].if,
-            new RegExp(GATE),
-            `${name} would run without store credentials and fail deep inside a fastlane lane`,
-          );
-        }
-      });
-
-      test('the release job survives its store jobs being skipped', () => {
-        for (const name of spec.releaseJobs) {
-          // A skipped dependency skips its dependents unless the condition uses
-          // a status function. Without this the gate above would take the
-          // GitHub release down with the uploads.
-          assert.match(
-            jobs[name].if,
-            /!cancelled\(\)/,
-            `${name} has no status function in its if, so a skipped upload skips it too`,
-          );
-        }
-      });
-
-      test('the release job does not reach its artifacts only through a store job', () => {
-        for (const name of spec.releaseJobs) {
-          const needs = jobs[name].needs;
-          assert.ok(needs.length > 0, `${name} declares no needs`);
-          const onlyStore = spec.storeJobs.some((s) => needs.includes(s));
-          const alsoOther = /prepare|build-ios|build-android/.test(needs);
-          assert.ok(
-            !onlyStore || alsoOther,
-            `${name} reaches its artifacts only through store jobs (${needs}); name the jobs that actually produce them`,
-          );
-        }
-      });
-
-      test('signing is derived so that uploading implies something to upload', () => {
-        // Only cd-internal builds; beta and production promote what it
-        // produced, so they have no signing inputs to derive.
-        if (file !== 'cd-internal.yml') return;
-        for (const [job, input, variable] of [
-          ['build-ios', 'ios-signing-enabled', 'IOS_SIGNING_ENABLED'],
-          ['build-android', 'android-signing-enabled', 'ANDROID_SIGNING_ENABLED'],
-        ]) {
-          const body = jobs[job].body.filter((l) => !l.trimStart().startsWith('#')).join('\n');
-          assert.match(body, new RegExp(`${input}:`), `${job} does not pass ${input}`);
-          // Both halves of the OR. Without the uploads term, someone could turn
-          // uploads on and leave signing off, and the upload job would look for
-          // an artifact the build never produced.
-          assert.match(
-            body,
-            new RegExp(`${GATE}\\s*==\\s*'true'\\s*\\|\\|`),
-            `${job}'s ${input} does not treat uploads as implying signing`,
-          );
-          assert.match(
-            body,
-            new RegExp(`${variable}\\s*==\\s*'true'`),
-            `${job}'s ${input} ignores ${variable}, so signing cannot be turned on without uploading`,
-          );
-        }
-      });
-
-      test('a release created without uploads says so in its body', () => {
-        for (const name of spec.releaseJobs) {
-          // Comments stripped first: the workflows explain this very pitfall in
-          // prose, and prose read as code is a false positive. The same trap
-          // caught the workflows repo's own version of this check.
-          const body = jobs[name].body.filter((l) => !l.trimStart().startsWith('#')).join('\n');
-          assert.match(body, /body-note:/, `${name} creates a release with no marker`);
-          // GitHub's `&&` yields its first falsy operand, so `cond && '' || X`
-          // is X on both branches and every release would carry the marker.
-          // The non-empty value has to sit in the `&&` slot.
-          assert.doesNotMatch(
-            body,
-            /&&\s*''\s*\|\|/,
-            `${name} puts the empty string in the && slot, so every release would be marked`,
-          );
-          assert.match(
-            body,
-            new RegExp(`${GATE}\\s*!=\\s*'true'\\s*&&`),
-            `${name}'s marker condition is not inverted; it would mark the wrong builds`,
-          );
-        }
-      });
-    });
-  }
-});
-
 // The security gate has two callers. Each tier turns on what exists there -
 // source on every change, the release's built binaries at the production
 // dispatch - and the production store jobs cannot start until it has passed.
@@ -438,12 +272,6 @@ describe('the release path without a store account', () => {
 // ships an unchecked release, and a condition that uses the implicit
 // success() makes every dispatch with the gate switched off skip its stores.
 describe('the security gate', () => {
-  const dir = path.join(root, '.github/workflows');
-  const code = (file) =>
-    readFileSync(path.join(dir, file), 'utf8')
-      .split('\n')
-      .filter((l) => !l.trimStart().startsWith('#'))
-      .join('\n');
   const RELEASE_PR = "startsWith(github.ref_name, 'release-please--')";
 
   describe('ci.yml', () => {
@@ -520,57 +348,6 @@ describe('the security gate', () => {
       }
     });
   });
-
-  describe('cd-production.yml', () => {
-    const jobs = parseJobs('cd-production.yml');
-    const body = () => jobs.security.body.filter((l) => !l.trimStart().startsWith('#')).join('\n');
-
-    test('runs on action=release, after prepare, against the tag', () => {
-      assert.ok(jobs.security, 'cd-production.yml has no security job');
-      assert.match(jobs.security.uses, /check-security\.yml@[0-9a-f]{40}\b/);
-      assert.equal(jobs.security.needs, 'prepare');
-      assert.match(jobs.security.if, /inputs\.action == 'release'/);
-      assert.match(jobs.security.if, /vars\.SECURITY_ENABLED != 'false'/);
-      const tag = `\${{ inputs.tag }}`;
-      assert.ok(body().includes(`ref: ${tag}`));
-      assert.ok(body().includes(`release-tag: ${tag}`));
-    });
-
-    test('turns on the binary-side scanners and off the source ones', () => {
-      for (const input of ['binaries', 'mobile', 'bundle', 'sbom']) {
-        assert.match(body(), new RegExp(`^\\s+${input}: true$`, 'm'), `${input} is not on`);
-      }
-      for (const input of ['dependencies', 'code', 'policy']) {
-        assert.match(body(), new RegExp(`^\\s+${input}: false$`, 'm'), `${input} is not off`);
-      }
-    });
-
-    test('carries no LLM environment', () => {
-      assert.doesNotMatch(
-        code('cd-production.yml'),
-        /SECURITY_LLM|review:|review-codebase:|OPENAI_API_KEY|ANTHROPIC_API_KEY/,
-      );
-    });
-
-    test('Huawei waits on the Android release, so the security gate holds it too', () => {
-      assert.match(jobs['huawei-release'].needs, /\bandroid-release\b/);
-    });
-
-    test('every job that submits a binary waits on it, and survives it being switched off', () => {
-      for (const name of ['ios-release', 'android-release']) {
-        assert.match(
-          jobs[name].needs,
-          /\bsecurity\b/,
-          `${name} does not wait for the security gate`,
-        );
-        assert.match(
-          jobs[name].if,
-          /^\$\{\{ !failure\(\) && !cancelled\(\) && /,
-          `${name} uses the implicit success(), so a switched-off gate would skip the release`,
-        );
-      }
-    });
-  });
 });
 
 // GitHub's push path filter, for the patterns these workflows use: `**`
@@ -625,65 +402,141 @@ describe('cd-internal.yml builds every commit to main except a docs-only one', (
   });
 });
 
-// The callers stage nothing and write no shell: every step that used to be an
-// inline job is an input of a shared workflow.
-describe('no CD caller carries an inline job', () => {
+// Every CD workflow is one call to a shared pipeline (or, for the hotfix, to
+// publish-ota.yml): no step, no shell, no job graph of its own.
+describe('the CD callers are thin', () => {
   const dir = path.join(root, '.github/workflows');
-  const workflow = (file) => parse(readFileSync(path.join(dir, file), 'utf8'));
+  const callers = {
+    'cd-internal.yml': 'publish-internal.yml',
+    'cd-beta.yml': 'publish-beta.yml',
+    'cd-production.yml': 'publish-production.yml',
+    'cd-store-listing.yml': 'publish-store-listing.yml',
+    'cd-ota-hotfix.yml': 'publish-ota.yml',
+  };
+  const wf = (file) => parse(readFileSync(path.join(dir, file), 'utf8'));
+  const only = (file) => {
+    const jobs = Object.entries(wf(file).jobs);
+    assert.equal(jobs.length, 1, `${file} has ${jobs.length} jobs`);
+    return jobs[0][1];
+  };
 
-  for (const file of readdirSync(dir).filter((f) => /^cd-.*\.yml$/.test(f))) {
-    test(`${file}: every job calls a shared workflow, so there are no steps to hold`, () => {
-      for (const [name, job] of Object.entries(workflow(file).jobs)) {
-        const via = job.uses ?? '';
-        if (via.includes('/shared-workflows/.github/workflows/')) continue;
-        assert.fail(
-          `${file}: job ${name} has no shared uses: (${JSON.stringify(Object.keys(job))})`,
-        );
-      }
+  for (const [file, shared] of Object.entries(callers)) {
+    test(`${file} is a single call to ${shared} at the pin`, () => {
+      const job = only(file);
+      assert.match(
+        job.uses,
+        new RegExp(
+          `/shared-workflows/\\.github/workflows/${shared.replace('.', '\\.')}@[0-9a-f]{40}\\b`,
+        ),
+      );
+      assert.equal(job.steps, undefined);
+      assert.equal(job.needs, undefined);
     });
   }
 
-  test('the Huawei lanes download the bundle from the release tag', () => {
-    for (const [file, job] of [
-      ['cd-beta.yml', 'promote-huawei'],
-      ['cd-production.yml', 'huawei-release'],
-    ]) {
-      const huawei = workflow(file).jobs[job].with;
-      assert.equal(huawei['release-assets'], '*.aab', `${file} ${job}`);
-      assert.equal(huawei['release-tag'], '${{ inputs.tag }}', `${file} ${job}`);
-      assert.equal(huawei.artifacts, 'build-info', `${file} ${job}`);
+  test('each CD file is one of those, or one of the release chain around them', () => {
+    const files = readdirSync(dir)
+      .filter((f) => /^cd-.*\.yml$/.test(f))
+      .sort();
+    assert.deepEqual(
+      files,
+      [...Object.keys(callers), 'cd-beta-retry.yml', 'cd-release.yml'].sort(),
+    );
+  });
+
+  test('every secret the callers pass is a secret the shared workflow declares optional', () => {
+    // Passing none is allowed, so a repository without a store account still runs.
+    for (const file of Object.keys(callers)) {
+      const secrets = only(file).secrets ?? {};
+      for (const [name, value] of Object.entries(secrets)) {
+        assert.equal(value, `\${{ secrets.${name} }}`, `${file}: ${name}`);
+      }
     }
   });
 
-  test("beta's store notes come from build-info, without a staging job", () => {
-    const notes = workflow('cd-beta.yml').jobs['store-notes'].with;
-    assert.equal(notes.mode, 'append');
-    assert.equal(notes['release-notes-artifact'], 'build-info');
-    assert.equal(notes['release-notes-file'], 'store-notes.txt');
-  });
-
-  test("production's stage note is passed as text, and names the action and the run", () => {
-    const stage = workflow('cd-production.yml').jobs['stage-append'];
-    assert.equal(stage.with.mode, 'append');
-    assert.equal(stage.with['release-notes-artifact'], undefined);
-    const text = stage.with['release-notes-text'];
-    for (const part of [
-      'inputs.action',
-      'inputs.platforms',
-      'inputs.play_rollout_percent',
-      'github.run_id',
-    ]) {
-      assert.ok(text.includes(part), `the stage note leaves out ${part}`);
+  test('every toggle is read from a repository variable, so a checkout with none builds and publishes', () => {
+    const internal = only('cd-internal.yml').with;
+    assert.equal(internal['store-uploads-enabled'], "${{ vars.STORE_UPLOADS_ENABLED == 'true' }}");
+    assert.equal(
+      internal['huawei-uploads-enabled'],
+      "${{ vars.HUAWEI_UPLOADS_ENABLED == 'true' }}",
+    );
+    assert.equal(internal['ota-enabled'], "${{ vars.OTA_ENABLED == 'true' }}");
+    for (const file of ['cd-beta.yml', 'cd-production.yml']) {
+      assert.equal(
+        only(file).with['store-uploads-enabled'],
+        "${{ vars.STORE_UPLOADS_ENABLED == 'true' }}",
+        file,
+      );
     }
-    assert.equal(stage.if, '${{ !failure() && !cancelled() }}');
+    assert.equal(
+      only('cd-store-listing.yml').with['store-metadata-sync-enabled'],
+      "${{ vars.STORE_METADATA_SYNC_ENABLED == 'true' }}",
+    );
   });
 
-  test('the hotfix baseline is publish-ota latest, and the smoke check reads the baseline fingerprint', () => {
-    const publish = workflow('cd-ota-hotfix.yml').jobs.publish;
-    assert.deepEqual(Object.keys(workflow('cd-ota-hotfix.yml').jobs), ['publish']);
-    assert.equal(publish.needs, undefined);
-    assert.equal(publish.with['baseline-tag'], "${{ inputs.baseline_tag || 'latest' }}");
-    assert.equal(publish.with['runtime-version'], undefined);
-    assert.equal(publish.with['manifest-url'], '${{ vars.EXPO_UPDATES_URL }}');
+  test('build-number-offset is a number, whatever the repository variable holds', () => {
+    for (const file of ['cd-internal.yml', 'cd-beta.yml', 'cd-production.yml']) {
+      assert.equal(
+        only(file).with['build-number-offset'],
+        "${{ fromJSON(vars.BUILD_NUMBER_OFFSET || '1000') }}",
+        file,
+      );
+    }
+  });
+
+  test('the production dispatch values go to the pipeline as inputs', () => {
+    const with_ = only('cd-production.yml').with;
+    assert.equal(with_.tag, '${{ inputs.tag }}');
+    assert.equal(with_.action, '${{ inputs.action }}');
+    assert.equal(with_.platforms, '${{ inputs.platforms }}');
+    assert.equal(with_['play-rollout-percent'], '${{ inputs.play_rollout_percent }}');
+    assert.equal(with_['ios-phased-release'], '${{ inputs.ios_phased_release }}');
+  });
+
+  test('the production caller grants what the pipeline asks for, and no more of the Pages scopes than the web input needs', () => {
+    const production = only('cd-production.yml');
+    assert.deepEqual(
+      {
+        contents: production.permissions.contents,
+        actions: production.permissions.actions,
+        events: production.permissions['security-events'],
+      },
+      { contents: 'write', actions: 'read', events: 'write' },
+    );
+    // Both Pages scopes and the web input are marked together, so `make init
+    // --no-web` removes them as one: all three are there, or none is.
+    const web = [
+      production.permissions.pages,
+      production.permissions['id-token'],
+      production.with.web,
+    ];
+    assert.ok(
+      web.every((value) => value !== undefined) || web.every((value) => value === undefined),
+      `the Pages scopes and the web input must come and go together: ${web}`,
+    );
+    if (production.with.web !== undefined) {
+      assert.deepEqual(web, ['write', 'write', true]);
+    }
+  });
+
+  test('the security gate is switched off only by the SECURITY_ENABLED variable, and runs no LLM here', () => {
+    assert.equal(
+      only('cd-production.yml').with['security-enabled'],
+      "${{ vars.SECURITY_ENABLED != 'false' }}",
+    );
+    assert.doesNotMatch(
+      readFileSync(path.join(dir, 'cd-production.yml'), 'utf8')
+        .split('\n')
+        .filter((l) => !l.trimStart().startsWith('#'))
+        .join('\n'),
+      /SECURITY_LLM|OPENAI_API_KEY|ANTHROPIC_API_KEY/,
+    );
+  });
+
+  test('the hotfix baseline is the dispatch value or latest, behind the OTA toggle', () => {
+    const hotfix = only('cd-ota-hotfix.yml');
+    assert.equal(hotfix.with['baseline-tag'], "${{ inputs.baseline_tag || 'latest' }}");
+    assert.equal(hotfix.if, "${{ vars.OTA_ENABLED == 'true' }}");
   });
 });

@@ -31,9 +31,10 @@ from `make check` because they are external CLIs and cost minutes; see
 [security.md](security.md) for what each reads, where each runs, how to turn
 one off, and how to suppress a finding correctly.
 
-Nothing is enabled in two linters at once. `eslint.config.mjs` turns off every
-preset rule that duplicates a Biome rule, and `biome.json` turns off the two
-Biome rules that would duplicate ESLint's hooks rules.
+Nothing is enabled in two linters at once. The shared ESLint preset that
+`eslint.config.mjs` calls turns off every `eslint-config-expo` rule that
+duplicates a Biome rule, and the shared Biome preset that `biome.json` extends
+turns off the two Biome rules that would duplicate ESLint's hooks rules.
 
 ### Biome and ESLint overlap
 
@@ -259,7 +260,7 @@ Each gate has one supported escape hatch. Use it, with a comment saying why.
 | `minimumReleaseAge` | `minimumReleaseAgeExclude`, pinned as `name@exact-version` so the guard still applies to later releases | `pnpm-workspace.yaml` |
 | `trustPolicy: no-downgrade` | `trustPolicyExclude`, pinned as `name@exact-version` with a reason - pnpm compares publish dates<br>across every major of a package, so a later, stronger release can still read as this one having downgraded | `pnpm-workspace.yaml` |
 | Package build scripts | `onlyBuiltDependencies` or `allowBuilds`. `strictDepBuilds` forces an explicit decision | `pnpm-workspace.yaml` |
-| Coverage | Change the threshold in `jest.config.ts` or the `--test-coverage-*` flags of `test:scripts`,<br>deliberately, not silently | `jest.config.ts`, `package.json` |
+| Coverage | Change the threshold in the shared Jest preset (upstream, for the whole family)<br>or the `--test-coverage-*` flags of `test:scripts`, deliberately, not silently | shared-workflows, `package.json` |
 | CodeQL | `// codeql[<rule-id>]` alone on the line directly above the code,<br>with the reason in a comment *above the marker* — never between it and the code.<br>**Never** dismiss the alert in the GitHub UI or API | The code |
 
 Rules of thumb: suppress the narrowest scope that works, put the reason in the
@@ -378,10 +379,10 @@ every tool reads it, so each one names it itself:
 
 | Tool | Where | Entry |
 | --- | --- | --- |
-| Jest (both projects) | `jest.config.ts` | `<rootDir>/\.claude/worktrees/` in `testPathIgnorePatterns`,<br>`modulePathIgnorePatterns` and `coveragePathIgnorePatterns` |
-| Metro | `metro.config.js` | a `resolver.blockList` entry, anchored to the project root |
-| ESLint | `eslint.config.mjs` | `.claude/worktrees/**` in `globalIgnores` |
-| Biome | `biome.json` | `!!.claude/worktrees` in `files.includes` |
+| Jest (both projects) | the shared preset `jest.config.ts` calls | `<rootDir>/\.claude/worktrees/` in `testPathIgnorePatterns`,<br>`modulePathIgnorePatterns` and `coveragePathIgnorePatterns` |
+| Metro | the shared preset `metro.config.js` calls | a `resolver.blockList` entry, anchored to the project root |
+| ESLint | the shared preset `eslint.config.mjs` calls | `.claude/worktrees/**` in `globalIgnores` |
+| Biome | the shared preset `biome.json` extends | `!!.claude/worktrees` in `files.includes` |
 | knip | `knip.json` | none: its globs skip dot-directories and it reads `.gitignore`;<br>an `ignore` entry only draws a "Remove from ignore" hint |
 | tsc | `tsconfig.json` | `.claude/worktrees` in `exclude` |
 | typos | `typos.toml` | `.claude/worktrees/` in `extend-exclude` |
