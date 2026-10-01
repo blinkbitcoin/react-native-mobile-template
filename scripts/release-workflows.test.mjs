@@ -222,7 +222,13 @@ describe('cd-release.yml chains the release by dispatch', () => {
   // The web deploy's dispatch is pinned in ci-web-gate.test.mjs, which
   // `make init --no-web` deletes together with ci-web.yml and that line.
   test('a cut release dispatches cd-beta at the tag, with the tag as its input', () => {
-    assert.match(code, /dispatch-on-release: \|\n(?:\s+[^\n]*\n)*?\s+cd-beta\.yml tag=\{tag\}\n/);
+    const lines = parse(rp)
+      .jobs['release-please'].with['dispatch-on-release'].split('\n')
+      .map((line) => line.trim());
+    assert.ok(
+      lines.includes('cd-beta.yml tag={tag}'),
+      `no cd-beta.yml line in: ${lines.join(' | ')}`,
+    );
   });
 
   test('a created or updated release PR gets a CI run', () => {
