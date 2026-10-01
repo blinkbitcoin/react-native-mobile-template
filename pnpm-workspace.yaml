@@ -168,6 +168,24 @@ auditConfig:
     #
     # Re-evaluate: from 2026-09-17 per the override note above.
     - GHSA-5p2g-fcmc-qvqq
+    # GHSA-86w9-cpqp-85rv (CVE-2026-85393, high, CWE-347) - node-forge <=1.4.0:
+    # RSA PKCS#1 v1.5 verification accepts extra elements nested in the
+    # DigestAlgorithm, so with a low-exponent key a signature can be forged.
+    # No fixed release exists: 1.4.0 is the newest node-forge published.
+    #
+    # Path: expo > @expo/cli, directly and through
+    # @expo/code-signing-certificates@0.0.6; nothing else depends on it.
+    #
+    # Unreachable from the app: only the Expo CLI loads node-forge, on a
+    # developer machine or CI runner. It verifies only what it produced itself
+    # (signStringRSASHA256AndVerify checks its own fresh signature) or a
+    # certificate the developer configured; the shipped app checks update
+    # signatures with the platform's own crypto in expo-updates' native code.
+    # No attacker-supplied signature reaches node-forge's verify().
+    #
+    # Re-evaluate: when node-forge publishes a fix past 1.4.0, or if the app
+    # starts verifying signatures in JavaScript.
+    - GHSA-86w9-cpqp-85rv
 
 # babel.config.js names `babel-preset-expo`, and @babel/core resolves a preset
 # from the config file's own directory -- which pnpm's strict node_modules does
