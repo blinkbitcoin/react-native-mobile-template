@@ -13,10 +13,11 @@
     "plugins/**/*.ts",
     "modules/**/*.ts",
     "mocks/**/*.ts",
+    "e2e/**/*.ts",
     "scripts/**/*.mjs"
   ],
   "ignoreDependencies": ["ts-node", "expo-system-ui", "expo-doctor"],
-  "ignoreBinaries": ["typos", "make", "mise", "shasum"],
+  "ignoreBinaries": ["eval", "typos", "make", "mise"],
   "jest": {
     "config": "jest.config.ts"
   },

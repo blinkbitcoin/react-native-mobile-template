@@ -997,6 +997,16 @@ describe('init --yes --no-web', async () => {
     );
   });
 
+  test('runs knip without the ports, the eval allowance or the e2e/ glob', () => {
+    // The ports were for playwright.config.ts, which is gone.
+    const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
+    assert.equal(pkg.scripts['check:unused'], 'knip');
+    const knip = JSON.parse(readFileSync(path.join(root, 'knip.json'), 'utf8'));
+    assert.deepEqual(knip.ignoreBinaries, ['typos', 'make', 'mise']);
+    assert.ok(!knip.project.includes('e2e/**/*.ts'), knip.project.join(', '));
+    assert.ok(knip.project.includes('mocks/**/*.ts'), knip.project.join(', '));
+  });
+
   test('keeps the lockfile provenance exclusions untouched', () => {
     // `minimumReleaseAgeExclude` is a security control, not template noise.
     const before = readFileSync(path.join(REPO, 'pnpm-workspace.yaml'), 'utf8');

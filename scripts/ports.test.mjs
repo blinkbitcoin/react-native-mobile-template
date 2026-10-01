@@ -244,6 +244,8 @@ for (const [file, needle] of [
   ['scripts/e2e/maestro.sh', 'node scripts/ports.mjs --sh'],
   ['scripts/e2e/ci-mock-api-up.sh', 'node scripts/ports.mjs --sh'],
   ['Makefile', 'node scripts/ports.mjs --sh'],
+  // check:unused: knip loads playwright.config.ts, which needs the ports.
+  ['package.json', 'node scripts/ports.mjs --sh'],
 ]) {
   test(`${file} takes its ports from the helper`, () => {
     assert.ok(read(file).includes(needle), `${file} must reference ${needle}`);

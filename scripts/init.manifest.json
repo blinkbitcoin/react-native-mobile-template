@@ -132,6 +132,7 @@
       "scripts/e2e/web.sh",
       ".github/workflows/ci-web.yml",
       "scripts/ci-web-gate.test.mjs",
+      "scripts/check-unused-web.test.mjs",
       "docs/web-files.txt",
       "docs/decisions/0006-web-opt-in.md",
       "docs/decisions/0015-web-on-pages.md"
@@ -218,7 +219,34 @@
       {
         "path": "docs/quality.md",
         "optional": true,
-        "replace": [["| `docs` | `e2e` | `web` | |", "| `docs` | `e2e` | | |"]]
+        "replace": [
+          ["| `docs` | `e2e` | `web` | |", "| `docs` | `e2e` | | |"],
+          ["| `knip`, with the ports exported |", "| `knip` |"]
+        ],
+        "paragraphs": ["^The script exports the ports before it calls knip:\n"]
+      },
+      {
+        "$comment": "check:unused exports the ports only because knip loads playwright.config.ts, which this run deletes; with it go the eval allowance and the e2e/ project glob. Both knip.json anchors occur in the source and in the rewritten JSON, and the closing format pass tidies the gap.",
+        "path": "package.json",
+        "replace": [
+          [
+            "\"check:unused\": \"eval \\\"$(node scripts/ports.mjs --sh)\\\" && knip\"",
+            "\"check:unused\": \"knip\""
+          ]
+        ]
+      },
+      {
+        "path": "knip.json",
+        "replace": [["\"eval\",", ""], ["\"e2e/**/*.ts\",", ""]]
+      },
+      {
+        "path": "scripts/ports.mjs",
+        "replace": [
+          [
+            "// --sh`, which the Makefile's run targets, the E2E shell scripts and the\n// `check:unused` script (knip loads the web E2E config) eval.",
+            "// --sh`, which the Makefile's run targets and the E2E shell scripts eval."
+          ]
+        ]
       },
       {
         "$comment": "Two web residues in .github/: an ignore rule for a dependency this run just deleted, and a Platform option for a target the app no longer has.",
@@ -244,7 +272,13 @@
         "$comment": "The web preview port's row in the port table. WEB_PREVIEW_PORT itself stays in scripts/ports.mjs: an offset nobody binds costs nothing, and removing it would renumber the table.",
         "path": "docs/local-dev.md",
         "optional": true,
-        "lines": ["^\\| `WEB_PREVIEW_PORT` \\|"]
+        "lines": ["^\\| `WEB_PREVIEW_PORT` \\|"],
+        "replace": [
+          [
+            "three *outputs*, and so does the `check:unused` script, because knip loads\n`playwright.config.ts`.",
+            "three *outputs*."
+          ]
+        ]
       },
       {
         "$comment": "The port guard's pin on a config file this run deletes.",
@@ -255,7 +289,9 @@
           "^  // config and this package is CommonJS, so importing an ES module throws\\.$",
           "^  // web\\.sh derives the ports and exports them; the config reads those\\. The$",
           "^  // literal guard below is what stops it hardcoding one instead\\.$",
-          "^  \\['scripts/e2e/web\\.sh', 'node scripts/ports\\.mjs --sh'\\],$"
+          "^  \\['scripts/e2e/web\\.sh', 'node scripts/ports\\.mjs --sh'\\],$",
+          "^  // check:unused: knip loads playwright\\.config\\.ts, which needs the ports\\.$",
+          "^  \\['package\\.json', 'node scripts/ports\\.mjs --sh'\\],$"
         ]
       },
       {

@@ -62,7 +62,7 @@ describe('the scripts CI calls', () => {
     // expo-doctor's "scripts in package.json conflict with node_modules/.bin"
     // check, and CI runs expo-doctor too.
     assert.equal(pkg.scripts?.knip, undefined);
-    assert.equal(pkg.scripts['check:unused'], 'knip');
+    assert.match(pkg.scripts['check:unused'], /(^|&& )knip$/);
     assert.ok(pkg.devDependencies?.knip, 'knip must stay a devDependency');
   });
 

@@ -10,7 +10,8 @@
 //
 // This file is the ONE producer of a derived port. Consumers read it directly
 // (the web E2E config, `mocks/server.ts`) or through `node scripts/ports.mjs
-// --sh`, which the Makefile's run targets and the E2E shell scripts eval.
+// --sh`, which the Makefile's run targets, the E2E shell scripts and the
+// `check:unused` script (knip loads the web E2E config) eval.
 //
 // `.mise.toml` exports APP_PORT_BASE - the input - and deliberately not the
 // three derived ports: a mirrored `METRO_PORT=8081` sitting in the environment
