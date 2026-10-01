@@ -486,7 +486,7 @@ with that release's version beside it. Every one of the twelve files carries at
 least one, and several carry many: `cd-production.yml` alone has twelve.
 
 ```yaml
-uses: blinkbitcoin/shared-workflows/.github/workflows/check.yml@cb865d40f57e179f25a8c6de9a2be25ff025411d # v0.25.0
+uses: blinkbitcoin/shared-workflows/.github/workflows/check.yml@44cd6cb86d78fbe3acea30a7f9b1e5f385276606 # v0.26.1
 ```
 
 A shared-workflows release changes nothing here by itself
