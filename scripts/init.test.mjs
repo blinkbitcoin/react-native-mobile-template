@@ -1016,7 +1016,7 @@ describe('init --yes --no-web', async () => {
       '`pnpm build:web` (a production export, the flavour that deploys) and then runs',
       'the suite in `e2e/web/`.',
       '`playwright.config.ts` starts two web servers for it: the mock API and',
-      '`scripts/e2e/serve-dist.mjs`, both on ports derived from `APP_PORT_BASE`. The',
+      "the shared tooling's `serve-dist`, both on ports derived from `APP_PORT_BASE`. The",
       'latter serves `dist` the way GitHub Pages does - under `EXPO_PUBLIC_BASE_URL`',
       'when a deploy export was built for a sub-path, `/settings` from',
       '`settings.html`, and `404.html` with a 404 for a path with no file, which is',

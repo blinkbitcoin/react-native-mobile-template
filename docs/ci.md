@@ -347,9 +347,11 @@ Consequences encoded in this repo:
   session and drop the dev client back on its launcher. The launcher taps are
   still in the flow, but every one of them is `optional: true` — a fallback,
   never the happy path.
-- `scripts/e2e/maestro-ios.sh` and `scripts/e2e/maestro-android.sh` open the
-  same deep link before invoking Maestro, mirroring the workflows repo's
-  `scripts/e2e/app-launch.sh`, so a local run and a CI run reach the app the
+- A local run (`make test-e2e-ios`, `make test-e2e-android`, through
+  `scripts/e2e/maestro.sh`) launches the app with the workflows repo's own
+  `app-launch.sh` and runs the suite with its `ios-maestro.sh` /
+  `android-maestro.sh`, the copies `@blinkbitcoin/app-tooling` ships under
+  `e2e/`, so a local run and a CI run reach the app, and run the flows, the
   same way.
 
 ## Mock-API hooks
@@ -372,9 +374,9 @@ e2e-teardown-script: scripts/e2e/ci-mock-api-down.sh
   confusing one.
 
 Setup also runs `adb reverse` for the derived mock-API port when a device is
-attached. The workflows repo reverses `WORKFLOWS_MOCK_API_PORT`, whose default still
-predates `APP_PORT_BASE`; until it derives its ports from the same base, the
-hook covers the gap.
+attached. The workflows repo reverses `WORKFLOWS_MOCK_API_PORT`, whose default (8082)
+is the mock API under the default `APP_PORT_BASE` only; until it derives its
+ports from the same base, the hook covers any other base.
 
 The paths are consumer-relative file paths run with `bash`, not `package.json`
 script names. The workflows repo's own `self-smoke.yml` points at these exact
@@ -395,7 +397,9 @@ run's summary page first:
 The two E2E jobs also pass their builds between jobs as `ios-app` and
 `android-apk`; those are plumbing, not forensics.
 
-Locally the same debug tree lands in `.maestro/output/` (gitignored).
+Locally the same debug tree, with the junit report, lands in
+`.maestro/output/maestro/` (gitignored), and on Android the recording and
+forensics beside it in `.maestro/output/`.
 
 ## Badges
 
@@ -483,7 +487,7 @@ one, and several carry many: `cd-production.yml` alone has twelve.
 `cd-beta-retry.yml` calls no reusable workflow at all.
 
 ```yaml
-uses: blinkbitcoin/shared-workflows/.github/workflows/check.yml@5b9e2407821b402fc3b545771c6131490e6c1848 # v0.21.0
+uses: blinkbitcoin/shared-workflows/.github/workflows/check.yml@5189bd2a4c4ff3cb98b01e1cfda15923f7c1ae25 # v0.22.0
 ```
 
 A shared-workflows release changes nothing here by itself

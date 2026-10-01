@@ -20,9 +20,10 @@ echo $! >"$pidfile"
 echo "mock-api started (pid $(cat "$pidfile"), port $MOCK_API_PORT, log $log)"
 
 # shared-workflows' android-emulator.sh reverses $WORKFLOWS_MOCK_API_PORT, which
-# still defaults to the pre-APP_PORT_BASE 4000; reverse the port the app really
-# calls. No-op on the iOS job (no adb) and idempotent when the emulator already
-# has it. Remove once the workflows repo derives its ports from the same base.
+# defaults to 8082: the mock API under the default APP_PORT_BASE only. Reverse
+# the port the app really calls, so a different base still reaches it. No-op on
+# the iOS job (no adb) and idempotent when the emulator already has it. Remove
+# once the workflows repo derives its ports from APP_PORT_BASE.
 if command -v adb >/dev/null 2>&1 && adb devices | sed -n '2,$p' | grep -qw device; then
   adb reverse "tcp:$MOCK_API_PORT" "tcp:$MOCK_API_PORT" || true
 fi
