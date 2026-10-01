@@ -803,8 +803,7 @@ describe('init --yes --no-web', async () => {
     assert.doesNotMatch(ci, /\b[Tt]welve\b/);
     assert.match(ci, /Eleven files, in two groups: four that run on every change/);
     assert.match(ci, /the eleven files in/);
-    assert.match(ci, /Two of the eleven are the exception/);
-    assert.match(ci, /Ten of the eleven files carry/);
+    assert.match(ci, /Every one of the eleven files carries/);
     assert.match(ci, /`cd-production\.yml` alone has eleven\./);
   });
 
@@ -918,7 +917,10 @@ describe('init --yes --no-web', async () => {
     assert.match(gates, /with the repository variable its\n\/\/ gate reads\.\nimport assert/);
     const release = readFileSync(path.join(root, 'scripts/release-workflows.test.mjs'), 'utf8');
     assert.doesNotMatch(release, /ci-web|web deploy/);
-    assert.match(release, /\n {2}\}\);\n\n {2}test\('a cut release dispatches cd-beta at the tag'/);
+    assert.match(
+      release,
+      /\n {2}\}\);\n\n {2}test\('a cut release dispatches cd-beta at the tag, with the tag as its input'/,
+    );
   });
 
   // The sweep behind the targeted tests above: a file that names ci-web.yml
@@ -936,12 +938,8 @@ describe('init --yes --no-web', async () => {
   test('cd-release.yml no longer dispatches ci-web.yml but still starts beta', () => {
     const release = readFileSync(path.join(root, '.github/workflows/cd-release.yml'), 'utf8');
     assert.doesNotMatch(release, /ci-web/);
-    assert.doesNotMatch(release, /Deploy the web build/);
-    assert.match(
-      release,
-      /gh workflow run cd-beta\.yml --repo "\$REPO" --ref "\$TAG" -f "tag=\$TAG"/,
-    );
-    assert.match(release, /gh workflow run ci\.yml --repo "\$REPO" --ref "\$BRANCH"/);
+    assert.match(release, /dispatch-on-release: \|\n {8}cd-beta\.yml tag=\{tag\}\n\n/);
+    assert.match(release, /^ {6}ci-workflow: ci\.yml$/m);
   });
 
   // The generated app's own release-chain test, run in it: it used to read
@@ -967,7 +965,7 @@ describe('init --yes --no-web', async () => {
       runbook,
       /A `release: published` trigger on `cd-beta\.yml`\nwould therefore never fire\./,
     );
-    assert.match(runbook, /tag=vX\.Y\.Z`, and `ci\.yml` on the\n/);
+    assert.match(runbook, /vX\.Y\.Z -f tag=vX\.Y\.Z`\), and\n/);
     assert.match(runbook, /│ {2}CD \/ Beta dispatched\n/);
     assert.match(runbook, /`Store notes` job is its own job after the beta dispatch: a red\n/);
     const readme = readFileSync(path.join(root, 'README.md'), 'utf8');
@@ -1119,11 +1117,11 @@ describe('init --yes --web', async () => {
       config,
       /typedRoutes: true,\n {4}\/\/ Web only\.[\s\S]*?\.\.\.\(process\.env\.EXPO_PUBLIC_BASE_URL \? \{ baseUrl: process\.env\.EXPO_PUBLIC_BASE_URL \} : \{\}\),\n {2}\},/,
     );
-    // The step itself, straight after the beta dispatch, with no gap where the
+    // The line itself, straight after the beta dispatch, with no gap where the
     // marker lines were.
     assert.match(
       readFileSync(path.join(root, '.github/workflows/cd-release.yml'), 'utf8'),
-      /-f "tag=\$TAG"\n {6}- name: Deploy the web build at the new tag\n[\s\S]*?gh workflow run ci-web\.yml --repo "\$REPO" --ref "\$TAG" -f "deploy=true"\n {6}# The PR's number/,
+      /cd-beta\.yml tag=\{tag\}\n {8}ci-web\.yml deploy=true\n\n/,
     );
   });
 

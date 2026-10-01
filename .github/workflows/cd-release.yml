@@ -1,8 +1,7 @@
 name: CD / Release
 # Keeps one "chore(main): release X.Y.Z" PR open against main. Merging that PR
 # is the only human action that cuts a release: it bumps package.json, writes
-# the CHANGELOG section, tags `vX.Y.Z` and publishes the GitHub release, which
-# is what `cd-beta.yml` listens for.
+# the CHANGELOG section, tags `vX.Y.Z` and publishes the GitHub release.
 #
 # Merge that PR with **squash** (or rebase). `resolve-version.sh` (the shared
 # script; `make version` runs it from @blinkbitcoin/app-tooling) reads the
@@ -27,94 +26,41 @@ concurrency:
   group: release-please-${{ github.ref }}
   cancel-in-progress: false
 jobs:
+  # release-please in manifest mode: `release-type`, `package-name`,
+  # `include-component-in-tag`, `bump-minor-pre-major` and
+  # `changelog-sections` all live in release-please-config.json under
+  # packages["."].
+  #
+  # Everything release-please creates - the PR, the tag, the release - is
+  # created with GITHUB_TOKEN, and GitHub never starts a workflow from an event
+  # that token caused, so the shared workflow starts the follow-on work by name
+  # (`workflow_dispatch` is the one exemption):
+  # - a cut release starts each `dispatch-on-release` line at the new tag, so
+  #   that run's `github.sha` is the release commit cd-internal built, which is
+  #   what cd-beta-retry.yml matches on;
+  # - a created or updated release PR gets a run of `ci-workflow` on its
+  #   branch. The PR is bot-authored, so its own `pull_request` runs wait for a
+  #   human to approve them; this is the run that counts, a full CI run, E2E
+  #   included, on every push to main (the store-notes job below makes
+  #   release-please rewrite the PR each time). Free on a public repository; a
+  #   private consumer that finds it too much sets `ci-workflow: ''`.
   release-please:
     name: Release
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    uses: blinkbitcoin/shared-workflows/.github/workflows/pr-release.yml@cb865d40f57e179f25a8c6de9a2be25ff025411d # v0.25.0
     permissions:
       contents: write
       pull-requests: write
-      # The dispatch steps below write to the Actions API.
+      # The dispatches write to the Actions API.
       actions: write
-    # Consumed by the dispatch steps below, and exposed for a consumer that
-    # wants to chain something else off the cut release (e.g. moving a major
-    # tag).
-    outputs:
-      release-created: ${{ steps.release.outputs.release_created }}
-      tag-name: ${{ steps.release.outputs.tag_name }}
-      # Empty on a push that opens or updates no release PR; the store-notes
-      # job below is gated on it.
-      pr-number: ${{ steps.pr.outputs.number }}
-      pr-branch: ${{ steps.pr.outputs.branch }}
-    steps:
-      # Manifest mode only. `release-type`, `package-name`,
-      # `include-component-in-tag`, `bump-minor-pre-major` and
-      # `changelog-sections` all live in release-please-config.json under
-      # packages["."] — passing any of them inline here makes the action ignore
-      # both the config file and the manifest.
-      - name: Release please
-        id: release
-        uses: googleapis/release-please-action@v5
-        with:
-          config-file: release-please-config.json
-          manifest-file: .release-please-manifest.json
-      # Everything release-please creates - the PR, the tag, the release - is
-      # created with GITHUB_TOKEN, and GitHub never starts a workflow from an
-      # event that token caused, so nothing downstream would run from a
-      # `release: published` or `pull_request` trigger. The one exemption is
-      # `workflow_dispatch`, so the follow-on work is started here by name.
-      # `--ref "$TAG"` puts the run on the release commit: `github.sha` is then
-      # the same sha cd-internal built, which is what cd-beta-retry.yml
-      # matches on.
-      - name: Start the beta promotion at the new tag
-        if: ${{ steps.release.outputs.release_created == 'true' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          TAG: ${{ steps.release.outputs.tag_name }}
-        run: gh workflow run cd-beta.yml --repo "$REPO" --ref "$TAG" -f "tag=$TAG"
-      # init:web-start
-      - name: Deploy the web build at the new tag
-        if: ${{ steps.release.outputs.release_created == 'true' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          TAG: ${{ steps.release.outputs.tag_name }}
-        run: gh workflow run ci-web.yml --repo "$REPO" --ref "$TAG" -f "deploy=true"
-      # init:web-end
-      # The PR's number and branch are read from the `pr` output in the shell,
-      # not with `fromJSON()` in `env:`: the runner validates a step's `env`
-      # expressions even when its `if` is false, and `fromJSON('')` is a
-      # template error - which failed this job on the first push that produced
-      # no release PR. Parsed once, here, for the CI dispatch below and for the
-      # store-notes job's `needs` outputs.
-      - name: Read the release PR
-        id: pr
-        if: ${{ steps.release.outputs.prs_created == 'true' }}
-        env:
-          PR_JSON: ${{ steps.release.outputs.pr }}
-        run: |
-          number="$(jq -r '.number // empty' <<<"$PR_JSON")"
-          branch="$(jq -r '.headBranchName // empty' <<<"$PR_JSON")"
-          if [ -z "$number" ] || [ -z "$branch" ]; then
-            echo "release-please reported a PR but its 'pr' output lacks number or headBranchName" >&2
-            exit 1
-          fi
-          printf 'number=%s\nbranch=%s\n' "$number" "$branch" >> "$GITHUB_OUTPUT"
-      # The release PR is bot-authored, so its own `pull_request` runs wait for
-      # a human to approve them and are marked failed when the PR merges. This
-      # is the run that counts. It is a full CI run, E2E included, once per
-      # update of the release PR - and the store-notes job below makes that
-      # every push to main, since release-please rewrites a PR whose body it
-      # did not write itself. Free on a public repository; a private consumer
-      # that finds it too much can drop this one step.
-      - name: Run CI on the release PR
-        if: ${{ steps.release.outputs.prs_created == 'true' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          BRANCH: ${{ steps.pr.outputs.branch }}
-        run: gh workflow run ci.yml --repo "$REPO" --ref "$BRANCH"
+    with:
+      ci-workflow: ci.yml
+      # One workflow per line, `{tag}` replaced by the tag. `#` lines are
+      # skipped, so the init markers stay comments here too.
+      dispatch-on-release: |
+        cd-beta.yml tag={tag}
+        # init:web-start
+        ci-web.yml deploy=true
+        # init:web-end
 
   # The store notes, drafted once into the release PR body for a human
   # to review with the version bump. release-please carries the section into

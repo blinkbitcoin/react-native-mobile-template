@@ -31,6 +31,10 @@ default token. No App, no secrets.
 - `scripts/release-workflows.test.mjs` — pins the three dispatches, their
   gates, and that no `release:` trigger or App reference remains.
 
+Since then the job itself moved to shared-workflows' `pr-release.yml`, which
+runs the same three dispatches from its `dispatch-on-release` and
+`ci-workflow` inputs; the decision is unchanged.
+
 `--ref $TAG` on purpose: the dispatched run's `github.sha` is the release
 commit, which is what `cd-beta-retry.yml` matches a failed beta run on.
 
