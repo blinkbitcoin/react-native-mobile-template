@@ -500,8 +500,8 @@ code against this repository before any CD run can:
   and every output a caller reads, against what the called workflow declares
   at the new commit, and that every pin and the tooling package are on that
   one commit.
-- `scripts/release/store-notes.test.mjs` runs the store-notes chain through the
-  shared scripts and our generator, end to end.
+- The shared `store-notes` app suite (`make test-app`, CI's Checks / App suites) runs the
+  store-notes chain through the shared scripts and our generator, end to end.
 
 The same Unit job fails until one more thing moves. The shared tooling package
 (`@blinkbitcoin/app-tooling`, behind `make check-contract`) is a git dependency
