@@ -186,6 +186,24 @@ auditConfig:
     # Re-evaluate: when node-forge publishes a fix past 1.4.0, or if the app
     # starts verifying signatures in JavaScript.
     - GHSA-86w9-cpqp-85rv
+    #
+    # GHSA-vfj7-8cjw-p6xm (CVE-2026-93687, high, CWE-674) - braces <=3.0.3: the
+    # recursive brace-pattern parser has no depth guard, so a deeply nested
+    # pattern under the length limit overflows the call stack and the Node.js
+    # process exits with an uncaught RangeError. No fixed release exists: 3.0.3
+    # is the newest braces published.
+    #
+    # Path: braces < micromatch@4.0.8, whose dependents are Metro's file map,
+    # Jest, GraphQL codegen, the Lingui CLI and fast-glob.
+    #
+    # Unreachable from the app: all of them are build, test or code generation
+    # tooling that runs on a developer machine or CI runner over patterns from
+    # the repository's own configuration, and none ships in the app binary. The
+    # worst outcome is a tool process that exits.
+    #
+    # Re-evaluate: when braces publishes a fix past 3.0.3, or if the app starts
+    # expanding brace patterns it received from outside at runtime.
+    - GHSA-vfj7-8cjw-p6xm
 
 # babel.config.js names `babel-preset-expo`, and @babel/core resolves a preset
 # from the config file's own directory -- which pnpm's strict node_modules does
