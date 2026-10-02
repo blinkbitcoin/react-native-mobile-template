@@ -48,7 +48,7 @@ jobs:
     # baseline release found", which reads as a hotfix problem rather than
     # "OTA is not enabled here".
     if: ${{ vars.OTA_ENABLED == 'true' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-ota.yml@80e8e0efc4570209de1247ce32ee9c8f102389d2 # v0.27.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-ota.yml@99f5f97f31d7f56ce1a7b0af6e04243b11663846 # v0.27.0
     permissions:
       contents: read
     with:

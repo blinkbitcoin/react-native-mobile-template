@@ -41,7 +41,7 @@ jobs:
   # concurrency group above, the permissions, and the secrets.
   internal:
     name: Internal
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-internal.yml@80e8e0efc4570209de1247ce32ee9c8f102389d2 # v0.27.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-internal.yml@99f5f97f31d7f56ce1a7b0af6e04243b11663846 # v0.27.0
     permissions:
       # `contents: write` for the reserved build tag and the pre-release;
       # `actions: read` for the green gate's `gh run list`.
