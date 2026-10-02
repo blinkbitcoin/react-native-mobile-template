@@ -13,7 +13,7 @@ AGE_RATING="$SKILL_DIR/scripts/age-rating.sh"
 SYNC="$SKILL_DIR/scripts/sync.sh"
 SKILL_MD="$SKILL_DIR/SKILL.md"
 
-SHARED_RB="$REPO_ROOT_OF_TEMPLATE/fastlane/lanes/shared.rb"
+SHARED_RB="$REPO_ROOT_OF_TEMPLATE/node_modules/@blinkbitcoin/app-tooling/fastlane/lanes/shared.rb"
 AGE_RATING_GEM="$REPO_ROOT_OF_TEMPLATE/vendor/bundle/ruby/3.3.0/gems/fastlane-2.239.0/spaceship/lib/spaceship/connect_api/models/age_rating_declaration.rb"
 APP_CATEGORY_GEM="$REPO_ROOT_OF_TEMPLATE/vendor/bundle/ruby/3.3.0/gems/fastlane-2.239.0/spaceship/lib/spaceship/connect_api/models/app_category.rb"
 APP_SCREENSHOT_GEM="$REPO_ROOT_OF_TEMPLATE/vendor/bundle/ruby/3.3.0/gems/fastlane-2.239.0/deliver/lib/deliver/app_screenshot.rb"

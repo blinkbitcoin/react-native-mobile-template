@@ -253,9 +253,8 @@ and rotate by deleting the API client in the console and creating a new one.
 
 ## Samsung Galaxy Store
 
-**Not implemented.** `fastlane/lanes/future.rb` has an `upload_samsung` lane
-that fails loudly rather than pretending to work. This section is what
-implementing it would need.
+**Not implemented.** No lane exists for it. This section is what
+implementing one would need.
 
 **Account:** [Samsung Seller Portal](https://seller.samsungapps.com) — free.
 A commercial seller account needs business verification.

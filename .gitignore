@@ -98,7 +98,7 @@ modules/*/android/.cxx/
 # `pull_metadata`, which downloads the console's copy for review.
 # iOS screenshots live under fastlane/screenshots/<locale>/ (deliver's own
 # default) rather than fastlane/metadata/ios/screenshots/, which deliver
-# refuses to see (assert_ios_metadata_dirs! in fastlane/lanes/shared.rb).
+# refuses to see (assert_ios_metadata_dirs! in the shared lanes).
 # The .gitkeep files keep the empty template directories in the tree.
 
 # Release artifacts. `artifacts/` is where the lanes write by default, but

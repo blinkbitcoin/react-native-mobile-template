@@ -1018,7 +1018,7 @@ signing key, so it will not install over a Play-installed copy of the app.
 
 ## Rehearsing lanes locally (DRY_RUN=1)
 
-`DRY_RUN=1` makes every store call in `fastlane/lanes/shared.rb` log its
+`DRY_RUN=1` makes every store call in the shared lanes' `shared.rb` log its
 arguments and return canned data instead of talking to App Store Connect or
 Play, so a whole promotion can be walked on a laptop with no credentials. The
 log redacts credential-shaped arguments itself, so it is safe to paste into a
@@ -1094,23 +1094,21 @@ as above.
 
 ## Future stores
 
-`fastlane/lanes/future.rb` holds two deliberate stubs that fail loudly rather
-than pretending to work:
+No lane exists for a store beyond Apple, Google and Huawei. Two have come up:
 
-| Lane | Store | What implementing it needs |
-| --- | --- | --- |
-| `upload_samsung` | Samsung Galaxy Store | Seller Portal API credentials and the Galaxy Store CLI; the same `.aab` works |
-| `fdroid_metadata` | F-Droid | Reproducible builds and metadata YAML in `fdroiddata`;<br>F-Droid builds from source, so it needs the release to be buildable without any proprietary dependency |
+| Store | What implementing it needs |
+| --- | --- |
+| Samsung Galaxy Store | Seller Portal API credentials and the Galaxy Store CLI; the same `.aab` works |
+| F-Droid | Reproducible builds and metadata YAML in `fdroiddata`;<br>F-Droid builds from source, so it needs the release to be buildable without any proprietary dependency |
 
 Signup, consoles and credentials for both are in
-[store-accounts.md](store-accounts.md). Huawei AppGallery used to be a third
-stub and is now implemented — see [Huawei AppGallery](#huawei-appgallery) —
+[store-accounts.md](store-accounts.md). Huawei AppGallery is implemented — see [Huawei AppGallery](#huawei-appgallery) —
 though only the binary half: the part that is not the lane, making a bundle
 work on devices that ship without Google Play Services, still needs a Huawei
 Mobile Services equivalent for anything that depends on it at runtime.
 
-Each stub raises `UI.user_error!` pointing back at this section. Add a store the
-way Huawei was added: implement its lane and add a job to
+Add a store the way Huawei was added: implement its lane (in the shared lanes,
+upstream) and add a job to
 `cd-production.yml` behind the `platforms` input and a toggle of its own,
 and, if the store has test tiers, jobs in `cd-internal.yml` and
 `cd-beta.yml` too — nothing else in the path assumes there are only two

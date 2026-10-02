@@ -14,7 +14,7 @@ Five runners, each with a job. Nothing here needs a network.
 | Config plugins | Jest, `plugins` project (plain node) | `plugins/*.test.ts` | `make test-unit` |
 | Node scripts | `node:test` | `scripts/**/*.test.mjs` | `make test-scripts` |
 | Shared app suites | `node:test`, shipped in `@blinkbitcoin/app-tooling` | none here: they read this app's files | `make test-app` |
-| Fastlane lanes | minitest | `fastlane/test/lanes_test.rb` | `make check-release` |
+| Fastlane lanes | minitest, in shared-workflows | none here: the Fastfile only imports them | `make check-release` |
 | E2E, native | Maestro | `.maestro/flows/` | `make test-e2e-ios`, `make test-e2e-android` |
 | E2E, web | Playwright | `e2e/web/` | `make test-e2e-web` |
 
@@ -175,8 +175,9 @@ test passes rather than a branch no test can take.
 `make verify-android` run the shared tooling's scripts and programs, so their
 tests are in shared-workflows: a bats file per script, against fakes on
 `PATH`, and node:test at 100% for the doctor. What stays here is the fastlane
-side: `fastlane/test/` checks that the verify lanes call the package's
-verifiers with the right arguments.
+side: `make check-release` parses the Fastfile and lists the lanes. The lanes
+themselves, including that the verify lanes call the package's verifiers with the
+right arguments, are tested in shared-workflows.
 
 ### Script coverage
 
