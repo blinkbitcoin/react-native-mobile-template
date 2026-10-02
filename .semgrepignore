@@ -6,10 +6,6 @@ src/graphql/__generated__/
 # Test files carry deliberately bad data (fixtures, negative-path assertions);
 # production tooling under scripts/ is still scanned.
 **/*.test.*
-# A decoy Google service-account key (fake project id "decoy-project-123456",
-# key id "0000...dead"). tests/run.sh feeds it to scripts/validate-play-json.sh
-# to exercise that validator; not a real credential.
-.claude/skills/store-credentials/tests/fixtures/
 # A copy of AndroidManifest.xml used only to test scripts/release's OTA
 # fixture-parsing code, not the app's real (generated, uncommitted) manifest.
 scripts/release/fixtures/

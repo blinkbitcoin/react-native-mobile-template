@@ -339,7 +339,7 @@ those lanes do.
 
 ## Doing this with an agent
 
-`.claude/skills/store-setup/` drives the whole checklist above end to end —
+The `store-setup` skill of the [store-release plugin](https://github.com/blinkbitcoin/shared-workflows/tree/main/plugins/store-release) (enabled by `.claude/settings.json`) drives the whole checklist above end to end —
 `store-consoles` for the console work, `store-credentials` for turning what
 you get into GitHub secrets and variables, and `store-metadata` for the
 `fastlane/metadata/**` copy and images. It starts by asking you to pick a
@@ -360,7 +360,7 @@ production rollout — and it never runs `fastlane match nuke`, in any mode,
 with or without a yes.
 
 For what a whole run actually looks like, read
-`.claude/skills/store-setup/references/walkthrough.md`: a conceptual transcript
+the plugin's `store-setup/references/walkthrough.md`: a conceptual transcript
 of one session in browser-pause mode, from the identifiers gate to a
 submittable listing.
 
