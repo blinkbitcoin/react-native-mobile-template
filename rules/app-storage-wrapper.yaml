@@ -1,0 +1,25 @@
+rules:
+  - id: rn-secret-in-storage-wrapper
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      A token, secret, password or credential is being written through this
+      app's storage wrapper (src/lib/storage.ts), which sits in front of
+      expo-sqlite/kv-store and is unencrypted on both platforms. Use
+      src/lib/secure-store (expo-secure-store) instead. The key naming rule is
+      the shared one, rn-secret-in-plain-storage.
+    metadata:
+      category: security
+      references:
+        - https://docs.expo.dev/versions/latest/sdk/securestore/
+    patterns:
+      - pattern-inside: |
+          import { storage } from '$MOD';
+          ...
+      - metavariable-regex:
+          metavariable: $MOD
+          regex: ^(@/|\.{1,2}/)(.*/)?lib/storage$
+      - pattern: storage.set($KEY, $VALUE)
+      - metavariable-regex:
+          metavariable: $KEY
+          regex: '.*(?i:(^|[^a-zA-Z])(token|secret|password|credential)([^a-zA-Z]|$|(?=[A-Z]))).*|.*(?<=[a-z])(Token|Secret|Password|Credential)([^a-zA-Z]|$|(?=[A-Z])).*|.*(?i:(^|[^a-zA-Z])(api|access|private|secret|signing|encryption|auth|session|refresh)[-_]?key([^a-zA-Z]|$|(?=[A-Z]))).*'

@@ -18,13 +18,13 @@ just the one that failed.
 | commitlint | Commit and PR-title conventions | `commitlint.config.mjs` |
 | pnpm | Dependency provenance, release age, allowed builds, audit exceptions | `pnpm-workspace.yaml` |
 | osv-scanner | Known vulnerabilities and malicious-package records in the lockfile | `osv-scanner.toml` |
-| Semgrep | Mobile-specific source patterns and the registry TypeScript/secrets/OWASP packs | `rules/`, `.semgrepignore` |
+| Semgrep | The package's mobile source patterns and the registry TypeScript/secrets/OWASP packs; this app's storage wrapper rule | `rules/`, `.semgrepignore` |
 | pnpm install policy scanner | The install-time supply-chain settings, asserted rather than trusted | `pnpm-workspace.yaml` |
 | pnpm sbom | A CycloneDX bill of materials from the lockfile | `security-settings.json` (`jobs.sbom`) |
 | Bundle scanner | Private variable names, credential-shaped strings and cleartext URLs in the exported bundle | `security-settings.json` (`jobs.bundle`) |
 | mobsfscan | Mobile-specific misconfiguration in a fresh prebuild of `android/` and `ios/` | `.mobsf` |
 | Binary checks | OWASP MASTG tests over the release's built APK and IPA | `security-settings.json` (`jobs.binaries`) |
-| LLM reviewer and codebase review (OpenAnt) | Security review of the diff, and an LLM scan of the codebase; both off by default | `security-review.prompt.md`, `security-settings.json` (`llm`) |
+| LLM reviewer and codebase review (OpenAnt) | Security review of the diff, and an LLM scan of the codebase; both off by default | `security-settings.json` (`llm`); an optional `security-review.prompt.md` is added to the package's |
 
 The scanners from osv-scanner down are `make check-security*`, run separately
 from `make check` because they are external CLIs and cost minutes; see

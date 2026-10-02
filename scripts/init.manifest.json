@@ -180,11 +180,6 @@
         ]
       },
       {
-        "$comment": "The web export directory, in the CodeQL scan exclusions. Left behind it is a path-ignore for a target the generated app does not build.",
-        "path": ".github/codeql/codeql-config.yml",
-        "lines": ["^  - dist # web export$"]
-      },
-      {
         "path": ".gitignore",
         "lines": ["^/playwright-report$", "^web-build/$"],
         "replace": [
