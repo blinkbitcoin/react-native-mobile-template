@@ -9,7 +9,8 @@ shipped in `@blinkbitcoin/app-tooling` and run here as `pnpm exec
 check-security [job]`. What this repository keeps is its settings,
 `security-settings.json` (every key, its default and its environment twin are
 in the package's own `security-settings.json`), and the files those settings
-name: the Semgrep rules in `rules/` (`jobs.code.rules`) and `.mobsf`.
+name: the Semgrep rule for this app's own storage wrapper in `rules/`
+(`jobs.code.rules`, run after the package's own React Native rules) and `.mobsf`.
 
 In CI the same scanners run through the reusable `check-security.yml` from
 shared-workflows, at the same commit as the package: the `security` job in `ci.yml` on every change, and the
@@ -117,8 +118,8 @@ last `make check-security`.
 - **`sbom`** is a record rather than a scan: a CycloneDX bill of every
   component the lockfile pins, kept as a workflow artifact of the production
   run so a later advisory can be checked against exactly what shipped.
-- **`review`** sends the diff, with `security-review.prompt.md` as the
-  instructions, to the configured provider and validates the answer before it
+- **`review`** sends the diff, with the package's `security-review.prompt.md` as
+  the instructions (a `security-review.prompt.md` here would be appended to it), to the configured provider and validates the answer before it
   becomes a finding: every finding must name a file in the diff, a line and a
   known severity, or the whole answer is dropped. Generated files and the
   lockfile are left out; files beyond `review.maxDiffBytes` are named as
@@ -338,23 +339,17 @@ regression. It also means `code.sh` needs network access every run - fetching
 what `--config p/...` does. `--metrics off` only stops telemetry; it does not
 make the run offline.
 
-**`rn-secret-in-plain-storage` (`rules/react-native-secrets.yaml`)** reports a
-credential-named key written to unencrypted key-value storage: `AsyncStorage`,
-`expo-sqlite/kv-store` (the store this template uses, through `setItem`,
-`setItemSync` or `setItemAsync`), and the template's own `storage.set` wrapper
-in `src/lib/storage.ts`. It used to know only `AsyncStorage`, which this app
-does not use, so none of the app's own writes was checked. **It has two
-deliberate gaps.** It does not match an unqualified `key` identifier, so
-`keyExtractor` and `sortKey` are not reported - only identifiers that read as
-a credential, such as `apiKey` or `authToken`, trigger the rule. It also does
-not match a fused-lowercase identifier such as `authtoken`: the rule looks for
-a word boundary between the credential word and the rest of the name, so
-`authToken` and `auth_token` match but `authtoken` does not. Both are
-precision trade-offs against false positives on ordinary React Native code,
-not coverage gaps to be closed by loosening the pattern.
+**`rn-secret-in-storage-wrapper` (`rules/app-storage-wrapper.yaml`)** reports a
+credential-named key written through this template's own `storage.set` wrapper
+in `src/lib/storage.ts`, which sits in front of `expo-sqlite/kv-store`. The
+package's `rn-secret-in-plain-storage` rule already covers `AsyncStorage` and
+`kv-store` directly, so the app's own writes would be missed without this one.
+It shares that rule's naming logic, and so its two deliberate gaps: no
+unqualified `key` identifier, and no fused-lowercase `authtoken` (see the shared
+tooling's `docs/security.md`).
 
 **`rules/` needs its own exclusion in every tool that discovers files by a
-generic convention.** `rules/react-native-secrets.test.tsx` is deliberately
+generic convention.** `rules/app-storage-wrapper.test.tsx` is deliberately
 uninstantiable snippet code in Semgrep's own `<rule-id>.test.tsx` fixture
 convention, scanned by `semgrep --test rules/`, never meant to run as
 anything else. Four tools currently exclude `rules/` for that reason, each

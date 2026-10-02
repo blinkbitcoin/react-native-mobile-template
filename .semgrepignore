@@ -1,13 +1,6 @@
-# Generated, vendored or not-our-source paths. Everything else is scanned.
-node_modules/
-ios/
-android/
-dist/
-coverage/
-.claude/worktrees/
-# Every CI job's checkout of shared-workflows, not this repository's source.
-.workflows/
-.expo/
+# What only this repository generates or fixtures. check-security also applies
+# the family's own list (node_modules, ios, android, dist, coverage, vendor/bundle,
+# .expo, worktrees, .workflows) on top of this file; everything else is scanned.
 src/i18n/locales/
 src/graphql/__generated__/
 # Test files carry deliberately bad data (fixtures, negative-path assertions);

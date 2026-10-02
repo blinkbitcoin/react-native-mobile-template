@@ -1,5 +1,0 @@
-# Scripts here source their helpers by relative path, so shellcheck must follow
-# them. Mirrors the shared-workflows repository so both resolve sources the
-# same way.
-external-sources=true
-source-path=SCRIPTDIR

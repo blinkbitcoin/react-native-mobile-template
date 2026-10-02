@@ -1,55 +1,11 @@
-# CodeQL configuration, read by BOTH the CI analysis
-# (.github/workflows/ci-codeql.yml calls check-code-scanning.yml, whose `configuration-file`
-# input defaults to this path and hands it to github/codeql-action/init) and
-# the local run (`make check-code-scanning`, which
-# parses the suite and the packs out of this file). One file, so local and CI cannot
-# disagree about what was scanned or with which queries.
+# This repository's CodeQL configuration. The suite, the alert-suppression pack
+# and the paths nobody scans (ios, android, dist, coverage, vendor/bundle, .expo,
+# .workflows, worktrees) are the shared tooling's defaults: both the CI analysis
+# (check-code-scanning.yml) and `make check-code-scanning` merge this file over
+# them (@blinkbitcoin/app-tooling's README, "resolve-code-scanning-config"). What
+# is left here is what only this repository generates.
 name: react-native-mobile-template
 
-# `security-and-quality`: the default security suite plus the
-# maintainability/reliability queries that GitHub sells separately as "Code
-# quality". They overlap Biome and ESLint in places; the non-overlapping half is
-# dataflow, which neither linter does.
-queries:
-  - uses: security-and-quality
-
-# This pack is not optional decoration - it is the suppression mechanism.
-# `AlertSuppression.ql` is what makes an inline
-#
-#     // Why this cannot happen here.
-#     // codeql[js/some-rule-id]
-#     const value = untrusted;
-#
-# comment actually suppress one finding. A marker alone on its line covers that
-# line and the one immediately BELOW it, so it has to be the last line before
-# the code: the reason goes ABOVE the marker, never between the marker and the
-# code, or the marker covers the reason and the finding quietly stays open.
-# WITHOUT this pack the marker is ignored either way: the comment sits in the
-# file looking like it works while the alert keeps coming back. esign lost three
-# rounds to one JWT false positive exactly that way.
-#
-# And a marker is the right tool, not an API/UI dismissal:
-#   - a dismissal is keyed to the alert's FINGERPRINT, so it evaporates the next
-#     time the file moves or the lines around it shift, and the alert re-opens
-#     with nobody having changed anything;
-#   - a marker travels with the code, is reviewed in the diff that adds it, and
-#     silences exactly one site rather than the whole query - the same rule
-#     firing somewhere else still shows up.
-# So: suppress in the source, with a comment saying why, never in the UI.
-packs:
-  - codeql/javascript-queries:AlertSuppression.ql
-
-# Generated, compiled, vendored or native output: scanning it reports findings
-# nobody can fix in this repo, and the generators are the real review surface.
-# `make check-code-scanning` mirrors this list as LGTM_INDEX_FILTERS so a local
-# database holds the same files a CI one does.
 paths-ignore:
   - src/graphql/generated # graphql-codegen output (`make gen-graphql`)
   - src/i18n/locales/*/messages.ts # compiled Lingui catalogs (`make gen-i18n`)
-  - ios # expo prebuild output, never committed
-  - android # expo prebuild output, never committed
-  - dist # web export
-  - coverage # jest reports
-  - vendor/bundle # fastlane's gems
-  - .workflows # the workflows repo, checked out beside us on a runner
-  - .claude/worktrees # other checkouts of this repository (Claude Code worktrees)
