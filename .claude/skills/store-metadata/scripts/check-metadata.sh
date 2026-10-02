@@ -21,7 +21,7 @@ die_usage() { echo "FATAL: $*" >&2; exit 64; }
 
 # The template ships prose that says this; shipping it to App Review or Play
 # is worse than failing the lane. Must equal METADATA_PLACEHOLDER in
-# fastlane/lanes/shared.rb - a test asserts that.
+# the shared lanes' shared.rb - a test asserts that.
 PLACEHOLDER='Replace this text'
 
 # Modern App Store Connect category ids - the "[A-Z_]+" constants in the

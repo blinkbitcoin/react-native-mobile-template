@@ -60,7 +60,7 @@ and print the exact command: installing Xcode, `sudo xcode-select -s
 | `ruby gems: The following gems are missing` after installing | Gems went in under another Ruby, before mise's 3.3 was active | `make setup-toolchain` (mise first, then `make install`) |
 | `pod: not found`, or CocoaPods complains about UTF-8 | Not installed in mise's Ruby; locale not UTF-8 | `make setup-ios` |
 | `adb: not found` while `$ANDROID_HOME` is set | Shell without mise activation, or an old `.mise.toml` that loads `.env.local` after `_.path` | Activate mise, or `mise exec -- make doctor` |
-| `make check-release` fails with `invalid multibyte char (US-ASCII)` in `fastlane/lanes/shared.rb` | The shell sets no locale, so Ruby reads source as ASCII | Run through mise (its `[env]` defaults `LANG` to `en_US.UTF-8`), or export `LANG=en_US.UTF-8` |
+| `make check-release` fails with `invalid multibyte char (US-ASCII)` in the shared lanes' `shared.rb` | The shell sets no locale, so Ruby reads source as ASCII | Run through mise (its `[env]` defaults `LANG` to `en_US.UTF-8`), or export `LANG=en_US.UTF-8` |
 | `$ANDROID_HOME is not set` | No SDK yet, or `.env.local` missing | `make setup-android` |
 
 ### Android build (`make dev-android`)

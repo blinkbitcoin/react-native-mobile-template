@@ -124,7 +124,7 @@ passes the archive's own `dSYMs/` directory to
 the shared tooling's `release/verify-ios.sh --dsym`, which checks that the dSYM UUIDs cover
 the binary's. So a build that verifies has usable symbols on disk.
 
-`fastlane/lanes/ios.rb` has the upload hook already stubbed:
+The shared lanes' `ios.rb` (`@blinkbitcoin/app-tooling/fastlane/lanes/ios.rb`) has the upload hook already stubbed:
 
 ```
 fastlane ios upload_symbols            # downloads dSYMs from App Store Connect

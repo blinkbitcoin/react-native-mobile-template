@@ -70,7 +70,7 @@ owner. `scripts/init.manifest.json` is the authoritative list; in summary it
 covers `app.config.ts`, `package.json`, `release-please-config.json`, the
 `.env*` files, `.maestro/flows/deep-link.yaml`, the Maestro launch scripts,
 `fastlane/metadata/**`, `store-notes.prompt.md`,
-`fastlane/lanes/android.rb`, the `certs/README.md` example command, the local
+the `certs/README.md` example command, the local
 Expo module podspec, `plugins/with-android-release-signing.ts`, the release
 fixtures, `src/lib/native-intent.ts` with its test, `deploy/ota/*`, and every
 Markdown file in the repo root, `docs/`, `docs/decisions/` and `.github/` —

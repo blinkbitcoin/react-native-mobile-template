@@ -31,7 +31,7 @@ semgrep = "1.177.0"
 # and `make doctor` checks it is set.
 EXPO_NO_TELEMETRY = "1"
 # A UTF-8 locale when the shell sets none: without it Ruby reads source as
-# US-ASCII, so `make check-release` dies on fastlane/lanes/shared.rb ("invalid
+# US-ASCII, so `make check-release` dies on the shared lanes' shared.rb ("invalid
 # multibyte char") and CocoaPods refuses to run. A LANG you set wins.
 LANG = "{{ env.LANG | default(value='en_US.UTF-8') }}"
 # Per-machine overrides, gitignored by the `.env*.local` rule. Absent by
