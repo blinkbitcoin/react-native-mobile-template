@@ -15,14 +15,15 @@
 SHELL := /bin/bash
 
 # Every port derives from APP_PORT_BASE (default 8080) plus a fixed offset;
-# `scripts/ports.mjs` is the table and the ONLY thing that derives one. mise
+# the `ports` program of @blinkbitcoin/app-tooling is the table and the ONLY
+# thing that derives one. mise
 # exports the base and nothing else, on purpose: a mirrored METRO_PORT in the
 # environment is indistinguishable from a deliberate per-service override, and
 # `APP_PORT_BASE=8090 make dev` would then quietly stay on the default. So the
 # run targets eval the helper, which also means they work in a shell with no
 # mise activated. EXPO_PUBLIC_API_URL comes from that eval too: it is baked into
 # the bundle, so .env.development stays the bare-`expo start` default.
-PORTS := eval "$$(node scripts/ports.mjs --sh)"
+PORTS := eval "$$(pnpm exec ports --sh)"
 
 # ---------- Setup ----------
 init: ## Rename this template into your app (interactive; --yes for CI)
@@ -37,11 +38,7 @@ doctor: ## Check the local toolchain (run this first)
 # install gems in their own step, or a machine with no ruby yet).
 install: ## Install dependencies (pnpm + Ruby gems) and git hooks
 	pnpm install --frozen-lockfile
-	@if [ "$(NO_BUNDLE)" = "1" ]; then \
-		echo "NO_BUNDLE=1: skipping bundle install (make check-release will need it)"; \
-	else \
-		bundle config set --local path vendor/bundle && bundle install; \
-	fi
+	pnpm exec install-gems
 
 # A machine with mise to a working one, in one step each. Idempotent, so they
 # are also the first thing to re-run when the toolchain misbehaves. The scripts
@@ -67,7 +64,7 @@ setup-maestro: install ## Maestro at the pinned version, from the checksummed re
 
 # ---------- Run ----------
 ports: ## Print the ports derived from APP_PORT_BASE
-	@node scripts/ports.mjs
+	@pnpm exec ports
 
 dev: ## Metro for the dev client (APP_PORT_BASE+1)
 	@$(PORTS) && pnpm start --port "$$METRO_PORT"
@@ -193,12 +190,8 @@ check-docs: ## Docs freshness, AGENTS.md command table, make target names, table
 # The skills' tests run here, in the recipe rather than as a prerequisite: they
 # need the same Ruby and bundle, and CI's Release job runs this target by name.
 # As a separate target in `check` they ran on laptops and in no CI job.
-check-release: ## Ruby syntax + fastlane lane parse + lane unit tests + skill tests
-	@bundle check >/dev/null 2>&1 || { echo "run: bundle install (see docs/release-runbook.md)"; exit 1; }
-	for f in fastlane/Fastfile fastlane/lanes/*.rb fastlane/test/*.rb; do ruby -c "$$f" || exit 1; done
-	FASTLANE_SKIP_ENV_ASSERT=1 bundle exec fastlane lanes
-	bundle exec ruby -Ifastlane/test fastlane/test/lanes_test.rb
-	pnpm exec check-skills
+check-release: ## Ruby syntax, fastlane lane parse, the lanes' unit tests and the skill tests
+	pnpm exec check-release
 
 check-skills: ## Only the skill tests (offline, fakes only; needs bundle install) - part of check-release
 	pnpm exec check-skills
@@ -222,11 +215,6 @@ check-security-dependencies: ## Known vulnerabilities and malicious packages in 
 
 check-security-code: ## Semgrep over app source: TypeScript, secrets, OWASP packs plus rules/
 	pnpm exec check-security code
-	@if command -v semgrep >/dev/null 2>&1; then \
-		semgrep --test rules/; \
-	else \
-		echo "semgrep not installed: rule tests skipped"; \
-	fi
 
 check-security-policy: ## Assert the pnpm install policy: release cooldown, no implicit builds, no trust downgrade
 	pnpm exec check-security policy
@@ -290,8 +278,7 @@ test-coverage: ## Tests with coverage thresholds and the empty-row check (what C
 # badge reads .security/verdict.json from the last make check-security; set
 # BADGE_SECURITY to a verdict line to try another, or to empty for none.
 gen-badges: ## Render the CI badges into coverage/badge/ (run make test-coverage first, make check-security for Security)
-	@BADGE_UNIT="$${BADGE_UNIT:-success}" BADGE_E2E="$${BADGE_E2E:-success}" \
-		BADGE_SECURITY="$${BADGE_SECURITY-$$(cat .security/verdict.json 2>/dev/null)}" pnpm exec gen-badges
+	pnpm exec gen-badges --local
 
 # ---------- End-to-end ----------
 test-e2e-ios: ## Maestro flows on iOS (needs: make dev-api, make dev, make dev-ios)
@@ -312,6 +299,6 @@ reset: clean ## clean + reinstall
 	rm -rf node_modules && pnpm install --frozen-lockfile
 
 help: ## Show this help
-	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
+	@pnpm exec help
 
 .PHONY: init doctor install setup setup-toolchain setup-android setup-ios setup-maestro ports dev dev-ios dev-android dev-web dev-api prebuild build-web version verify-ios verify-android store-notes gen-i18n gen-graphql check-types check-lint fix-format fix-lint fix-tooling-pin check-format check-unused check-spell check-generated check-prebuild check-code check-expo-health check-audit check-licenses check-ci check-docs check-skills check-secrets check-security check-security-dependencies check-security-code check-security-policy check-security-sbom check-security-bundle check-security-mobile check-security-binaries check-security-review check-security-review-codebase check-release check check-slow ci check-code-scanning check-contract test-app test-scripts test-unit test-coverage gen-badges test-e2e-ios test-e2e-android test-e2e-web test clean reset help

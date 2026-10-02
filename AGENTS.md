@@ -25,7 +25,7 @@ src/test/           jest setup, render helper, mocks
 plugins/            Expo config plugins (with-*.ts) + their tests
 modules/            local native modules (hello-native)
 mocks/              GraphQL mock API (server.ts, msw.ts, schema.graphql)
-scripts/            check-*.sh, init, ports, e2e/
+scripts/            init, e2e/ and the guards (*.test.mjs) only this repository has
 .maestro/           Maestro flows (native e2e); e2e/web/ is Playwright
 fastlane/           store lanes + metadata; deploy/ota/ is the update server
 docs/               architecture, local-dev, quality, testing, ci, native-extensions,
@@ -139,10 +139,10 @@ aggregates.
 - **Never `cp -R generated/. .`** when scaffolding from a generator: it clobbers
   `.git/`. Use `rsync -a --exclude .git generated/ .`.
 - **Never hardcode a port.** Every port is `APP_PORT_BASE` (default 8080) plus a
-  fixed offset, and `scripts/ports.mjs` is the only thing that derives one —
-  mise exports the base, the Makefile's run targets eval the helper. Never
+  fixed offset, and the `ports` program of `@blinkbitcoin/app-tooling` is the only
+  thing that derives one — mise exports the base, the Makefile's run targets eval it. Never
   mirror a derived port into `.mise.toml`: it then reads as a per-service
-  override and `APP_PORT_BASE=8090` stops working. `scripts/ports.test.mjs`
+  override and `APP_PORT_BASE=8090` stops working. `scripts/port-pins.test.mjs`
   fails on a bare literal and names the file; see
   [docs/local-dev.md](docs/local-dev.md).
 - **Never set a locale as a command prefix in shell code.** Write
@@ -314,8 +314,9 @@ used. A zero-statement re-export under `coveragePathIgnorePatterns` still has
 its sibling test, pinning what it re-exports.
 
 The Node scripts have their own gate: `test:scripts` (`make test-scripts`, CI's
-Unit job) runs `node:test` with its built-in coverage at 100% lines, branches
-and functions over every `scripts/**/*.mjs` module. A script's command-line
+Unit job) is the shared `test-scripts` runner: `node:test` with its built-in
+coverage at 100% lines, branches and functions over every `scripts/**/*.mjs`
+module, and a failure naming any module no test loaded. A script's command-line
 entry is an exported `main(argv, io)` that returns the exit code, tested
 in-process; the entry itself is only an `import.meta.main` guard that sets
 `process.exitCode` from `main`, which one subprocess run per script covers. See `docs/testing.md`.

@@ -7,7 +7,7 @@
 # The launch and the suite are the shared tooling's, the scripts CI runs
 # (node_modules/@blinkbitcoin/app-tooling/e2e/): the same deep link into the dev
 # client, the same retry, the same check that flows ran. What is this app's
-# stays here: the ports, which scripts/ports.mjs derives from APP_PORT_BASE, and
+# stays here: the ports, which the package's `ports` derives from APP_PORT_BASE, and
 # the wait for the mock API before the suite starts.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -25,7 +25,7 @@ esac
 # already-exported per-service variable wins. Read on a line of its own, so a
 # helper that rejects APP_PORT_BASE stops the script (`set -e` does not reach a
 # failing `$(...)` inside eval's argument).
-ports="$(node scripts/ports.mjs --sh)"
+ports="$(pnpm exec ports --sh)"
 eval "$ports"
 export WORKFLOWS_METRO_PORT="$METRO_PORT"
 export WORKFLOWS_MOCK_API_PORT="$MOCK_API_PORT"
@@ -35,9 +35,8 @@ export WORKFLOWS_OUT="${WORKFLOWS_OUT:-$PWD/.maestro/output}"
 
 # Before the launch, not as the suite's setup hook: the app asks the mock API
 # for data as soon as it opens.
-bash scripts/e2e/wait-for-mock-api.sh
-
 e2e=node_modules/@blinkbitcoin/app-tooling/e2e
+bash "$e2e/wait-for-http.sh" "http://localhost:$MOCK_API_PORT/"
 if [ "$platform" = ios ]; then
   bash "$e2e/ios-simulator.sh" pick
   bash "$e2e/app-launch.sh" ios

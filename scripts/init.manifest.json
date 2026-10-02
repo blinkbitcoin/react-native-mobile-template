@@ -128,7 +128,6 @@
     "commitlintConfig": "commitlint.config.mjs",
     "files": [
       "playwright.config.ts",
-      "scripts/build-web.sh",
       "scripts/e2e/web.sh",
       ".github/workflows/ci-web.yml",
       "scripts/ci-web-gate.test.mjs",
@@ -226,7 +225,7 @@
         "path": "package.json",
         "replace": [
           [
-            "\"check:unused\": \"eval \\\"$(node scripts/ports.mjs --sh)\\\" && knip\"",
+            "\"check:unused\": \"eval \\\"$(pnpm exec ports --sh)\\\" && knip\"",
             "\"check:unused\": \"knip\""
           ]
         ]
@@ -234,15 +233,6 @@
       {
         "path": "knip.json",
         "replace": [["\"eval\",", ""], ["\"e2e/**/*.ts\",", ""]]
-      },
-      {
-        "path": "scripts/ports.mjs",
-        "replace": [
-          [
-            "// --sh`, which the Makefile's run targets, the E2E shell scripts and the\n// `check:unused` script (knip loads the web E2E config) eval.",
-            "// --sh`, which the Makefile's run targets and the E2E shell scripts eval."
-          ]
-        ]
       },
       {
         "$comment": "Two web residues in .github/: an ignore rule for a dependency this run just deleted, and a Platform option for a target the app no longer has.",
@@ -265,7 +255,7 @@
         "lines": ["^\\s*\\| \\[0006\\]", "^\\s*\\| \\[0015\\]"]
       },
       {
-        "$comment": "The web preview port's row in the port table. WEB_PREVIEW_PORT itself stays in scripts/ports.mjs: an offset nobody binds costs nothing, and removing it would renumber the table.",
+        "$comment": "The web preview port's row in the port table. WEB_PREVIEW_PORT itself stays in the package's port table: an offset nobody binds costs nothing, and removing it would renumber the table.",
         "path": "docs/local-dev.md",
         "optional": true,
         "lines": ["^\\| `WEB_PREVIEW_PORT` \\|"],
@@ -278,16 +268,16 @@
       },
       {
         "$comment": "The port guard's pin on a config file this run deletes.",
-        "path": "scripts/ports.test.mjs",
+        "path": "scripts/port-pins.test.mjs",
         "optional": true,
         "lines": [
           "^  // playwright\\.config\\.ts is not here on purpose: Playwright require\\(\\)s a \\.ts$",
           "^  // config and this package is CommonJS, so importing an ES module throws\\.$",
           "^  // web\\.sh derives the ports and exports them; the config reads those\\. The$",
           "^  // literal guard below is what stops it hardcoding one instead\\.$",
-          "^  \\['scripts/e2e/web\\.sh', 'node scripts/ports\\.mjs --sh'\\],$",
+          "^  \\['scripts/e2e/web\\.sh', 'pnpm exec ports --sh'\\],$",
           "^  // check:unused: knip loads playwright\\.config\\.ts, which needs the ports\\.$",
-          "^  \\['package\\.json', 'node scripts/ports\\.mjs --sh'\\],$"
+          "^  \\['package\\.json', 'pnpm exec ports --sh'\\],$"
         ]
       },
       {
@@ -489,7 +479,10 @@
         "optional": true,
         "$comment": "The layout block names the init script and its doc page; both are going away, and a line scrub would take the whole inventory line.",
         "replace": [
-          ["check-*.sh, init, ports, e2e/", "check-*.sh, ports, e2e/"],
+          [
+            "init, e2e/ and the guards (*.test.mjs) only this repository has",
+            "e2e/ and the guards (*.test.mjs) only this repository has"
+          ],
           [
             "ota, ota-and-crash-reporting, template-usage, decisions/",
             "ota, ota-and-crash-reporting, decisions/"

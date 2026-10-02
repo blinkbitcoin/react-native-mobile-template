@@ -1063,7 +1063,7 @@ describe('init --yes --no-web', async () => {
     assert.deepEqual(removedLines(REPO, root, 'AGENTS.md'), [
       // Two layout lines are rewritten, not deleted: they name the init script
       // and its doc page, both of which are gone afterwards.
-      'scripts/            check-*.sh, init, ports, e2e/',
+      'scripts/            init, e2e/ and the guards (*.test.mjs) only this repository has',
       '.maestro/           Maestro flows (native e2e); e2e/web/ is Playwright',
       '                    release-runbook, ota, ota-and-crash-reporting, template-usage, decisions/',
       '| `make init` | Rename this template into your app, then delete itself (template only; `docs/template-usage.md`) |',
@@ -1087,7 +1087,7 @@ describe('init --yes --web', async () => {
     assert.ok(existsSync(path.join(root, '.github/workflows/ci-web.yml')));
     assert.ok(existsSync(path.join(root, 'src/features/settings/NativeDemoCard.web.tsx')));
     const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
-    assert.equal(pkg.scripts['build:web'], 'bash scripts/build-web.sh');
+    assert.equal(pkg.scripts['build:web'], 'build-web');
     assert.ok(pkg.dependencies['react-native-web']);
     assert.match(readFileSync(path.join(root, 'Makefile'), 'utf8'), /^test-e2e-web:/m);
     assert.match(readFileSync(path.join(root, 'app.config.ts'), 'utf8'), /^\s*web: \{/m);

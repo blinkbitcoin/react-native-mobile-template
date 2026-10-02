@@ -124,9 +124,9 @@ Metro's offset is `+1` on purpose: `8081` is Expo's own default and the port the
 `expo-development-client` deep link assumes, so the default base leaves every
 existing instruction true.
 
-`scripts/ports.mjs` is the table, and it is the only thing that derives a port.
+The `ports` program of `@blinkbitcoin/app-tooling` is the table, and it is the only thing that derives a port.
 `.mise.toml`'s `[env]` exports `APP_PORT_BASE` — the *input* — and nothing else;
-the Makefile's run targets `eval "$(node scripts/ports.mjs --sh)"` to get the
+the Makefile's run targets `eval "$(pnpm exec ports --sh)"` to get the
 three *outputs*, and so does the `check:unused` script, because knip loads
 `playwright.config.ts`. Keeping one producer is not tidiness: a mirrored
 `METRO_PORT=8081` sitting in the environment is indistinguishable from a
@@ -158,9 +158,9 @@ Expo bakes it into the bundle, so `.env.development` carries the mock API's
 default URL for a bare `expo start`, and the Makefile's run targets export the
 derived one over it.
 
-`scripts/ports.test.mjs` (`pnpm test:scripts`) greps the tracked tree for a bare
-port literal and fails naming the file. If a new file genuinely needs one, add
-it to `ALLOWED` there with a reason.
+`scripts/port-pins.test.mjs` (`pnpm test:scripts`) runs the shared `check-ports`, which
+greps the tracked tree for a bare port literal and fails naming the file. If a new
+file genuinely needs one, name it in `ports.allow` in `app-tooling.json` with a reason.
 
 ## The dev client and the deep link
 
@@ -172,7 +172,7 @@ not work on a simulator or an emulator. Waiting for a "DEVELOPMENT SERVERS"
 entry there is waiting forever. Open the app through the deep link instead:
 
 ```sh
-eval "$(node scripts/ports.mjs --sh)"   # $METRO_PORT; see "Ports" above
+eval "$(pnpm exec ports --sh)"   # $METRO_PORT; see "Ports" above
 
 # iOS simulator
 xcrun simctl openurl booted "rnmt://expo-development-client/?url=http%3A%2F%2Flocalhost%3A$METRO_PORT"

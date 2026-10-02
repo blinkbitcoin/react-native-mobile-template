@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
-// playwright.config.ts throws without the ports from scripts/ports.mjs, on
+// playwright.config.ts throws without the ports from the `ports` program of @blinkbitcoin/app-tooling, on
 // purpose, and knip only logs "Error loading" and exits 0: the e2e/web specs
 // silently stop being entries. check:unused exports the ports first.
 const env = { ...process.env, NO_COLOR: '1' };

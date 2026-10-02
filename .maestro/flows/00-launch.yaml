@@ -72,7 +72,7 @@ tags: [smoke]
         text: 'DEVELOPMENT SERVERS'
     commands:
       # Any port, deliberately: Metro's is derived from APP_PORT_BASE
-      # (scripts/ports.mjs) and CI picks its own, so a literal would pin the
+      # (`pnpm exec ports`) and CI picks its own, so a literal would pin the
       # flow to one worktree. `${METRO_PORT}` is not the answer either - this
       # suite also runs from shared-workflows, which passes only APP_ID,
       # and Maestro aborts a flow on an unresolved variable. The cost, accepted:

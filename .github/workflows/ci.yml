@@ -100,11 +100,12 @@ jobs:
       # exported variable wins over the dotenv file, so this is the URL the
       # bundle embeds. It has to be a literal: the build job runs before, and on
       # a different runner from, the job that starts the mock API. 8082 is
-      # `BASE_DEFAULT` 8080 plus `mockApi.offset` 2 from `scripts/ports.mjs`,
+      # `BASE_DEFAULT` 8080 plus `mockApi.offset` 2 from the `ports` program of `@blinkbitcoin/app-tooling`,
       # deterministic on a runner because nothing sets `APP_PORT_BASE` there.
       environment-variables: '{"EXPO_PUBLIC_API_URL":"http://localhost:8082/graphql"}'
-      e2e-setup-script: scripts/e2e/ci-mock-api-up.sh
-      e2e-teardown-script: scripts/e2e/ci-mock-api-down.sh
+      # The shared e2e scripts start this, wait for it on the mock API port and
+      # stop it afterwards.
+      mock-api-command: pnpm dev:api
   security:
     name: Security
     needs: checks

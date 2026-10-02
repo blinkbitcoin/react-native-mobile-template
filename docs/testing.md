@@ -29,7 +29,7 @@ measures them):
 
 | Module | Its test |
 | --- | --- |
-| `scripts/ports.mjs` | `scripts/ports.test.mjs` |
+| `scripts/init.mjs` | `scripts/init.test.mjs` |
 | `src/components/Card.tsx` | `src/components/Card.test.tsx` |
 | `src/i18n/i18n.ts` | `src/i18n/i18n.test.tsx` (a `.ts` module may be tested in JSX) |
 | `src/features/settings/NativeDemoCard.web.tsx` | `src/features/settings/NativeDemoCard.web.test.tsx` |
@@ -56,7 +56,7 @@ route's own logic is under test.
 Check one module against its own test before pushing:
 
 ```sh
-node --test --experimental-test-coverage --test-coverage-include=scripts/ports.mjs scripts/ports.test.mjs
+node --test --experimental-test-coverage --test-coverage-include=scripts/init.mjs scripts/init.test.mjs
 pnpm exec jest src/components/Card.test.tsx --coverage --collectCoverageFrom=src/components/Card.tsx
 ```
 
@@ -103,24 +103,22 @@ which is why they sit at the top level and not in either project.
 
 ### `pnpm test:scripts`
 
-`node --test --experimental-test-coverage --test-coverage-include="scripts/**/*.mjs"
---test-coverage-lines=100 --test-coverage-branches=100 --test-coverage-functions=100
-"scripts/**/*.test.mjs"` covers the tooling that has no business booting React
-Native, and fails below 100% — see [Script coverage](#script-coverage). The
-include keeps the gate on this repository's scripts: a test that runs
-shared-workflows' scripts from `$WORKFLOWS_DIR` (or `pnpm` from outside mise)
-would otherwise have that code measured too. The script runs
-`check-test-siblings` first (see
-[One test file per module](#one-test-file-per-module)). The suites include:
+`test-scripts`, the shared tooling's runner (`@blinkbitcoin/app-tooling`), covers
+the tooling that has no business booting React Native, and fails below 100% — see
+[Script coverage](#script-coverage). It runs `check-test-siblings` first (see
+[One test file per module](#one-test-file-per-module)), then `node --test` with
+coverage over `scripts/**/*.test.mjs`, gated to this repository's own
+`scripts/**/*.mjs` (what `testScripts` in `app-tooling.json` names, by default
+those two globs), so a test that runs shared-workflows' scripts from `$WORKFLOWS_DIR`
+is not measured. The suites include:
 
 | Suite | Covers |
 | --- | --- |
 | `scripts/init.test.mjs` | The template rename and web-removal script behind `make init` |
-| `scripts/coverage-completeness.test.mjs` | Loads every `scripts/**/*.mjs` module, so one no test imports still counts |
 | `scripts/ci-suite-gates.test.mjs` | `ci.yml`'s `unit`, `e2e` and `badges` jobs evaluated together for each kind of change, and `unit` held to having<br>no gate (see [ci.md](ci.md#skipping-a-suite-the-change-cannot-affect)) |
 
 These run in `make ci` (and in CI's Unit job), **not** in `make check`, which
-is the static gates only. The port guard in `scripts/ports.test.mjs` and the
+is the static gates only. The port guard in `scripts/port-pins.test.mjs` and the
 `make init` manifest coverage live here, so a change that passes `make check`
 can still fail Unit on the runner — and Unit gates E2E, so the E2E run you
 wanted never starts. These guards read every tracked file, which is why CI
@@ -185,10 +183,9 @@ verifiers with the right arguments.
 `pnpm test:scripts` (`make test-scripts`, `make ci`, CI's Unit job through
 shared-workflows' `check-unit`) measures the Node scripts with `node:test`'s
 own coverage and fails below **100% of lines, branches and functions**. The
-flags live in the `test:scripts` script in `package.json`, so CI enforces
-exactly what `make test-scripts` does. No dependency does the measuring, and
-nothing is excluded: test files are measured too, and are at 100% like the
-rest.
+thresholds are the shared runner's, so CI enforces exactly what
+`make test-scripts` does. No dependency does the measuring, and nothing is
+excluded.
 
 Two things make that reachable:
 
@@ -203,9 +200,9 @@ Two things make that reachable:
   child through the environment, so a subprocess test must pass
   `{ ...process.env, ... }`, never a fresh environment.
 - **Every module is in the report.** Node only reports files something loaded,
-  so a script no test imports would be missing rather than at 0%.
-  `scripts/coverage-completeness.test.mjs` imports every `scripts/**/*.mjs`
-  module, which puts a new, untested script in the report and fails the gate.
+  so a script no test imports would be missing rather than at 0%. The runner
+  reads the coverage report against the modules on disk and names each module
+  missing from it, so a new, untested script fails the gate with its name.
 
 The same rules as Jest apply: a threshold is never lowered, and a branch no
 test can take is restructured away rather than ignored.
@@ -347,7 +344,7 @@ server.use(
 
 `afterEach` resets the handlers. The URL has no port on purpose: no server is
 listening, `src/test/env.ts` sets `EXPO_PUBLIC_API_URL` to the same value, and
-`scripts/ports.test.mjs` rejects a bare port literal (see
+`scripts/port-pins.test.mjs` runs `check-ports`, which rejects a bare port literal (see
 [local-dev.md](local-dev.md)).
 
 ## Native module and plugin tests
