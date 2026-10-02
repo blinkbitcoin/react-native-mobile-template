@@ -49,9 +49,10 @@ flowchart LR
   providers and env, [quality.md](docs/quality.md) says which linter owns
   which rule.
 - **Shipping it** — [The pipelines](#the-pipelines) lists every workflow and
-  job, [release-runbook.md](docs/release-runbook.md) is how to cut, promote,
-  roll out and halt, [store-accounts.md](docs/store-accounts.md) is the
-  accounts and credentials.
+  job, [release-runbook.md](docs/release-runbook.md) is what this app sets for a
+  release (the procedure itself is in
+  [shared-workflows](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/release-runbook.md)),
+  [store-accounts.md](docs/store-accounts.md) is the accounts and credentials.
 
 ## Getting started
 
@@ -133,7 +134,6 @@ another. A release can be watched end to end before the store accounts exist.
 | `.maestro/`, `e2e/` | Maestro flows for device E2E, Playwright specs for web                               |
 | `assets/`           | Icons, splash screens and fonts                                                      |
 | `certs/`            | The public OTA code-signing certificate. Never a private key                         |
-| `deploy/`           | Deployment for the self-hosted update server                                         |
 | `docs/`             | Twelve pages, indexed by question in [docs/README.md](docs/README.md)                |
 
 Not in here, deliberately: `ios/` and `android/`. They are generated.
@@ -173,8 +173,9 @@ the TestFlight and Play submissions all happen without anyone typing a command.
 Beta promotion and the staged production rollout are one dispatch each, and a
 bad rollout is halted the same way.
 
-[**Release runbook**](docs/release-runbook.md) is the whole path, including how
-to rehearse it. [**Store accounts**](docs/store-accounts.md) covers getting the
+[**Release runbook**](docs/release-runbook.md) holds what this app sets for the
+path, and links the shared runbook for the six steps and how to rehearse them.
+[**Store accounts**](docs/store-accounts.md) covers getting the
 accounts and credentials in the first place — Apple, Google, Huawei, Samsung.
 
 ## Documentation

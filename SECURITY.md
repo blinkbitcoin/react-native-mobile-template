@@ -41,9 +41,10 @@ OTA update.
   `src/lib/storage` (unencrypted key-value).
 - **CI and release credentials** live in GitHub Environments and organisation
   secrets, scoped per environment, rotated on team changes. The authoritative
-  list — which variable belongs to which environment, and why the release flow
-  uses a GitHub App rather than a PAT — is in
-  [`docs/release-runbook.md`](docs/release-runbook.md).
+  list — which variable belongs to which environment — is in
+  [`docs/release-runbook.md`](docs/release-runbook.md), and why the release
+  chain dispatches workflows instead of using a GitHub App token is in the
+  shared runbook's [Why the hop is a dispatch](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/release-runbook.md#why-the-hop-is-a-dispatch).
 - If a secret is committed or otherwise exposed, treat it as compromised:
   rotate first, then clean up history.
 
@@ -51,4 +52,4 @@ Dependency exposure is watched by `make check-audit` (audit, lockfile
 provenance), `make check-licenses` and by Dependabot (`.github/dependabot.yml`). Provenance means every
 package comes from the npm registry with an integrity hash; the one exception is
 shared-workflows' own tooling package, at exactly the commit the workflows pin
-([ADR 0024](docs/decisions/0024-shared-tooling-at-the-workflows-pin.md)).
+([ADR 0024](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0024-shared-tooling-at-the-workflows-pin.md)).

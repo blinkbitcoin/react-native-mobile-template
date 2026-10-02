@@ -255,7 +255,7 @@ check-code-scanning: ## CodeQL code scanning locally, with the same config CI us
 # Not in `make check` either: CI's `Checks / Contract` job already runs this
 # checker, from its own checkout of the commit the workflows pin, and a gate
 # `make ci` reaches must be one a CI step runs by the same name. This is the same
-# check from the installed package (the same commit, docs/decisions/0024-...),
+# check from the installed package (the same commit, ADR 0024 in shared-workflows),
 # for a laptop, before pushing.
 check-contract: ## Everything the called shared workflows need from this repository, in one report
 	pnpm exec check-contract

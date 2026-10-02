@@ -5,8 +5,6 @@ extend-exclude = [".workflows/", ".claude/worktrees/", "vendor/bundle/", "pnpm-l
 # add false positives here, one per line, e.g. `ba = "ba"`
 unparseable = "unparseable"
 ba = "ba"
-# Ruby's File::WRONLY (an open flag), quoted in the archived plans under docs/superpowers/
-WRONLY = "WRONLY"
 # Deliberate one-dropped-letter typo, used as the reproduction case and test
 # fixture for verdict.mjs's failOn validation (a mistyped engine class must
 # fail the run, not silently disarm it) - not a real word, never fix it.

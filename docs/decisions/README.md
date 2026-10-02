@@ -4,6 +4,12 @@ Why this template is shaped the way it is. Each record states the forces, the
 decision, what it costs, and the files that embody it — so an ADR can be
 checked against the repository rather than believed.
 
+0001 to 0006 and 0026 are decisions about this app and live here. 0007 to 0025
+are about the CI, release and tooling half, which moved to
+[shared-workflows](https://github.com/blinkbitcoin/shared-workflows/tree/main/docs/decisions)
+under an `app-` prefix with their numbers kept; each index line below links to
+its record there.
+
 | ADR | Decision | Date |
 |---|---|---|
 | [0001](0001-expo-cng-no-native-dirs.md) | Expo CNG: no committed `ios/` and `android/`; native changes are plugins or local modules | 2026-09-05 |
@@ -12,25 +18,25 @@ checked against the repository rather than believed.
 | [0004](0004-lingui-i18n.md) | Lingui macros with catalogs compiled to committed TypeScript, no Metro transformer | 2026-09-05 |
 | [0005](0005-apollo4-client-preset.md) | Apollo Client 4, `TypedDocumentNode` from the codegen client preset, one mock schema | 2026-09-05 |
 | [0006](0006-web-opt-in.md) | Web is a separable target that can be stripped completely at adoption | 2026-09-05 |
-| [0007](0007-mise-not-nix.md) | `mise` pins the toolchain for humans and CI, not Nix | 2026-09-05 |
-| [0008](0008-release-please-and-store-notes.md) | release-please in manifest mode owns versioning; store notes are generated prose | 2026-09-05 |
-| [0009](0009-e2e-launch-by-deep-link.md) | E2E foregrounds the dev client by deep link; the launcher's Bonjour discovery never works | 2026-09-06 |
-| [0010](0010-ios-e2e-release-build.md) | iOS E2E runs a Release build and opens the session's first URL itself; Android keeps 0009 | 2026-09-17 |
-| [0011](0011-release-chain-by-dispatch.md) | release-please starts beta, web and the release PR's CI by `workflow_dispatch`; no GitHub App | 2026-09-18 |
-| [0012](0012-expo-sdk-drift-is-advisory.md) | Expo SDK patch drift is a warning; `minimumReleaseAge` alone decides when a patch comes in | 2026-09-18 |
-| [0013](0013-per-commit-queues.md) | CI on `main` and the internal release queue per commit; only store-touching jobs share the `release` queue | 2026-09-19 |
-| [0014](0014-green-gate-heals-itself.md) | Beta's green gate dispatches the internal build it is missing instead of waiting for a human | 2026-09-19 |
-| [0015](0015-web-on-pages.md) | The web target deploys to a Pages sub-path, with a 404 shell for deep links, tested as the same bytes | 2026-09-19 |
-| [0016](0016-job-names-by-purpose.md) | Workflow and job names say what a step is for, in store vocabulary, never a tool's | 2026-09-19 |
-| [0017](0017-build-tag-reserved-at-push.md) | The `-build.N` tag is created in Prepare at push time, while the commit is still main's tip;<br>GitHub refuses a later tag once a workflow file changed | 2026-09-19 |
-| [0018](0018-store-listing-sync-lane.md) | Additive `sync_metadata`/`pull_metadata` lanes edit the store listing outside a release,<br>gated behind `STORE_METADATA_SYNC_ENABLED`; `release_production` is unchanged | 2026-09-19 |
-| [0019](0019-huawei-appgallery-release-lane.md) | Huawei AppGallery joins at the release tier as an additive `upload_huawei` lane behind<br>`HUAWEI_UPLOADS_ENABLED`; the binary only, the listing stays console-only | 2026-09-20 |
-| [0020](0020-huawei-joins-every-tier.md) | AppGallery runs on the internal, beta and release tiers behind the same toggle;<br>one version slot makes a tier a submit flag, and a busy slot skips rather than fails | 2026-09-21 |
-| [0021](0021-store-notes-drafted-on-the-release-pr.md) | The store notes are drafted once into the release PR body for review, and every tier<br>ships that text; the prompt is `store-notes.prompt.md`; the LLM runs in that one job | 2026-09-22 |
-| [0022](0022-security-scanning-before-release.md) | Scanners write SARIF, one verdict step applies the threshold; placed by what each<br>check reads; deterministic scanners can block, an LLM reviewer only annotates | 2026-09-24 |
-| [0023](0023-cd-verified-before-release.md) | Every shared-workflows call is pinned to one commit SHA that Dependabot moves;<br>a PR runs the CD calls and the store-notes chain against that pin | 2026-09-26 |
-| [0024](0024-shared-tooling-at-the-workflows-pin.md) | The shared tooling package is a git dependency on shared-workflows at the workflows pin;<br>the lockfile gate allows that one source, and a test holds the two commits together | 2026-09-27 |
-| [0025](0025-security-scanners-from-the-shared-tooling.md) | The security scanners, resolver and verdict are shared-workflows' own, run here through the package's<br>`check-security`; this repository keeps only `security-settings.json` and the files it names | 2026-09-30 |
+| [0007](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0007-mise-not-nix.md) | `mise` pins the toolchain for humans and CI, not Nix | 2026-09-05 |
+| [0008](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0008-release-please-and-store-notes.md) | release-please in manifest mode owns versioning; store notes are generated prose | 2026-09-05 |
+| [0009](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0009-e2e-launch-by-deep-link.md) | E2E foregrounds the dev client by deep link; the launcher's Bonjour discovery never works | 2026-09-06 |
+| [0010](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0010-ios-e2e-release-build.md) | iOS E2E runs a Release build and opens the session's first URL itself; Android keeps 0009 | 2026-09-17 |
+| [0011](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0011-release-chain-by-dispatch.md) | release-please starts beta, web and the release PR's CI by `workflow_dispatch`; no GitHub App | 2026-09-18 |
+| [0012](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0012-expo-sdk-drift-is-advisory.md) | Expo SDK patch drift is a warning; `minimumReleaseAge` alone decides when a patch comes in | 2026-09-18 |
+| [0013](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0013-per-commit-queues.md) | CI on `main` and the internal release queue per commit; only store-touching jobs share the `release` queue | 2026-09-19 |
+| [0014](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0014-green-gate-heals-itself.md) | Beta's green gate dispatches the internal build it is missing instead of waiting for a human | 2026-09-19 |
+| [0015](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0015-web-on-pages.md) | The web target deploys to a Pages sub-path, with a 404 shell for deep links, tested as the same bytes | 2026-09-19 |
+| [0016](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0016-job-names-by-purpose.md) | Workflow and job names say what a step is for, in store vocabulary, never a tool's | 2026-09-19 |
+| [0017](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0017-build-tag-reserved-at-push.md) | The `-build.N` tag is created in Prepare at push time, while the commit is still main's tip;<br>GitHub refuses a later tag once a workflow file changed | 2026-09-19 |
+| [0018](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0018-store-listing-sync-lane.md) | Additive `sync_metadata`/`pull_metadata` lanes edit the store listing outside a release,<br>gated behind `STORE_METADATA_SYNC_ENABLED`; `release_production` is unchanged | 2026-09-19 |
+| [0019](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0019-huawei-appgallery-release-lane.md) | Huawei AppGallery joins at the release tier as an additive `upload_huawei` lane behind<br>`HUAWEI_UPLOADS_ENABLED`; the binary only, the listing stays console-only | 2026-09-20 |
+| [0020](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0020-huawei-joins-every-tier.md) | AppGallery runs on the internal, beta and release tiers behind the same toggle;<br>one version slot makes a tier a submit flag, and a busy slot skips rather than fails | 2026-09-21 |
+| [0021](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0021-store-notes-drafted-on-the-release-pr.md) | The store notes are drafted once into the release PR body for review, and every tier<br>ships that text; the prompt is `store-notes.prompt.md`; the LLM runs in that one job | 2026-09-22 |
+| [0022](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0022-security-scanning-before-release.md) | Scanners write SARIF, one verdict step applies the threshold; placed by what each<br>check reads; deterministic scanners can block, an LLM reviewer only annotates | 2026-09-24 |
+| [0023](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0023-cd-verified-before-release.md) | Every shared-workflows call is pinned to one commit SHA that Dependabot moves;<br>a PR runs the CD calls and the store-notes chain against that pin | 2026-09-26 |
+| [0024](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0024-shared-tooling-at-the-workflows-pin.md) | The shared tooling package is a git dependency on shared-workflows at the workflows pin;<br>the lockfile gate allows that one source, and a test holds the two commits together | 2026-09-27 |
+| [0025](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0025-security-scanners-from-the-shared-tooling.md) | The security scanners, resolver and verdict are shared-workflows' own, run here through the package's<br>`check-security`; this repository keeps only `security-settings.json` and the files it names | 2026-09-30 |
 | [0026](0026-cd-pipelines-from-shared-workflows.md) | The CD job graphs are shared-workflows' pipeline workflows; each `cd-*.yml` is one call with the trigger, group,<br>permissions, secrets and inputs |
 
 ## Writing a new one
@@ -43,4 +49,5 @@ date, as in 0002 (ESLint major) and 0004 (compiled catalogs).
 
 Longer guides live next to these: [`../architecture.md`](../architecture.md),
 [`../quality.md`](../quality.md), [`../testing.md`](../testing.md),
-[`../release-runbook.md`](../release-runbook.md).
+[`../release-runbook.md`](../release-runbook.md). New decisions about the
+shared workflows and tooling go to shared-workflows, not here.

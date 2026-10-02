@@ -94,7 +94,6 @@
       ".github/*.md",
       ".github/CODEOWNERS",
       ".github/ISSUE_TEMPLATE/*.yml",
-      "deploy/ota/*",
       "CHANGELOG.md",
       ".claude/skills/README.md"
     ]
@@ -113,8 +112,7 @@
       "scripts/ci-web-gate.test.mjs",
       "scripts/check-unused-web.test.mjs",
       "docs/web-files.txt",
-      "docs/decisions/0006-web-opt-in.md",
-      "docs/decisions/0015-web-on-pages.md"
+      "docs/decisions/0006-web-opt-in.md"
     ],
     "packageScripts": ["web", "build:web", "test:e2e:web"],
     "packageDependencies": ["@expo/metro-runtime", "react-dom", "react-native-web"],
@@ -224,7 +222,7 @@
         "lines": ["^\\s*- Web$"]
       },
       {
-        "$comment": "The ADR itself is deleted above; this is its row in the index.",
+        "$comment": "The ADR files for 0006 are deleted above; this drops their index lines. 0015 lives upstream, but its index line names the web target.",
         "path": "docs/decisions/README.md",
         "optional": true,
         "lines": ["^\\s*\\| \\[0006\\]", "^\\s*\\| \\[0015\\]"]
@@ -259,29 +257,6 @@
         "path": "mocks/README.md",
         "optional": true,
         "replace": [["Jest (and Playwright,\nshould you add it) instead use", "Jest instead uses"]]
-      },
-      {
-        "path": "docs/release-runbook.md",
-        "optional": true,
-        "$comment": "The first two replaces and the chart line are the production web deploy, whose job goes with its marker block in cd-production.yml: the summary and the Huawei note name it, the chart draws it. The rest are the release hop's dispatch of ci-web.yml, whose step goes with its marker block in cd-release.yml: the diagram, the store-notes job's place after it and the hop's own section.",
-        "lines": ["^    prel --> pweb\\[\"Web deploy\"\\]$"],
-        "replace": [
-          ["App Store + Play + web + OTA", "App Store + Play + OTA"],
-          [
-            "the store notes, the OTA publish and the web deploy do not wait for",
-            "the store notes and the OTA publish do not wait for"
-          ],
-          ["│  CD / Beta + CI / Web dispatched", "│  CD / Beta dispatched"],
-          ["job after the beta and web dispatches:", "job after the beta dispatch:"],
-          [
-            "A `release: published` trigger on `cd-beta.yml` or\n`ci-web.yml` would therefore never fire.",
-            "A `release: published` trigger on `cd-beta.yml`\nwould therefore never fire."
-          ],
-          [
-            "vX.Y.Z -f tag=vX.Y.Z`, the same for `ci-web.yml` with `deploy=true`), and",
-            "vX.Y.Z -f tag=vX.Y.Z`), and"
-          ]
-        ]
       },
       {
         "path": "README.md",
@@ -410,8 +385,7 @@
         "^\\s*\\|.*`e2e/web/?`",
         "^\\s*\\|\\s*`playwright-report`",
         "^\\s*\\|\\s*`github-pages`",
-        "^\\s*\\|.*web-files\\.txt",
-        "^- deploys the web export"
+        "^\\s*\\|.*web-files\\.txt"
       ],
       "bullets": ["PLAYWRIGHT_SKIP_EXPORT"],
       "$comment": "PLAYWRIGHT_SKIP_EXPORT is both a bullet (ci.md) and a standalone paragraph (testing.md); bullets run first, so each file loses exactly its own shape.",
