@@ -149,10 +149,6 @@
         "marker": "init:web"
       },
       {
-        "path": "metro.config.js",
-        "marker": "init:web"
-      },
-      {
         "path": ".github/workflows/cd-production.yml",
         "marker": "init:web"
       },
@@ -434,11 +430,15 @@
       },
       {
         "path": "metro.config.js",
-        "$comment": "The resolver fix it names is inside the init:web block.",
+        "$comment": "The shared preset applies the web fixes unless it is told there is no web target.",
         "replace": [
           [
-            "// Expo's default Metro config plus one resolver fix.",
-            "// Expo's default Metro config."
+            "plus the shared worktree and .workflows blocks and the web fixes.",
+            "plus the shared worktree and .workflows blocks."
+          ],
+          [
+            "withSharedMetroConfig(getDefaultConfig(__dirname));",
+            "withSharedMetroConfig(getDefaultConfig(__dirname), { web: false });"
           ]
         ]
       }
@@ -496,7 +496,7 @@
         "optional": true,
         "$comment": "The layout block names the init script and its doc page; both are going away, and a line scrub would take the whole inventory line.",
         "replace": [
-          ["check-*.sh, init, ports, release/", "check-*.sh, ports, release/"],
+          ["check-*.sh, init, ports, e2e/", "check-*.sh, ports, e2e/"],
           [
             "ota, ota-and-crash-reporting, template-usage, decisions/",
             "ota, ota-and-crash-reporting, decisions/"

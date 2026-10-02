@@ -486,7 +486,7 @@ with that release's version beside it. Every one of the twelve files carries at
 least one, and several carry many: `cd-production.yml` alone has twelve.
 
 ```yaml
-uses: blinkbitcoin/shared-workflows/.github/workflows/check.yml@cb865d40f57e179f25a8c6de9a2be25ff025411d # v0.25.0
+uses: blinkbitcoin/shared-workflows/.github/workflows/check.yml@44cd6cb86d78fbe3acea30a7f9b1e5f385276606 # v0.26.1
 ```
 
 A shared-workflows release changes nothing here by itself
@@ -500,8 +500,8 @@ code against this repository before any CD run can:
   and every output a caller reads, against what the called workflow declares
   at the new commit, and that every pin and the tooling package are on that
   one commit.
-- `scripts/release/store-notes.test.mjs` runs the store-notes chain through the
-  shared scripts and our generator, end to end.
+- The shared `store-notes` app suite (`make test-app`, CI's Checks / App suites) runs the
+  store-notes chain through the shared scripts and our generator, end to end.
 
 The same Unit job fails until one more thing moves. The shared tooling package
 (`@blinkbitcoin/app-tooling`, behind `make check-contract`) is a git dependency
@@ -525,12 +525,14 @@ reaches its scripts through `$WORKFLOWS_DIR`. Nothing in this repo references
 `shared-workflows` paths directly. Local tooling that walks the whole tree
 ignores it, in every place the consumer guide's
 [`.workflows/` ignore list](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/consumer-guide.md#workflows-ignore-list-for-consumers)
-names: `biome.json` (`!**/.workflows`), `eslint.config.mjs` (`.workflows/**`),
+names: `biome.json` (`!**/.workflows`, from the shared preset it extends),
+`eslint.config.mjs` (`.workflows/**`, from the shared preset),
 `tsconfig.json` (`exclude`), `knip.json` (every glob is rooted, so none reaches
 it), `typos.toml` (`extend-exclude`), `jest.config.ts`
-(`testPathIgnorePatterns` and `modulePathIgnorePatterns`, anchored to
-`<rootDir>`), `metro.config.js` (`resolver.blockList`), `.semgrepignore`,
-the CodeQL configuration and `.gitignore` (`/.workflows`).
+(`testPathIgnorePatterns`, `modulePathIgnorePatterns` and
+`coveragePathIgnorePatterns`, anchored to `<rootDir>`, from the shared preset),
+`metro.config.js` (`resolver.blockList`, from the shared preset),
+`.semgrepignore`, the CodeQL configuration and `.gitignore` (`/.workflows`).
 `check-ignored-directories` (from `@blinkbitcoin/app-tooling`, run by
 `make check-ci`) asks each of those tools whether it still skips the
 directory, and the contract check reports any of them this repository loses.

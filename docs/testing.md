@@ -83,17 +83,19 @@ commands above.
 
 ### The two Jest projects
 
-`jest.config.ts` defines them:
+`jest.config.ts` calls `createJestConfig` from the shared Expo preset
+(`@blinkbitcoin/app-tooling/expo/jest`) with this app's paths, and the preset
+defines them:
 
-- `app`: the `jest-expo` preset, `src/test/env.ts` and `src/test/setup.ts`, the
-  `@/*` path alias, and module mocks for `expo-secure-store`,
-  `expo-sqlite/kv-store` and `expo-updates`. It ignores `/plugins/`, `/e2e/`,
-  `/scripts/` and `/rules/` (Semgrep's own `<rule-id>.test.tsx` fixture
-  convention, asserted by `semgrep --test rules/`, never a Jest suite).
+- `app`: the `jest-expo` preset, this app's `src/test/env.ts` and
+  `src/test/setup.ts`, the `@/*` path alias, and the preset's stand-ins for
+  `expo-secure-store`, `expo-sqlite/kv-store` and `expo-updates`. It ignores
+  `/plugins/`, `/e2e/`, `/scripts/` and `/rules/` (Semgrep's own
+  `<rule-id>.test.tsx` fixture convention, asserted by `semgrep --test rules/`,
+  never a Jest suite).
 - `plugins`: plain node, matching `plugins/**/*.test.ts`. Config plugins run
   inside the Expo CLI, not in a React Native runtime, so they get no preset.
-  Its only setup file is `src/test/setup.plugins.ts`, which installs the
-  console guard below and nothing else.
+  Its only setup file is the console guard below.
 
 `collectCoverageFrom`, `coverageReporters` and `coverageThreshold` are global,
 which is why they sit at the top level and not in either project.
@@ -116,7 +118,6 @@ would otherwise have that code measured too. The script runs
 | `scripts/init.test.mjs` | The template rename and web-removal script behind `make init` |
 | `scripts/coverage-completeness.test.mjs` | Loads every `scripts/**/*.mjs` module, so one no test imports still counts |
 | `scripts/ci-suite-gates.test.mjs` | `ci.yml`'s `unit`, `e2e` and `badges` jobs evaluated together for each kind of change, and `unit` held to having<br>no gate (see [ci.md](ci.md#skipping-a-suite-the-change-cannot-affect)) |
-| `scripts/release/store-notes.test.mjs` | The store notes the way CD drafts them: cd-release's `environment-variables` through the shared `build-env.sh`,<br>`pr-store-notes.sh` and `gen-store-notes` on a real release PR body with a `gh` shim, a local model and this<br>repository's `store-notes.prompt.md`, then the shared `gen-store-notes.sh` reading the section back |
 
 These run in `make ci` (and in CI's Unit job), **not** in `make check`, which
 is the static gates only. The port guard in `scripts/ports.test.mjs` and the
@@ -144,19 +145,20 @@ is offset by a small thoroughly tested one.
 - Test files themselves are dropped in `collectCoverageFrom`.
 - `coveragePathIgnorePatterns` lists everything with no behaviour to assert.
   Each entry carries a one-line reason in `jest.config.ts`, and an entry
-  without one is not mergeable. Today: ambient `.d.ts` declarations, the Jest
-  setup files and manual mocks under `src/test/`, generated GraphQL, compiled
-  Lingui catalogs, the three pure re-export route barrels under `src/app/`,
-  and the `requireNativeModule` binding under `modules/*/src/`.
+  without one is not mergeable. The preset holds the generic ones (ambient
+  `.d.ts` declarations, other checkouts); this app adds the Jest setup files
+  under `src/test/`, generated GraphQL, compiled Lingui catalogs, the three
+  pure re-export route barrels under `src/app/`, and the `requireNativeModule`
+  binding under `modules/*/src/`.
 
-  It is spread into both Jest projects rather than declared once at the root:
+  The preset puts it into both Jest projects rather than once at the root:
   unlike the other coverage options this one is project-scoped, and a
   root-level copy is silently ignored when `projects` is set.
 
 An exclusion is a claim that the file cannot be meaningfully tested, and "it is
-test infrastructure" is not that claim. `src/test/console.ts` and
-`src/test/render.tsx` are ordinary modules with ordinary logic, so they are
-measured like any other file. Only the three setup files are excluded, and for
+test infrastructure" is not that claim. `src/test/render.tsx` is an ordinary
+module with ordinary logic, so it is measured like any other file. Only the two
+setup files are excluded, and for
 a mechanical reason: every suite runs them, but they run *before* the project's
 instrumentation is installed, so they report 0% however thoroughly they are
 exercised.
@@ -167,9 +169,7 @@ input and maps the missing-module failure, and it is tested. If a branch really
 is unreachable, prefer restructuring the code to delete it over excluding the
 file: that is why the root layout's global error handler moved to
 `src/lib/global-error-handler.ts`, where the "no hook on web" case is a value a
-test passes rather than a branch no test can take, and why `assertSilent()` is
-split out of `installConsoleGuard()` — an `afterEach` cannot observe its own
-failure, so the throwing branch needs a seam a test can call.
+test passes rather than a branch no test can take.
 
 ### Setup scripts, the doctor and the release verifiers
 
@@ -243,11 +243,10 @@ run.
 
 ## Tests are silent
 
-A `console.error` or `console.warn` during a test fails that test. Both Jest
-projects install the guard: the `app` project through `src/test/setup.ts`, the
-`plugins` project through `src/test/setup.plugins.ts`. Both call
-`installConsoleGuard()` from `src/test/console.ts`, which imports nothing so the
-plain-node project can load it without RNTL or MSW.
+A `console.error` or `console.warn` during a test fails that test. The shared
+Jest preset installs the guard in both projects, after this app's own setup
+files, from `@blinkbitcoin/app-tooling/expo/jest/console`; it imports nothing,
+so the plain-node project can load it without RNTL or MSW.
 
 `console.log` is deliberately *not* guarded. Metro, jest-expo and the Expo
 modules log progress through it in ways the app suite does not control.
@@ -261,7 +260,7 @@ logging need.** Fix the test before reaching for an opt-out.
 Two opt-outs, both explicit and both scoped to one test:
 
 ```ts
-import { allowConsole } from '@/test/console';
+import { allowConsole } from '@blinkbitcoin/app-tooling/expo/jest/console';
 
 test('the error link logs the GraphQL error', async () => {
   allowConsole('warn', 'GraphQL error in X'); // string, RegExp, or omitted
@@ -284,11 +283,9 @@ const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
 That is how `src/lib/logger.test.ts` — the suite whose whole job is to check
 what reaches the console — keeps passing.
 
-`src/test/console.test.ts` unit-tests the recorder directly and covers both
-opt-outs against the live guard. Two seams exist because an `afterEach` cannot
-observe its own failure: `createConsoleRecorder(target)` takes the console to
-record, and `assertSilent(recorder)` is the `afterEach` body — the only way to
-reach the branch that throws is to call it from a test.
+The guard's own tests live with it in shared-workflows
+(`packages/app-tooling/console.test.mjs`): they unit-test the recorder and
+cover both opt-outs against the live guard.
 
 ## Writing a component test
 

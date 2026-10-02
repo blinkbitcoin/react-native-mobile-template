@@ -25,9 +25,10 @@ runs the CD logic against the pinned shared code:
 - `check-contract` (from `@blinkbitcoin/app-tooling` at the pin; `make check-contract`, CI's Checks / Contract) — every call
   against the inputs, their types, the secrets and the outputs its workflow declares, and one commit across every pin.
   Until shared-workflows v0.18.0 this was the template's own `scripts/workflow-contract.test.mjs`.
-- `scripts/release/store-notes.test.mjs` — cd-release's `environment-variables`, the shared `build-env.sh`,
-  `pr-store-notes.sh` and `gen-store-notes.sh`, and the `gen-store-notes` program with our prompt, end to end,
-  then read back the way the release lanes read it.
+- The `store-notes` app suite of `@blinkbitcoin/app-tooling` (`make test-app`) — cd-release's
+  `environment-variables`, the shared `build-env.sh`, `pr-store-notes.sh` and `gen-store-notes.sh`, and the
+  `gen-store-notes` program with our prompt, end to end, then read back the way the release lanes read it. It was
+  this repository's `scripts/release/store-notes.test.mjs` until the chain moved upstream.
 
 ## Consequences
 
