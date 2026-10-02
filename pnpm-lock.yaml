@@ -207,8 +207,8 @@ importers:
         specifier: ^2.5.11
         version: 2.5.11
       '@blinkbitcoin/app-tooling':
-        specifier: github:blinkbitcoin/shared-workflows#cb865d40f57e179f25a8c6de9a2be25ff025411d&path:/packages/app-tooling
-        version: https://codeload.github.com/blinkbitcoin/shared-workflows/tar.gz/cb865d40f57e179f25a8c6de9a2be25ff025411d#path:/packages/app-tooling(5dfd4c12eb1b14f8f0fa10ac317d7ad0)
+        specifier: github:blinkbitcoin/shared-workflows#44cd6cb86d78fbe3acea30a7f9b1e5f385276606&path:/packages/app-tooling
+        version: https://codeload.github.com/blinkbitcoin/shared-workflows/tar.gz/44cd6cb86d78fbe3acea30a7f9b1e5f385276606#path:/packages/app-tooling(5dfd4c12eb1b14f8f0fa10ac317d7ad0)
       '@commitlint/cli':
         specifier: ^21.2.2
         version: 21.2.2(@types/node@26.4.1)(conventional-commits-parser@7.1.2)(typescript@6.0.3)
@@ -840,9 +840,9 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@blinkbitcoin/app-tooling@https://codeload.github.com/blinkbitcoin/shared-workflows/tar.gz/cb865d40f57e179f25a8c6de9a2be25ff025411d#path:/packages/app-tooling':
-    resolution: {gitHosted: true, integrity: sha512-fP/nxJG1WL915Dy/22HWVLTA64wBhTkO+85UQI+YC4rBB1NQYRf/pIK3AWmMZsupJ+xshUwSFcRvHGWl7rIh2Q==, path: /packages/app-tooling, tarball: https://codeload.github.com/blinkbitcoin/shared-workflows/tar.gz/cb865d40f57e179f25a8c6de9a2be25ff025411d}
-    version: 0.7.0
+  '@blinkbitcoin/app-tooling@https://codeload.github.com/blinkbitcoin/shared-workflows/tar.gz/44cd6cb86d78fbe3acea30a7f9b1e5f385276606#path:/packages/app-tooling':
+    resolution: {gitHosted: true, integrity: sha512-cU/yi1lvQLcwjyz7v54b9Y7bmkpx6N+S4dM6qwiaSVx+EKJyxQGqj7/rUD0iuDPqeGi2JI+Jz5wdAGI/Zfbrfw==, path: /packages/app-tooling, tarball: https://codeload.github.com/blinkbitcoin/shared-workflows/tar.gz/44cd6cb86d78fbe3acea30a7f9b1e5f385276606}
+    version: 0.8.1
     engines: {node: '>=22.12'}
     hasBin: true
     peerDependencies:
@@ -7933,7 +7933,7 @@ snapshots:
   '@biomejs/cli-win32-x64@2.5.11':
     optional: true
 
-  '@blinkbitcoin/app-tooling@https://codeload.github.com/blinkbitcoin/shared-workflows/tar.gz/cb865d40f57e179f25a8c6de9a2be25ff025411d#path:/packages/app-tooling(5dfd4c12eb1b14f8f0fa10ac317d7ad0)':
+  '@blinkbitcoin/app-tooling@https://codeload.github.com/blinkbitcoin/shared-workflows/tar.gz/44cd6cb86d78fbe3acea30a7f9b1e5f385276606#path:/packages/app-tooling(5dfd4c12eb1b14f8f0fa10ac317d7ad0)':
     optionalDependencies:
       '@biomejs/biome': 2.5.11
       '@commitlint/config-conventional': 21.2.2

@@ -1,16 +1,9 @@
 {
-  "extends": "expo/tsconfig.base",
+  "extends": ["expo/tsconfig.base", "@blinkbitcoin/app-tooling/expo/tsconfig.base.json"],
   "compilerOptions": {
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-    "verbatimModuleSyntax": true,
-    "noFallthroughCasesInSwitch": true,
-    "noImplicitOverride": true,
     "ignoreDeprecations": "6.0",
     "baseUrl": ".",
-    "paths": { "@/*": ["src/*"] },
-    "types": ["jest", "node"]
+    "paths": { "@/*": ["src/*"] }
   },
   "include": [
     "**/*.ts",

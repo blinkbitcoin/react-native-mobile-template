@@ -1,7 +1,7 @@
 // Conventional Commits with a closed scope list. PR titles are linted with
 // the same config in CI because squash merges take the title as the message.
 export default {
-  extends: ['@commitlint/config-conventional'],
+  extends: ['@blinkbitcoin/app-tooling/expo/commitlint'],
   rules: {
     'scope-enum': [
       2,
@@ -24,7 +24,5 @@ export default {
         'web',
       ],
     ],
-    'body-max-line-length': [0],
-    'footer-max-line-length': [0],
   },
 };

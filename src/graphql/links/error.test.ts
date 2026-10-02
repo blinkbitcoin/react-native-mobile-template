@@ -1,6 +1,6 @@
 import { ApolloClient, ApolloLink, execute, gql, InMemoryCache, Observable } from '@apollo/client';
+import { allowConsole } from '@blinkbitcoin/app-tooling/expo/jest/console';
 import { crashReporting } from '@/lib/crash-reporting';
-import { allowConsole } from '@/test/console';
 import { createErrorLink, onUnauthenticated } from './error';
 
 const QUERY = gql`

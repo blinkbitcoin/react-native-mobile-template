@@ -1,4 +1,4 @@
-import raw from '@/test/mocks/expo-sqlite-kv-store';
+import raw from '@blinkbitcoin/app-tooling/expo/jest/mocks/expo-sqlite-kv-store';
 import { storage } from './storage';
 
 test('round-trips JSON values and removes them', async () => {

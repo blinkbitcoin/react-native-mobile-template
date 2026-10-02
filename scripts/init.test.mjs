@@ -508,7 +508,6 @@ const BINARY = /\.(png|jpg|jpeg|gif|ttf|otf|ico|webp|pem|keystore|jks|zip)$/i;
 // Every file with an init:web marker block (web.markedBlocks in the manifest).
 const WEB_MARKED_FILES = [
   'app.config.ts',
-  'metro.config.js',
   '.github/workflows/cd-production.yml',
   '.github/workflows/cd-release.yml',
 ];
@@ -869,6 +868,13 @@ describe('init --yes --no-web', async () => {
     );
   });
 
+  // Metro's web fixes come from the shared preset, which leaves them out when told.
+  test('tells the Metro preset there is no web target', () => {
+    const metro = readFileSync(path.join(root, 'metro.config.js'), 'utf8');
+    assert.match(metro, /withSharedMetroConfig\(getDefaultConfig\(__dirname\), \{ web: false \}\)/);
+    assert.doesNotMatch(metro, /web fixes/);
+  });
+
   // The second app.config.ts block: the Pages sub-path only ci-web.yml sets.
   test('drops the web-only baseUrl from experiments and keeps typedRoutes', () => {
     const config = readFileSync(path.join(root, 'app.config.ts'), 'utf8');
@@ -1057,7 +1063,7 @@ describe('init --yes --no-web', async () => {
     assert.deepEqual(removedLines(REPO, root, 'AGENTS.md'), [
       // Two layout lines are rewritten, not deleted: they name the init script
       // and its doc page, both of which are gone afterwards.
-      'scripts/            check-*.sh, init, ports, release/ (the store-notes test), e2e/',
+      'scripts/            check-*.sh, init, ports, e2e/',
       '.maestro/           Maestro flows (native e2e); e2e/web/ is Playwright',
       '                    release-runbook, ota, ota-and-crash-reporting, template-usage, decisions/',
       '| `make init` | Rename this template into your app, then delete itself (template only; `docs/template-usage.md`) |',
@@ -1104,7 +1110,10 @@ describe('init --yes --web', async () => {
     for (const rel of WEB_MARKED_FILES) {
       assert.doesNotMatch(readFileSync(path.join(root, rel), 'utf8'), /init:web-(start|end)/, rel);
     }
-    assert.match(readFileSync(path.join(root, 'metro.config.js'), 'utf8'), /tslib\.es6\.mjs/);
+    assert.match(
+      readFileSync(path.join(root, 'metro.config.js'), 'utf8'),
+      /withSharedMetroConfig\(getDefaultConfig\(__dirname\)\);/,
+    );
     assert.match(
       readFileSync(path.join(root, '.github/workflows/cd-production.yml'), 'utf8'),
       /^ {2}web:$/m,

@@ -76,8 +76,8 @@ updates:
   # Third-party actions, and the shared workflows every caller is pinned to by
   # commit SHA. A shared-workflows release arrives here as one PR moving all
   # of the pins together, and that PR's CI runs the shared code against this
-  # repository (the contract check, Checks / Contract, and
-  # scripts/release/store-notes.test.mjs) before any CD run uses it. That PR stays
+  # repository (the contract check, Checks / Contract, and the shared
+  # store-notes app suite, Checks / App suites) before any CD run uses it. That PR stays
   # red until `make fix-tooling-pin` moves the shared tooling package, a git
   # dependency on the same commit, to the new pin and pushes onto it.
   - package-ecosystem: github-actions
