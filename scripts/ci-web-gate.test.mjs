@@ -75,7 +75,7 @@ describe('cd-release.yml dispatches the web deploy at a cut release', () => {
 // production release redeployed a project Pages site with its asset paths
 // missing `/<repo>` - the 404s ADR 0015 fixed for the first.
 describe('every web deploy bakes in the same base path', () => {
-  const production = parse(workflow('cd-production.yml')).jobs.web;
+  const production = parse(workflow('cd-production.yml')).jobs.production.with;
   // ci-web.yml deploys only when dispatched with deploy=true; the expression
   // below is its own with that condition taken as met.
   const deployed = unwrap(web.jobs.web.with['base-url']).replace(/^inputs\.deploy && /, '');
@@ -87,9 +87,8 @@ describe('every web deploy bakes in the same base path', () => {
     );
   });
 
-  test("cd-production.yml's web job deploys, and passes that same base path", () => {
-    assert.match(production.uses, /\/build-web\.yml@/);
-    assert.equal(production.with.deploy, true);
-    assert.equal(unwrap(production.with['base-url']), deployed);
+  test('cd-production.yml redeploys the web site through the pipeline, with that same base path', () => {
+    assert.equal(production.web, true);
+    assert.equal(unwrap(production['web-base-url']), deployed);
   });
 });

@@ -45,7 +45,7 @@ One variable, read in three places:
 | Place | Effect when `OTA_ENABLED` is not `true` |
 | --- | --- |
 | `app.config.ts` | `updates: { enabled: false }` — no URL, no certificate, no update check is compiled into the binary |
-| `.github/workflows/release-{internal,beta,production}.yml` | the `ota-*` job is skipped (`if: vars.OTA_ENABLED == 'true'`) |
+| `.github/workflows/cd-{internal,beta,production}.yml` | the callers pass `ota-enabled: vars.OTA_ENABLED == 'true'`; the pipeline skips its OTA job when it is false |
 | `.github/workflows/cd-ota-hotfix.yml` | the publish job is skipped |
 
 The build-time value comes from the `OTA_ENABLED` environment variable. A GitHub
@@ -127,7 +127,7 @@ every caller passes it as `manifest-url` so that after each publish
 the workflow fetches the manifest a client would fetch, with the same `expo-*`
 headers, and fails when it does not come back. A publish that "succeeded" but
 serves nothing is otherwise indistinguishable from a working one until a user
-opens the app. The check defaults to the iOS platform, so the callers pair it
+opens the app. The check defaults to the iOS platform, so the pipelines pair it
 with `runtime-version: ${{ needs.prepare.outputs.fingerprint-ios }}`. `cd-ota-hotfix.yml`
 has no prepare job, so it passes no `runtime-version`: with none given the smoke
 check reads the baseline release's `build-info.json`, whose `fingerprint.ios`

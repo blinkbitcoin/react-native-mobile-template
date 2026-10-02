@@ -794,16 +794,14 @@ describe('init --yes --no-web', async () => {
   // stale, because the reader cannot tell which one to trust. The template has
   // eleven workflow files and `--no-web` deletes `ci-web.yml`, so the generated app
   // has ten: no "eleven" may survive the rewrite, and every count that describes
-  // the ten has to have moved with it. (The `nine` below is not a file count —
-  // it is how many `uses:` are left in `cd-production.yml` once the web job
-  // goes with its marker block.)
+  // the ten has to have moved with it. (`cd-production.yml` is one `uses:`
+  // either way: the web redeploy is an input of the production pipeline.)
   test('rewrites every workflow-file count in docs/ci.md, not just the first', () => {
     const ci = readFileSync(path.join(root, 'docs/ci.md'), 'utf8');
     assert.doesNotMatch(ci, /\b[Tt]welve\b/);
     assert.match(ci, /Eleven files, in two groups: four that run on every change/);
     assert.match(ci, /the eleven files in/);
     assert.match(ci, /Every one of the eleven files carries/);
-    assert.match(ci, /`cd-production\.yml` alone has eleven\./);
   });
 
   test('keeps the E2E suite class in docs/ci.md and drops only the web one', () => {
@@ -862,9 +860,11 @@ describe('init --yes --no-web', async () => {
       assert.doesNotMatch(readFileSync(path.join(root, rel), 'utf8'), /init:web-(start|end)/, rel);
     }
     assert.doesNotMatch(readFileSync(path.join(root, 'app.config.ts'), 'utf8'), /^\s*web: \{/m);
+    // The web redeploy is an input of the production pipeline, with the two
+    // Pages scopes it needs; all three go with their markers.
     assert.doesNotMatch(
       readFileSync(path.join(root, '.github/workflows/cd-production.yml'), 'utf8'),
-      /^ {2}web:$/m,
+      /^ {6}(?:web|web-base-url|pages|id-token):/m,
     );
   });
 
@@ -1114,10 +1114,10 @@ describe('init --yes --web', async () => {
       readFileSync(path.join(root, 'metro.config.js'), 'utf8'),
       /withSharedMetroConfig\(getDefaultConfig\(__dirname\)\);/,
     );
-    assert.match(
-      readFileSync(path.join(root, '.github/workflows/cd-production.yml'), 'utf8'),
-      /^ {2}web:$/m,
-    );
+    const production = readFileSync(path.join(root, '.github/workflows/cd-production.yml'), 'utf8');
+    for (const key of ['web: true', 'web-base-url:', 'pages: write', 'id-token: write']) {
+      assert.ok(production.includes(`      ${key}`), `cd-production.yml lost ${key}`);
+    }
     // Both app.config.ts blocks: the web key, and the baseUrl straight after
     // typedRoutes with no gap where the marker lines were.
     const config = readFileSync(path.join(root, 'app.config.ts'), 'utf8');

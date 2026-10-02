@@ -31,6 +31,7 @@ checked against the repository rather than believed.
 | [0023](0023-cd-verified-before-release.md) | Every shared-workflows call is pinned to one commit SHA that Dependabot moves;<br>a PR runs the CD calls and the store-notes chain against that pin | 2026-09-26 |
 | [0024](0024-shared-tooling-at-the-workflows-pin.md) | The shared tooling package is a git dependency on shared-workflows at the workflows pin;<br>the lockfile gate allows that one source, and a test holds the two commits together | 2026-09-27 |
 | [0025](0025-security-scanners-from-the-shared-tooling.md) | The security scanners, resolver and verdict are shared-workflows' own, run here through the package's<br>`check-security`; this repository keeps only `security-settings.json` and the files it names | 2026-09-30 |
+| [0026](0026-cd-pipelines-from-shared-workflows.md) | The CD job graphs are shared-workflows' pipeline workflows; each `cd-*.yml` is one call with the trigger, group,<br>permissions, secrets and inputs |
 
 ## Writing a new one
 
