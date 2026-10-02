@@ -222,7 +222,7 @@ Connect → Users and permissions → List management → User list (verify the 
 on screen; it has moved before), create a list of testers by Huawei ID, and
 select it on the version's testing page. Testers are invited **per release** and
 install through the AppGallery app, so a new test version needs the list
-selected again. `.claude/skills/store-consoles/` walks it as the
+selected again. the store-release plugin's `store-consoles` skill walks it as the
 `huawei-testers` step.
 
 Things worth knowing before you read a red job:
@@ -621,7 +621,7 @@ Why a variable rather than detecting the secrets: GitHub's `secrets` context is
 not available in a job-level `if:`, so a job cannot ask whether its own
 credentials exist.
 
-`.claude/skills/store-setup/` enforces that order as three checklist steps —
+The store-release plugin's `store-setup` skill enforces that order as three checklist steps —
 `toggle-signing`, then `rehearse-dry-run`, then `toggle-uploads` — so signing
 can never be turned on ahead of its credentials, nor uploads ahead of a
 passing dry run.
@@ -732,7 +732,7 @@ lane still walks end to end
 and package name, which would then disagree with the `IOS_BUNDLE_ID` /
 `ANDROID_PACKAGE` the lanes assert.
 
-`.claude/skills/store-credentials/scripts/push-to-github.sh --plan` prints
+The `store-credentials` skill's `push-to-github.sh --plan` prints
 `unchanged` / `set` / `missing` for every variable above, without writing
 anything.
 
@@ -761,7 +761,7 @@ you want a reviewer between a token and production.
 | `APP_REVIEW_DEMO_USER`, `APP_REVIEW_DEMO_PASSWORD` | same | A working login for the reviewer; omit both if the app needs no account |
 | `APP_REVIEW_NOTES` | same | Free-text notes for the reviewer |
 
-`.claude/skills/store-credentials/scripts/push-to-github.sh --plan` covers
+`push-to-github.sh --plan` covers
 the secrets above too, reporting the same three statuses per name without
 ever printing a value.
 

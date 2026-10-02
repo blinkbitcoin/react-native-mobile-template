@@ -9,6 +9,9 @@
 [extend]
 useDefault = true
 
+# The store setup skills moved to the store-release plugin in shared-workflows, but
+# this repository's history still carries their test fixtures, and the history scan
+# reads every revision, so these allowlists stay for as long as that history does.
 # Skill test suites run offline against fakes, and the fakes have to look real
 # to exercise the validators: a throwaway RSA key in a "decoy-project" service
 # account, a Huawei client secret made of 0123456789abcdef, a basic-auth header

@@ -1,0 +1,14 @@
+{
+  "extraKnownMarketplaces": {
+    "shared-workflows": {
+      "source": {
+        "source": "github",
+        "repo": "blinkbitcoin/shared-workflows",
+        "ref": "v0"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "store-release@shared-workflows": true
+  }
+}
