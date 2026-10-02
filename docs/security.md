@@ -62,6 +62,12 @@ explained with `auditConfig.ignoreGhsas` in `pnpm-workspace.yaml`.
   only the Expo CLI loads it, on a developer machine or CI runner, and it
   verifies only signatures it made itself or certificates the developer
   configured; the shipped app checks update signatures in native code.
+- **`braces@3.0.3`** (GHSA-vfj7-8cjw-p6xm, CVSS 7.5 high) - pulled in through
+  `micromatch@4.0.8`, whose dependents are Metro's file map, Jest, GraphQL
+  codegen, the Lingui CLI and `fast-glob`. No fixed release exists. Unreachable
+  from the app: a deeply nested brace pattern only makes a build, test or
+  codegen process exit, on a developer machine or CI runner, over patterns from
+  the repository's own configuration.
 
 ### Accepted findings in the other scanners
 

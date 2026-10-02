@@ -74,7 +74,10 @@ leaks) is in [store-accounts.md](store-accounts.md). The `store-credentials`
 skill's `push-to-github.sh --plan` prints `unchanged`, `set` or `missing` for
 every name without printing a value. Which job reads each name is in the shared
 [Variables and secrets](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/release-runbook.md#variables-and-secrets).
-These are the ones this app sets itself.
+These are the ones this app sets itself. The `cd-*.yml` callers read them and
+hand them to the shared pipelines as inputs (`store-uploads-enabled`,
+`huawei-uploads-enabled`, `ota-enabled`, `testflight-internal-group` and so on):
+a pipeline reads no repository variable itself.
 
 **Identity, always:** `IOS_BUNDLE_ID`, `IOS_SCHEME`, `ANDROID_PACKAGE`. Every
 release job sets `APP_VARIANT=production`, so the bundle id and package name
