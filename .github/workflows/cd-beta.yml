@@ -155,42 +155,12 @@ jobs:
 
   # ---- Huawei AppGallery (opt-in, additional store) ------------------------
 
-  # This workflow never builds, so there is no Android App Bundle among its
-  # artifacts: it lives on the `vX.Y.Z` release the job above just moved the
-  # assets onto. Stage it back into an artifact the lane job can download, the
-  # same way `cd-production.yml` does for its own first upload.
-  huawei-binary:
-    name: Stage Huawei binary
-    needs: [prepare, github-release]
-    if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && vars.HUAWEI_UPLOADS_ENABLED == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      - name: Download the Android App Bundle from the release tag
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          TAG: ${{ inputs.tag }}
-        run: |
-          set -euo pipefail
-          mkdir -p staged
-          gh release download "$TAG" --pattern '*.aab' --dir staged
-          ls -l staged
-      - uses: actions/upload-artifact@v7
-        with:
-          name: huawei-binary
-          path: staged/*.aab
-          compression-level: 0
-          if-no-files-found: error
-
   promote-huawei:
     name: Promote Huawei
     # `promote-android` too: AppGallery should not receive a beta Play refused.
     # Nothing downstream waits for this job - the store notes, the OTA publish
     # and the release itself are already done or independent of it.
-    needs: [prepare, promote-android, huawei-binary]
+    needs: [prepare, promote-android]
     if: ${{ vars.STORE_UPLOADS_ENABLED == 'true' && vars.HUAWEI_UPLOADS_ENABLED == 'true' }}
     uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store.yml@44cd6cb86d78fbe3acea30a7f9b1e5f385276606 # v0.26.1
     permissions:
@@ -203,10 +173,13 @@ jobs:
       # 5,000 testers.
       lane: promote_huawei_beta
       environment: beta
-      # Every artifact of the run, not just build-info: the lane needs the
-      # build info and the store notes from build-info and the bundle from
-      # huawei-binary, and both land in the same assets directory.
-      artifacts: "*"
+      # This workflow never builds, so there is no Android App Bundle among
+      # its artifacts: the lane takes the build info and the store notes from
+      # build-info, and the bundle from the `vX.Y.Z` release the job above just
+      # moved the assets onto. Both land in the same assets directory.
+      artifacts: build-info
+      release-tag: ${{ inputs.tag }}
+      release-assets: '*.aab'
       environment-variables: '{"APP_VARIANT":"production", "HUAWEI_APP_ID": "${{ vars.HUAWEI_APP_ID }}", "HUAWEI_UPLOADS_ENABLED": "${{ vars.HUAWEI_UPLOADS_ENABLED }}", "HUAWEI_SUBMIT_DELAY_SECONDS": "${{ vars.HUAWEI_SUBMIT_DELAY_SECONDS }}", "HUAWEI_FEEDBACK_EMAIL": "${{ vars.HUAWEI_FEEDBACK_EMAIL }}", "HUAWEI_TEST_DAYS": "${{ vars.HUAWEI_TEST_DAYS }}"}'
       version: ${{ needs.prepare.outputs.version }}
       build-number: ${{ needs.prepare.outputs.build-number }}
@@ -221,39 +194,13 @@ jobs:
       HUAWEI_CLIENT_SECRET: ${{ secrets.HUAWEI_CLIENT_SECRET }}
 
   # The store notes are what beta testers and, later, App Review actually read,
-  # and until now nothing showed the operator what the pipeline would ship. The
-  # runbook's override flow ("edit the `## Store notes` section of the release
-  # body") also expected a section that was never written.
-  #
-  # The section is re-uploaded under a name that is deliberately *not* one of
-  # publish-github-release's fixed asset globs: `append` uploads whatever of that set is
-  # in the download directory and regenerates SHA256SUMS over it, so handing it
-  # `build-info` here would replace the checksums of the promoted binaries
-  # with the checksums of four metadata files.
-  store-notes-section:
-    name: Stage store notes
-    needs: [prepare, github-release]
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          name: build-info
-          path: meta
-      - name: Rename the notes so it is not one of the release's fixed assets
-        run: |
-          set -euo pipefail
-          mkdir -p section
-          cp meta/store-notes.txt section/store-notes-section.md
-      - uses: actions/upload-artifact@v7
-        with:
-          name: release-store-notes
-          path: section/store-notes-section.md
-          if-no-files-found: error
-
+  # and the runbook's override flow ("edit the `## Store notes` section of the
+  # release body") expects a section in the release. `append` changes only the
+  # body, so it takes the notes straight from build-info's store-notes.txt: it
+  # uploads nothing and leaves the promoted binaries' SHA256SUMS alone.
   store-notes:
     name: Attach store notes
-    needs: [prepare, store-notes-section]
+    needs: [prepare, github-release]
     uses: blinkbitcoin/shared-workflows/.github/workflows/publish-github-release.yml@44cd6cb86d78fbe3acea30a7f9b1e5f385276606 # v0.26.1
     permissions:
       contents: write
@@ -262,8 +209,8 @@ jobs:
       mode: append
       release-tag: ${{ inputs.tag }}
       append-title: Store notes
-      release-notes-artifact: release-store-notes
-      release-notes-file: store-notes-section.md
+      release-notes-artifact: build-info
+      release-notes-file: store-notes.txt
 
   ota-beta:
     name: OTA

@@ -135,7 +135,7 @@ def huawei_upload!(aab: nil, submit: {})
   build_info # asserts the artifact belongs to this version/build number
   bundle = aab || File.join(artifact_dir('android'), 'app-release.aab')
   unless File.exist?(bundle) || ENV['DRY_RUN'] == '1'
-    UI.user_error!("No Android App Bundle at #{bundle} - the huawei-binary job stages it from the release tag")
+    UI.user_error!("No Android App Bundle at #{bundle} - publish-store downloads it from the release tag (release-assets)")
   end
 
   # Configuration is checked before the pre-flight, so a typo in the delay or

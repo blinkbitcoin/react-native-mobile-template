@@ -195,8 +195,8 @@ them are in [store-accounts.md](store-accounts.md#huawei-appgallery).
 | Tier | Workflow | Jobs | Lane | What AppGallery does | Review |
 | --- | --- | --- | --- | --- | --- |
 | internal | `cd-internal.yml` | `Upload Huawei` | `upload_huawei_internal` | Test version, manual review<br>skipped, up to 100 testers | Automated,<br>hours |
-| beta | `cd-beta.yml` | `Stage Huawei binary`,<br>`Promote Huawei` | `promote_huawei_beta` | Test version, open testing<br>with review, up to 5,000 testers | Manual,<br>1 to 3 days |
-| release | `cd-production.yml` | `Stage Huawei binary`,<br>`Release Huawei` | `upload_huawei` | The formal release, testing<br>flag off | Manual,<br>days |
+| beta | `cd-beta.yml` | `Promote Huawei` | `promote_huawei_beta` | Test version, open testing<br>with review, up to 5,000 testers | Manual,<br>1 to 3 days |
+| release | `cd-production.yml` | `Release Huawei` | `upload_huawei` | The formal release, testing<br>flag off | Manual,<br>days |
 
 **One version slot.** AppGallery has no tracks. A tier is a flavour of the
 submit, not a destination: the same version record is submitted with the testing
@@ -204,7 +204,7 @@ flag on and manual review skipped (internal), with the testing flag on and
 review left on (beta), or with the testing flag off (release). There is no
 promote endpoint either, so each tier **re-uploads** the bundle rather than
 moving one AppGallery already holds — the beta and release tiers stage it back
-off the release tag with `Stage Huawei binary`, because neither workflow builds.
+off the release tag (`release-assets: '*.aab'`), because neither workflow builds.
 "No bundle on the tag" therefore means the beta promote never ran for that tag:
 re-run [step 3](#3-beta-promotes-itself) and dispatch again.
 
