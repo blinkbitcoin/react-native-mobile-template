@@ -711,7 +711,7 @@ lane still walks end to end
 | `TESTFLIGHT_EXTERNAL_GROUP` | `cd-beta` iOS promote | External group name; must already exist and be approved |
 | `PLAY_UPDATE_PRIORITY` | Android upload / production | `0`–`5`, Play in-app update priority |
 | `ANDROID_UPLOAD_CERT_SHA256` | `verify-android.sh`, read from the environment (via `environment-variables`); `--cert-sha256` is the manual override | `keytool -list -v -keystore upload.keystore`, the SHA-256 line.<br>**Leave it unset and the signature check reports `skip`** —<br>the gate that exists to catch a wrong signing identity stops checking |
-| `OTA_ENABLED` | `app.config.ts` at build time (via `environment-variables`) and the `ota-enabled` input of the pipelines, which gates every OTA job | `true` to turn OTA on; see [ota.md](ota.md) |
+| `OTA_ENABLED` | `app.config.ts` at build time (via `environment-variables`) and<br>the pipelines' `ota-enabled` input, which gates every OTA job | `true` to turn OTA on; see [ota.md](ota.md) |
 | `EXPO_UPDATES_URL` | `app.config.ts` at build time (via `environment-variables`) and the OTA manifest smoke check | Public origin of the update server |
 | `OTA_CLI_VERSION` | `publish-ota` | Exact `eoas` version; the publish script refuses to run unpinned |
 | `STORE_NOTES_INCLUDE_CHANGELOG` | `gen-store-notes` in internal's `build-prepare` and in `Store notes`<br>(via `environment-variables`) | `true` appends the changelog where notes are generated |
