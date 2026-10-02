@@ -113,7 +113,8 @@ Then check what you asserted:
 make check-prebuild
 ```
 
-`scripts/check-prebuild.sh` never touches your `./ios` or `./android`. It
+`check-prebuild` (the shared tooling's program; this repository's assertions are the
+`prebuild` section of `app-tooling.json`) never touches your `./ios` or `./android`. It
 copies the repo (minus `node_modules`, `ios`, `android` and `.git`) into a temp
 directory twice and prebuilds both platforms with
 `expo prebuild --platform all --clean --no-install`:
@@ -145,8 +146,8 @@ Maestro flow is what exercises them.
 ## Capability recipes
 
 None of these are installed. Each is the supported path when you need the
-capability, and each needs a new dev client build plus an entry in
-`scripts/check-prebuild.sh` if it changes the native projects. Check the
+capability, and each needs a new dev client build plus an assertion in
+the `prebuild` section of `app-tooling.json` if it changes the native projects. Check the
 current API against the package's own documentation before wiring it: the
 notes below are about which package to reach for, not about its call
 signatures.
@@ -176,8 +177,8 @@ safe-area-context.
 
 1. Config plugin, local module, or build properties. Pick deliberately.
 2. Write the mod or the module, with a test.
-3. Extend `scripts/check-prebuild.sh` with an assertion on the generated
-   output.
+3. Add an assertion on the generated output to the `prebuild` section of
+   `app-tooling.json`.
 4. `make check-prebuild`, then `make dev-ios` or `make dev-android` for a real dev
    client.
 5. Add or extend a Maestro flow if it is user visible.

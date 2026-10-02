@@ -30,5 +30,161 @@
       "gen-graphql": "GraphQL is what it generates, the typed documents, not the tool that does it",
       "check-expo-health": "Expo is the SDK whose health it checks, the same stem shared-workflows' expo-health gate uses"
     }
+  },
+  "ports": {
+    "retired": [8089, 4000],
+    "allow": {
+      ".mise.toml": "the base default, pinned by scripts/port-pins.test.mjs",
+      ".env.development": "the dotenv default, pinned by scripts/port-pins.test.mjs",
+      ".env.example": "the dotenv default, pinned by scripts/port-pins.test.mjs",
+      "docs/local-dev.md": "the Ports table, the one place a reader sees the numbers, pinned by scripts/port-pins.test.mjs",
+      "docs/release-runbook.md": "explains that same built-in React Native constant",
+      "docs/decisions/": "ADRs record what was true when they were accepted",
+      "docs/superpowers/": "archived plans and specs, not live documentation",
+      "CHANGELOG.md": "generated release history",
+      ".github/workflows/ci.yml": "the iOS E2E environment-variables URL, which must be a literal (the build job precedes the mock API job, on another runner) and is pinned by scripts/port-pins.test.mjs",
+      "scripts/port-pins.test.mjs": "names the numbers it pins"
+    }
+  },
+  "prebuild": {
+    "exclude": ["vendor"],
+    "scenarios": {
+      "default": {
+        "label": "OTA off",
+        "env": {
+          "APP_VARIANT": "production",
+          "APP_VERSION": "1.2.3",
+          "APP_BUILD_NUMBER": "42"
+        },
+        "assert": [
+          {
+            "file": "ios/*/Info.plist",
+            "contains": "<key>AppBuildStamp</key>",
+            "message": "iOS Info.plist lacks AppBuildStamp"
+          },
+          {
+            "file": "ios/*/Info.plist",
+            "contains": "ITSAppUsesNonExemptEncryption",
+            "message": "iOS Info.plist lacks ITSAppUsesNonExemptEncryption"
+          },
+          {
+            "file": "android/app/src/main/AndroidManifest.xml",
+            "contains": "android:name=\"AppBuildStamp\"",
+            "message": "AndroidManifest lacks AppBuildStamp"
+          },
+          {
+            "file": "android/app/build.gradle",
+            "contains": "ANDROID_UPLOAD_STORE_FILE",
+            "message": "build.gradle lacks release signing config"
+          },
+          {
+            "file": "android/app/build.gradle",
+            "contains": "signingConfig signingConfigs.release",
+            "message": "release buildType is not pointed at the release signingConfig"
+          },
+          {
+            "file": "android/app/build.gradle",
+            "contains": "ANDROID_UPLOAD_* gradle properties not set: release build will be signed with the DEBUG keystore",
+            "message": "build.gradle lacks the debug-keystore fallback warning"
+          },
+          {
+            "file": "android/gradle.properties",
+            "pattern": "(?:^|\\n)reactNativeArchitectures=armeabi-v7a,arm64-v8a",
+            "message": "gradle.properties lacks arm-only ABIs"
+          },
+          {
+            "file": "android/gradle.properties",
+            "pattern": "(?:^|\\n)org\\.gradle\\.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m",
+            "message": "gradle.properties lacks the enlarged Gradle JVM args"
+          },
+          {
+            "file": "android/app/build.gradle",
+            "contains": "versionCode 42",
+            "message": "versionCode not injected"
+          },
+          {
+            "file": "ios/*/Info.plist",
+            "contains": "<string>1.2.3</string>",
+            "message": "CFBundleShortVersionString not injected"
+          },
+          {
+            "file": "ios/*/Info.plist",
+            "contains": "UIAppFonts",
+            "message": "iOS Info.plist lacks UIAppFonts (bundled font not registered)"
+          },
+          {
+            "exists": "ios/**/SplashScreenBackground.colorset",
+            "message": "iOS project lacks SplashScreenBackground.colorset (expo-splash-screen did not run)"
+          },
+          {
+            "file": "ios/*/Supporting/Expo.plist",
+            "pattern": "<key>EXUpdatesEnabled</key>\\s*<false/>",
+            "message": "Expo.plist does not disable EXUpdatesEnabled with OTA off"
+          },
+          {
+            "file": "ios/*/Supporting/Expo.plist",
+            "absent": "EXUpdatesCodeSigningCertificate",
+            "message": "Expo.plist carries a code-signing certificate with OTA off"
+          },
+          {
+            "file": "android/app/src/main/AndroidManifest.xml",
+            "contains": "expo.modules.updates.ENABLED\" android:value=\"false\"",
+            "message": "AndroidManifest does not disable expo.modules.updates.ENABLED with OTA off"
+          },
+          {
+            "file": "android/app/src/main/AndroidManifest.xml",
+            "absent": "expo.modules.updates.CODE_SIGNING_CERTIFICATE",
+            "message": "AndroidManifest carries a code-signing certificate with OTA off"
+          }
+        ]
+      },
+      "ota": {
+        "label": "OTA on",
+        "env": {
+          "APP_VARIANT": "production",
+          "APP_VERSION": "1.2.3",
+          "APP_BUILD_NUMBER": "42",
+          "OTA_ENABLED": "true",
+          "EXPO_UPDATES_URL": "https://updates.example.com/manifest"
+        },
+        "assert": [
+          {
+            "file": "ios/*/Supporting/Expo.plist",
+            "pattern": "<key>EXUpdatesEnabled</key>\\s*<true/>",
+            "message": "Expo.plist does not enable EXUpdatesEnabled with OTA on"
+          },
+          {
+            "file": "ios/*/Supporting/Expo.plist",
+            "contains": "https://updates.example.com/manifest",
+            "message": "Expo.plist lacks EXUpdatesURL with OTA on"
+          },
+          {
+            "file": "ios/*/Supporting/Expo.plist",
+            "contains": "EXUpdatesCodeSigningCertificate",
+            "message": "Expo.plist lacks EXUpdatesCodeSigningCertificate with OTA on"
+          },
+          {
+            "file": "ios/*/Supporting/Expo.plist",
+            "contains": "BEGIN CERTIFICATE",
+            "message": "Expo.plist code-signing certificate is not embedded"
+          },
+          {
+            "file": "ios/*/Supporting/Expo.plist",
+            "contains": "EXUpdatesCodeSigningMetadata",
+            "message": "Expo.plist lacks EXUpdatesCodeSigningMetadata with OTA on"
+          },
+          {
+            "file": "android/app/src/main/AndroidManifest.xml",
+            "contains": "https://updates.example.com/manifest",
+            "message": "AndroidManifest lacks the update URL with OTA on"
+          },
+          {
+            "file": "android/app/src/main/AndroidManifest.xml",
+            "contains": "expo.modules.updates.CODE_SIGNING_CERTIFICATE",
+            "message": "AndroidManifest lacks the code-signing certificate meta-data with OTA on"
+          }
+        ]
+      }
+    }
   }
 }

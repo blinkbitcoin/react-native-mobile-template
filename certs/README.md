@@ -13,7 +13,7 @@ committed.**
 
 The committed certificate was generated for the template so that an
 `OTA_ENABLED=true` prebuild works out of the box (see
-`scripts/check-prebuild.sh`). **Its private key was generated and then
+the `prebuild` section of `app-tooling.json`). **Its private key was generated and then
 immediately discarded**, so this certificate cannot sign anything. It is a
 placeholder: it proves the wiring, not the trust chain.
 

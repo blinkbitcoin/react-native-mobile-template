@@ -2,7 +2,7 @@ import { parseEnv } from './env';
 
 // 9999 on purpose: a port the rewrite has to carry across (otherwise a
 // `replace(/:\/\/localhost.*/, '://10.0.2.2')` regression would pass here), but
-// not one scripts/ports.test.mjs guards, since nothing binds it.
+// not one scripts/port-pins.test.mjs guards, since nothing binds it.
 
 test('accepts a valid public env', () => {
   const env = parseEnv({

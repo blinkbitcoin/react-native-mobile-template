@@ -201,7 +201,7 @@ change to a caller workflow or a Dependabot pin bump runs everything.
 `ci.yml` does not read it: there is no change the unit suite cannot affect
 here. `Unit` is not only Jest. It runs `test:scripts`, whose repository-wide
 guards read every tracked file, documentation included:
-`scripts/ports.test.mjs` rejects a bare port literal anywhere. The classifier's
+`scripts/port-pins.test.mjs` (the shared `check-ports`) rejects a bare port literal anywhere. The classifier's
 unit list ignores `.maestro/`, `e2e/`, `playwright.config.*`, `fastlane/`, the
 Gemfile and docs, so gating on it let a change to those alone land without the
 guards, to fail whichever PR ran `Unit` next. The cost is the minute or two
@@ -338,7 +338,7 @@ rnmt://expo-development-client/?url=http%3A%2F%2Flocalhost%3A$METRO_PORT  # iOS
 rnmt://expo-development-client/?url=http%3A%2F%2F10.0.2.2%3A$METRO_PORT   # Android (10.0.2.2 is the host from the emulator)
 ```
 
-`METRO_PORT` is `APP_PORT_BASE` + 1 (`scripts/ports.mjs`). Its default is also
+`METRO_PORT` is `APP_PORT_BASE` + 1 (`pnpm exec ports`). Its default is also
 the workflows repo's `WORKFLOWS_METRO_PORT` default, so CI and a default local run
 reach the app on the same port.
 
@@ -364,30 +364,22 @@ Consequences encoded in this repo:
 ## Mock-API hooks
 
 The flows talk to the local GraphQL mock API (`pnpm dev:api`, on
-`APP_PORT_BASE` + 2). `ci.yml` wires the workflows' generic E2E hooks to two
-small scripts in this repo:
+`APP_PORT_BASE` + 2). `ci.yml` hands the workflows' E2E job the one command that
+starts it:
 
 ```yaml
-e2e-setup-script: scripts/e2e/ci-mock-api-up.sh
-e2e-teardown-script: scripts/e2e/ci-mock-api-down.sh
+mock-api-command: pnpm dev:api
 ```
 
-- **Setup** starts `pnpm dev:api` with `nohup`, writes its pid to
-  `$WORKFLOWS_OUT/mock-api.pid` (falling back to `/tmp` outside CI), and blocks on
-  `scripts/e2e/wait-for-mock-api.sh` until the server answers a real GraphQL
-  query. A missing setup script is fatal — the job fails before the suite runs.
-- **Teardown** kills that pid if it is still alive and always exits `0`. It runs
-  with `if: always()`, so it must never turn a diagnosable failure into a
-  confusing one.
+The shared E2E scripts do the rest: start it in the background with its pid and
+log under `$WORKFLOWS_OUT`, wait for it on the mock-API port until something
+answers, and stop it after the suite, pass or fail, without ever turning a
+diagnosable failure into a confusing one. This repository carries none of that.
 
-Setup also runs `adb reverse` for the derived mock-API port when a device is
-attached. The workflows repo reverses `WORKFLOWS_MOCK_API_PORT`, whose default (8082)
-is the mock API under the default `APP_PORT_BASE` only; until it derives its
-ports from the same base, the hook covers any other base.
-
-The paths are consumer-relative file paths run with `bash`, not `package.json`
-script names. The workflows repo's own `self-smoke.yml` points at these exact
-paths, so renaming them breaks that smoke test.
+The command is run through `bash -c`, so it can be any shell command. The port the
+shared scripts wait on and reverse onto an Android device is the workflow's
+`mock-api-port` input, whose default (8082) is the mock API under the default
+`APP_PORT_BASE` only.
 
 ## Forensics
 

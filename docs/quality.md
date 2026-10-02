@@ -356,7 +356,7 @@ binary. Naming the script for the gate rather than the tool is the family's
 rule anyway (`check:<stem>` for a gate, `gen:<stem>` for a generator).
 
 The script exports the ports before it calls knip:
-`eval "$(node scripts/ports.mjs --sh)" && knip`. knip's Playwright plugin
+`eval "$(pnpm exec ports --sh)" && knip`. knip's Playwright plugin
 loads `playwright.config.ts` to find the specs under `e2e/web/`, and that
 config throws when `WEB_PREVIEW_PORT` is unset — deliberately, so a real run
 never guesses a port. knip only logs "Error loading playwright.config.ts" and

@@ -1,6 +1,6 @@
 // scripts/e2e/maestro.sh: this app's half of a local Maestro run. The launch and
 // the suite are the shared tooling's scripts, tested in shared-workflows; this
-// file tests what the wrapper adds - the ports from scripts/ports.mjs, the wait
+// file tests what the wrapper adds - the ports from the package's `ports`, the wait
 // for the mock API, the output directory and the order of the steps. Each case
 // runs the real script in a throwaway checkout whose wait script and package
 // scripts are fakes that record their arguments and the environment they saw.
@@ -36,9 +36,7 @@ afterEach(() => {
  */
 const fake = (name) => `#!/usr/bin/env bash
 key="FAIL_$(printf '%s' "${name}" | tr 'a-z-' 'A-Z_')"
-printf '%s|%s|%s|%s|%s\\n' "${name}" "$*" "\${WORKFLOWS_METRO_PORT:-}" "\${WORKFLOWS_MOCK_API_PORT:-}" "\${WORKFLOWS_OUT:-}" >> "$(dirname "$0")/${
-  name === 'wait-for-mock-api' ? '../..' : '../../../..'
-}/calls.log"
+printf '%s|%s|%s|%s|%s\\n' "${name}" "$*" "\${WORKFLOWS_METRO_PORT:-}" "\${WORKFLOWS_MOCK_API_PORT:-}" "\${WORKFLOWS_OUT:-}" >> "$(dirname "$0")/../../../../calls.log"
 exit "\${!key:-0}"
 `;
 
@@ -52,9 +50,17 @@ const checkout = () => {
     path.join(REPOSITORY, 'scripts/e2e/maestro.sh'),
     path.join(root, 'scripts/e2e/maestro.sh'),
   );
-  copyFileSync(path.join(REPOSITORY, 'scripts/ports.mjs'), path.join(root, 'scripts/ports.mjs'));
+  // `pnpm exec ports` is the package's program; the checkout has no pnpm, so a
+  // shim runs the real one from this repository's own node_modules.
+  const shim = path.join(root, 'bin');
+  mkdirSync(shim);
+  writeFileSync(
+    path.join(shim, 'pnpm'),
+    `#!/usr/bin/env bash\n[ "$1 $2" = "exec ports" ] || exit 64\nshift 2\nexec node "${path.join(REPOSITORY, 'node_modules/@blinkbitcoin/app-tooling/bin/ports.mjs')}" "$@"\n`,
+  );
+  chmodSync(path.join(shim, 'pnpm'), 0o755);
   const steps = {
-    'scripts/e2e/wait-for-mock-api.sh': 'wait-for-mock-api',
+    [`${PACKAGE_E2E}/wait-for-http.sh`]: 'wait-for-http',
     [`${PACKAGE_E2E}/ios-simulator.sh`]: 'ios-simulator',
     [`${PACKAGE_E2E}/app-launch.sh`]: 'app-launch',
     [`${PACKAGE_E2E}/ios-maestro.sh`]: 'ios-maestro',
@@ -81,7 +87,12 @@ const run = (root, args, env = {}) => {
   const result = spawnSync('bash', [path.join(root, 'scripts/e2e/maestro.sh'), ...args], {
     cwd: tmpdir(),
     encoding: 'utf8',
-    env: { ...base, APP_PORT_BASE: '9100', ...env },
+    env: {
+      ...base,
+      PATH: `${path.join(root, 'bin')}${path.delimiter}${base.PATH}`,
+      APP_PORT_BASE: '9100',
+      ...env,
+    },
   });
   let calls = [];
   try {
@@ -98,7 +109,7 @@ test('iOS waits for the mock API, picks the simulator, launches, then runs the s
   assert.equal(status, 0, stderr);
   const out = path.join(root, '.maestro/output');
   assert.deepEqual(calls, [
-    ['wait-for-mock-api', '', '9101', '9102', out],
+    ['wait-for-http', 'http://localhost:9102/', '9101', '9102', out],
     ['ios-simulator', 'pick', '9101', '9102', out],
     ['app-launch', 'ios', '9101', '9102', out],
     ['ios-maestro', '--include-tags smoke', '9101', '9102', out],
@@ -111,7 +122,7 @@ test('Android waits for the mock API, then hands the rest to the Android suite r
   assert.equal(status, 0, stderr);
   const out = path.join(root, '.maestro/output');
   assert.deepEqual(calls, [
-    ['wait-for-mock-api', '', '9101', '9102', out],
+    ['wait-for-http', 'http://localhost:9102/', '9101', '9102', out],
     ['android-maestro', '', '9101', '9102', out],
   ]);
 });
@@ -137,18 +148,18 @@ test("the suite runner's status is the script's", () => {
 });
 
 test('a mock API that never answers stops the run before anything is launched', () => {
-  const { status, calls } = run(checkout(), ['ios'], { FAIL_WAIT_FOR_MOCK_API: '1' });
+  const { status, calls } = run(checkout(), ['ios'], { FAIL_WAIT_FOR_HTTP: '1' });
   assert.equal(status, 1);
   assert.deepEqual(
     calls.map(([name]) => name),
-    ['wait-for-mock-api'],
+    ['wait-for-http'],
   );
 });
 
 test('a failed pick or launch stops the iOS run before the suite', () => {
   for (const [failing, ran] of [
-    ['FAIL_IOS_SIMULATOR', ['wait-for-mock-api', 'ios-simulator']],
-    ['FAIL_APP_LAUNCH', ['wait-for-mock-api', 'ios-simulator', 'app-launch']],
+    ['FAIL_IOS_SIMULATOR', ['wait-for-http', 'ios-simulator']],
+    ['FAIL_APP_LAUNCH', ['wait-for-http', 'ios-simulator', 'app-launch']],
   ]) {
     const { status, calls } = run(checkout(), ['ios'], { [failing]: '1' });
     assert.equal(status, 1, failing);

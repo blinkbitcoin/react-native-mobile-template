@@ -85,7 +85,7 @@ Two constraints from this repo:
   `make check-security-bundle` fails the build if a non-public key name shows up
   in the exported bundle.
 - Adding a native SDK means a config plugin entry in `app.config.ts`, a new
-  assertion in `scripts/check-prebuild.sh`, and a fresh dev client. See
+  assertion in the `prebuild` section of `app-tooling.json`, and a fresh dev client. See
   [native-extensions.md](native-extensions.md).
 
 ## Recipe: Sentry
@@ -106,7 +106,7 @@ current API against the package's own documentation.
    `src/config/constants.ts`, plus `Updates.updateId` and `Updates.channel`
    from `src/services/updates.ts` when OTA is on. Without the update id, a
    crash from an OTA build is attributed to the store build's JavaScript.
-6. Add an assertion to `scripts/check-prebuild.sh` for whatever the plugin
+6. Add an assertion to the `prebuild` section of `app-tooling.json` for whatever the plugin
    writes into the native projects.
 
 ### Symbols
@@ -159,7 +159,7 @@ you rely on symbolicated JavaScript frames.
    `crashlytics().setUserId`.
 5. Android symbol upload runs through the Firebase Gradle plugin, which is
    another prebuild-visible change to assert in
-   `scripts/check-prebuild.sh`.
+   the `prebuild` section of `app-tooling.json`.
 
 Crashlytics is the right choice when the app is already in the Firebase
 ecosystem. Otherwise the static-frameworks tax buys nothing.

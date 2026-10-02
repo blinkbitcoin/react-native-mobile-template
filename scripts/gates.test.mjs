@@ -209,8 +209,8 @@ describe('the shared tooling guards run where CI runs them', () => {
     assert.ok(settings.docs.architecture.includes('Makefile'));
   });
 
-  test('test:scripts starts with the sibling-test guard, whose rules are in app-tooling.json', () => {
-    assert.match(pkg.scripts['test:scripts'], /^check-test-siblings && node --test /);
+  test("test:scripts is the package's runner, which starts with the sibling-test guard whose rules are in app-tooling.json", () => {
+    assert.equal(pkg.scripts['test:scripts'], 'test-scripts');
     const settings = JSON.parse(read('app-tooling.json'));
     assert.deepEqual(settings.testSiblings.mirror, { 'src/app/': 'src/__tests__/app/' });
   });
