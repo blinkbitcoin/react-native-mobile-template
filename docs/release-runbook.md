@@ -104,7 +104,9 @@ is unset). `E2E_IOS=true` runs iOS E2E on every push to `main`.
 **Store groups and tuning:** `TESTFLIGHT_INTERNAL_GROUP`,
 `TESTFLIGHT_EXTERNAL_GROUP`, `PLAY_UPDATE_PRIORITY`, `BUILD_NUMBER_OFFSET`
 (raise only), `XCODE_VERSION`, and `ANDROID_UPLOAD_CERT_SHA256` (unset, and the
-signature check reports `skip`).
+signature check reports `skip`). `PLAY_RELEASE_STATUS` is `draft` for the first
+Play upload and unset (meaning `completed`) after it: Play refuses a completed
+release on an app that has never been published.
 
 **Secrets**, scoped to the `internal`, `beta` and `production` environments:
 `MATCH_PASSWORD`, `MATCH_GIT_URL`, `MATCH_GIT_BASIC_AUTHORIZATION`,
