@@ -41,7 +41,7 @@ jobs:
   # concurrency group above, the permissions, and the secrets.
   internal:
     name: Internal
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-internal.yml@a84cd348a9f7e1cb9233ae0a9b3dfbd3e03736ec # v0.27.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-internal.yml@c731cdcb138fad6769aee5c4e79596ce699c039b # v0.28.0
     permissions:
       # `contents: write` for the reserved build tag and the pre-release;
       # `actions: read` for the green gate's `gh run list`.
@@ -68,6 +68,9 @@ jobs:
       macos-runner: ${{ vars.WORKFLOWS_MACOS_RUNNER || 'macos-26' }}
       testflight-internal-group: ${{ vars.TESTFLIGHT_INTERNAL_GROUP }}
       play-update-priority: ${{ vars.PLAY_UPDATE_PRIORITY }}
+      # `draft` until the Play app has been published once: Play refuses a
+      # completed release on an app that never went live. Empty means completed.
+      play-release-status: ${{ vars.PLAY_RELEASE_STATUS }}
       # `environment-variables` is the only way a caller gets an environment variable into
       # the prebuild, the lanes and the consumer scripts. Non-secret only: the
       # value is a workflow input, unmasked and visible to anyone who can read
