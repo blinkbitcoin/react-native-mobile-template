@@ -99,9 +99,12 @@ someone applied to an Xcode project two years ago and cannot explain.
 
 The workflows live in
 [`blinkbitcoin/shared-workflows`](https://github.com/blinkbitcoin/shared-workflows),
-pinned here to one commit that Dependabot moves. What is left in this repo is eleven short files naming
-which ones to run. A fix to the Android emulator boot lands once, for every app
-in the family.
+and so do the programs, presets and store lanes they run: the
+`@blinkbitcoin/app-tooling` package, installed from the same commit. Both are
+pinned here to one commit that Dependabot moves. What is left in this repo is
+twelve short files naming which ones to run, and the settings that are this
+app's own. A fix to the Android emulator boot lands once, for every app in the
+family.
 
 #### Every gate is a `make` target
 
@@ -128,19 +131,20 @@ another. A release can be watched end to end before the store accounts exist.
 | `src/services/`     | The Apollo client and its retry, auth and error links                                |
 | `modules/`          | A local Expo native module (`hello-native`) — the worked example of native code      |
 | `plugins/`          | Config plugins. `with-build-stamp.ts` shows the pattern: native config as TypeScript |
-| `fastlane/`         | `Fastfile` plus one lane file per platform, store metadata, `Matchfile` for signing  |
-| `scripts/`          | Every gate and helper `make` calls, with `node:test` files next to them              |
+| `fastlane/`         | A `Fastfile` that imports the shared lanes, store metadata, `Matchfile` for signing  |
+| `scripts/`          | `init`, the E2E wrappers and this repo's own guard tests; the gates run from the package |
 | `mocks/`            | The GraphQL mock API — one schema, served to Jest via MSW and to E2E as a server     |
 | `.maestro/`, `e2e/` | Maestro flows for device E2E, Playwright specs for web                               |
 | `assets/`           | Icons, splash screens and fonts                                                      |
 | `certs/`            | The public OTA code-signing certificate. Never a private key                         |
-| `docs/`             | Twelve pages, indexed by question in [docs/README.md](docs/README.md)                |
+| `docs/`             | Thirteen pages, indexed by question in [docs/README.md](docs/README.md)              |
+| `.claude/`          | The `native-setup` skill, and the settings that enable the shared `store-release` plugin |
 
 Not in here, deliberately: `ios/` and `android/`. They are generated.
 
 ## The pipelines
 
-Eleven workflow files. Each is a thin caller —
+Twelve workflow files. Each is a thin caller —
 [`shared-workflows`](https://github.com/blinkbitcoin/shared-workflows)
 holds what they actually do. Job names are what the Actions graph shows.
 
@@ -159,9 +163,10 @@ holds what they actually do. Job names are what the Actions graph shows.
 | Workflow                 | Jobs                                                                                                                                         | Fires on                                                                              |
 | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
 | `cd-release.yml`     | `Release`<br>`Store notes`                                                                                                                     | Push to `main`. Maintains the version PR and drafts the store notes into it; dispatches beta and web at a cut release           |
-| `cd-internal.yml`   | `Internal / Prepare`<br>`Internal / Build iOS`<br>`Internal / Build Android`<br>`Internal / Upload iOS`<br>`Internal / Upload Android`<br>`Internal / Pre-release`<br>`Internal / OTA`                                   ` | Push to `main`, once CI is green for that sha. TestFlight and the Play internal track |
-| `cd-beta.yml`       | `Beta / Prepare`<br>`Beta / Promote iOS`<br>`Beta / Promote Android`<br>`Beta / Release`<br>`Beta / Attach store notes`<br>`Beta / OTA`                                                      ` | Dispatched by `cd-release.yml` at the tag. Promotes the internal build rather than rebuilding              |
-| `cd-production.yml` | `Production / Prepare`<br>`Production / Security`<br>`Production / Release iOS`<br>`Production / Release Android`<br>`Production / Phased iOS`<br>`Production / Rollout Android`<br>`Production / Halt Android`<br>`Production / Release`<br>`Production / OTA`<br>`Production / Web`       ` | Dispatch only, carrying the action. `Security` checks the release's binaries first;<br>phased release and staged rollout, with a halt |
+| `cd-internal.yml`   | `Internal / Prepare`<br>`Internal / Build iOS`<br>`Internal / Build Android`<br>`Internal / Upload iOS`<br>`Internal / Upload Android`<br>`Internal / Upload Huawei`<br>`Internal / Pre-release`<br>`Internal / OTA` | Push to `main`, once CI is green for that sha. TestFlight, the Play internal track<br>and, when it is on, Huawei AppGallery |
+| `cd-beta.yml`       | `Beta / Prepare`<br>`Beta / Promote iOS`<br>`Beta / Promote Android`<br>`Beta / Promote Huawei`<br>`Beta / Release`<br>`Beta / Attach store notes`<br>`Beta / OTA` | Dispatched by `cd-release.yml` at the tag. Promotes the internal build rather than rebuilding |
+| `cd-production.yml` | `Production / Prepare`<br>`Production / Security`<br>`Production / Release iOS`<br>`Production / Release Android`<br>`Production / Release Huawei`<br>`Production / Phased iOS`<br>`Production / Rollout Android`<br>`Production / Halt Android`<br>`Production / Release`<br>`Production / Attach stage note`<br>`Production / OTA`<br>`Production / Web` | Dispatch only, carrying the action: `release`, `rollout`, `halt`, `resume` or `complete`.<br>`Security` checks the release's binaries first; phased release and staged rollout, with a halt |
+| `cd-store-listing.yml` | `Store listing`                                                                                                                         | Dispatch. Pushes the store text and screenshots in `fastlane/` to the consoles, or pulls what they hold |
 | `cd-beta-retry.yml`      | `Retry Beta`                                                                                                                                 | A failed beta run. Retries it without a human                                         |
 | `cd-ota-hotfix.yml`         | `Publish`                                                                                                                       | Dispatch. Ships JS without a store round trip, gated on the native fingerprint        |
 
@@ -177,6 +182,8 @@ bad rollout is halted the same way.
 path, and links the shared runbook for the six steps and how to rehearse them.
 [**Store accounts**](docs/store-accounts.md) covers getting the
 accounts and credentials in the first place — Apple, Google, Huawei, Samsung.
+In Claude Code, the `store-release` plugin from shared-workflows, which
+`.claude/settings.json` enables, walks through the same setup step by step.
 
 ## Documentation
 
