@@ -246,7 +246,7 @@ in-process; the entry itself is only an `import.meta.main` guard that sets
 
 ## CI, release and troubleshooting
 
-- CI and CD are eleven caller workflows into `blinkbitcoin/shared-workflows`,
+- CI and CD are twelve caller workflows into `blinkbitcoin/shared-workflows`,
   every call pinned to one commit SHA that Dependabot moves in one PR, and a PR
   runs the CD calls against that pin ([ADR 0023](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0023-cd-verified-before-release.md)).
   The shared tooling package (`@blinkbitcoin/app-tooling`) is a git dependency
