@@ -67,7 +67,7 @@ your shell sets no locale (fastlane and CocoaPods need UTF-8), and `APP_PORT_BAS
 (see [Ports](#ports)), puts `node_modules/.bin` on `PATH` (so `biome`, `eslint`
 and `expo` run without a `pnpm exec` prefix), and loads `.env.local` if you have
 one — a gitignored file for per-machine overrides. There is no `.envrc`: see
-[decisions/0007-mise-not-nix.md](decisions/0007-mise-not-nix.md) for why direnv
+[ADR 0007](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0007-mise-not-nix.md) for why direnv
 is not a second mechanism here.
 
 Then check the rest of the machine:
@@ -260,7 +260,7 @@ commits already passed the hook once.
 | Metro serves stale JS, or a module resolves oddly | `pnpm start --clear`, or `make clean` for the caches and generated projects |
 | `Watchman` errors, or file changes are not picked up | `watchman watch-del-all`, then restart Metro. `make doctor` checks watchman is installed |
 | iOS build fails on a pod that was just added | `make prebuild`, which reruns pod install, or delete `ios/` and let `make dev-ios` regenerate it |
-| `make check-expo-health` warns about Expo SDK drift | `pnpm expo install --check` is the fix path, once `minimumReleaseAge` lets the patch in. The drift is a warning,<br>not a failure: [ADR 0012](decisions/0012-expo-sdk-drift-is-advisory.md) says why. Genuine exceptions go in `expo.install.exclude` in `package.json` |
+| `make check-expo-health` warns about Expo SDK drift | `pnpm expo install --check` is the fix path, once `minimumReleaseAge` lets the patch in. The drift is a warning,<br>not a failure: [ADR 0012](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0012-expo-sdk-drift-is-advisory.md) says why. Genuine exceptions go in `expo.install.exclude` in `package.json` |
 | A `pnpm install` fails on a package that is too new | `minimumReleaseAge` in `pnpm-workspace.yaml` is 1 day.<br>Wait, or add an exact `name@version` entry to `minimumReleaseAgeExclude` with a comment saying why |
 | A `pnpm install` fails with a trust-policy / provenance-downgrade error | `trustPolicy: no-downgrade` in `pnpm-workspace.yaml`.<br>pnpm compares publish dates across every major of a package, so a later, stronger release can still read as a downgrade.<br>Confirm with `pnpm audit` that the package is not actually vulnerable, then add an exact `name@version` entry<br>to `trustPolicyExclude` with a comment saying why |
 | `Cannot find native module 'HelloNative'` | You are on web or in Expo Go. Build a dev client: `make dev-ios` or `make dev-android` |
@@ -268,7 +268,7 @@ commits already passed the hook once.
 | The dev client sits on its launcher screen | Open the `expo-development-client` deep link. See above |
 | Type errors in `src/graphql/generated/` | Do not edit it. Run `make gen-graphql`.<br>It imports `@graphql-typed-document-node/core`, which is why that package is a direct dependency |
 | A release Android build dies in `createBundleReleaseJsAndAssets` with "Cannot find module 'babel-preset-expo'" | `publicHoistPattern` in `pnpm-workspace.yaml` exists for this. Do not remove that entry. See [quality.md](quality.md) |
-| A script fails now and then with status 139, e.g. `grep failed with status 139` from `make verify-ios` | A `LC_ALL=C cmd` prefix crashing a Homebrew bash in a forked subshell (CoreFoundation is not fork-safe).<br>Write `env LC_ALL=C cmd`; `check-shell-locale` (`make check-ci`) enforces it. See [release-runbook.md](release-runbook.md) |
+| A script fails now and then with status 139, e.g. `grep failed with status 139` from `make verify-ios` | A `LC_ALL=C cmd` prefix crashing a Homebrew bash in a forked subshell (CoreFoundation is not fork-safe).<br>Write `env LC_ALL=C cmd`; `check-shell-locale` (`make check-ci`) enforces it. See the [family rules](../AGENTS.md#family-rules) |
 | `make check-release` says to run `bundle install` | You skipped the Ruby half of `make install` (`NO_BUNDLE=1`, or an older clone).<br>Re-run `make install`. Ruby gems are not committed |
 
 ## Editors

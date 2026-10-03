@@ -70,7 +70,7 @@ updates:
       # A git dependency on shared-workflows at the commit the workflow pins
       # name, never moved on its own: the github-actions group below moves the
       # pins, and `make fix-tooling-pin` on that PR moves this to match
-      # (docs/decisions/0024-shared-tooling-at-the-workflows-pin.md).
+      # (https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0024-shared-tooling-at-the-workflows-pin.md).
       - dependency-name: '@blinkbitcoin/app-tooling'
 
   # Third-party actions, and the shared workflows every caller is pinned to by

@@ -420,7 +420,7 @@ come from the Expo config, which needs `yq` (pinned in `.mise.toml`).
    on that first link ~40 s late — during the *next* flow. `00-launch` opens
    the scheme's bare root link once so every later `openLink` is alert-free and
    immediate. A flow that opens a URL still waits with `extendedWaitUntil`; see
-   [ADR 0010](decisions/0010-ios-e2e-release-build.md).
+   [ADR 0010](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0010-ios-e2e-release-build.md).
 
 ### iOS is a Release build in CI
 

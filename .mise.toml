@@ -41,7 +41,7 @@ LANG = "{{ env.LANG | default(value='en_US.UTF-8') }}"
 _.file = [".env.local"]
 # Locally installed CLIs (biome, eslint, expo, ...) on PATH, so they run without
 # a `pnpm exec` prefix. This is the useful half of a direnv `.envrc`; see
-# docs/decisions/0007-mise-not-nix.md.
+# https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0007-mise-not-nix.md.
 #
 # The rest of `_.path` is the native toolchain `make setup` installs: the
 # Android SDK's tools from ANDROID_HOME (which `make setup-android` records in

@@ -38,9 +38,7 @@
       ".env.development": "the dotenv default, pinned by scripts/port-pins.test.mjs",
       ".env.example": "the dotenv default, pinned by scripts/port-pins.test.mjs",
       "docs/local-dev.md": "the Ports table, the one place a reader sees the numbers, pinned by scripts/port-pins.test.mjs",
-      "docs/release-runbook.md": "explains that same built-in React Native constant",
       "docs/decisions/": "ADRs record what was true when they were accepted",
-      "docs/superpowers/": "archived plans and specs, not live documentation",
       "CHANGELOG.md": "generated release history",
       ".github/workflows/ci.yml": "the iOS E2E environment-variables URL, which must be a literal (the build job precedes the mock API job, on another runner) and is pinned by scripts/port-pins.test.mjs",
       "scripts/port-pins.test.mjs": "names the numbers it pins"

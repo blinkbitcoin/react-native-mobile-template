@@ -176,9 +176,9 @@ repository variable `HUAWEI_UPLOADS_ENABLED` is `true`, on top of
 `STORE_UPLOADS_ENABLED`. The upload path is the community plugin
 [`fastlane-plugin-huawei_appgallery_connect`](https://github.com/shr3jn/fastlane-plugin-huawei_appgallery_connect),
 pinned exactly — Huawei publishes no first-party command-line tool. See
-[decisions/0019](decisions/0019-huawei-appgallery-release-lane.md) for why the
+[decisions/0019](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0019-huawei-appgallery-release-lane.md) for why the
 lanes stop at the binary and
-[decisions/0020](decisions/0020-huawei-joins-every-tier.md) for why there is one
+[decisions/0020](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0020-huawei-joins-every-tier.md) for why there is one
 on every tier.
 
 **Account:** [Huawei Developer](https://developer.huawei.com/consumer/en/) —
@@ -218,7 +218,7 @@ at registration and cannot be changed afterwards, so pick it deliberately.
    18+), release countries and pricing, all in the console. The bundle must
    target Android API level 30 or higher and ship 64-bit code; the template's
    Android build already does both. Nothing here is synced by the pipeline (see
-   [Store listing metadata](release-runbook.md#store-listing-metadata) for
+   [Store listing metadata](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/release-runbook.md#store-listing-metadata) for
    what is, on Apple and Google). A draft listing publishes nothing; the
    lane's submit is the step that makes a version public. Review takes days
    rather than hours — verify the current estimate on screen.
@@ -292,7 +292,7 @@ from different contexts and a secret placed as a variable is both broken and
 public to anyone who can read the run.
 
 The full list, with which workflow reads each, is in
-[release-runbook.md](release-runbook.md#variables-and-secrets).
+[the shared release runbook](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/release-runbook.md#variables-and-secrets) (this app's own subset is in [release-runbook.md](release-runbook.md#variables-and-secrets)).
 
 The path each credential takes, from the console page it is created on to the
 lane that reads it:
@@ -334,7 +334,7 @@ stdin, so it never lands in argv, in a log line or in the shell history.
 `android sync_metadata` / `pull_metadata` use to edit the Play listing, so the
 service account needs the **Manage store presence** permission in Play
 Console → Users and permissions, not just release access. See
-[Store listing metadata](release-runbook.md#store-listing-metadata) for what
+[Store listing metadata](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/release-runbook.md#store-listing-metadata) for what
 those lanes do.
 
 ## Doing this with an agent

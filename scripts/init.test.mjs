@@ -52,7 +52,7 @@ const RENAME_TOKENS =
 // `blinkbitcoin` is two different things: the GitHub owner of THIS repo, which
 // init must rewrite, and the owner of the reusable-workflow repo, which it must
 // not - that repo, and the tooling package it ships (a git dependency on it,
-// docs/decisions/0024-shared-tooling-at-the-workflows-pin.md). Blanking the
+// ADR 0024 in shared-workflows). Blanking the
 // second is what makes the first greppable.
 const WORKFLOWS_REPO = /blinkbitcoin\/shared-workflows|@blinkbitcoin\/app-tooling/g;
 const namesTheOwner = (text) => text.replace(WORKFLOWS_REPO, '').includes('blinkbitcoin');
@@ -414,17 +414,7 @@ describe('the manifest', () => {
     ]);
     const tracked = spawnSync(
       'git',
-      [
-        'grep',
-        '-l',
-        '-I',
-        '-E',
-        RENAME_TOKENS.source,
-        '--',
-        '.',
-        ':!docs/superpowers',
-        ':!pnpm-lock.yaml',
-      ],
+      ['grep', '-l', '-I', '-E', RENAME_TOKENS.source, '--', '.', ':!pnpm-lock.yaml'],
       {
         cwd: REPO,
         encoding: 'utf8',
@@ -445,17 +435,7 @@ describe('the manifest', () => {
     ]);
     const tracked = spawnSync(
       'git',
-      [
-        'grep',
-        '-l',
-        '-I',
-        '-F',
-        'blinkbitcoin',
-        '--',
-        '.',
-        ':!docs/superpowers',
-        ':!pnpm-lock.yaml',
-      ],
+      ['grep', '-l', '-I', '-F', 'blinkbitcoin', '--', '.', ':!pnpm-lock.yaml'],
       { cwd: REPO, encoding: 'utf8' },
     );
     const files = tracked.stdout.split('\n').filter(Boolean);
@@ -471,9 +451,9 @@ describe('the manifest', () => {
 // Integration
 // ---------------------------------------------------------------------------
 
-// The planning trees are checked in but are not part of the product, and they
-// are full of the very tokens the scan asserts on.
-const SKIP_PREFIXES = ['docs/superpowers/', '.superpowers/'];
+// A local planning tree is not part of the product, and it is full of the very
+// tokens the scan asserts on.
+const SKIP_PREFIXES = ['.superpowers/'];
 // Skipped wherever they appear when walking the result.
 const SKIP_ANYWHERE = new Set(['node_modules', '.git', '.expo', '.workflows']);
 // Skipped only at the repo root: `ios`/`android` there would be prebuild output,
@@ -486,7 +466,6 @@ const SKIP_SCAN_AT_ROOT = new Set([
   'android',
   'vendor',
   'playwright-report',
-  'docs/superpowers',
   '.superpowers',
   'assets',
   'Gemfile.lock',
@@ -881,13 +860,14 @@ describe('init --yes --no-web', async () => {
     );
   });
 
-  // cd-production.yml's web job goes with its marker block; the chart that
-  // draws it and the note that names it have to go with it.
-  test('drops the production web deploy from the release runbook', () => {
+  // The github-pages environment exists only for the web deploy, so its row in
+  // the runbook's environments table goes, and the other three stay.
+  test("drops the github-pages row from the runbook's environments table", () => {
     const runbook = readFileSync(path.join(root, 'docs/release-runbook.md'), 'utf8');
-    assert.doesNotMatch(runbook, /pweb|[Ww]eb deploy/);
-    assert.match(runbook, /prel -->\|"OTA_ENABLED"\| pota\["OTA production"\]\n {2}end\n```\n/);
-    assert.match(runbook, /the store notes and the OTA publish do not wait for\n/);
+    assert.doesNotMatch(runbook, /github-pages/);
+    for (const environment of ['internal', 'beta', 'production']) {
+      assert.match(runbook, new RegExp(`^\\| \`${environment}\` \\|`, 'm'), environment);
+    }
   });
 
   // The cd-production.yml row names the web job and ci-web.yml; the rest of
@@ -918,13 +898,14 @@ describe('init --yes --no-web', async () => {
   });
 
   // The sweep behind the targeted tests above: a file that names ci-web.yml
-  // after this run points at a workflow that is not there. ADR 0011 is the
-  // exception, because it records why the release chain dispatches at all.
-  test('no file names ci-web.yml except the ADR that records its history', () => {
+  // after this run points at a workflow that is not there. The ADR that records
+  // why the release chain dispatches (0011) lives upstream now, so nothing is
+  // exempt.
+  test('no file names ci-web.yml', () => {
     const offenders = textFiles(root)
       .filter(([, text]) => text.includes('ci-web'))
       .map(([rel]) => rel);
-    assert.deepEqual(offenders, ['docs/decisions/0011-release-chain-by-dispatch.md']);
+    assert.deepEqual(offenders, []);
   });
 
   // Left behind, the step dispatches a workflow this run deleted, and the
@@ -954,14 +935,6 @@ describe('init --yes --no-web', async () => {
     const ci = readFileSync(path.join(root, 'docs/ci.md'), 'utf8');
     const row = ci.split('\n').find((line) => line.startsWith('| `cd-release.yml` |'));
     assert.match(row, /On a cut release, dispatches `cd-beta\.yml` at the tag \|$/);
-    const runbook = readFileSync(path.join(root, 'docs/release-runbook.md'), 'utf8');
-    assert.match(
-      runbook,
-      /A `release: published` trigger on `cd-beta\.yml`\nwould therefore never fire\./,
-    );
-    assert.match(runbook, /vX\.Y\.Z -f tag=vX\.Y\.Z`\), and\n/);
-    assert.match(runbook, /│ {2}CD \/ Beta dispatched\n/);
-    assert.match(runbook, /`Store notes` job is its own job after the beta dispatch: a red\n/);
     const readme = readFileSync(path.join(root, 'README.md'), 'utf8');
     assert.match(
       readme,
@@ -969,7 +942,6 @@ describe('init --yes --no-web', async () => {
     );
     for (const [rel, text] of [
       ['docs/ci.md cd-release.yml row', row],
-      ['docs/release-runbook.md', runbook],
       ['README.md', readme],
     ]) {
       assert.doesNotMatch(text, /ci-web|beta and web|CI \/ Web/, rel);
@@ -1127,9 +1099,10 @@ describe('init --yes --web', async () => {
       readFileSync(path.join(root, 'docs/ci.md'), 'utf8'),
       /\*\*Coexistence with the web target\.\*\* `ci-web\.yml` deploys the web export/,
     );
-    const runbook = readFileSync(path.join(root, 'docs/release-runbook.md'), 'utf8');
-    assert.match(runbook, /prel --> pweb\["Web deploy"\]/);
-    assert.match(runbook, /the OTA publish and the web deploy do not wait for/);
+    assert.match(
+      readFileSync(path.join(root, 'docs/release-runbook.md'), 'utf8'),
+      /^\| `github-pages` \|/m,
+    );
     assert.match(
       readFileSync(path.join(root, 'scripts/ci-suite-gates.test.mjs'), 'utf8'),
       /\/\/\n\/\/ The web suite gates itself \(scripts\/ci-web-gate\.test\.mjs\)\.\nimport/,

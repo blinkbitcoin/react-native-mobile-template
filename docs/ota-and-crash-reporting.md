@@ -133,7 +133,7 @@ fastlane ios upload_symbols dsym_path:/path/to/dSYMs
 
 Today it resolves the dSYM path and logs "wire your crash reporter's upload
 here". Adding the vendor upload action to that lane is the whole change. Detail
-in [release-runbook.md](release-runbook.md).
+in [the shared release runbook](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/release-runbook.md).
 
 Source maps need a decision, not just a line of config: something has to keep
 the map that matches each shipped bundle, including each OTA publish, or a

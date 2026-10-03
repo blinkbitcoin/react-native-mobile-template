@@ -91,7 +91,7 @@ scanners (and the LLM review, once configured); on the release pull request it
 adds the bundle scan and the codebase review (OpenAnt). On the production dispatch a second
 `Security` job checks the release's own binaries, and every store job waits for
 it. What each scanner reads, how to disable one, and what "skipped" means are in
-[security.md](security.md).
+[security.md](security.md) here and [the shared page](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/security.md).
 
 The Huawei AppGallery jobs hang off the Google Play ones on purpose: each of
 them `needs` its tier's Android store job, so AppGallery never receives a
@@ -450,7 +450,7 @@ These details are deliberate:
 **The Security badge shows the verdict, not the job.** The `security` job
 succeeds on `pass`, `informational` and `skipped` alike, so its result cannot
 tell them apart; `ci.yml` hands `publish-badges.yml` the `verdict` output
-instead (see [security.md](security.md#where-the-verdict-goes)):
+instead (see [where the verdict goes](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/security.md#where-the-verdict-goes)):
 
 | Verdict | Badge |
 | --- | --- |
@@ -489,7 +489,7 @@ uses: blinkbitcoin/shared-workflows/.github/workflows/check.yml@a84cd348a9f7e1cb
 ```
 
 A shared-workflows release changes nothing here by itself
-([ADR 0023](decisions/0023-cd-verified-before-release.md)). Dependabot's
+([ADR 0023](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0023-cd-verified-before-release.md)). Dependabot's
 `shared-workflows` group (`.github/dependabot.yml`) opens one PR moving every
 pin, release workflows included, and that PR's Unit job runs the new shared
 code against this repository before any CD run can:
@@ -505,7 +505,7 @@ code against this repository before any CD run can:
 The same Unit job fails until one more thing moves. The shared tooling package
 (`@blinkbitcoin/app-tooling`, behind `make check-contract`) is a git dependency
 on shared-workflows at the pinned commit
-([ADR 0024](decisions/0024-shared-tooling-at-the-workflows-pin.md)), and
+([ADR 0024](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0024-shared-tooling-at-the-workflows-pin.md)), and
 Dependabot cannot move a git dependency with the pins. Check out the PR's
 branch, run `make fix-tooling-pin` (it repoints `package.json` at the new pin
 and relocks), and push.

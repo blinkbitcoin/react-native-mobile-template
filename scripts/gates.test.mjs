@@ -130,9 +130,6 @@ test('no trace of the old abbreviated namespace survives', () => {
   const tracked = execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8' })
     .split('\n')
     .filter(Boolean)
-    // Archives are dated records of what was planned at the time; rewriting
-    // them to match today's names would make them lie about their own past.
-    .filter((f) => !f.startsWith('docs/superpowers/'))
     // Lock file integrity hashes contain the letters by coincidence.
     .filter((f) => f !== 'pnpm-lock.yaml')
     .filter((f) => f !== 'scripts/gates.test.mjs');

@@ -7,4 +7,3 @@
 /modules/         @blinkbitcoin/mobile-native
 /fastlane/        @blinkbitcoin/mobile-native
 /scripts/release/ @blinkbitcoin/mobile-native
-/deploy/          @blinkbitcoin/mobile-native

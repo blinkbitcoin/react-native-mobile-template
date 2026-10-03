@@ -27,7 +27,7 @@ modules/            local native modules (hello-native)
 mocks/              GraphQL mock API (server.ts, msw.ts, schema.graphql)
 scripts/            init, e2e/ and the guards (*.test.mjs) only this repository has
 .maestro/           Maestro flows (native e2e); e2e/web/ is Playwright
-fastlane/           store lanes + metadata; deploy/ota/ is the update server
+fastlane/           store lanes + metadata
 docs/               architecture, local-dev, quality, testing, ci, native-extensions,
                     release-runbook, ota, ota-and-crash-reporting, template-usage, decisions/
 ```
@@ -145,12 +145,6 @@ aggregates.
   override and `APP_PORT_BASE=8090` stops working. `scripts/port-pins.test.mjs`
   fails on a bare literal and names the file; see
   [docs/local-dev.md](docs/local-dev.md).
-- **Never set a locale as a command prefix in shell code.** Write
-  `env LC_ALL=C grep ...`, not `LC_ALL=C grep ...`: with the prefix a Homebrew
-  bash on macOS switches its own locale inside `$(...)` or a pipeline and now
-  and then dies with SIGSEGV (status 139). `check-shell-locale` (from
-  `@blinkbitcoin/app-tooling`, run by `make check-ci`) fails on the prefix and
-  names the line.
 - **User-visible strings go through Lingui** (`t`/`Trans` macros), then
   `make gen-i18n`. No bare literals in JSX.
 - **Secrets go through `src/lib/secure-store`**, never `expo-secure-store`
@@ -168,13 +162,6 @@ aggregates.
   missing `await waitFor`, not a logging need; a deliberate one opts out with
   `allowConsole(method, matcher)` from
   `@blinkbitcoin/app-tooling/expo/jest/console`, or by spying on the method.
-- **Worktrees under `.claude/worktrees/` are not this checkout.** Claude Code
-  puts whole checkouts there, node_modules included, so every tool that walks
-  the tree excludes the directory itself (Jest and Metro anchored to the root,
-  since a worktree's own root is under it too). The same goes for `.workflows/`,
-  where every CI job checks this repository out. A new tool adds its entry;
-  `check-ignored-directories` (from `@blinkbitcoin/app-tooling`, run by
-  `make check-ci`) holds the existing ones, and `docs/quality.md` lists them.
 - **Routes-only rule:** files in `src/app/` compose screens from `src/features`
   and `src/components` and may not import `@apollo/client`, `@/graphql`,
   `@/services` or `@/lib`. Only `src/app/_layout.tsx` and
@@ -197,89 +184,28 @@ aggregates.
   from `store-notes.prompt.md`; to change them, edit the prompt (the next
   push regenerates) or the release body after merging, then preview with
   `make store-notes` — see `docs/release-runbook.md`.
-- **No vague abbreviations, anywhere a human reads.** Write the word:
-  identifiers, organisation, credentials, repository, configuration,
-  environment. This applies to prose, plans, commit messages, comments and
-  names alike. Keep an abbreviation only when it is the industry's own name
-  for the thing (App Store Connect's `ASC_`, OTA, 2FA, API, JSON, CI, CD) and
-  expand an uncommon one on first use. A prefix made of the family's initials
-  was rejected for exactly this reason; so was "ids" for identifiers in a
-  status message.
-- **A make target is named for what it checks or does, never after the tool
-  that does it.** `check-unused`, not `check-knip`; `check-code-scanning`, not
-  `check-codeql`. A tool's name tells a reader nothing until they already know
-  the tool; it belongs in the `##` description, where `make help` shows it.
-  `check-make-target-names` (from `@blinkbitcoin/app-tooling`, run by
-  `make check-docs`) fails on a target with a word that names a tool pinned in
-  `.mise.toml` or a package in `package.json`; a `setup-` target installs the
-  tool it names, and any other exception needs an entry in the
-  `docs.allowTargetNames` section of `app-tooling.json`, target to reason.
-- **Workflow files carry their stage in the name.** GitHub reads only the top
-  level of `.github/workflows/`, so the prefix is the only grouping there is:
-  `ci.yml` and `ci-*.yml` run on every change and display as `CI` /
-  `CI / ...`; `cd-*.yml` make releases and display as `CD / ...`. A new
-  workflow takes the prefix and the matching display name
-  (`check-workflow-names`, run by `make check-ci`, fails otherwise). A rename
-  updates every reference in the same PR, not just the ones spelled `.yml`:
-  `uses:` paths, `gh workflow run` targets, `require-green-workflow`,
-  `workflow_run` listeners (they match the display name), the init manifest,
-  docs, diagrams, README tables and "Actions → ..." paths (the sidebar shows
-  display names). Before pushing, `git grep` the old name without its suffix.
-  Only `CHANGELOG.md`, `docs/superpowers/` and concurrency group names
-  (renaming one changes which runs queue together) may still hold it.
-- **Every PR tests everything it adds or changes, in the same PR.** That means
-  the happy path, every error path and every branch a reviewer could ask
-  about, and the PR description names the tests that cover the change. Where a
-  tool measures coverage the gate is 100%: Jest over `src/`, `plugins/` and
-  `modules/*/index.ts` (lines, branches, functions, statements), and
-  `node:test` over `scripts/**/*.mjs` (lines, branches, functions; `make
-  test-scripts`). Code no tool measures here is held to the same bar by
-  review: an end-to-end flow per user-facing flow, a `scripts/*.test.mjs` assertion
-  per workflow rule (the lanes' own cases are tested in shared-workflows). A threshold is never lowered and no file is excluded from
-  coverage to make a PR pass; if something truly cannot be tested, the PR says
-  what and why.
-- **Every source file has its own sibling test, and that file alone covers
-  it at 100%.** `foo.mjs` has `foo.test.mjs` and `Foo.tsx` has `Foo.test.tsx`
-  (a `.ts` module may use `.test.tsx`), in the same directory. A
-  directory-wide test file, a `__tests__/` directory, or a module's tests
-  living in a caller's test file does not count, even when global coverage is
-  100%. Check a module with its own test alone: `node --test
-  --experimental-test-coverage --test-coverage-include=<file>.mjs
-  <file>.test.mjs`, or `pnpm exec jest <file>.test.tsx --coverage
-  --collectCoverageFrom=<file>.tsx`. The one exception is `src/app/`:
-  expo-router loads every file there as a route, so a route's test mirrors its
-  path under `src/__tests__/app/` (`src/app/details/[id].tsx` →
-  `src/__tests__/app/details/[id].test.tsx`). Scope: `scripts/**/*.mjs`,
-  `src/**/*.ts(x)`, `plugins/*.ts` and `modules/*/index.ts`, less generated
-  code, `*.d.ts` and `src/test/`. `check-test-siblings` (from
-  `@blinkbitcoin/app-tooling`, the first step of `make test-scripts`, its rules
-  in the `testSiblings` section of `app-tooling.json`) fails naming every file
-  without one. **No exceptions, no allowlist**: a module
-  that needs a device, a simulator, a native build or the network is tested
-  against fakes of them, and the check fails if an allowlist comes back. A
-  shell script is held to the same rule, with its test named after it
-  (`foo.sh` → `foo.test.mjs`, running the script against fake tools on
-  `PATH`). The family's rule and its fake-tool pattern are written once in
-  [shared-workflows' AGENTS.md](https://github.com/blinkbitcoin/shared-workflows/blob/main/AGENTS.md),
-  whose check enforces it for every shell script the template hands over;
-  `check-test-siblings` does not check this repository's own shell scripts
-  yet: `app-tooling.json` lists only `scripts/**/*.mjs` as sources there.
-- **Docs and diagrams ship in the same PR as the change, never as a
-  follow-up.** Any change to a name, input, output, job, file, flow, count or
-  default updates every doc that describes it, in the same PR: prose, tables,
-  README and AGENTS.md, and every diagram (mermaid blocks, ASCII drawings in
-  code fences, SVGs under `docs/assets/`). Before pushing, `git grep` each
-  thing the diff renamed or changed, spelled every way a reader would meet it
-  (with and without `.yml`, the display name, the job name), and read each
-  diagram that shows the part you touched; a diagram that still draws the old
-  flow is drift even when no text search finds it. The PR description names
-  the docs it updated, or says why none needed to change. Mechanically
-  enforced on top: architecture-relevant changes without a `docs/` change get
-  a warning from `make check-docs` (a dependency bump does not count, and
-  Dependabot is exempt); adding a make target without a row in the table above
-  is a hard failure, and so is a markdown table cell wider than 120 visible
-  characters (break it with `<br>`) or a fenced `mermaid` block that does not
-  parse.
+
+## Family rules
+
+The rules every app of the family follows are written once, in
+[shared-workflows' AGENTS.md](https://github.com/blinkbitcoin/shared-workflows/blob/main/AGENTS.md#rules-every-app-of-the-family-follows),
+and apply here unchanged. The ones to know before a first change:
+
+- **Every PR tests everything it adds or changes**, and every source file has
+  its own sibling test that covers it at 100% alone (`foo.mjs` has
+  `foo.test.mjs`; a route's test mirrors its path under `src/__tests__/app/`).
+  `check-test-siblings` names any file without one.
+- **Docs and diagrams ship in the same PR as the change.** Update every doc
+  that names what you changed, and read each diagram that shows the part you
+  touched; `make check-docs` warns on an architecture change with no `docs/`
+  change.
+- **No vague abbreviations anywhere a human reads**: write the word.
+- **A make target is named for what it checks or does, never after the tool**,
+  and a workflow file carries its stage in its name (`ci-*.yml`, `cd-*.yml`).
+- **Never set a locale as a command prefix in shell code**: `env LC_ALL=C grep
+  ...`, not `LC_ALL=C grep ...`.
+- **Worktrees under `.claude/worktrees/` are not this checkout**, so every tool
+  that walks the tree excludes the directory.
 
 ## Testing map
 
@@ -307,11 +233,8 @@ through `test:coverage`) also fails on any file with zero statements
 (`check-coverage-empty`, from `@blinkbitcoin/app-tooling`), so a re-export
 barrel cannot lift the number while testing nothing.
 
-Global coverage says every line ran somewhere, not that its own test ran it.
-The sibling rule above closes that gap: each module's test covers it at 100%
-alone, so deleting a caller's test never silently uncovers the module it
-used. A zero-statement re-export under `coveragePathIgnorePatterns` still has
-its sibling test, pinning what it re-exports.
+Global coverage says every line ran somewhere, not that its own test ran it;
+the sibling rule in the family rules closes that gap.
 
 The Node scripts have their own gate: `test:scripts` (`make test-scripts`, CI's
 Unit job) is the shared `test-scripts` runner: `node:test` with its built-in
@@ -325,14 +248,16 @@ in-process; the entry itself is only an `import.meta.main` guard that sets
 
 - CI and CD are eleven caller workflows into `blinkbitcoin/shared-workflows`,
   every call pinned to one commit SHA that Dependabot moves in one PR, and a PR
-  runs the CD calls against that pin (`docs/decisions/0023-cd-verified-before-release.md`).
+  runs the CD calls against that pin ([ADR 0023](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0023-cd-verified-before-release.md)).
   The shared tooling package (`@blinkbitcoin/app-tooling`) is a git dependency
   at that same commit; run `make fix-tooling-pin` on the Dependabot PR
-  (`docs/decisions/0024-shared-tooling-at-the-workflows-pin.md`).
+  ([ADR 0024](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0024-shared-tooling-at-the-workflows-pin.md)).
   `docs/ci.md` maps each `make` target to its CI job and explains `.workflows/`.
-- Releases (versions, build numbers, store notes, environments, rollback,
-  hotfix): `docs/release-runbook.md`. Over-the-air updates and the channel
-  model: `docs/ota.md`.
+- What this app sets for a release (variables, secrets, environments, store
+  listing): `docs/release-runbook.md`; for over-the-air updates: `docs/ota.md`.
+  The general procedures (versions, build numbers, rollback, hotfix, the
+  channel model, the scanners) are the shared pages in
+  [shared-workflows' docs](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/README.md).
 - A machine that will not build or test natively: `make setup` first, then the
   symptom table in `.claude/skills/native-setup/SKILL.md`.
 - Local setup, first run and the Metro/pod/watchman troubleshooting table:

@@ -144,7 +144,7 @@ its CI step, and vice versa. To run the same check before pushing, run
 `make check-contract`: the checker comes from `@blinkbitcoin/app-tooling`, a git
 dependency on shared-workflows at the commit the workflows pin, so it is the
 same code CI runs
-([ADR 0024](decisions/0024-shared-tooling-at-the-workflows-pin.md)).
+([ADR 0024](https://github.com/blinkbitcoin/shared-workflows/blob/main/docs/decisions/app-0024-shared-tooling-at-the-workflows-pin.md)).
 
 ### How a gate gets into CI
 

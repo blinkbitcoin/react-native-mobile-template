@@ -72,7 +72,7 @@ covers `app.config.ts`, `package.json`, `release-please-config.json`, the
 `fastlane/metadata/**`, `store-notes.prompt.md`,
 the `certs/README.md` example command, the local
 Expo module podspec, `plugins/with-android-release-signing.ts`, the release
-fixtures, `src/lib/native-intent.ts` with its test, `deploy/ota/*`, and every
+fixtures, `src/lib/native-intent.ts` with its test, and every
 Markdown file in the repo root, `docs/`, `docs/decisions/` and `.github/` —
 plus `.github/CODEOWNERS` and `.github/ISSUE_TEMPLATE/*.yml`, where the
 `blinkbitcoin` owner segment becomes your `--owners` value.
@@ -120,10 +120,9 @@ spelled out for readers (`AGENTS.md`, `CONTRIBUTING.md`, `docs/quality.md`,
 `.github/PULL_REQUEST_TEMPLATE.md`) — and `knip.json`'s `playwright` plugin; and
 removes the marker-delimited web blocks from `app.config.ts` (the `web` key and
 the `experiments.baseUrl` that `ci-web.yml` sets for GitHub Pages),
-`metro.config.js`, `.github/workflows/cd-production.yml` (the `web` job, with
-the runbook chart's web deploy) and `.github/workflows/cd-release.yml` (its
+`metro.config.js`, `.github/workflows/cd-production.yml` (the `web` job) and `.github/workflows/cd-release.yml` (its
 dispatch of `ci-web.yml` at a cut release, with the docs that describe it), the
-web rows from the docs, the Pages half of `docs/ci.md`'s badge-branch paragraph
+web rows from the docs (the runbook's `github-pages` environment among them), the Pages half of `docs/ci.md`'s badge-branch paragraph
 (the ruleset exemption stays), the `react-dom` ignore from
 `.github/dependabot.yml`, the `Web` platform option from the bug-report issue
 template, and the web-variant case from
