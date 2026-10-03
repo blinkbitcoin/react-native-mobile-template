@@ -5,6 +5,15 @@ by [release-please](https://github.com/googleapis/release-please) from
 [Conventional Commits](https://www.conventionalcommits.org/) — edit the commit
 messages, not this file. See [docs/release-runbook.md](docs/release-runbook.md).
 
+## [0.10.1](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.10.0...v0.10.1) (2026-10-03)
+
+
+### Bug Fixes
+
+* **deps:** accept the node-forge signature advisory, which only the Expo CLI can reach ([#121](https://github.com/blinkbitcoin/react-native-mobile-template/issues/121)) ([3cd45e5](https://github.com/blinkbitcoin/react-native-mobile-template/commit/3cd45e5d6d7215dda751f435e82bc86fb35b2c91))
+* **deps:** move brace-expansion to its patched releases ([#111](https://github.com/blinkbitcoin/react-native-mobile-template/issues/111)) ([d52f282](https://github.com/blinkbitcoin/react-native-mobile-template/commit/d52f282b813b0095e06a26c6d664eaad7f111276))
+* **deps:** upgrade fast-uri and accept the braces advisory, which only build tooling reaches ([#132](https://github.com/blinkbitcoin/react-native-mobile-template/issues/132)) ([00721c2](https://github.com/blinkbitcoin/react-native-mobile-template/commit/00721c2742c28de8ecdb30c3dfa9d9e40b4296fc))
+
 ## [0.10.0](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.9.0...v0.10.0) (2026-09-29)
 
 
