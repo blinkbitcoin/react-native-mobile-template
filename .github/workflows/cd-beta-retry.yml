@@ -36,7 +36,7 @@ jobs:
   retry-beta:
     name: Retry Beta
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-retry.yml@626e2c6565242bc64f9e220c8464fd931715e022 # v0.29.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-retry.yml@b8a28fe92945c24de872699f64562a1bb7c09f75 # v0.30.0
     permissions:
       contents: read
       # `gh run rerun` writes to the Actions API.
