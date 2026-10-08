@@ -68,6 +68,18 @@ explained with `auditConfig.ignoreGhsas` in `pnpm-workspace.yaml`.
   from the app: a deeply nested brace pattern only makes a build, test or
   codegen process exit, on a developer machine or CI runner, over patterns from
   the repository's own configuration.
+- **`@graphql-tools/utils@11.2.2`** (GHSA-7mx3-vvmw-hjmv, high) - declared as
+  `^11` by `graphql-yoga` (the mock API), the GraphQL codegen packages and
+  `@graphql-tools/url-loader`'s `delegate` and `wrap`, all devDependencies.
+  The 11.x line has no fixed release; the 12.x copies are on the fixed 12.0.3.
+  Unreachable: the only `mergeDeep` caller is `@graphql-tools/delegate`, under
+  `url-loader`, which codegen never uses (its schema is a local file), and the
+  mock API stitches nothing.
+- **`sprintf-js@1.0.3`** (GHSA-hp3w-g68c-fv3c, CVSS 5.3 medium) - pulled in
+  through Jest coverage's `@istanbuljs/load-nyc-config` > `js-yaml@3` >
+  `argparse@1`. No fixed release exists. Unreachable: only js-yaml's own
+  command-line binary loads `argparse`, nothing here runs it, and `argparse`
+  formats only its own templates.
 
 ### Accepted findings in the other scanners
 
@@ -91,7 +103,7 @@ SARIF entirely rather than emitting it with a suppression marker, so
 the verdict has nothing to count and `make check-security-dependencies` simply
 reports `dependencies: clean` - the summary line's suppressed count stays `0`
 regardless. `osv-scanner.toml` and this section are therefore the only
-places these two accepted risks are visible; do not read a clean `dependencies`
+places these accepted risks are visible; do not read a clean `dependencies`
 run, on its own, as nothing being carried.
 
 ## This app's own scanner notes

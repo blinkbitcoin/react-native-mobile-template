@@ -204,6 +204,28 @@ auditConfig:
     # Re-evaluate: when braces publishes a fix past 3.0.3, or if the app starts
     # expanding brace patterns it received from outside at runtime.
     - GHSA-vfj7-8cjw-p6xm
+    #
+    # GHSA-7mx3-vvmw-hjmv (CVE-2026-104852, high, CWE-1321) -
+    # @graphql-tools/utils <=12.0.0: mergeDeep recursed through inherited
+    # properties, so response keys aliased to __proto__ or constructor while
+    # merging results from two subschemas overwrite Function.prototype. Fixed
+    # in 12.0.1, and the 12.x copies here are on 12.0.3; the 11.x line has no
+    # fixed release, and 11.2.2 is its newest.
+    #
+    # Path: graphql-yoga (the mock API) and the GraphQL codegen packages still
+    # declare ^11, and so do @graphql-tools/delegate and wrap under url-loader.
+    # All are devDependencies, and `pnpm audit --prod` does not report it.
+    #
+    # Unreachable from the app: none of it ships in the app binary. The only
+    # mergeDeep caller in the tree is @graphql-tools/delegate, reached through
+    # url-loader, which codegen.ts never uses (its schema is a local file),
+    # and the mock API serves one schema built by makeExecutableSchema, with
+    # nothing stitched or merged.
+    #
+    # Re-evaluate: when graphql-yoga and the codegen packages move to ^12.0.1
+    # (codegen 7.4.5 already has), or if this repository starts stitching or
+    # federating schemas.
+    - GHSA-7mx3-vvmw-hjmv
 
 # babel.config.js names `babel-preset-expo`, and @babel/core resolves a preset
 # from the config file's own directory -- which pnpm's strict node_modules does
