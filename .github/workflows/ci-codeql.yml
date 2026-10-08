@@ -35,4 +35,4 @@ jobs:
       contents: read
       actions: read # workflow metadata for the SARIF upload
       security-events: write # upload the SARIF results
-    uses: blinkbitcoin/shared-workflows/.github/workflows/check-code-scanning.yml@c731cdcb138fad6769aee5c4e79596ce699c039b # v0.28.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/check-code-scanning.yml@626e2c6565242bc64f9e220c8464fd931715e022 # v0.29.0

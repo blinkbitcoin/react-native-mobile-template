@@ -44,7 +44,7 @@ jobs:
   # store page from a mistaken dispatch; the lane asserts the same variable.
   listing:
     name: Store listing
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store-listing.yml@c731cdcb138fad6769aee5c4e79596ce699c039b # v0.28.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-store-listing.yml@626e2c6565242bc64f9e220c8464fd931715e022 # v0.29.0
     permissions:
       contents: read
     with:
