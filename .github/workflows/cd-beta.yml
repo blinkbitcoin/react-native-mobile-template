@@ -30,7 +30,7 @@ jobs:
   # group above, the permissions, and the secrets.
   beta:
     name: Beta
-    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-beta.yml@c731cdcb138fad6769aee5c4e79596ce699c039b # v0.28.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/publish-beta.yml@626e2c6565242bc64f9e220c8464fd931715e022 # v0.29.0
     permissions:
       # `contents: write` for the release; `actions: write` because the green
       # gate runs `gh run list` and, when the build is missing, `gh workflow run`.

@@ -50,7 +50,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.14",
-    "@blinkbitcoin/app-tooling": "github:blinkbitcoin/shared-workflows#c731cdcb138fad6769aee5c4e79596ce699c039b&path:/packages/app-tooling",
+    "@blinkbitcoin/app-tooling": "github:blinkbitcoin/shared-workflows#626e2c6565242bc64f9e220c8464fd931715e022&path:/packages/app-tooling",
     "@commitlint/cli": "^21.2.3",
     "@commitlint/config-conventional": "^21.2.3",
     "@expo/fingerprint": "^0.20.13",

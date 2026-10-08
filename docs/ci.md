@@ -485,7 +485,7 @@ with that release's version beside it. Every one of the twelve files carries at
 least one; the pipeline callers carry one each, and `ci.yml` and `cd-release.yml` a few.
 
 ```yaml
-uses: blinkbitcoin/shared-workflows/.github/workflows/check.yml@c731cdcb138fad6769aee5c4e79596ce699c039b # v0.28.0
+uses: blinkbitcoin/shared-workflows/.github/workflows/check.yml@626e2c6565242bc64f9e220c8464fd931715e022 # v0.29.0
 ```
 
 A shared-workflows release changes nothing here by itself
