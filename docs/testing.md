@@ -328,7 +328,7 @@ Notes on RNTL 14 and React 19:
 ## Testing against the mock API
 
 MSW is started in `src/test/setup.ts` with
-`onUnhandledRequest: 'error'`, so an unexpected request fails the test rather
+`onUnhandledFrame: 'error'`, so an unexpected request fails the test rather
 than hanging. The handlers execute the same executable schema the
 `pnpm dev:api` server does (`mocks/README.md`), so a test cannot pass against
 a response the real server would never produce.
