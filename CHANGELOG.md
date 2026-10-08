@@ -5,6 +5,13 @@ by [release-please](https://github.com/googleapis/release-please) from
 [Conventional Commits](https://www.conventionalcommits.org/) — edit the commit
 messages, not this file. See [docs/release-runbook.md](docs/release-runbook.md).
 
+## [0.10.2](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.10.1...v0.10.2) (2026-10-08)
+
+
+### Bug Fixes
+
+* **deps:** upgrade the patched audit findings and accept the two with no fix ([#138](https://github.com/blinkbitcoin/react-native-mobile-template/issues/138)) ([744e4cf](https://github.com/blinkbitcoin/react-native-mobile-template/commit/744e4cfd029e4f8a8c7037c581cea3689cc3dabe))
+
 ## [0.10.1](https://github.com/blinkbitcoin/react-native-mobile-template/compare/v0.10.0...v0.10.1) (2026-10-03)
 
 
