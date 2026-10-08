@@ -46,7 +46,7 @@ jobs:
   #   private consumer that finds it too much sets `ci-workflow: ''`.
   release-please:
     name: Release
-    uses: blinkbitcoin/shared-workflows/.github/workflows/pr-release.yml@626e2c6565242bc64f9e220c8464fd931715e022 # v0.29.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/pr-release.yml@b8a28fe92945c24de872699f64562a1bb7c09f75 # v0.30.0
     permissions:
       contents: write
       pull-requests: write
@@ -75,7 +75,7 @@ jobs:
     name: Store notes
     needs: release-please
     if: ${{ needs.release-please.outputs.pr-number != '' }}
-    uses: blinkbitcoin/shared-workflows/.github/workflows/pr-store-notes.yml@626e2c6565242bc64f9e220c8464fd931715e022 # v0.29.0
+    uses: blinkbitcoin/shared-workflows/.github/workflows/pr-store-notes.yml@b8a28fe92945c24de872699f64562a1bb7c09f75 # v0.30.0
     permissions:
       contents: read
       pull-requests: write
